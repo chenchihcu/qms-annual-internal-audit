@@ -1,0 +1,144 @@
+import { useState } from 'react'
+import type { AuditStore } from '../hooks/useAuditStore'
+import { isNcrStale } from '../lib/ncr'
+import type { NCRStatus } from '../types'
+import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { EmptyState } from './ui/EmptyState'
+import { PrintDocHeader } from './ui/PrintDocHeader'
+
+const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
+
+const FOCUS_RING =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+
+export function NCRList({ store }: { store: AuditStore }) {
+  const { state, updateNCR, addManualNCR } = store
+  const { company, settings } = state
+
+  const [newNcr, setNewNcr] = useState({
+    qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
+    departmentId: company.planRows[0]?.departmentId ?? '',
+    description: '',
+  })
+
+  const planRowOptions = company.planRows.map((r) => ({
+    value: `${r.qpCode}|${r.departmentId}`,
+    label: `${r.qpCode} · ${r.department}`,
+  }))
+
+  return (
+    <div className="space-y-6 print-area qr-form">
+      <Card className="no-print">
+        <h2 className="mb-2 text-lg font-semibold text-ink">手動新增 NCR</h2>
+        <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            label="程序／部門"
+            value={`${newNcr.qpCode}|${newNcr.departmentId}`}
+            onChange={(v) => {
+              const [qp, dept] = v.split('|')
+              setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
+            }}
+            options={planRowOptions}
+          />
+          <Input
+            label="描述"
+            value={newNcr.description}
+            onChange={(v) => setNewNcr((s) => ({ ...s, description: v }))}
+          />
+          <div className="flex items-end">
+            <Button
+              onClick={() => {
+                if (!newNcr.description.trim()) return
+                addManualNCR(newNcr)
+                setNewNcr((s) => ({ ...s, description: '' }))
+              }}
+            >
+              新增 NCR
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
+          <p className="text-sm text-muted">查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。</p>
+        </div>
+
+        <PrintDocHeader
+          companyName={company.name}
+          auditYear={settings.auditYear}
+          formTitle="不符合事項清單 QR-28-03"
+        />
+
+        {company.ncrs.length === 0 ? (
+          <EmptyState message="目前無不符合事項" />
+        ) : (
+          <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+            <table className="qr-checklist w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-page text-left text-muted">
+                  <th className="border border-line p-2">NCR#</th>
+                  <th className="border border-line p-2">QP</th>
+                  <th className="border border-line p-2">部門</th>
+                  <th className="border border-line p-2">流程</th>
+                  <th className="border border-line p-2">描述</th>
+                  <th className="border border-line p-2">日期</th>
+                  <th className="border border-line p-2">狀態</th>
+                </tr>
+              </thead>
+              <tbody>
+                {company.ncrs.map((ncr) => {
+                  const stale = isNcrStale(ncr, company.audits)
+                  return (
+                    <tr key={ncr.id} className={stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+                      <td className="border border-line p-2 font-mono text-xs">{ncr.ncrNumber}</td>
+                      <td className="border border-line p-2">{ncr.qpCode}</td>
+                      <td className="border border-line p-2">{ncr.department}</td>
+                      <td className="border border-line p-2">{ncr.process}</td>
+                      <td className="border border-line p-2">
+                        {stale && (
+                          <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                            查檢已非不符，建議結案
+                          </p>
+                        )}
+                        <textarea
+                          className={`w-full min-w-[200px] rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                          rows={2}
+                          value={ncr.description}
+                          onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
+                        />
+                        <span className="print-only">{ncr.description}</span>
+                      </td>
+                      <td className="border border-line p-2">
+                        <input
+                          type="date"
+                          className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
+                          value={ncr.date}
+                          onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
+                        />
+                        <span className="print-only">{ncr.date}</span>
+                      </td>
+                      <td className="border border-line p-2">
+                        <div className="no-print">
+                          <Select
+                            value={ncr.status}
+                            onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
+                            options={STATUSES.map((s) => ({ value: s, label: s }))}
+                          />
+                        </div>
+                        <span className="print-only"><Badge label={ncr.status} /></span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}

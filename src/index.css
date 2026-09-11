@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-page: #f8fafc;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-muted: #475569;
+  --color-line: #e2e8f0;
+  --color-primary: #1d4ed8;
+  --font-sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", ui-sans-serif, system-ui, sans-serif;
+}
+
+html.dark {
+  color-scheme: dark;
+  --color-page: #0f172a;
+  --color-surface: #1e293b;
+  --color-ink: #f1f5f9;
+  --color-muted: #94a3b8;
+  --color-line: #334155;
+  --color-primary: #3b82f6;
+}
+
+@layer base {
+  body {
+    @apply bg-page text-ink font-sans antialiased;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  a.skip-link {
+    @apply absolute left-2 top-2 z-[100] -translate-y-16 rounded-lg bg-primary px-3 py-2 text-sm text-white transition;
+  }
+
+  a.skip-link:focus {
+    @apply translate-y-0;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    background: white;
+    font-size: 11pt;
+    color: #000;
+  }
+
+  .print-break {
+    page-break-before: always;
+  }
+
+  .qr-form {
+    color: #000;
+  }
+
+  .qr-form-header h1 {
+    font-size: 16pt;
+  }
+
+  .qr-header-table,
+  .qr-checklist,
+  .qr-plan-table {
+    border: 1.5pt solid #000;
+  }
+
+  .qr-header-table td,
+  .qr-header-table th,
+  .qr-checklist td,
+  .qr-checklist th,
+  .qr-plan-table td,
+  .qr-plan-table th {
+    border: 0.75pt solid #000;
+    padding: 4pt 6pt;
+  }
+
+  .qr-label {
+    background: #f0f0f0;
+    font-weight: 600;
+    width: 18%;
+    white-space: nowrap;
+  }
+
+  .qr-checklist thead tr,
+  .qr-plan-table thead tr {
+    background: #e8e8e8 !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}
+
+.print-only {
+  display: none;
+}
