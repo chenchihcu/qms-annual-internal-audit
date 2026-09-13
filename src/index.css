@@ -37,7 +37,11 @@ html.dark {
   [data-netlify-deploy-status],
   .netlify-badge,
   [data-qms-netlify-hud-hidden],
-  body > a[href*="netlify.com"]:not(#root *) {
+  body > a[href*="netlify.com"]:not(#root *),
+  body > nf-badge,
+  body > nf-hud,
+  body > nf-toolbar,
+  body > netlify-hud {
     display: none !important;
     pointer-events: none !important;
     visibility: hidden !important;
@@ -57,7 +61,11 @@ html.dark {
   #netlify-badge,
   .netlify-badge,
   [data-qms-netlify-hud-hidden],
-  body > a[href*="netlify.com"]:not(#root *) {
+  body > a[href*="netlify.com"]:not(#root *),
+  body > nf-badge,
+  body > nf-hud,
+  body > nf-toolbar,
+  body > netlify-hud {
     display: none !important;
     visibility: hidden !important;
   }
