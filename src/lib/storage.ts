@@ -10,6 +10,7 @@ import type { AppState } from '../types'
 
 export const LEGACY_STORAGE_KEYS = [
   STORAGE_KEY,
+  'qms-annual-internal-audit-v8',
   'qms-annual-internal-audit-v7',
   'qms-annual-internal-audit-v6',
   'qms-annual-internal-audit-v5',

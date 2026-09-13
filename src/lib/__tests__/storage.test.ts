@@ -23,7 +23,7 @@ describe('storage migration', () => {
     vi.restoreAllMocks()
   })
 
-  it('migrates v5 NCR records missing close-out fields to v8', () => {
+  it('migrates v5 NCR records missing close-out fields to v9', () => {
     const legacy = createDemoState()
     legacy.version = 5
     legacy.dataSource = 'user'
@@ -48,7 +48,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v5', JSON.stringify(legacy))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(8)
+    expect(state.version).toBe(9)
     expect(state.dataSource).toBe('user')
     expect(state.companies.jiurun.ncrs[0].rootCause).toBe('')
     expect(state.companies.jiurun.ncrs[0].correctiveAction).toBe('')
@@ -66,7 +66,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(userState))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(8)
+    expect(state.version).toBe(9)
     expect(state.dataSource).toBe('user')
     expect(state.settings.leadAuditor).toBe('正式主導稽核員')
     expect(state.companies.jiurun.ncrs[0].description).toBe('使用者自訂 NCR 描述')
@@ -78,7 +78,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(cloned))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(8)
+    expect(state.version).toBe(9)
     expect(state.dataSource).toBe('demo')
     expect(companiesAreDifferentiated(state)).toBe(true)
     expect(state.companies.jiurun.ncrs.length).toBe(1)
@@ -95,7 +95,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(cloned))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(8)
+    expect(state.version).toBe(9)
     expect(state.dataSource).toBe('demo')
     expect(companiesAreDifferentiated(state)).toBe(true)
     expect(state.companies.zhenglongxing.ncrs.length).toBe(0)
@@ -111,13 +111,36 @@ describe('storage migration', () => {
     expect(companiesAreDifferentiated(state)).toBe(true)
   })
 
-  it('does not re-refresh already migrated v8 demo on subsequent loads', () => {
+  it('does not re-refresh already migrated v9 demo on subsequent loads', () => {
     const demo = createDemoState()
-    demo.settings.leadAuditor = '已落地 v8 示範'
+    demo.settings.leadAuditor = '已落地 v9 示範'
     localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
 
     const { state } = loadStateFromStorage()
-    expect(state.settings.leadAuditor).toBe('已落地 v8 示範')
+    expect(state.settings.leadAuditor).toBe('已落地 v9 示範')
     expect(state.dataSource).toBe('demo')
+  })
+
+  it('refreshes v8 demo companies once on v9 migration while preserving settings', () => {
+    const demo = createDemoState()
+    demo.version = 8
+    demo.settings.leadAuditor = '自訂主任稽核員'
+    demo.companies.jiurun.audits = demo.companies.jiurun.audits.map((audit) =>
+      audit.qpCode === 'QP-28'
+        ? {
+            ...audit,
+            items: audit.items.map((item) => ({ ...item, judgment: null as typeof item.judgment })),
+          }
+        : audit,
+    )
+    localStorage.setItem('qms-annual-internal-audit-v8', JSON.stringify(demo))
+
+    const { state } = loadStateFromStorage()
+    expect(state.version).toBe(9)
+    expect(state.settings.leadAuditor).toBe('自訂主任稽核員')
+    expect(state.dataSource).toBe('demo')
+    expect(state.companies.jiurun.audits.some((a) => a.qpCode === 'QP-28' && a.items.every((i) => i.judgment))).toBe(
+      true,
+    )
   })
 })

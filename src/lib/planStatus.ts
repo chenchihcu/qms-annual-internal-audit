@@ -37,29 +37,26 @@ function ncrsForProcedure(ncrs: NCR[], row: PlanRow): NCR[] {
   return ncrs.filter((ncr) => ncr.qpCode === row.qpCode && ncr.departmentId === row.departmentId)
 }
 
-/** 由查檢完成度與 NCR 狀態推導月格狀態（不含手動覆寫） */
+/** 由查檢完成度與 NCR 狀態推導月格狀態（不含手動覆寫）；同一計畫列所有已排程月格共用結果 */
 export function deriveMonthStatus(
   row: PlanRow,
   monthIndex: number,
   audits: ProcedureAudit[],
   ncrs: NCR[],
-  auditYear: number,
+  _auditYear: number,
 ): MonthStatus {
   if (!isMonthScheduled(row, monthIndex)) return null
 
   const audit = findAuditForRow(audits, row)
-  const monthNumber = monthIndex + 1
-  const auditMonth = audit ? resolveAuditMonth(audit, auditYear) : null
-
-  if (!audit || auditMonth !== monthNumber || !isProcedureComplete(audit)) {
-    return '擬定'
-  }
-
   const procedureNcrs = ncrsForProcedure(ncrs, row)
   const openNcrs = procedureNcrs.filter(isNcrOpen)
 
   if (openNcrs.length > 0) {
     return '矯正中'
+  }
+
+  if (!audit || !isProcedureComplete(audit)) {
+    return '擬定'
   }
 
   if (procedureNcrs.length > 0 && procedureNcrs.every(isNcrClosed)) {

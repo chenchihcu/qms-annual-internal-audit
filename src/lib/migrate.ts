@@ -1,9 +1,10 @@
+import { createDemoState } from '../data/demoData'
 import { migrateChecklistItem } from './checklistEvidence'
 import { carryPlanDatesToAudit } from './auditDates'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
 
-export const CURRENT_STORAGE_VERSION = 8
+export const CURRENT_STORAGE_VERSION = 9
 
 const DERIVED_STATUSES: MonthStatus[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
 
@@ -66,10 +67,19 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
   }
 }
 
+function refreshDemoCompanies(raw: AppState): AppState['companies'] {
+  const fresh = createDemoState()
+  return {
+    jiurun: fresh.companies.jiurun,
+    zhenglongxing: fresh.companies.zhenglongxing,
+  }
+}
+
 export function migrateState(raw: AppState): AppState {
   if (raw.version >= CURRENT_STORAGE_VERSION) return raw
 
-  const next: AppState = {
+  const fromVersion = raw.version ?? 0
+  let next: AppState = {
     ...raw,
     version: CURRENT_STORAGE_VERSION,
     companies: { ...raw.companies },
@@ -77,6 +87,13 @@ export function migrateState(raw: AppState): AppState {
 
   for (const companyId of Object.keys(next.companies) as Array<keyof typeof next.companies>) {
     next.companies[companyId] = migrateCompany(next.companies[companyId], next.settings.auditYear)
+  }
+
+  if (fromVersion < 9 && next.dataSource === 'demo') {
+    next = {
+      ...next,
+      companies: refreshDemoCompanies(next),
+    }
   }
 
   return next

@@ -85,6 +85,7 @@ function buildAudit(
   qpCode: string,
   departmentId: string,
   partialItems: Array<{ no: number; judgment: '符合' | '不符' | '觀察' | '不適用'; description?: string }>,
+  options?: { fullyJudged?: boolean },
 ) {
   const dept = departments.find((d) => d.id === departmentId)
   if (!dept) {
@@ -105,6 +106,11 @@ function buildAudit(
       item.description = p.description ?? ''
     }
   })
+  if (options?.fullyJudged) {
+    items.forEach((checkItem) => {
+      if (!checkItem.judgment) checkItem.judgment = '符合'
+    })
+  }
   return {
     id: `audit-${qpCode}-${departmentId}`,
     qpCode,
@@ -140,7 +146,7 @@ function createCompanyData(companyId: CompanyId): CompanyData {
     )
 
     const audits = [
-      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }]),
+      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }], { fullyJudged: true }),
       buildAudit('QP-16', 'dept-qa', [
         { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
       ]),
@@ -236,10 +242,15 @@ function createCompanyData(companyId: CompanyId): CompanyData {
   )
 
   const audits = [
-    buildAudit('QP-28', 'dept-qa', [
-      { no: 1, judgment: '符合' },
-      { no: 2, judgment: '符合' },
-    ]),
+    buildAudit(
+      'QP-28',
+      'dept-qa',
+      [
+        { no: 1, judgment: '符合' },
+        { no: 2, judgment: '符合' },
+      ],
+      { fullyJudged: true },
+    ),
     buildAudit('QP-05', 'dept-qa', [{ no: 1, judgment: '符合' }]),
     buildAudit('QP-21', 'dept-prod', [{ no: 1, judgment: '觀察', description: '首件檢查紀錄偶缺簽名' }]),
   ]
@@ -297,11 +308,11 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 8,
+    version: 9,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v8'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v9'
 
 function migrateCompanyNcrs(company: CompanyData): CompanyData {
   return {
