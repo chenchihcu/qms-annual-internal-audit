@@ -4,6 +4,7 @@ import {
   hasAnyJudgment,
 } from '../lib/scoring'
 import { buildDashboardRiskTiles } from '../lib/dashboardTiles'
+import { buildTodayWork } from '../lib/todayWork'
 import type { AppState, TabId } from '../types'
 import { Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
@@ -11,7 +12,7 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 
 interface DashboardProps {
   state: AppState & { company: AppState['companies'][keyof AppState['companies']] }
-  onNavigate: (tab: TabId, auditKey?: string) => void
+  onNavigate: (tab: TabId, auditKey?: string, ncrId?: string) => void
 }
 
 function KpiCard({
@@ -84,6 +85,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
   const summary = calculateAnnualScore(company.audits, settings.scoringRules)
   const riskGroups = buildDashboardRiskTiles(company, settings.scoringRules)
+  const todayWork = buildTodayWork(company, settings.auditYear)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -125,6 +127,65 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         auditYear={settings.auditYear}
         formTitle="年度稽核儀表板"
       />
+
+      {(todayWork.procedures.length > 0 || todayWork.openNcrs.length > 0) && (
+        <Card className="no-print">
+          <h2 className="mb-1 text-lg font-semibold text-ink">今日工作</h2>
+          <p className="mb-4 text-sm text-muted">
+            {todayWork.month > 0
+              ? `${todayWork.month} 月待辦 · ${company.name}`
+              : `稽核年度非今年，僅列出未結案 NCR · ${company.name}`}
+          </p>
+          <div className="space-y-4">
+            {todayWork.procedures.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-sm font-medium text-ink">待完成程序稽核</h3>
+                <ul className="divide-y divide-line rounded-lg border border-line">
+                  {todayWork.procedures.map((item) => (
+                    <li key={item.auditKey}>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('audit', item.auditKey)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="font-medium text-ink">
+                          {item.qpCode} · {item.department}
+                        </span>
+                        <span className="shrink-0 text-sm text-muted">
+                          {item.status ?? '待辦'}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {todayWork.openNcrs.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-sm font-medium text-ink">未結案不符合（NCR）</h3>
+                <ul className="divide-y divide-line rounded-lg border border-line">
+                  {todayWork.openNcrs.map((ncr) => (
+                    <li key={ncr.id}>
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('ncr', undefined, ncr.id)}
+                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="font-medium text-ink">
+                          {ncr.ncrNumber} · {ncr.qpCode}
+                        </span>
+                        {ncr.dueDate && (
+                          <span className="shrink-0 text-sm text-muted">期限 {ncr.dueDate}</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard

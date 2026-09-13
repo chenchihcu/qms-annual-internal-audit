@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { canTransitionNcrStatus, isNcrStale, validateNcrClose } from '../lib/ncr'
 import type { NCRClassification, NCRStatus } from '../types'
@@ -39,7 +39,13 @@ function NcrField({
   )
 }
 
-export function NCRList({ store }: { store: AuditStore }) {
+export function NCRList({
+  store,
+  selectedNcrId,
+}: {
+  store: AuditStore
+  selectedNcrId?: string
+}) {
   const { state, updateNCR, addManualNCR } = store
   const { company, settings } = state
 
@@ -49,6 +55,13 @@ export function NCRList({ store }: { store: AuditStore }) {
     description: '',
   })
   const [closeErrors, setCloseErrors] = useState<Record<string, string>>({})
+  const selectedRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (selectedNcrId && selectedRef.current) {
+      selectedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedNcrId])
 
   const planRowOptions = company.planRows.map((r) => ({
     value: `${r.qpCode}|${r.departmentId}`,
@@ -136,7 +149,14 @@ export function NCRList({ store }: { store: AuditStore }) {
               return (
                 <article
                   key={ncr.id}
-                  className={`rounded-xl border border-line p-4 ${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : 'bg-page/40'}`}
+                  ref={ncr.id === selectedNcrId ? selectedRef : undefined}
+                  className={`rounded-xl border border-line p-4 ${
+                    ncr.id === selectedNcrId
+                      ? 'ring-2 ring-primary bg-primary/5'
+                      : stale
+                        ? 'bg-amber-50/50 dark:bg-amber-950/20'
+                        : 'bg-page/40'
+                  }`}
                 >
                   <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-line pb-3">
                     <div>

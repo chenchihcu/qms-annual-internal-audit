@@ -33,6 +33,7 @@ export function ProcedureAuditPanel({
     addChecklistItem,
     removeChecklistItem,
     markChecklistItemNA,
+    setRemainingUnjudgedToConform,
     getProcedureTitle,
   } = store
 
@@ -247,9 +248,19 @@ export function ProcedureAuditPanel({
               <span className="text-xs text-muted">計畫月份：{audit.plannedMonth} 月</span>
             )}
           </div>
-          <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)}>
-            新增稽核項目
-          </Button>
+          <div className="flex flex-wrap gap-2 no-print">
+            {pendingCount > 0 && (
+              <Button
+                variant="secondary"
+                onClick={() => setRemainingUnjudgedToConform(audit.id)}
+              >
+                其餘未判定改符合
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => addChecklistItem(audit.id)}>
+              新增稽核項目
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

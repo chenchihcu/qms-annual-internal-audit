@@ -52,6 +52,7 @@ export function isValidTabId(id: string): id is TabId {
 export interface HashState {
   tab: TabId
   auditKey?: string
+  ncrId?: string
 }
 
 export function parseAppHash(hash: string): HashState {
@@ -61,18 +62,20 @@ export function parseAppHash(hash: string): HashState {
   const tabParam = params.get('tab') ?? 'settings'
   const tab = isValidTabId(tabParam) ? tabParam : 'settings'
   const auditKey = params.get('audit') ?? undefined
-  return { tab, auditKey }
+  const ncrId = params.get('ncr') ?? undefined
+  return { tab, auditKey, ncrId }
 }
 
-export function buildAppHash(tab: TabId, auditKey?: string): string {
+export function buildAppHash(tab: TabId, auditKey?: string, ncrId?: string): string {
   const params = new URLSearchParams()
   params.set('tab', tab)
   if (auditKey) params.set('audit', auditKey)
+  if (ncrId) params.set('ncr', ncrId)
   return `#${params.toString()}`
 }
 
-export function syncHash(tab: TabId, auditKey?: string) {
-  const next = buildAppHash(tab, auditKey)
+export function syncHash(tab: TabId, auditKey?: string, ncrId?: string) {
+  const next = buildAppHash(tab, auditKey, ncrId)
   if (window.location.hash !== next) {
     window.history.replaceState(null, '', next)
   }

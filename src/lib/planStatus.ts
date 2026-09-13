@@ -55,12 +55,12 @@ export function deriveMonthStatus(
     return '矯正中'
   }
 
-  if (!audit || !isProcedureComplete(audit)) {
-    return '擬定'
-  }
-
   if (procedureNcrs.length > 0 && procedureNcrs.every(isNcrClosed)) {
     return '矯正圓滿'
+  }
+
+  if (!audit || !isProcedureComplete(audit)) {
+    return '擬定'
   }
 
   if (hasNonConformJudgment(audit)) {
