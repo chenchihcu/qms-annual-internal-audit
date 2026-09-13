@@ -67,7 +67,7 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
   }
 }
 
-function refreshDemoCompanies(raw: AppState): AppState['companies'] {
+function refreshDemoCompanies(): AppState['companies'] {
   const fresh = createDemoState()
   return {
     jiurun: fresh.companies.jiurun,
@@ -92,7 +92,7 @@ export function migrateState(raw: AppState): AppState {
   if (fromVersion < 9 && next.dataSource === 'demo') {
     next = {
       ...next,
-      companies: refreshDemoCompanies(next),
+      companies: refreshDemoCompanies(),
     }
   }
 
