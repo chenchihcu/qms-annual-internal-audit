@@ -311,6 +311,24 @@ export function useAuditStore() {
     updateChecklistItem(auditId, itemId, { judgment: '不適用' })
   }, [updateChecklistItem])
 
+  const setRemainingUnjudgedToConform = useCallback((auditId: string) => {
+    setState((s) => {
+      const co = s.companies[s.activeCompanyId]
+      const audits = co.audits.map((a) => {
+        if (a.id !== auditId) return a
+        return {
+          ...a,
+          items: a.items.map((item) =>
+            item.judgment === null || item.judgment === undefined
+              ? { ...item, judgment: '符合' as const }
+              : item,
+          ),
+        }
+      })
+      return persistAudit(s, audits, s.activeCompanyId)
+    })
+  }, [persistAudit])
+
   const updateNCR = useCallback((id: string, patch: Partial<NCR>) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
@@ -735,6 +753,7 @@ export function useAuditStore() {
     addChecklistItem,
     removeChecklistItem,
     markChecklistItemNA,
+    setRemainingUnjudgedToConform,
     updateNCR,
     addManualNCR,
     updateObservation,

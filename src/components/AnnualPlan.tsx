@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useState, type MouseEvent } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import type { TabId } from '../types'
 import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
@@ -28,7 +29,13 @@ function statusShort(status: MonthStatus): string {
   return status === '矯正圓滿' ? '圓' : status.charAt(0)
 }
 
-export function AnnualPlan({ store }: { store: AuditStore }) {
+export function AnnualPlan({
+  store,
+  onNavigate,
+}: {
+  store: AuditStore
+  onNavigate: (tab: TabId, auditKey?: string) => void
+}) {
   const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus, updateDepartment } =
     store
   const { settings, company } = state
@@ -39,6 +46,41 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
     newYear: settings.auditYear,
   })
   const [regenConfirm, setRegenConfirm] = useState(false)
+
+  const handleMonthCellClick = useCallback(
+    (
+      e: MouseEvent<HTMLButtonElement>,
+      row: (typeof company.planRows)[0],
+      monthIndex: number,
+      scheduled: MonthStatus,
+      status: MonthStatus,
+      manual: MonthStatus | null | undefined,
+    ) => {
+      if (!scheduled) return
+      if (e.altKey || e.shiftKey) {
+        setPlanMonthStatus(row.id, monthIndex, cycleMonthStatus(manual ?? status))
+        return
+      }
+      onNavigate('audit', `${row.qpCode}|${row.departmentId}`)
+    },
+    [onNavigate, setPlanMonthStatus, company.planRows],
+  )
+
+  const handleMonthCellContextMenu = useCallback(
+    (
+      e: MouseEvent<HTMLButtonElement>,
+      row: (typeof company.planRows)[0],
+      monthIndex: number,
+      status: MonthStatus,
+      manual: MonthStatus | null | undefined,
+      scheduled: MonthStatus,
+    ) => {
+      if (!scheduled) return
+      e.preventDefault()
+      setPlanMonthStatus(row.id, monthIndex, cycleMonthStatus(manual ?? status))
+    },
+    [setPlanMonthStatus, company.planRows],
+  )
 
   const requestYearChange = (raw: string) => {
     setYearDraft(raw)
@@ -99,7 +141,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           {MONTH_STATUS_LEGEND.map((l) => (
             <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
           ))}
-          <span className="text-muted">（預設依查檢／NCR 自動更新；點擊月格可手動覆寫）</span>
+          <span className="text-muted">（預設依查檢／NCR 自動更新；點擊月格開啟程序稽核；Alt+點擊或右鍵可手動覆寫）</span>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 no-print">
@@ -216,12 +258,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         title={`${statusLabel(status)}${manual ? '（手動覆寫）' : scheduled ? '（自動）' : ''}`}
                         aria-label={`${row.qpCode} ${i + 1} 月：${statusLabel(status)}`}
                         className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(status)} ${manual ? 'ring-1 ring-amber-400' : ''}`}
-                        onClick={() =>
-                          setPlanMonthStatus(
-                            row.id,
-                            i,
-                            cycleMonthStatus(manual ?? status),
-                          )
+                        onClick={(e) =>
+                          handleMonthCellClick(e, row, i, scheduled, status, manual)
+                        }
+                        onContextMenu={(e) =>
+                          handleMonthCellContextMenu(e, row, i, status, manual, scheduled)
                         }
                         disabled={!scheduled && status === null}
                       >

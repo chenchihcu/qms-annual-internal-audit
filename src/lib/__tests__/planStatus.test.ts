@@ -121,6 +121,25 @@ describe('deriveMonthStatus', () => {
     }
   })
 
+  it('returns 矯正圓滿 when all NCRs closed even when checklist incomplete', () => {
+    expect(
+      deriveMonthStatus(
+        baseRow(),
+        2,
+        [baseAudit([item(null)])],
+        [
+          baseNcr({
+            status: '結案',
+            rootCause: '原因',
+            correctiveAction: '措施',
+            verificationEvidence: '複查合格',
+          }),
+        ],
+        2026,
+      ),
+    ).toBe('矯正圓滿')
+  })
+
   it('returns 矯正中 on scheduled months with open NCR even when checklist incomplete', () => {
     const row = baseRow({
       months: Array(12)

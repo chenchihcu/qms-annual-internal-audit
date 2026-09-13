@@ -58,26 +58,29 @@ function App() {
   const initialHash = parseAppHash(window.location.hash)
   const [tab, setTab] = useState<TabId>(initialHash.tab)
   const [auditKey, setAuditKey] = useState<string | undefined>(initialHash.auditKey)
+  const [ncrId, setNcrId] = useState<string | undefined>(initialHash.ncrId)
   const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
   const { settings, activeCompanyId, company } = store.state
 
   useEffect(() => {
-    syncHash(tab, auditKey)
-  }, [tab, auditKey])
+    syncHash(tab, auditKey, ncrId)
+  }, [tab, auditKey, ncrId])
 
   useEffect(() => {
     const onHash = () => {
       const parsed = parseAppHash(window.location.hash)
       setTab(parsed.tab)
       setAuditKey(parsed.auditKey)
+      setNcrId(parsed.ncrId)
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const navigate = useCallback((nextTab: TabId, nextAuditKey?: string) => {
+  const navigate = useCallback((nextTab: TabId, nextAuditKey?: string, nextNcrId?: string) => {
     setTab(nextTab)
     if (nextAuditKey !== undefined) setAuditKey(nextAuditKey)
+    if (nextNcrId !== undefined) setNcrId(nextNcrId)
   }, [])
 
   const handleAuditKeyChange = useCallback((key: string) => {
@@ -207,7 +210,7 @@ function App() {
         )}
         {tab === 'plan' && (
           <TabErrorBoundary>
-            <AnnualPlan store={store} />
+            <AnnualPlan store={store} onNavigate={navigate} />
           </TabErrorBoundary>
         )}
         {tab === 'audit' && (
@@ -221,7 +224,7 @@ function App() {
         )}
         {tab === 'ncr' && (
           <TabErrorBoundary>
-            <NCRList store={store} />
+            <NCRList store={store} selectedNcrId={ncrId} />
           </TabErrorBoundary>
         )}
         {tab === 'observations' && (
