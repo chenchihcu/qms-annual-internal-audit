@@ -27,7 +27,7 @@ export interface SaveStateResult {
 
 function parseStoredState(raw: string): AppState {
   const parsed = JSON.parse(raw) as AppState
-  if (parsed.version >= 6) return parsed
+  if (parsed.version >= 6) return migrateToV6(parsed)
   if (parsed.version >= 4 && parsed.externalAuditPrep) return migrateToV6(parsed)
   if (parsed.companies) return migrateToV4(parsed)
   return parsed

@@ -113,6 +113,8 @@ export interface NCR {
   /** 驗證／結案佐證 */
   verificationEvidence: string
   checklistItemId?: string
+  /** 由跨年觀察事項「已轉 NCR」建立 */
+  observationId?: string
   sourceYear?: number
   carriedToYear?: number
 }
@@ -127,6 +129,8 @@ export interface Observation {
   content: string
   description: string
   status: ObservationStatus
+  /** 連結至由「已轉 NCR」建立的 NCR */
+  ncrId?: string
   carriedToYear?: number
   carriedToChecklistId?: string
 }
@@ -156,7 +160,10 @@ export interface ExternalAuditPrepItemState {
 
 export interface ExternalAuditPrepState {
   year: number
-  internalAuditComplete: boolean
+  /** 未設定時依雙公司程序稽核資料自動判定 */
+  internalAuditCompleteOverride?: boolean
+  /** @deprecated v6 起改用 internalAuditCompleteOverride；遷移時保留讀取 */
+  internalAuditComplete?: boolean
   managementReviewComplete: boolean
   items: ExternalAuditPrepItemState[]
 }

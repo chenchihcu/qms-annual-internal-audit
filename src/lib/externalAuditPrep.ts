@@ -1,5 +1,11 @@
 import prepSeed from '../data/externalAuditPrep.seed.json'
-import type { CompanyData, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
+import type {
+  CompanyData,
+  CompanyId,
+  ExternalAuditPrepItemState,
+  ExternalAuditPrepState,
+  ProcedureAudit,
+} from '../types'
 
 export type PrepScopeMode = 'both_separate' | 'merged' | 'site_scope'
 
@@ -25,7 +31,6 @@ export const EXTERNAL_AUDIT_PREP_SEED = prepSeed as {
 export function createDefaultPrepState(year: number): ExternalAuditPrepState {
   return {
     year,
-    internalAuditComplete: false,
     managementReviewComplete: false,
     items: EXTERNAL_AUDIT_PREP_SEED.items.map((item) => ({
       id: `prep-${item.no}`,
@@ -71,10 +76,108 @@ export function countPrepProgress(state: ExternalAuditPrepState): {
   return { done, total: state.items.length }
 }
 
+export interface InternalAuditCompleteDetail {
+  companyId: string
+  companyName: string
+  plannedCount: number
+  completedCount: number
+  complete: boolean
+}
+
+export interface InternalAuditCompleteSummary {
+  complete: boolean
+  details: InternalAuditCompleteDetail[]
+  incompletePlanKeys: string[]
+}
+
+const DUAL_COMPANY_IDS: CompanyId[] = ['jiurun', 'zhenglongxing']
+
+/** 單一程序稽核是否已足夠完成（有實施日期，或查檢項皆已判定） */
+export function isProcedureAuditCompleteEnough(audit: ProcedureAudit | undefined): boolean {
+  if (!audit) return false
+  if (audit.auditDate.trim() !== '') return true
+  if (audit.items.length === 0) return false
+  return audit.items.every((item) => item.judgment !== null)
+}
+
+export function computeCompanyInternalAuditComplete(
+  companyId: string,
+  company: CompanyData,
+): InternalAuditCompleteDetail {
+  let completedCount = 0
+
+  for (const row of company.planRows) {
+    const audit = company.audits.find(
+      (a) => a.qpCode === row.qpCode && a.departmentId === row.departmentId,
+    )
+    if (isProcedureAuditCompleteEnough(audit)) {
+      completedCount++
+    }
+  }
+
+  return {
+    companyId,
+    companyName: company.name || companyId,
+    plannedCount: company.planRows.length,
+    completedCount,
+    complete: company.planRows.length === 0 || completedCount === company.planRows.length,
+  }
+}
+
+export function computeInternalAuditComplete(
+  companies: Record<string, CompanyData>,
+  companyIds: CompanyId[] = DUAL_COMPANY_IDS,
+): InternalAuditCompleteSummary {
+  const details = companyIds.map((id) =>
+    computeCompanyInternalAuditComplete(id, companies[id] ?? emptyCompany()),
+  )
+  const incompletePlanKeys = details.flatMap((d) =>
+    d.complete ? [] : [`${d.companyId}:${d.plannedCount - d.completedCount}`],
+  )
+  return {
+    complete: details.every((d) => d.complete),
+    details,
+    incompletePlanKeys,
+  }
+}
+
+function emptyCompany(): CompanyData {
+  return {
+    name: '',
+    departments: [],
+    planRows: [],
+    audits: [],
+    ncrs: [],
+    observations: [],
+    suggestions: [],
+  }
+}
+
+export function getInternalAuditCompleteOverride(prep: ExternalAuditPrepState): boolean | undefined {
+  if (prep.internalAuditCompleteOverride !== undefined) {
+    return prep.internalAuditCompleteOverride
+  }
+  if (prep.internalAuditComplete !== undefined) {
+    return prep.internalAuditComplete
+  }
+  return undefined
+}
+
+export function getEffectiveInternalAuditComplete(
+  prep: ExternalAuditPrepState,
+  companies: Record<string, CompanyData>,
+): boolean {
+  const override = getInternalAuditCompleteOverride(prep)
+  if (override !== undefined) return override
+  return computeInternalAuditComplete(companies).complete
+}
+
 export interface PrepSequenceWarnings {
   openNcrCount: number
   ncrWarning: boolean
   sequenceWarning: boolean
+  internalAuditComputed: boolean
+  internalAuditOverridden: boolean
   messages: string[]
 }
 
@@ -93,13 +196,27 @@ export function evaluatePrepSequence(
     messages.push(`尚有 ${openNcrCount} 件未結案內部 NCR，建議於外部稽核前關閉。`)
   }
 
-  const sequenceWarning =
-    prep.managementReviewComplete && !prep.internalAuditComplete
+  const internalAuditComputed = computeInternalAuditComplete(companies).complete
+  const internalAuditOverridden = getInternalAuditCompleteOverride(prep) !== undefined
+  const effectiveInternalComplete = getEffectiveInternalAuditComplete(prep, companies)
+
+  const sequenceWarning = prep.managementReviewComplete && !effectiveInternalComplete
   if (sequenceWarning) {
     messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求。')
   }
 
-  return { openNcrCount, ncrWarning, sequenceWarning, messages }
+  if (internalAuditOverridden && prep.managementReviewComplete && !internalAuditComputed) {
+    messages.push('內部稽核已手動標記完成，但程序稽核資料顯示尚有未完成項目。')
+  }
+
+  return {
+    openNcrCount,
+    ncrWarning,
+    sequenceWarning,
+    internalAuditComputed,
+    internalAuditOverridden,
+    messages,
+  }
 }
 
 export function itemHasCallout(no: number): 'quality-objectives' | 'risk-climate' | 'satisfaction' | null {

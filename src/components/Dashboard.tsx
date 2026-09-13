@@ -48,6 +48,38 @@ function KpiCard({
   return <Card>{inner}</Card>
 }
 
+function DualNavKpiCard({
+  title,
+  segments,
+  hint,
+  onNavigate,
+}: {
+  title: string
+  segments: { label: string; value: number; tab: TabId; accent?: string }[]
+  hint?: string
+  onNavigate: (tab: TabId) => void
+}) {
+  return (
+    <Card className="p-5">
+      <p className="text-sm text-muted">{title}</p>
+      <div className="mt-2 flex divide-x divide-line rounded-lg border border-line">
+        {segments.map((seg) => (
+          <button
+            key={seg.tab}
+            type="button"
+            onClick={() => onNavigate(seg.tab)}
+            className="flex flex-1 flex-col items-center px-3 py-2 transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span className={`text-2xl font-bold ${seg.accent ?? 'text-primary'}`}>{seg.value}</span>
+            <span className="mt-1 text-xs text-muted">{seg.label}</span>
+          </button>
+        ))}
+      </div>
+      {hint && <p className="mt-2 text-xs text-muted">{hint}</p>}
+    </Card>
+  )
+}
+
 export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
   const summary = calculateAnnualScore(company.audits, settings.scoringRules)
@@ -107,12 +139,23 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           accent="text-red-600 dark:text-red-400"
           onClick={() => onNavigate('ncr')}
         />
-        <KpiCard
-          title="觀察 / 第三方建議"
-          value={summary.totalObservation + openSug}
-          hint={`待追蹤 ${openObs + openSug} 件`}
-          accent="text-amber-600 dark:text-amber-400"
-          onClick={() => onNavigate('observations')}
+        <DualNavKpiCard
+          title="觀察／第三方建議"
+          hint={`待追蹤 ${openObs + openSug} 件 · 點選分別前往觀察事項或建議追蹤`}
+          onNavigate={onNavigate}
+          segments={[
+            {
+              label: '觀察事項',
+              value: summary.totalObservation + openObs,
+              tab: 'observations',
+              accent: 'text-amber-600 dark:text-amber-400',
+            },
+            {
+              label: '第三方建議',
+              value: openSug,
+              tab: 'suggestions',
+            },
+          ]}
         />
         <KpiCard
           title="計畫稽核次數"

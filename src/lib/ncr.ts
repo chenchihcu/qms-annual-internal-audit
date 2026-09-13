@@ -1,4 +1,4 @@
-import type { ChecklistItem, NCR, NCRStatus, ProcedureAudit } from '../types'
+import type { ChecklistItem, NCR, NCRStatus, Observation, ProcedureAudit } from '../types'
 
 export const EMPTY_NCR_CLOSEOUT = {
   rootCause: '',
@@ -90,4 +90,45 @@ export function collectNCRsFromAudits(
 
 export function updateNCRStatus(ncrs: NCR[], id: string, status: NCRStatus): NCR[] {
   return ncrs.map((n) => (n.id === id ? { ...n, status } : n))
+}
+
+export function findNcrForObservation(ncrs: NCR[], observation: Observation): NCR | undefined {
+  if (observation.ncrId) {
+    const linked = ncrs.find((n) => n.id === observation.ncrId)
+    if (linked) return linked
+  }
+  return ncrs.find((n) => n.observationId === observation.id)
+}
+
+/** 觀察事項設為「已轉 NCR」時建立 NCR（不重複） */
+export function ensureNcrFromObservation(
+  observation: Observation,
+  existingNcrs: NCR[],
+  year: number,
+): { ncrs: NCR[]; ncrId: string } {
+  const existing = findNcrForObservation(existingNcrs, observation)
+  if (existing) {
+    return { ncrs: existingNcrs, ncrId: existing.id }
+  }
+
+  const description =
+    observation.description.trim() !== ''
+      ? observation.description
+      : observation.content
+
+  const ncr = normalizeNCR({
+    id: `ncr-obs-${observation.id}`,
+    ncrNumber: generateNCRNumber(year, existingNcrs.length + 1),
+    qpCode: observation.qpCode,
+    departmentId: observation.departmentId,
+    department: observation.department,
+    process: observation.process,
+    description,
+    date: new Date().toISOString().slice(0, 10),
+    status: '開立',
+    observationId: observation.id,
+    sourceYear: observation.year,
+  })
+
+  return { ncrs: [...existingNcrs, ncr], ncrId: ncr.id }
 }

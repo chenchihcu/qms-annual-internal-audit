@@ -14,7 +14,12 @@ import type {
 } from '../types'
 import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
 import { autoArrangePlan } from '../lib/planner'
-import { collectNCRsFromAudits, generateNCRNumber } from '../lib/ncr'
+import {
+  auditIdForPlanRow,
+  shouldPropagateAuditAuditorsToPlan,
+  shouldPropagatePlanAuditorsToAudit,
+} from '../lib/auditorSync'
+import { collectNCRsFromAudits, ensureNcrFromObservation, generateNCRNumber } from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
@@ -114,10 +119,28 @@ export function useAuditStore() {
   const updatePlanRow = useCallback((id: string, patch: Partial<PlanRow>) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
+      const row = co.planRows.find((r) => r.id === id)
+      if (!row) return s
+
+      let audits = co.audits
+      if (patch.auditors !== undefined && patch.auditors !== row.auditors) {
+        const auditId = auditIdForPlanRow(row.qpCode, row.departmentId)
+        const audit = co.audits.find((a) => a.id === auditId)
+        if (
+          audit &&
+          shouldPropagatePlanAuditorsToAudit(row.auditors, patch.auditors, audit.auditors)
+        ) {
+          audits = co.audits.map((a) =>
+            a.id === auditId ? { ...a, auditors: patch.auditors! } : a,
+          )
+        }
+      }
+
       return patchCompany(s, s.activeCompanyId, {
         planRows: co.planRows.map((r) =>
           r.id === id ? { ...r, ...patch, manualOverride: true } : r,
         ),
+        audits,
       })
     })
   }, [])
@@ -143,10 +166,14 @@ export function useAuditStore() {
       const existing = co.audits.find((a) => a.id === auditId)
       if (existing) return existing
 
+      const planRow = co.planRows.find(
+        (r) => r.qpCode === qpCode && r.departmentId === departmentId,
+      )
       const dept = co.departments.find((d) => d.id === departmentId)
       const entry = PROCEDURE_PLAN_TEMPLATE.find(
         (e) => e.qpCode === qpCode && e.departmentId === departmentId,
       ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
+      const auditors = planRow?.auditors ?? dept?.defaultAuditors ?? ''
       if (!dept || !entry) {
         return {
           id: auditId,
@@ -158,7 +185,7 @@ export function useAuditStore() {
           notifyDate: '',
           auditDate: '',
           departmentManager: dept?.owner ?? '',
-          auditors: dept?.defaultAuditors ?? '',
+          auditors,
           auditCategory: entry?.auditCategory ?? '系統稽核',
           items: createChecklistForProcedure(qpCode, dept?.name),
         }
@@ -174,7 +201,7 @@ export function useAuditStore() {
         notifyDate: '',
         auditDate: '',
         departmentManager: dept.owner,
-        auditors: dept.defaultAuditors,
+        auditors,
         auditCategory: entry.auditCategory,
         items: createChecklistForProcedure(qpCode, dept.name),
       }
@@ -194,11 +221,27 @@ export function useAuditStore() {
   const updateAudit = useCallback((audit: ProcedureAudit) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
-      const exists = co.audits.some((a) => a.id === audit.id)
+      const existing = co.audits.find((a) => a.id === audit.id)
+      const exists = existing !== undefined
       const audits = exists
         ? co.audits.map((a) => (a.id === audit.id ? audit : a))
         : [...co.audits, audit]
-      return persistAudit(s, audits, s.activeCompanyId)
+
+      let planRows = co.planRows
+      if (existing && audit.auditors !== existing.auditors) {
+        planRows = co.planRows.map((row) => {
+          if (row.qpCode !== audit.qpCode || row.departmentId !== audit.departmentId) return row
+          if (
+            shouldPropagateAuditAuditorsToPlan(existing.auditors, audit.auditors, row.auditors)
+          ) {
+            return { ...row, auditors: audit.auditors }
+          }
+          return row
+        })
+      }
+
+      const next = persistAudit(s, audits, s.activeCompanyId)
+      return patchCompany(next, s.activeCompanyId, { planRows })
     })
   }, [persistAudit])
 
@@ -311,8 +354,24 @@ export function useAuditStore() {
   const updateObservation = useCallback((id: string, patch: Partial<Observation>) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
+      const obs = co.observations.find((o) => o.id === id)
+      if (!obs) return s
+
+      let ncrs = co.ncrs
+      let ncrId = obs.ncrId
+      const nextStatus = patch.status ?? obs.status
+
+      if (nextStatus === 'became_ncr') {
+        const result = ensureNcrFromObservation({ ...obs, ...patch }, ncrs, s.settings.auditYear)
+        ncrs = result.ncrs
+        ncrId = result.ncrId
+      }
+
       return patchCompany(s, s.activeCompanyId, {
-        observations: co.observations.map((o) => (o.id === id ? { ...o, ...patch } : o)),
+        observations: co.observations.map((o) =>
+          o.id === id ? { ...o, ...patch, ncrId: ncrId ?? o.ncrId } : o,
+        ),
+        ncrs,
       })
     })
   }, [])
@@ -400,7 +459,14 @@ export function useAuditStore() {
   )
 
   const updateExternalPrepSequence = useCallback(
-    (patch: Partial<Pick<AppState['externalAuditPrep'], 'internalAuditComplete' | 'managementReviewComplete'>>) => {
+    (
+      patch: Partial<
+        Pick<
+          AppState['externalAuditPrep'],
+          'internalAuditCompleteOverride' | 'managementReviewComplete'
+        >
+      >,
+    ) => {
       setState((s) => ({
         ...s,
         externalAuditPrep: { ...s.externalAuditPrep, ...patch },
@@ -408,6 +474,17 @@ export function useAuditStore() {
     },
     [],
   )
+
+  const resetInternalAuditCompleteOverride = useCallback(() => {
+    setState((s) => {
+      const { internalAuditCompleteOverride: _o, internalAuditComplete: _l, ...rest } =
+        s.externalAuditPrep
+      return {
+        ...s,
+        externalAuditPrep: rest,
+      }
+    })
+  }, [])
 
   const carryForwardObservation = useCallback(
     (obsId: string, qpCode: string, departmentId: string) => {
@@ -653,6 +730,7 @@ export function useAuditStore() {
     addSuggestion,
     updateExternalPrepItem,
     updateExternalPrepSequence,
+    resetInternalAuditCompleteOverride,
     carryForwardObservation,
     carryForwardNCR,
     carryForwardSuggestion,
