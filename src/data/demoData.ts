@@ -292,11 +292,11 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 6,
+    version: 7,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v6'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v7'
 
 function migrateCompanyNcrs(company: CompanyData): CompanyData {
   return {
@@ -313,7 +313,7 @@ export function migrateToV6(raw: AppState): AppState {
         jiurun: migrateCompanyNcrs(raw.companies.jiurun),
         zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
       },
-      dataSource: raw.dataSource ?? 'user',
+      dataSource: raw.dataSource,
     }
   }
   const prep = raw.externalAuditPrep
@@ -333,8 +333,24 @@ export function migrateToV6(raw: AppState): AppState {
       zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
     },
     externalAuditPrep: prepWithoutLegacy,
-    dataSource: raw.dataSource ?? 'user',
+    dataSource: raw.dataSource,
     version: 6,
+  }
+}
+
+export function migrateToV7(raw: AppState): AppState {
+  const base =
+    raw.version >= 6
+      ? migrateToV6(raw)
+      : raw.version >= 4 && raw.externalAuditPrep
+        ? migrateToV6(raw)
+        : raw.companies
+          ? migrateToV4(raw)
+          : raw
+  return {
+    ...base,
+    dataSource: base.dataSource ?? 'user',
+    version: 7,
   }
 }
 

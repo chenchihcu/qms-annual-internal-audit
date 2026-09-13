@@ -1,14 +1,15 @@
 import {
   createDemoState,
-  migrateToV4,
-  migrateToV6,
+  migrateToV7,
   migrateV1State,
   STORAGE_KEY,
 } from '../data/demoData'
+import { shouldRefreshToCurrentDemo } from './demoRefresh'
 import type { AppState } from '../types'
 
 export const LEGACY_STORAGE_KEYS = [
   STORAGE_KEY,
+  'qms-annual-internal-audit-v6',
   'qms-annual-internal-audit-v5',
   'qms-annual-internal-audit-v4',
 ] as const
@@ -27,10 +28,15 @@ export interface SaveStateResult {
 
 function parseStoredState(raw: string): AppState {
   const parsed = JSON.parse(raw) as AppState
-  if (parsed.version >= 6) return migrateToV6(parsed)
-  if (parsed.version >= 4 && parsed.externalAuditPrep) return migrateToV6(parsed)
-  if (parsed.companies) return migrateToV4(parsed)
-  return parsed
+
+  if ((parsed.version ?? 0) < 7 && shouldRefreshToCurrentDemo(parsed)) {
+    const fresh = createDemoState()
+    fresh.activeCompanyId = parsed.activeCompanyId ?? 'jiurun'
+    return fresh
+  }
+
+  if ((parsed.version ?? 0) >= 7) return parsed
+  return migrateToV7(parsed)
 }
 
 export function loadStateFromStorage(): LoadStateResult {
