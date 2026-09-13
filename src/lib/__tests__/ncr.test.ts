@@ -3,6 +3,7 @@ import {
   collectNCRsFromAudits,
   isNcrStale,
   findChecklistItem,
+  normalizeNCR,
 } from '../ncr'
 import type { ChecklistItem, NCR, ProcedureAudit } from '../../types'
 
@@ -62,6 +63,25 @@ describe('collectNCRsFromAudits', () => {
     const first = collectNCRsFromAudits(audits, 2026, [])
     const second = collectNCRsFromAudits(audits, 2026, first)
     expect(second).toHaveLength(1)
+  })
+})
+
+describe('normalizeNCR', () => {
+  it('fills missing close-out fields for legacy records', () => {
+    const ncr = normalizeNCR({
+      id: 'x',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-01',
+      departmentId: 'd1',
+      department: '管理部',
+      process: 'p',
+      description: 'desc',
+      date: '2026-01-01',
+      status: '開立',
+    })
+    expect(ncr.rootCause).toBe('')
+    expect(ncr.correctiveAction).toBe('')
+    expect(ncr.verificationEvidence).toBe('')
   })
 })
 

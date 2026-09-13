@@ -298,8 +298,11 @@ export function useAuditStore() {
           description: input.description,
           date: new Date().toISOString().slice(0, 10),
           status: '開立',
+          rootCause: '',
+          correctiveAction: '',
+          verificationEvidence: '',
         }
-        return patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] })
+        return { ...patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] }), dataSource: 'user' as const }
       })
     },
     [],
@@ -598,11 +601,15 @@ export function useAuditStore() {
       const migrated =
         parsed.version === 1 ? migrateV1State(parsed) : migrateToV4(parsed as AppState)
       if (migrated) {
-        setState(migrated)
+        setState({ ...migrated, dataSource: 'user' })
         return
       }
     }
-    setState(parsed)
+    setState({ ...parsed, dataSource: 'user' })
+  }, [])
+
+  const dismissDemoBanner = useCallback(() => {
+    setState((s) => ({ ...s, dataSource: 'user' }))
   }, [])
 
   const resetToDemo = useCallback(() => setState(createDemoState()), [])
@@ -653,6 +660,7 @@ export function useAuditStore() {
     importJSON,
     resetToDemo,
     clearAll,
+    dismissDemoBanner,
     getProcedureTitle,
   }
 }

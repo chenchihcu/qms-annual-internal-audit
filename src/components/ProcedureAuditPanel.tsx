@@ -234,15 +234,16 @@ export function ProcedureAuditPanel({
                       </td>
                     )}
                     <td className="border border-line p-2 align-top text-center">{item.no}</td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                    <td className="audit-content-cell border border-line p-2 align-top">
+                      <textarea
+                        className={`w-full min-h-[4.5rem] resize-y rounded border border-line bg-surface px-2 py-1 text-sm leading-relaxed no-print ${FOCUS_RING}`}
+                        rows={Math.min(6, Math.max(2, Math.ceil(item.content.length / 40)))}
                         value={item.content}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { content: e.target.value })
                         }
                       />
-                      <span className="print-only">{item.content}</span>
+                      <span className="print-only whitespace-pre-wrap">{item.content}</span>
                       {item.sourceYear && (
                         <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">來源：{item.sourceYear} 年追蹤</span>
                       )}

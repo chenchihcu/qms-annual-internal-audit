@@ -102,9 +102,16 @@ export interface NCR {
   departmentId: string
   department: string
   process: string
+  /** 不符合事項描述（QR-28-03） */
   description: string
   date: string
   status: NCRStatus
+  /** 根本原因分析 */
+  rootCause: string
+  /** 矯正措施 */
+  correctiveAction: string
+  /** 驗證／結案佐證 */
+  verificationEvidence: string
   checklistItemId?: string
   sourceYear?: number
   carriedToYear?: number
@@ -164,11 +171,15 @@ export interface CompanyData {
   suggestions: ThirdPartySuggestion[]
 }
 
+export type DataSource = 'demo' | 'user'
+
 export interface AppState {
   activeCompanyId: CompanyId
   settings: AuditSettings
   companies: Record<CompanyId, CompanyData>
   externalAuditPrep: ExternalAuditPrepState
+  /** 示範資料或使用者正式資料 */
+  dataSource?: DataSource
   version: number
 }
 

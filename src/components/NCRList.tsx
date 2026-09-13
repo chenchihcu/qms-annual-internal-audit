@@ -11,6 +11,33 @@ const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
+function NcrField({
+  label,
+  value,
+  onChange,
+  rows = 2,
+  printValue,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  rows?: number
+  printValue?: string
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-muted">{label}</label>
+      <textarea
+        className={`w-full rounded border border-line bg-surface px-2 py-1.5 text-sm no-print ${FOCUS_RING}`}
+        rows={rows}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <p className="print-only whitespace-pre-wrap text-sm">{printValue ?? value}</p>
+    </div>
+  )
+}
+
 export function NCRList({ store }: { store: AuditStore }) {
   const { state, updateNCR, addManualNCR } = store
   const { company, settings } = state
@@ -63,7 +90,9 @@ export function NCRList({ store }: { store: AuditStore }) {
       <Card>
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
-          <p className="text-sm text-muted">查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。</p>
+          <p className="text-sm text-muted">
+            查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。
+          </p>
         </div>
 
         <PrintDocHeader
@@ -75,67 +104,78 @@ export function NCRList({ store }: { store: AuditStore }) {
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-            <table className="qr-checklist w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-page text-left text-muted">
-                  <th className="border border-line p-2">NCR#</th>
-                  <th className="border border-line p-2">QP</th>
-                  <th className="border border-line p-2">部門</th>
-                  <th className="border border-line p-2">流程</th>
-                  <th className="border border-line p-2">描述</th>
-                  <th className="border border-line p-2">日期</th>
-                  <th className="border border-line p-2">狀態</th>
-                </tr>
-              </thead>
-              <tbody>
-                {company.ncrs.map((ncr) => {
-                  const stale = isNcrStale(ncr, company.audits)
-                  return (
-                    <tr key={ncr.id} className={stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
-                      <td className="border border-line p-2 font-mono text-xs">{ncr.ncrNumber}</td>
-                      <td className="border border-line p-2">{ncr.qpCode}</td>
-                      <td className="border border-line p-2">{ncr.department}</td>
-                      <td className="border border-line p-2">{ncr.process}</td>
-                      <td className="border border-line p-2">
-                        {stale && (
-                          <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                            查檢已非不符，建議結案
-                          </p>
-                        )}
-                        <textarea
-                          className={`w-full min-w-[200px] rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                          rows={2}
-                          value={ncr.description}
-                          onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
+          <div className="space-y-4">
+            {company.ncrs.map((ncr) => {
+              const stale = isNcrStale(ncr, company.audits)
+              return (
+                <article
+                  key={ncr.id}
+                  className={`rounded-xl border border-line p-4 ${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : 'bg-page/40'}`}
+                >
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-line pb-3">
+                    <div>
+                      <p className="font-mono text-sm font-semibold text-ink">{ncr.ncrNumber}</p>
+                      <p className="mt-1 text-sm text-muted">
+                        {ncr.qpCode} · {ncr.department} · {ncr.process}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="no-print">
+                        <Select
+                          value={ncr.status}
+                          onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
+                          options={STATUSES.map((s) => ({ value: s, label: s }))}
                         />
-                        <span className="print-only">{ncr.description}</span>
-                      </td>
-                      <td className="border border-line p-2">
-                        <input
-                          type="date"
-                          className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
-                          value={ncr.date}
-                          onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
-                        />
-                        <span className="print-only">{ncr.date}</span>
-                      </td>
-                      <td className="border border-line p-2">
-                        <div className="no-print">
-                          <Select
-                            value={ncr.status}
-                            onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
-                            options={STATUSES.map((s) => ({ value: s, label: s }))}
-                          />
-                        </div>
-                        <span className="print-only"><Badge label={ncr.status} /></span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                      </div>
+                      <span className="print-only"><Badge label={ncr.status} /></span>
+                    </div>
+                  </div>
+
+                  {stale && (
+                    <p className="mb-3 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      查檢已非不符，建議結案
+                    </p>
+                  )}
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <NcrField
+                      label="不符合描述"
+                      value={ncr.description}
+                      onChange={(v) => updateNCR(ncr.id, { description: v })}
+                      rows={3}
+                    />
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-muted">發現日期</label>
+                      <input
+                        type="date"
+                        className={`w-full rounded border border-line bg-surface px-2 py-1.5 text-sm no-print ${FOCUS_RING}`}
+                        value={ncr.date}
+                        onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
+                      />
+                      <p className="print-only text-sm">{ncr.date}</p>
+                    </div>
+                    <NcrField
+                      label="根本原因"
+                      value={ncr.rootCause}
+                      onChange={(v) => updateNCR(ncr.id, { rootCause: v })}
+                    />
+                    <NcrField
+                      label="矯正措施"
+                      value={ncr.correctiveAction}
+                      onChange={(v) => updateNCR(ncr.id, { correctiveAction: v })}
+                    />
+                    <div className="md:col-span-2">
+                      <NcrField
+                        label="驗證／結案佐證"
+                        value={ncr.verificationEvidence}
+                        onChange={(v) => updateNCR(ncr.id, { verificationEvidence: v })}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </Card>

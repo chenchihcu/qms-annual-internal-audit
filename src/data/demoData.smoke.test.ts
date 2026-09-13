@@ -5,8 +5,9 @@ import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 describe('demoData smoke (delivery gate)', () => {
   it('createDemoState does not throw and aligns QP/dept', () => {
     const state = createDemoState()
-    expect(STORAGE_KEY).toContain('v5')
-    expect(state.version).toBeGreaterThanOrEqual(5)
+    expect(STORAGE_KEY).toContain('v6')
+    expect(state.version).toBeGreaterThanOrEqual(6)
+    expect(state.dataSource).toBe('demo')
     expect(state.companies.jiurun.planRows.length).toBeGreaterThan(0)
     for (const audit of state.companies.jiurun.audits) {
       const entry =

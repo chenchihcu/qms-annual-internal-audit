@@ -1,5 +1,33 @@
 import type { ChecklistItem, NCR, NCRStatus, ProcedureAudit } from '../types'
 
+export const EMPTY_NCR_CLOSEOUT = {
+  rootCause: '',
+  correctiveAction: '',
+  verificationEvidence: '',
+} as const
+
+/** 舊版 localStorage 可能缺少結案欄位，補預設空字串避免渲染錯誤 */
+export function normalizeNCR(ncr: Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>): NCR {
+  return {
+    ...EMPTY_NCR_CLOSEOUT,
+    qpCode: '',
+    departmentId: '',
+    department: '',
+    process: '',
+    description: '',
+    date: '',
+    status: '開立',
+    ...ncr,
+    rootCause: ncr.rootCause ?? '',
+    correctiveAction: ncr.correctiveAction ?? '',
+    verificationEvidence: ncr.verificationEvidence ?? '',
+  }
+}
+
+export function normalizeNCRList(ncrs: Array<Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>>): NCR[] {
+  return ncrs.map(normalizeNCR)
+}
+
 export function generateNCRNumber(year: number, index: number): string {
   return `NCR-${year}-${String(index).padStart(3, '0')}`
 }
@@ -39,7 +67,7 @@ export function collectNCRsFromAudits(
       if (item.judgment !== '不符') continue
       if (existingByItemId.has(item.id)) continue
 
-      const ncr: NCR = {
+      const ncr = normalizeNCR({
         id: `ncr-${item.id}`,
         ncrNumber: generateNCRNumber(year, nextIndex),
         qpCode: audit.qpCode,
@@ -50,7 +78,7 @@ export function collectNCRsFromAudits(
         date: audit.auditDate || new Date().toISOString().slice(0, 10),
         status: '開立',
         checklistItemId: item.id,
-      }
+      })
       result.push(ncr)
       existingByItemId.set(item.id, ncr)
       nextIndex++
