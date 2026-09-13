@@ -127,3 +127,9 @@ html.dark {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+#netlify-badge,
+.netlify-badge,
+a[href='https://www.netlify.com'] {
+  display: none !important;
+}

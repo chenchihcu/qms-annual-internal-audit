@@ -114,6 +114,7 @@ function buildAudit(
     documents: entry.documents,
     notifyDate: '2026-03-01',
     auditDate: '2026-03-15',
+    plannedMonth: 3,
     departmentManager: dept.owner,
     auditors: dept.defaultAuditors,
     auditCategory: entry.auditCategory,
@@ -160,6 +161,10 @@ function createCompanyData(companyId: CompanyId): CompanyData {
         rootCause: '現場人員對隔離區標示規範不熟悉',
         correctiveAction: '重訓並增設標示看板',
         verificationEvidence: '',
+        responsiblePerson: '品保部經理',
+        dueDate: '2026-04-15',
+        containment: '立即補齊隔離區標示並暫停該區進料',
+        classification: '輕微',
         checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
       },
     ])
@@ -292,11 +297,11 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 7,
+    version: 8,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v7'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v8'
 
 function migrateCompanyNcrs(company: CompanyData): CompanyData {
   return {
@@ -367,6 +372,8 @@ export function migrateToV4(raw: AppState): AppState {
   demo.dataSource = 'user'
   return demo
 }
+
+export { migrateState } from '../lib/migrate'
 
 /** 舊版 v1 遷移（若存在） */
 export function migrateV1State(raw: unknown): AppState | null {

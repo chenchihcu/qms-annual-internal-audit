@@ -6,6 +6,8 @@ export type Judgment = '符合' | '不符' | '觀察' | '不適用'
 
 export type NCRStatus = '開立' | '矯正中' | '結案'
 
+export type NCRClassification = '重大' | '輕微'
+
 /** 年度計畫月格狀態（對應紙本圖例） */
 export type MonthStatus = '擬定' | '滿意' | '不滿意' | '矯正中' | '矯正圓滿' | null
 
@@ -61,6 +63,8 @@ export interface PlanRow {
   auditors: string
   auditCategory: InternalAuditCategory
   months: MonthStatus[]
+  /** 手動覆寫特定月格狀態（其餘月格由稽核/NCR 自動推導） */
+  manualMonthOverrides?: (MonthStatus | null)[]
   manualOverride: boolean
 }
 
@@ -73,6 +77,12 @@ export interface ChecklistItem {
   content: string
   judgment: Judgment | null
   description: string
+  /** 抽樣數量 */
+  sampleSize?: string
+  /** 客觀證據 */
+  objectiveEvidence?: string
+  /** AS9100 條款 */
+  as9100Clause?: string
   procedureRef?: string
   sourceYear?: number
   carriedFromId?: string
@@ -89,6 +99,8 @@ export interface ProcedureAudit {
   documents: string
   notifyDate: string
   auditDate: string
+  /** 對應年度計畫排定月份（1–12） */
+  plannedMonth?: number
   departmentManager: string
   auditors: string
   auditCategory: InternalAuditCategory
@@ -112,6 +124,10 @@ export interface NCR {
   correctiveAction: string
   /** 驗證／結案佐證 */
   verificationEvidence: string
+  responsiblePerson?: string
+  dueDate?: string
+  containment?: string
+  classification?: NCRClassification
   checklistItemId?: string
   /** 由跨年觀察事項「已轉 NCR」建立 */
   observationId?: string

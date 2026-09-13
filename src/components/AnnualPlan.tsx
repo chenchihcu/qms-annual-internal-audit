@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus } from '../types'
@@ -98,7 +99,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           {MONTH_STATUS_LEGEND.map((l) => (
             <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
           ))}
-          <span className="text-muted">（點擊月格循環切換狀態）</span>
+          <span className="text-muted">（預設依查檢／NCR 自動更新；點擊月格可手動覆寫）</span>
         </div>
 
         <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 no-print">
@@ -197,14 +198,32 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                     />
                     <span className="print-only">{row.auditors}</span>
                   </td>
-                  {(Array.isArray(row.months) ? row.months : []).map((status, i) => (
+                  {(Array.isArray(row.months) ? row.months : []).map((scheduled, i) => {
+                    const status = scheduled
+                      ? getDisplayMonthStatus(
+                          row,
+                          i,
+                          company.audits,
+                          company.ncrs,
+                          settings.auditYear,
+                        )
+                      : null
+                    const manual = row.manualMonthOverrides?.[i]
+                    return (
                     <td key={i} className="border border-line p-0.5 text-center">
                       <button
                         type="button"
-                        title={statusLabel(status)}
+                        title={`${statusLabel(status)}${manual ? '（手動覆寫）' : scheduled ? '（自動）' : ''}`}
                         aria-label={`${row.qpCode} ${i + 1} 月：${statusLabel(status)}`}
-                        className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(status)}`}
-                        onClick={() => setPlanMonthStatus(row.id, i, cycleMonthStatus(status))}
+                        className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(status)} ${manual ? 'ring-1 ring-amber-400' : ''}`}
+                        onClick={() =>
+                          setPlanMonthStatus(
+                            row.id,
+                            i,
+                            cycleMonthStatus(manual ?? status),
+                          )
+                        }
+                        disabled={!scheduled && status === null}
                       >
                         {statusShort(status)}
                       </button>
@@ -212,7 +231,8 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         {statusShort(status)}
                       </span>
                     </td>
-                  ))}
+                    )
+                  })}
                 </tr>
               ))}
             </tbody>

@@ -5,10 +5,12 @@ import {
   STORAGE_KEY,
 } from '../data/demoData'
 import { shouldRefreshToCurrentDemo } from './demoRefresh'
+import { migrateState } from './migrate'
 import type { AppState } from '../types'
 
 export const LEGACY_STORAGE_KEYS = [
   STORAGE_KEY,
+  'qms-annual-internal-audit-v7',
   'qms-annual-internal-audit-v6',
   'qms-annual-internal-audit-v5',
   'qms-annual-internal-audit-v4',
@@ -35,8 +37,8 @@ function parseStoredState(raw: string): AppState {
     return fresh
   }
 
-  if ((parsed.version ?? 0) >= 7) return parsed
-  return migrateToV7(parsed)
+  const upToV7 = (parsed.version ?? 0) >= 7 ? parsed : migrateToV7(parsed)
+  return migrateState(upToV7)
 }
 
 export function loadStateFromStorage(): LoadStateResult {
@@ -58,7 +60,7 @@ export function loadStateFromStorage(): LoadStateResult {
     const legacy = localStorage.getItem('qms-annual-internal-audit-v1')
     if (legacy) {
       const migrated = migrateV1State(JSON.parse(legacy))
-      if (migrated) return { state: migrated }
+      if (migrated) return { state: migrateState(migrated) }
     }
   } catch {
     const backup = localStorage.getItem(STORAGE_KEY)
