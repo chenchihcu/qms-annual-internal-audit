@@ -107,6 +107,37 @@ describe('deriveMonthStatus', () => {
   it('returns 不滿意 when complete with 不符 but no NCR yet', () => {
     expect(deriveMonthStatus(baseRow(), 2, [baseAudit([item('不符')])], [], 2026)).toBe('不滿意')
   })
+
+  it('applies derived status to all scheduled months when complete', () => {
+    const row = baseRow({
+      months: Array(12)
+        .fill(null)
+        .map((_, i) => (i <= 2 ? '擬定' : null)) as PlanRow['months'],
+    })
+    const audit = baseAudit([item('符合')], { plannedMonth: 1, auditDate: '2026-01-15' })
+
+    for (const monthIndex of [0, 1, 2]) {
+      expect(deriveMonthStatus(row, monthIndex, [audit], [], 2026)).toBe('滿意')
+    }
+  })
+
+  it('returns 矯正中 on scheduled months with open NCR even when checklist incomplete', () => {
+    const row = baseRow({
+      months: Array(12)
+        .fill(null)
+        .map((_, i) => (i === 2 ? '擬定' : null)) as PlanRow['months'],
+    })
+
+    expect(
+      deriveMonthStatus(
+        row,
+        2,
+        [baseAudit([item(null)])],
+        [baseNcr({ status: '矯正中' })],
+        2026,
+      ),
+    ).toBe('矯正中')
+  })
 })
 
 describe('getDisplayMonthStatus', () => {
