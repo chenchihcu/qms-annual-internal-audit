@@ -89,6 +89,10 @@ export function useAuditStore() {
     setState((s) => ({ ...s, activeCompanyId: companyId }))
   }, [])
 
+  const updateCompany = useCallback((patch: Partial<Pick<CompanyData, 'keyCustomerName'>>) => {
+    setState((s) => patchCompany(s, s.activeCompanyId, patch))
+  }, [])
+
   const updateDepartment = useCallback(
     (id: string, patch: Partial<CompanyData['departments'][0]>) => {
       setState((s) => {
@@ -793,6 +797,7 @@ export function useAuditStore() {
     saveError,
     updateSettings,
     switchCompany,
+    updateCompany,
     updateDepartment,
     regeneratePlan,
     updatePlanRow,

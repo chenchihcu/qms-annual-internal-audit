@@ -1,11 +1,16 @@
-import { useCallback, useState, type MouseEvent } from 'react'
+import { useCallback, useMemo, useState, type MouseEvent } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { TabId } from '../types'
 import { checkPlanRowImpartiality } from '../lib/impartiality'
 import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
+import {
+  describeStakeholderScheduleEffect,
+  filterPlanRowsByStakeholder,
+  stakeholderTagHint,
+} from '../lib/stakeholderSchedule'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
-import type { MonthStatus } from '../types'
+import type { MonthStatus, StakeholderTag } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { FormPrintButton } from './ui/FormPrintButton'
@@ -38,8 +43,15 @@ export function AnnualPlan({
   store: AuditStore
   onNavigate: (tab: TabId, auditKey?: string) => void
 }) {
-  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus, updateDepartment } =
-    store
+  const {
+    state,
+    updateSettings,
+    updateCompany,
+    regeneratePlan,
+    updatePlanRow,
+    setPlanMonthStatus,
+    updateDepartment,
+  } = store
   const { settings, company } = state
 
   const [yearDraft, setYearDraft] = useState(String(settings.auditYear))
@@ -48,6 +60,12 @@ export function AnnualPlan({
     newYear: settings.auditYear,
   })
   const [regenConfirm, setRegenConfirm] = useState(false)
+  const [stakeholderFilter, setStakeholderFilter] = useState<StakeholderTag | null>(null)
+
+  const visiblePlanRows = useMemo(
+    () => filterPlanRowsByStakeholder(company.planRows, stakeholderFilter, company.departments),
+    [company.planRows, company.departments, stakeholderFilter],
+  )
 
   const handleMonthCellClick = useCallback(
     (
@@ -121,7 +139,7 @@ export function AnnualPlan({
       <ConfirmDialog
         open={regenConfirm}
         title="自動編排年度計畫"
-        description="未手動鎖定（未標示 manualOverride）的計畫列，月格狀態將依風險與窗口重新計算。已手動調整的列會保留。"
+        description="未手動鎖定的計畫列將依風險、計畫窗口與各部門利害關係人標籤重新排程（客戶／法規/認證會優先排在窗口前段；經營層提高優先序）。已手動調整的列會保留。"
         confirmLabel="重新編排"
         onConfirm={() => {
           regeneratePlan()
@@ -130,26 +148,13 @@ export function AnnualPlan({
         onCancel={() => setRegenConfirm(false)}
       />
 
-      <Card>
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4 no-print">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">年度稽核計畫（QR-28-01）</h2>
-            <p className="text-sm text-muted">程序導向編排 · 月格狀態對應紙本圖例</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <FormPrintButton />
-            <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
-          </div>
+      <Card className="no-print">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-ink">年度稽核計畫（QR-28-01）</h2>
+          <p className="text-sm text-muted">程序導向編排 · 月格狀態對應紙本圖例</p>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
-          {MONTH_STATUS_LEGEND.map((l) => (
-            <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
-          ))}
-          <span className="text-muted">（預設依查檢／NCR 自動更新；點擊月格開啟程序稽核；Alt+點擊或右鍵可手動覆寫）</span>
-        </div>
-
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 no-print">
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input
             label="稽核年度"
             type="number"
@@ -192,12 +197,126 @@ export function AnnualPlan({
             onChange={(v) => updateSettings({ managementReviewDate: v })}
           />
         </div>
+      </Card>
+
+      <Card className="no-print">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold text-ink">利害關係人與排程依據</h3>
+            <p className="mt-1 text-sm text-muted">
+              請先設定各部門標籤，再執行自動編排。標籤影響排程優先序與月份分佈（客戶／法規/認證 → 窗口前段；經營層 → 提高優先序）。
+            </p>
+          </div>
+          <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
+        </div>
+
+        <div className="mb-6 rounded-lg border border-line bg-page/40 p-4">
+          <Input
+            label="主要客戶（選填，例：九潤精密）"
+            value={company.keyCustomerName ?? ''}
+            onChange={(v) => updateCompany({ keyCustomerName: v })}
+          />
+          {company.keyCustomerName?.trim() && (
+            <p className="mt-2 text-sm text-ink">
+              關鍵客戶：<span className="font-medium">{company.keyCustomerName}</span>
+              {company.departments.some((d) => d.stakeholders.includes('客戶')) && (
+                <span className="text-muted"> · 已標記「客戶」的部門將納入客戶導向排程</span>
+              )}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {company.departments.map((dept) => (
+            <div key={dept.id} className="rounded-lg border border-line p-4">
+              <p className="mb-1 font-medium text-ink">{dept.name} · 負責人：{dept.owner}</p>
+              <p className="mb-3 text-xs text-muted">
+                排程效果：{describeStakeholderScheduleEffect(dept.stakeholders)}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {STAKEHOLDER_TAGS.map((tag) => {
+                  const active = dept.stakeholders.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      aria-pressed={active}
+                      title={stakeholderTagHint(tag)}
+                      className={`rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${active ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'border-line text-muted'}`}
+                      onClick={() => {
+                        const stakeholders = active
+                          ? dept.stakeholders.filter((s) => s !== tag)
+                          : [...dept.stakeholders, tag]
+                        updateDepartment(dept.id, { stakeholders })
+                      }}
+                    >
+                      {tag}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4 no-print">
+          <div className="flex flex-wrap gap-2 text-xs">
+            {MONTH_STATUS_LEGEND.map((l) => (
+              <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
+            ))}
+          </div>
+          <FormPrintButton />
+        </div>
+        <p className="mb-4 text-xs text-muted no-print">
+          預設依查檢／NCR 自動更新月格；點擊月格開啟程序稽核；Alt+點擊或右鍵可手動覆寫
+        </p>
+
+        <div className="mb-4 flex flex-wrap items-center gap-2 no-print">
+          <span className="text-xs font-medium text-muted">依利害關係人篩選：</span>
+          <button
+            type="button"
+            aria-pressed={stakeholderFilter === null}
+            className={`rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${
+              stakeholderFilter === null
+                ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200'
+                : 'border-line text-muted'
+            }`}
+            onClick={() => setStakeholderFilter(null)}
+          >
+            全部
+          </button>
+          {STAKEHOLDER_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              aria-pressed={stakeholderFilter === tag}
+              title={stakeholderTagHint(tag)}
+              className={`rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${
+                stakeholderFilter === tag
+                  ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200'
+                  : 'border-line text-muted'
+              }`}
+              onClick={() => setStakeholderFilter(tag)}
+            >
+              {tag}
+            </button>
+          ))}
+          {stakeholderFilter && (
+            <span className="text-xs text-muted">
+              顯示 {visiblePlanRows.length} / {company.planRows.length} 列
+            </span>
+          )}
+        </div>
 
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="年度內部稽核計畫 QR-28-01"
-          subtitle={`主任稽核員：${settings.leadAuditor}`}
+          subtitle={`主任稽核員：${settings.leadAuditor}${
+            company.keyCustomerName?.trim() ? ` · 主要客戶：${company.keyCustomerName}` : ''
+          }`}
         />
 
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">
@@ -208,6 +327,11 @@ export function AnnualPlan({
 
         <div className="overflow-x-auto">
           <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+          {visiblePlanRows.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted no-print">
+              目前篩選條件下無符合的計畫列
+            </p>
+          ) : (
           <table className="qr-plan-table w-full min-w-[1000px] border-collapse text-sm">
             <thead>
               <tr className="bg-page text-left text-muted">
@@ -225,14 +349,26 @@ export function AnnualPlan({
               </tr>
             </thead>
             <tbody>
-              {company.planRows.map((row) => {
+              {visiblePlanRows.map((row) => {
                 const rowWarning = checkPlanRowImpartiality(row, company.departments)
+                const dept = company.departments.find((d) => d.id === row.departmentId)
                 return (
                 <tr key={row.id} className={row.manualOverride ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
                   <td className="border border-line p-2">{row.sequence}</td>
                   <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>
                   <td className="border border-line p-2 font-medium">{row.qpCode}</td>
-                  <td className="border border-line p-2">{row.department}</td>
+                  <td className="border border-line p-2">
+                    <div>{row.department}</div>
+                    {dept && dept.stakeholders.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1 no-print">
+                        {dept.stakeholders.map((tag) => (
+                          <span key={tag} className="rounded bg-page px-1.5 py-0.5 text-[10px] text-muted">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="border border-line p-2">
                     <div>{row.process}</div>
                     <div className="text-xs text-muted">{row.documents}</div>
@@ -292,38 +428,7 @@ export function AnnualPlan({
               })}
             </tbody>
           </table>
-        </div>
-      </Card>
-
-      <Card className="no-print">
-        <h3 className="mb-4 text-lg font-semibold text-ink">利害關係人設定</h3>
-        <div className="space-y-4">
-          {company.departments.map((dept) => (
-            <div key={dept.id} className="rounded-lg border border-line p-4">
-              <p className="mb-2 font-medium text-ink">{dept.name} · 負責人：{dept.owner}</p>
-              <div className="flex flex-wrap gap-2">
-                {STAKEHOLDER_TAGS.map((tag) => {
-                  const active = dept.stakeholders.includes(tag)
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      aria-pressed={active}
-                      className={`rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${active ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'border-line text-muted'}`}
-                      onClick={() => {
-                        const stakeholders = active
-                          ? dept.stakeholders.filter((s) => s !== tag)
-                          : [...dept.stakeholders, tag]
-                        updateDepartment(dept.id, { stakeholders })
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+          )}
         </div>
       </Card>
     </div>

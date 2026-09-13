@@ -5,7 +5,7 @@ import { normalizeAuditNotice } from './auditNotice'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
 
-export const CURRENT_STORAGE_VERSION = 10
+export const CURRENT_STORAGE_VERSION = 11
 
 const DERIVED_STATUSES: MonthStatus[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
 
@@ -62,6 +62,7 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
 
   return {
     ...company,
+    keyCustomerName: company.keyCustomerName ?? '',
     planRows,
     audits,
     ncrs: company.ncrs.map(migrateNcr),

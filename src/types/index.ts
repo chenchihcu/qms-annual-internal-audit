@@ -188,6 +188,8 @@ export interface ExternalAuditPrepState {
 
 export interface CompanyData {
   name: string
+  /** 主要客戶名稱（選填；雙公司情境下可標示關鍵客戶，如正隆興 → 九潤） */
+  keyCustomerName?: string
   departments: DepartmentProfile[]
   planRows: PlanRow[]
   audits: ProcedureAudit[]

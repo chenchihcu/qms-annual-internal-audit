@@ -48,10 +48,11 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v5', JSON.stringify(legacy))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(10)
+    expect(state.version).toBe(11)
     expect(state.dataSource).toBe('user')
     expect(state.companies.jiurun.ncrs[0].rootCause).toBe('')
     expect(state.companies.jiurun.audits[0].notifySent).toBe(false)
+    expect(state.companies.jiurun.keyCustomerName).toBe('')
     expect(state.companies.jiurun.ncrs[0].correctiveAction).toBe('')
     expect(state.companies.jiurun.ncrs[0].verificationEvidence).toBe('')
     expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
@@ -67,7 +68,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(userState))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(10)
+    expect(state.version).toBe(11)
     expect(state.dataSource).toBe('user')
     expect(state.settings.leadAuditor).toBe('正式主導稽核員')
     expect(state.companies.jiurun.ncrs[0].description).toBe('使用者自訂 NCR 描述')
@@ -79,7 +80,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(cloned))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(10)
+    expect(state.version).toBe(11)
     expect(state.dataSource).toBe('demo')
     expect(companiesAreDifferentiated(state)).toBe(true)
     expect(state.companies.jiurun.ncrs.length).toBe(1)
@@ -96,7 +97,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v6', JSON.stringify(cloned))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(10)
+    expect(state.version).toBe(11)
     expect(state.dataSource).toBe('demo')
     expect(companiesAreDifferentiated(state)).toBe(true)
     expect(state.companies.zhenglongxing.ncrs.length).toBe(0)
@@ -137,7 +138,7 @@ describe('storage migration', () => {
     localStorage.setItem('qms-annual-internal-audit-v8', JSON.stringify(demo))
 
     const { state } = loadStateFromStorage()
-    expect(state.version).toBe(10)
+    expect(state.version).toBe(11)
     expect(state.settings.leadAuditor).toBe('自訂主任稽核員')
     expect(state.dataSource).toBe('demo')
     expect(state.companies.jiurun.audits.some((a) => a.qpCode === 'QP-28' && a.items.every((i) => i.judgment))).toBe(
