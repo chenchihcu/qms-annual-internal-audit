@@ -12,7 +12,9 @@ import { PreAuditPrep } from './components/PreAuditPrep'
 import { RiskAssessment } from './components/RiskAssessment'
 import { SettingsPanel } from './components/SettingsPanel'
 import { TAB_GROUPS, parseAppHash, syncHash } from './lib/navigation'
+import { shouldShowDemoBanner } from './lib/demoMode'
 import { getStoredTheme, toggleTheme } from './lib/theme'
+import { DemoBanner } from './components/DemoBanner'
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
@@ -86,14 +88,19 @@ function App() {
     ? store.lastSavedAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
     : null
 
+  const showDemoBanner = shouldShowDemoBanner(store.state)
+
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-16">
       <a href="#main-content" className="skip-link no-print">
         跳到主要內容
       </a>
 
       <header className="border-b border-line bg-surface no-print">
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
+          {showDemoBanner && (
+            <DemoBanner onDismiss={store.dismissDemoBanner} />
+          )}
           {(store.loadWarning || store.saveError) && (
             <div
               role="alert"

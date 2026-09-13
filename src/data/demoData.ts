@@ -2,6 +2,7 @@ import type { AppState, CompanyData, CompanyId } from '../types'
 import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
+import { normalizeNCRList } from '../lib/ncr'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
@@ -120,7 +121,102 @@ function buildAudit(
   }
 }
 
-function createCompanyData(companySuffix: string): CompanyData {
+function createCompanyData(companyId: CompanyId): CompanyData {
+  const companySuffix = companyId === 'jiurun' ? 'jiurun' : 'zlx'
+
+  if (companyId === 'jiurun') {
+    const planRows = autoArrangePlan(
+      {
+        departments,
+        planEntries: PROCEDURE_PLAN_TEMPLATE,
+        auditYear: settings.auditYear,
+        planWindowStart: settings.planWindowStart,
+        planWindowEnd: settings.planWindowEnd,
+        managementReviewDate: settings.managementReviewDate,
+        openCarryForwardCount: 2,
+      },
+      { leadAuditor: settings.leadAuditor },
+    )
+
+    const audits = [
+      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }]),
+      buildAudit('QP-16', 'dept-qa', [
+        { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
+      ]),
+      buildAudit('QP-20', 'dept-admin', [{ no: 1, judgment: '符合' }]),
+    ]
+
+    const ncrs = normalizeNCRList([
+      {
+        id: 'ncr-demo-1',
+        ncrNumber: `NCR-2026-001-${companySuffix}`,
+        qpCode: 'QP-16',
+        departmentId: 'dept-qa',
+        department: '品保部',
+        process: '製程/最終檢驗',
+        description: '不合格品隔離區標示不完整',
+        date: '2026-03-15',
+        status: '矯正中',
+        rootCause: '現場人員對隔離區標示規範不熟悉',
+        correctiveAction: '重訓並增設標示看板',
+        verificationEvidence: '',
+        checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
+      },
+    ])
+
+    return {
+      name: '',
+      departments,
+      planRows,
+      audits,
+      ncrs,
+      observations: [
+        {
+          id: `obs-2025-1-${companySuffix}`,
+          year: 2025,
+          qpCode: 'QP-01',
+          departmentId: 'dept-admin',
+          department: '管理部',
+          process: '文件管制',
+          content: '文件回收舊版時，部分部門未簽收確認',
+          description: '建議強化文件發放回收簽收紀錄',
+          status: 'open',
+        },
+        {
+          id: `obs-2025-2-${companySuffix}`,
+          year: 2025,
+          qpCode: 'QP-22',
+          departmentId: 'dept-prod',
+          department: '生產製造部',
+          process: '追溯性',
+          content: '工單與現場實際用料偶有不一致',
+          description: '建議每班首件核對工單物料',
+          status: 'open',
+        },
+      ],
+      suggestions: [
+        {
+          id: `sug-2025-1-${companySuffix}`,
+          year: 2025,
+          procedure: 'QP-18',
+          issue: '部分量測設備校正標籤資訊不完整',
+          progress: '已通知各單位補貼，待複查',
+          responsibleUnit: '品保部',
+          status: 'open',
+        },
+        {
+          id: `sug-2025-2-${companySuffix}`,
+          year: 2025,
+          procedure: 'QP-09',
+          issue: '合約審查紀錄缺少客戶特殊要求欄位',
+          progress: '表單已修訂，舊案補登中',
+          responsibleUnit: '業務部',
+          status: 'open',
+        },
+      ],
+    }
+  }
+
   const planRows = autoArrangePlan(
     {
       departments,
@@ -129,7 +225,7 @@ function createCompanyData(companySuffix: string): CompanyData {
       planWindowStart: settings.planWindowStart,
       planWindowEnd: settings.planWindowEnd,
       managementReviewDate: settings.managementReviewDate,
-      openCarryForwardCount: 2,
+      openCarryForwardCount: 0,
     },
     { leadAuditor: settings.leadAuditor },
   )
@@ -137,28 +233,10 @@ function createCompanyData(companySuffix: string): CompanyData {
   const audits = [
     buildAudit('QP-28', 'dept-qa', [
       { no: 1, judgment: '符合' },
+      { no: 2, judgment: '符合' },
     ]),
-    buildAudit('QP-16', 'dept-qa', [
-      { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
-    ]),
-    buildAudit('QP-20', 'dept-admin', [
-      { no: 1, judgment: '符合' },
-    ]),
-  ]
-
-  const ncrs = [
-    {
-      id: 'ncr-demo-1',
-      ncrNumber: `NCR-2026-001-${companySuffix}`,
-      qpCode: 'QP-16',
-      departmentId: 'dept-qa',
-      department: '品保部',
-      process: '製程/最終檢驗',
-      description: '不合格品隔離區標示不完整',
-      date: '2026-03-15',
-      status: '矯正中' as const,
-      checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
-    },
+    buildAudit('QP-05', 'dept-qa', [{ no: 1, judgment: '符合' }]),
+    buildAudit('QP-21', 'dept-prod', [{ no: 1, judgment: '觀察', description: '首件檢查紀錄偶缺簽名' }]),
   ]
 
   return {
@@ -166,49 +244,29 @@ function createCompanyData(companySuffix: string): CompanyData {
     departments,
     planRows,
     audits,
-    ncrs,
+    ncrs: [],
     observations: [
       {
         id: `obs-2025-1-${companySuffix}`,
         year: 2025,
-        qpCode: 'QP-01',
-        departmentId: 'dept-admin',
-        department: '管理部',
-        process: '文件管制',
-        content: '文件回收舊版時，部分部門未簽收確認',
-        description: '建議強化文件發放回收簽收紀錄',
-        status: 'open' as const,
-      },
-      {
-        id: `obs-2025-2-${companySuffix}`,
-        year: 2025,
-        qpCode: 'QP-22',
-        departmentId: 'dept-prod',
-        department: '生產製造部',
-        process: '追溯性',
-        content: '工單與現場實際用料偶有不一致',
-        description: '建議每班首件核對工單物料',
-        status: 'open' as const,
+        qpCode: 'QP-12',
+        departmentId: 'dept-qa',
+        department: '品保部',
+        process: '進料檢驗',
+        content: '供應商材質證明更新不及時',
+        description: '已列管追蹤，待供應商回覆',
+        status: 'open',
       },
     ],
     suggestions: [
       {
         id: `sug-2025-1-${companySuffix}`,
         year: 2025,
-        procedure: 'QP-18',
-        issue: '部分量測設備校正標籤資訊不完整',
-        progress: '已通知各單位補貼，待複查',
-        responsibleUnit: '品保部',
-        status: 'open' as const,
-      },
-      {
-        id: `sug-2025-2-${companySuffix}`,
-        year: 2025,
-        procedure: 'QP-09',
-        issue: '合約審查紀錄缺少客戶特殊要求欄位',
-        progress: '表單已修訂，舊案補登中',
-        responsibleUnit: '業務部',
-        status: 'open' as const,
+        procedure: 'QP-07',
+        issue: '教育訓練矩陣未含新進人員',
+        progress: 'HR 補登中',
+        responsibleUnit: '管理部',
+        status: 'open',
       },
     ],
   }
@@ -233,18 +291,44 @@ export function createDemoState(): AppState {
     settings,
     companies,
     externalAuditPrep: prep,
-    version: 5,
+    dataSource: 'demo',
+    version: 6,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v5'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v6'
+
+function migrateCompanyNcrs(company: CompanyData): CompanyData {
+  return {
+    ...company,
+    ncrs: normalizeNCRList(company.ncrs),
+  }
+}
+
+export function migrateToV6(raw: AppState): AppState {
+  const companies = {
+    jiurun: migrateCompanyNcrs(raw.companies.jiurun),
+    zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
+  }
+  return {
+    ...raw,
+    companies,
+    dataSource: raw.dataSource ?? 'user',
+    version: 6,
+  }
+}
 
 export function migrateToV4(raw: AppState): AppState {
-  if (raw.version >= 5 && raw.externalAuditPrep) return raw
+  if (raw.version >= 6) return raw
+  if (raw.version >= 5 && raw.externalAuditPrep) return migrateToV6(raw)
   const demo = createDemoState()
   demo.activeCompanyId = raw.activeCompanyId
   demo.settings = raw.settings
-  demo.companies = raw.companies
+  demo.companies = {
+    jiurun: migrateCompanyNcrs(raw.companies.jiurun),
+    zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
+  }
+  demo.dataSource = 'user'
   return demo
 }
 
@@ -271,7 +355,7 @@ export function migrateV1State(raw: unknown): AppState | null {
       })),
     })) as CompanyData['audits']
   }
-  if (old.ncrs) company.ncrs = old.ncrs as CompanyData['ncrs']
+  if (old.ncrs) company.ncrs = normalizeNCRList(old.ncrs as CompanyData['ncrs'])
   if (old.observations) company.observations = old.observations as CompanyData['observations']
   return demo
 }

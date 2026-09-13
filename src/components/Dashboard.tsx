@@ -3,15 +3,15 @@ import {
   formatScoreDisplay,
   hasAnyJudgment,
 } from '../lib/scoring'
-import { buildAuditFocusOverview } from '../lib/planner'
+import { buildDashboardRiskTiles } from '../lib/dashboardTiles'
 import type { AppState, TabId } from '../types'
-import { Badge, Card } from './ui/Badge'
+import { Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 interface DashboardProps {
   state: AppState & { company: AppState['companies'][keyof AppState['companies']] }
-  onNavigate: (tab: TabId) => void
+  onNavigate: (tab: TabId, auditKey?: string) => void
 }
 
 function KpiCard({
@@ -51,7 +51,7 @@ function KpiCard({
 export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
   const summary = calculateAnnualScore(company.audits, settings.scoringRules)
-  const focusRows = buildAuditFocusOverview(company.planRows)
+  const riskGroups = buildDashboardRiskTiles(company, settings.scoringRules)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -81,6 +81,11 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       ? summary.overallScore
       : 0
 
+  const handleTileClick = (auditKey: string) => {
+    if (!auditKey) return
+    onNavigate('audit', auditKey)
+  }
+
   return (
     <div className="space-y-6 print-area">
       <PrintDocHeader
@@ -89,37 +94,25 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         formTitle="年度稽核儀表板"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title={`年度總分 · ${company.name}`}
           value={overallDisplay}
           hint={summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序'}
         />
         <KpiCard
-          title="未結案 NCR"
-          value={openNCR}
-          hint={`全部 ${company.ncrs.length} 件`}
+          title="不符合（NCR）"
+          value={company.ncrs.length}
+          hint={`未結案 ${openNCR} 件`}
           accent="text-red-600 dark:text-red-400"
           onClick={() => onNavigate('ncr')}
         />
         <KpiCard
-          title="本年查檢觀察"
-          value={summary.totalObservation}
-          hint="查檢表判定「觀察」"
+          title="觀察 / 第三方建議"
+          value={summary.totalObservation + openSug}
+          hint={`待追蹤 ${openObs + openSug} 件`}
           accent="text-amber-600 dark:text-amber-400"
           onClick={() => onNavigate('observations')}
-        />
-        <KpiCard
-          title="跨年待追蹤"
-          value={openObs}
-          hint="前年度觀察 open"
-          onClick={() => onNavigate('observations')}
-        />
-        <KpiCard
-          title="第三方建議"
-          value={openSug}
-          hint="待追蹤建議"
-          onClick={() => onNavigate('suggestions')}
         />
         <KpiCard
           title="計畫稽核次數"
@@ -149,38 +142,54 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       )}
 
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-ink">稽核重點標示（QR-28-01 概覽）</h2>
-        {focusRows.length === 0 ? (
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-lg font-semibold text-ink">稽核重點與得分（QR-28-01）</h2>
+          <p className="text-xs text-muted">
+            綠 ≥80% · 琥珀 ≥60% · 紅 &lt;60% · 未評分 —
+          </p>
+        </div>
+
+        {riskGroups.length === 0 ? (
           <EmptyState message="尚無計畫列，請至「年度計畫」建立或自動編排。" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-line bg-page text-left text-muted">
-                  <th className="p-2">Sheet</th>
-                  <th className="p-2">風險等級</th>
-                  <th className="p-2">稽核程序</th>
-                  <th className="p-2">被稽核單位</th>
-                  <th className="p-2">負責人</th>
-                  <th className="p-2 text-center">查檢項數</th>
-                  <th className="p-2">稽核類型</th>
-                </tr>
-              </thead>
-              <tbody>
-                {focusRows.map((row) => (
-                  <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-line">
-                    <td className="p-2 text-muted">{row.sheet}</td>
-                    <td className="p-2"><Badge label={row.riskLevel} /></td>
-                    <td className="p-2 font-medium text-ink">{row.qpCode}</td>
-                    <td className="p-2">{row.department}</td>
-                    <td className="p-2">{row.owner}</td>
-                    <td className="p-2 text-center">{row.itemCount}</td>
-                    <td className="p-2 text-muted">{row.auditCategory}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-6">
+            {riskGroups.map((group) => (
+              <section key={group.riskLevel}>
+                <h3 className="mb-3 text-sm font-semibold text-ink">
+                  {group.riskLevel === '高' ? '高風險' : group.riskLevel === '中' ? '中風險' : '低風險'}
+                  {' · '}
+                  {group.tiles.length}
+                </h3>
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {group.tiles.map((tile) => (
+                    <button
+                      key={`${tile.qpCode}-${tile.departmentId}`}
+                      type="button"
+                      onClick={() => handleTileClick(tile.auditKey)}
+                      className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 no-print"
+                      aria-label={`${tile.qpCode} ${tile.department}，得分 ${tile.scoreLabel}，前往程序稽核`}
+                    >
+                      <p className="font-semibold text-ink">{tile.qpCode}</p>
+                      <p className="mt-1 text-xs text-muted">{tile.department}</p>
+                      <p className={`mt-3 text-2xl font-bold ${tile.scoreClass}`}>{tile.scoreLabel}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 hidden print:block">
+                  <table className="w-full border-collapse text-sm">
+                    <tbody>
+                      {group.tiles.map((tile) => (
+                        <tr key={`print-${tile.qpCode}-${tile.departmentId}`} className="border-b border-line">
+                          <td className="p-1">{tile.qpCode}</td>
+                          <td className="p-1">{tile.department}</td>
+                          <td className="p-1">{tile.scoreLabel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </Card>

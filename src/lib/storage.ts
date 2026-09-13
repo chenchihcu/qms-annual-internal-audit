@@ -1,5 +1,17 @@
-import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
+import {
+  createDemoState,
+  migrateToV4,
+  migrateToV6,
+  migrateV1State,
+  STORAGE_KEY,
+} from '../data/demoData'
 import type { AppState } from '../types'
+
+export const LEGACY_STORAGE_KEYS = [
+  STORAGE_KEY,
+  'qms-annual-internal-audit-v5',
+  'qms-annual-internal-audit-v4',
+] as const
 
 export const CORRUPT_BACKUP_KEY = `${STORAGE_KEY}-corrupt-backup`
 
@@ -13,13 +25,29 @@ export interface SaveStateResult {
   error?: string
 }
 
+function parseStoredState(raw: string): AppState {
+  const parsed = JSON.parse(raw) as AppState
+  if (parsed.version >= 6) return parsed
+  if (parsed.version >= 4 && parsed.externalAuditPrep) return migrateToV6(parsed)
+  if (parsed.companies) return migrateToV4(parsed)
+  return parsed
+}
+
 export function loadStateFromStorage(): LoadStateResult {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as AppState
-      if (parsed.version >= 4 && parsed.externalAuditPrep) return { state: parsed }
-      if (parsed.companies) return { state: migrateToV4(parsed) }
+    for (const key of LEGACY_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      const state = parseStoredState(raw)
+      if (key !== STORAGE_KEY) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+          localStorage.removeItem(key)
+        } catch {
+          /* quota */
+        }
+      }
+      return { state }
     }
     const legacy = localStorage.getItem('qms-annual-internal-audit-v1')
     if (legacy) {

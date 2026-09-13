@@ -29,6 +29,17 @@ html.dark {
     line-height: 1.6;
   }
 
+  /* Netlify deploy badge / HUD — keep off interactive UI & print */
+  iframe[src*="netlify"],
+  a[href*="netlify.com"][target="_blank"][rel*="noopener"],
+  #netlify-badge,
+  [data-netlify-hud],
+  [data-netlify-deploy-status],
+  .netlify-badge {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
   a.skip-link {
     @apply absolute left-2 top-2 z-[100] -translate-y-16 rounded-lg bg-primary px-3 py-2 text-sm text-white transition;
   }
@@ -104,4 +115,15 @@ html.dark {
 
 .print-only {
   display: none;
+}
+
+/* 查檢表長文不截斷（螢幕與列印） */
+.qr-checklist td.align-top {
+  vertical-align: top;
+}
+
+.qr-checklist .audit-content-cell {
+  min-width: 12rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
