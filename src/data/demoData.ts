@@ -282,7 +282,7 @@ export function createDemoState(): AppState {
   }
 
   const prep = createDefaultPrepState(settings.auditYear)
-  prep.internalAuditComplete = true
+  prep.internalAuditCompleteOverride = true
   prep.items[0].jiurunDone = true
   prep.items[0].zhenglongxingDone = true
 
@@ -306,20 +306,40 @@ function migrateCompanyNcrs(company: CompanyData): CompanyData {
 }
 
 export function migrateToV6(raw: AppState): AppState {
-  const companies = {
-    jiurun: migrateCompanyNcrs(raw.companies.jiurun),
-    zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
+  if (raw.version >= 6) {
+    return {
+      ...raw,
+      companies: {
+        jiurun: migrateCompanyNcrs(raw.companies.jiurun),
+        zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
+      },
+      dataSource: raw.dataSource ?? 'user',
+    }
+  }
+  const prep = raw.externalAuditPrep
+  const migratedPrep = {
+    ...prep,
+    internalAuditCompleteOverride:
+      prep.internalAuditCompleteOverride ??
+      (prep.internalAuditComplete === true ? true : undefined),
+  }
+  const { internalAuditComplete: _legacy, ...prepWithoutLegacy } = migratedPrep as AppState['externalAuditPrep'] & {
+    internalAuditComplete?: boolean
   }
   return {
     ...raw,
-    companies,
+    companies: {
+      jiurun: migrateCompanyNcrs(raw.companies.jiurun),
+      zhenglongxing: migrateCompanyNcrs(raw.companies.zhenglongxing),
+    },
+    externalAuditPrep: prepWithoutLegacy,
     dataSource: raw.dataSource ?? 'user',
     version: 6,
   }
 }
 
 export function migrateToV4(raw: AppState): AppState {
-  if (raw.version >= 6) return raw
+  if (raw.version >= 6 && raw.externalAuditPrep) return migrateToV6(raw)
   if (raw.version >= 5 && raw.externalAuditPrep) return migrateToV6(raw)
   const demo = createDemoState()
   demo.activeCompanyId = raw.activeCompanyId

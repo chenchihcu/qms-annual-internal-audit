@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   collectNCRsFromAudits,
+  ensureNcrFromObservation,
+  findNcrForObservation,
   isNcrStale,
   findChecklistItem,
   normalizeNCR,
 } from '../ncr'
-import type { ChecklistItem, NCR, ProcedureAudit } from '../../types'
+import type { ChecklistItem, NCR, Observation, ProcedureAudit } from '../../types'
 
 const baseAudit = (items: ChecklistItem[]): ProcedureAudit => ({
   id: 'audit-1',
@@ -89,5 +91,45 @@ describe('findChecklistItem', () => {
   it('finds item across audits', () => {
     const audits = [baseAudit([{ id: 'x', category: 'a', no: 1, content: '', judgment: null, description: '' }])]
     expect(findChecklistItem(audits, 'x')?.id).toBe('x')
+  })
+})
+
+const sampleObservation = (): Observation => ({
+  id: 'obs-1',
+  year: 2025,
+  qpCode: 'QP-01',
+  departmentId: 'dept-admin',
+  department: '管理部',
+  process: '文件管制',
+  content: '文件回收未簽收',
+  description: '建議補強簽收紀錄',
+  status: 'became_ncr',
+})
+
+describe('ensureNcrFromObservation', () => {
+  it('creates NCR with 開立 status and observation link', () => {
+    const obs = sampleObservation()
+    const { ncrs, ncrId } = ensureNcrFromObservation(obs, [], 2026)
+    expect(ncrs).toHaveLength(1)
+    expect(ncrId).toBe('ncr-obs-obs-1')
+    expect(ncrs[0].status).toBe('開立')
+    expect(ncrs[0].observationId).toBe('obs-1')
+    expect(ncrs[0].qpCode).toBe('QP-01')
+    expect(ncrs[0].description).toContain('簽收')
+  })
+
+  it('does not duplicate when called again', () => {
+    const obs = sampleObservation()
+    const first = ensureNcrFromObservation(obs, [], 2026)
+    const linked = { ...obs, ncrId: first.ncrId }
+    const second = ensureNcrFromObservation(linked, first.ncrs, 2026)
+    expect(second.ncrs).toHaveLength(1)
+    expect(second.ncrId).toBe(first.ncrId)
+  })
+
+  it('finds NCR by observationId even without ncrId on observation', () => {
+    const obs = sampleObservation()
+    const { ncrs } = ensureNcrFromObservation(obs, [], 2026)
+    expect(findNcrForObservation(ncrs, obs)?.id).toBe('ncr-obs-obs-1')
   })
 })

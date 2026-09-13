@@ -1,14 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
+  computeInternalAuditComplete,
   createDefaultPrepState,
   countPrepProgress,
   evaluatePrepSequence,
+  getEffectiveInternalAuditComplete,
   getPrepTemplate,
   isItemDone,
+  isProcedureAuditCompleteEnough,
   itemHasCallout,
   EXTERNAL_AUDIT_PREP_SEED,
 } from '../externalAuditPrep'
-import type { CompanyData } from '../../types'
+import type { CompanyData, ProcedureAudit } from '../../types'
 
 const emptyCompany = (): CompanyData => ({
   name: '測試',
@@ -108,10 +111,31 @@ describe('evaluatePrepSequence', () => {
   it('warns when management review done before internal audit', () => {
     const prep = createDefaultPrepState(2026)
     prep.managementReviewComplete = true
-    prep.internalAuditComplete = false
+    const incompleteCompany = (): CompanyData => ({
+      ...emptyCompany(),
+      planRows: [
+        {
+          id: 'r1',
+          qpCode: 'QP-01',
+          departmentId: 'd1',
+          sequence: 1,
+          riskLevel: '中',
+          department: '管理部',
+          process: 'p',
+          documents: 'd',
+          auditUnit: '品保',
+          owner: 'o',
+          auditors: '',
+          auditCategory: '系統稽核',
+          months: Array(12).fill(null),
+          manualOverride: false,
+        },
+      ],
+      audits: [],
+    })
     const result = evaluatePrepSequence(prep, {
-      jiurun: emptyCompany(),
-      zhenglongxing: emptyCompany(),
+      jiurun: incompleteCompany(),
+      zhenglongxing: incompleteCompany(),
     })
     expect(result.sequenceWarning).toBe(true)
     expect(result.messages.some((m) => m.includes('管理審查'))).toBe(true)
@@ -119,13 +143,88 @@ describe('evaluatePrepSequence', () => {
 
   it('no sequence warning when order is correct', () => {
     const prep = createDefaultPrepState(2026)
-    prep.internalAuditComplete = true
+    prep.internalAuditCompleteOverride = true
     prep.managementReviewComplete = true
     const result = evaluatePrepSequence(prep, {
       jiurun: emptyCompany(),
       zhenglongxing: emptyCompany(),
     })
     expect(result.sequenceWarning).toBe(false)
+  })
+})
+
+describe('computeInternalAuditComplete', () => {
+  const baseAudit = (withDate: boolean, allJudged: boolean): ProcedureAudit => ({
+    id: 'a1',
+    qpCode: 'QP-01',
+    departmentId: 'd1',
+    department: '管理部',
+    process: 'p',
+    documents: 'd',
+    notifyDate: '',
+    auditDate: withDate ? '2026-03-01' : '',
+    departmentManager: '',
+    auditors: '',
+    auditCategory: '系統稽核',
+    items: [
+      {
+        id: 'i1',
+        category: 'c',
+        no: 1,
+        content: 'x',
+        judgment: allJudged ? '符合' : null,
+        description: '',
+      },
+    ],
+  })
+
+  it('is complete when audit has date', () => {
+    expect(isProcedureAuditCompleteEnough(baseAudit(true, false))).toBe(true)
+  })
+
+  it('is complete when all items judged without date', () => {
+    expect(isProcedureAuditCompleteEnough(baseAudit(false, true))).toBe(true)
+  })
+
+  it('requires both companies plan rows satisfied', () => {
+    const company = (): CompanyData => ({
+      ...emptyCompany(),
+      planRows: [
+        {
+          id: 'r1',
+          qpCode: 'QP-01',
+          departmentId: 'd1',
+          sequence: 1,
+          riskLevel: '中',
+          department: '管理部',
+          process: 'p',
+          documents: 'd',
+          auditUnit: '品保',
+          owner: 'o',
+          auditors: '',
+          auditCategory: '系統稽核',
+          months: Array(12).fill(null),
+          manualOverride: false,
+        },
+      ],
+      audits: [baseAudit(true, false)],
+    })
+    const summary = computeInternalAuditComplete({
+      jiurun: company(),
+      zhenglongxing: company(),
+    })
+    expect(summary.complete).toBe(true)
+  })
+
+  it('uses override when set', () => {
+    const prep = createDefaultPrepState(2026)
+    prep.internalAuditCompleteOverride = true
+    expect(
+      getEffectiveInternalAuditComplete(prep, {
+        jiurun: emptyCompany(),
+        zhenglongxing: emptyCompany(),
+      }),
+    ).toBe(true)
   })
 })
 

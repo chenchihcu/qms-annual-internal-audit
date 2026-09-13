@@ -3,12 +3,16 @@ import type { ExternalAuditPrepItemState } from '../types'
 import type { PrepScopeMode } from '../lib/externalAuditPrep'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
+  computeInternalAuditComplete,
   countPrepProgress,
   evaluatePrepSequence,
+  getEffectiveInternalAuditComplete,
+  getInternalAuditCompleteOverride,
   getPrepTemplate,
   isItemDone,
   itemHasCallout,
 } from '../lib/externalAuditPrep'
+import { Button } from './ui/Badge'
 import { Card } from './ui/Badge'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
@@ -156,10 +160,18 @@ function DoneCell({
 }
 
 export function PreAuditPrep({ store }: { store: AuditStore }) {
-  const { state, updateExternalPrepItem, updateExternalPrepSequence } = store
+  const {
+    state,
+    updateExternalPrepItem,
+    updateExternalPrepSequence,
+    resetInternalAuditCompleteOverride,
+  } = store
   const { settings, externalAuditPrep, companies } = state
   const { done, total } = countPrepProgress(externalAuditPrep)
   const warnings = evaluatePrepSequence(externalAuditPrep, companies)
+  const internalAuditSummary = computeInternalAuditComplete(companies)
+  const effectiveInternalComplete = getEffectiveInternalAuditComplete(externalAuditPrep, companies)
+  const internalAuditOverride = getInternalAuditCompleteOverride(externalAuditPrep)
   const seed = EXTERNAL_AUDIT_PREP_SEED
 
   return (
@@ -192,18 +204,41 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         </div>
 
         <p className="mb-4 text-sm font-semibold text-ink">稽核序位（須依序完成）</p>
+        <div className="mb-2 text-xs text-muted">
+          內部稽核完成度（自動）：
+          {internalAuditSummary.details.map((d) => (
+            <span key={d.companyId} className="ml-2">
+              {d.companyName} {d.completedCount}/{d.plannedCount}
+            </span>
+          ))}
+          {internalAuditSummary.complete ? ' · 兩公司程序皆已足夠完成' : ' · 尚有未完成程序'}
+        </div>
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
             <label className="flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
               <input
                 type="checkbox"
                 className={`h-4 w-4 ${FOCUS_RING}`}
-                checked={externalAuditPrep.internalAuditComplete}
+                checked={effectiveInternalComplete}
                 onChange={(e) =>
-                  updateExternalPrepSequence({ internalAuditComplete: e.target.checked })
+                  updateExternalPrepSequence({
+                    internalAuditCompleteOverride: e.target.checked,
+                  })
                 }
               />
               <span className="font-medium">1. 內部稽核完成</span>
+              {internalAuditOverride === undefined && (
+                <span className="text-xs text-muted">（自動）</span>
+              )}
             </label>
+            {internalAuditOverride !== undefined && (
+              <Button
+                variant="secondary"
+                className="text-xs"
+                onClick={() => resetInternalAuditCompleteOverride()}
+              >
+                重設為自動判定
+              </Button>
+            )}
             <span className="text-muted">→</span>
             <label className="flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
               <input
