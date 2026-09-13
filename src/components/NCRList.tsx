@@ -4,6 +4,7 @@ import { canTransitionNcrStatus, isNcrStale, validateNcrClose } from '../lib/ncr
 import type { NCRClassification, NCRStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
+import { FormPrintButton } from './ui/FormPrintButton'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
@@ -124,11 +125,14 @@ export function NCRList({
       </Card>
 
       <Card>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
-          <p className="text-sm text-muted">
-            查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。結案後年度計畫月格將自動更新為矯正圓滿。
-          </p>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
+            <p className="text-sm text-muted">
+              查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。結案後年度計畫月格將自動更新為矯正圓滿。
+            </p>
+          </div>
+          <FormPrintButton />
         </div>
 
         <PrintDocHeader

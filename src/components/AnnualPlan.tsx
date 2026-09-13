@@ -1,12 +1,14 @@
 import { useCallback, useState, type MouseEvent } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { TabId } from '../types'
+import { checkPlanRowImpartiality } from '../lib/impartiality'
 import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { FormPrintButton } from './ui/FormPrintButton'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
@@ -134,7 +136,10 @@ export function AnnualPlan({
             <h2 className="text-lg font-semibold text-ink">年度稽核計畫（QR-28-01）</h2>
             <p className="text-sm text-muted">程序導向編排 · 月格狀態對應紙本圖例</p>
           </div>
-          <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
+          <div className="flex flex-wrap gap-2">
+            <FormPrintButton />
+            <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
+          </div>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
@@ -220,7 +225,9 @@ export function AnnualPlan({
               </tr>
             </thead>
             <tbody>
-              {company.planRows.map((row) => (
+              {company.planRows.map((row) => {
+                const rowWarning = checkPlanRowImpartiality(row, company.departments)
+                return (
                 <tr key={row.id} className={row.manualOverride ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
                   <td className="border border-line p-2">{row.sequence}</td>
                   <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>
@@ -237,8 +244,14 @@ export function AnnualPlan({
                       className={`w-full rounded border border-line bg-surface px-1 py-0.5 text-sm no-print ${FOCUS_RING}`}
                       value={row.auditors}
                       onChange={(e) => updatePlanRow(row.id, { auditors: e.target.value })}
+                      title={rowWarning?.message}
                     />
                     <span className="print-only">{row.auditors}</span>
+                    {rowWarning && (
+                      <p className="mt-1 text-xs text-amber-700 no-print dark:text-amber-300" title={rowWarning.message}>
+                        ⚠ 公正性
+                      </p>
+                    )}
                   </td>
                   {(Array.isArray(row.months) ? row.months : []).map((scheduled, i) => {
                     const status = scheduled
@@ -275,7 +288,8 @@ export function AnnualPlan({
                     )
                   })}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>

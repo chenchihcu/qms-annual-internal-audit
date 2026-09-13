@@ -105,6 +105,44 @@ export function findNcrForObservation(ncrs: NCR[], observation: Observation): NC
   return ncrs.find((n) => n.observationId === observation.id)
 }
 
+/** 查檢表判定「觀察」時手動轉 NCR（不重複） */
+export function ensureNcrFromChecklistObservation(
+  audit: ProcedureAudit,
+  itemId: string,
+  existingNcrs: NCR[],
+  year: number,
+): { ncrs: NCR[]; ncrId: string | null } {
+  const item = audit.items.find((i) => i.id === itemId)
+  if (!item || item.judgment !== '觀察') {
+    return { ncrs: existingNcrs, ncrId: null }
+  }
+
+  const existing = existingNcrs.find((n) => n.checklistItemId === itemId)
+  if (existing) {
+    return { ncrs: existingNcrs, ncrId: existing.id }
+  }
+
+  const description = item.description.trim() !== '' ? item.description : item.content
+  const ncr = normalizeNCR({
+    id: `ncr-obs-chk-${itemId}`,
+    ncrNumber: generateNCRNumber(year, existingNcrs.length + 1),
+    qpCode: audit.qpCode,
+    departmentId: audit.departmentId,
+    department: audit.department,
+    process: audit.process,
+    description,
+    date: audit.auditDate || new Date().toISOString().slice(0, 10),
+    status: '開立',
+    checklistItemId: itemId,
+  })
+
+  return { ncrs: [...existingNcrs, ncr], ncrId: ncr.id }
+}
+
+export function findNcrForChecklistItem(ncrs: NCR[], itemId: string): NCR | undefined {
+  return ncrs.find((n) => n.checklistItemId === itemId)
+}
+
 /** 觀察事項設為「已轉 NCR」時建立 NCR（不重複） */
 export function ensureNcrFromObservation(
   observation: Observation,

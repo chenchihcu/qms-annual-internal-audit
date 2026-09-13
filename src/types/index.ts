@@ -98,6 +98,8 @@ export interface ProcedureAudit {
   process: string
   documents: string
   notifyDate: string
+  /** 已通知被稽核部門（QR-28-02 標記已通知） */
+  notifySent?: boolean
   auditDate: string
   /** 對應年度計畫排定月份（1–12） */
   plannedMonth?: number

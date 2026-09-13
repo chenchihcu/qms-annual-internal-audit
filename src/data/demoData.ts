@@ -308,7 +308,7 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 9,
+    version: 10,
   }
 }
 
