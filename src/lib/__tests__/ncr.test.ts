@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   collectNCRsFromAudits,
+  canTransitionNcrStatus,
   ensureNcrFromObservation,
   findNcrForObservation,
   isNcrStale,
   findChecklistItem,
   normalizeNCR,
+  validateNcrClose,
 } from '../ncr'
 import type { ChecklistItem, NCR, Observation, ProcedureAudit } from '../../types'
 
@@ -131,5 +133,44 @@ describe('ensureNcrFromObservation', () => {
     const obs = sampleObservation()
     const { ncrs } = ensureNcrFromObservation(obs, [], 2026)
     expect(findNcrForObservation(ncrs, obs)?.id).toBe('ncr-obs-obs-1')
+  })
+})
+
+describe('validateNcrClose', () => {
+  it('blocks close when verificationEvidence is empty', () => {
+    const ncr: NCR = {
+      id: 'n1',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-16',
+      departmentId: 'd1',
+      department: '品保部',
+      process: 'p',
+      description: 'desc',
+      date: '2026-03-01',
+      status: '矯正中',
+      rootCause: '原因',
+      correctiveAction: '措施',
+      verificationEvidence: '',
+    }
+    expect(validateNcrClose(ncr).ok).toBe(false)
+    expect(canTransitionNcrStatus(ncr, '結案').ok).toBe(false)
+  })
+
+  it('allows close when required fields are filled', () => {
+    const ncr: NCR = {
+      id: 'n1',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-16',
+      departmentId: 'd1',
+      department: '品保部',
+      process: 'p',
+      description: 'desc',
+      date: '2026-03-01',
+      status: '矯正中',
+      rootCause: '原因',
+      correctiveAction: '措施',
+      verificationEvidence: '複查合格',
+    }
+    expect(canTransitionNcrStatus(ncr, '結案').ok).toBe(true)
   })
 })

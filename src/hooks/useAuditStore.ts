@@ -13,13 +13,20 @@ import type {
   ThirdPartySuggestion,
 } from '../types'
 import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
+import { migrateState } from '../lib/migrate'
 import { autoArrangePlan } from '../lib/planner'
 import {
   auditIdForPlanRow,
   shouldPropagateAuditAuditorsToPlan,
   shouldPropagatePlanAuditorsToAudit,
 } from '../lib/auditorSync'
-import { collectNCRsFromAudits, ensureNcrFromObservation, generateNCRNumber } from '../lib/ncr'
+import { carryPlanDatesToAudit } from '../lib/auditDates'
+import {
+  canTransitionNcrStatus,
+  collectNCRsFromAudits,
+  ensureNcrFromObservation,
+  generateNCRNumber,
+} from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
@@ -151,9 +158,18 @@ export function useAuditStore() {
       return patchCompany(s, s.activeCompanyId, {
         planRows: co.planRows.map((r) => {
           if (r.id !== rowId) return r
+          const manualMonthOverrides = [...(r.manualMonthOverrides ?? Array(12).fill(null))] as (
+            | MonthStatus
+            | null
+          )[]
+          manualMonthOverrides[monthIndex] = status
           const months = [...r.months] as MonthStatus[]
-          months[monthIndex] = status
-          return { ...r, months, manualOverride: true }
+          if (status === null) {
+            months[monthIndex] = null
+          } else if (!months[monthIndex]) {
+            months[monthIndex] = '擬定'
+          }
+          return { ...r, months, manualMonthOverrides, manualOverride: true }
         }),
       })
     })
@@ -174,39 +190,25 @@ export function useAuditStore() {
         (e) => e.qpCode === qpCode && e.departmentId === departmentId,
       ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
       const auditors = planRow?.auditors ?? dept?.defaultAuditors ?? ''
-      if (!dept || !entry) {
-        return {
-          id: auditId,
-          qpCode,
-          departmentId,
-          department: dept?.name ?? departmentId,
-          process: entry?.process ?? qpCode,
-          documents: entry?.documents ?? qpCode,
-          notifyDate: '',
-          auditDate: '',
-          departmentManager: dept?.owner ?? '',
-          auditors,
-          auditCategory: entry?.auditCategory ?? '系統稽核',
-          items: createChecklistForProcedure(qpCode, dept?.name),
-        }
-      }
-
-      return {
+      const base: ProcedureAudit = {
         id: auditId,
         qpCode,
         departmentId,
-        department: dept.name,
-        process: entry.process,
-        documents: entry.documents,
+        department: dept?.name ?? departmentId,
+        process: entry?.process ?? qpCode,
+        documents: entry?.documents ?? qpCode,
         notifyDate: '',
         auditDate: '',
-        departmentManager: dept.owner,
+        departmentManager: dept?.owner ?? '',
         auditors,
-        auditCategory: entry.auditCategory,
-        items: createChecklistForProcedure(qpCode, dept.name),
+        auditCategory: entry?.auditCategory ?? '系統稽核',
+        items: createChecklistForProcedure(qpCode, dept?.name),
       }
+      return planRow
+        ? carryPlanDatesToAudit(planRow, base, state.settings.auditYear)
+        : base
     },
-    [activeCompany],
+    [activeCompany, state.settings.auditYear],
   )
 
   const persistAudit = useCallback(
@@ -312,8 +314,19 @@ export function useAuditStore() {
   const updateNCR = useCallback((id: string, patch: Partial<NCR>) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
+      const current = co.ncrs.find((n) => n.id === id)
+      if (!current) return s
+
+      const merged = { ...current, ...patch }
+      if (patch.status && patch.status !== current.status) {
+        const gate = canTransitionNcrStatus(merged, patch.status)
+        if (!gate.ok) {
+          return s
+        }
+      }
+
       return patchCompany(s, s.activeCompanyId, {
-        ncrs: co.ncrs.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+        ncrs: co.ncrs.map((n) => (n.id === id ? merged : n)),
       })
     })
   }, [])
@@ -674,15 +687,15 @@ export function useAuditStore() {
 
   const importJSON = useCallback((json: string) => {
     const parsed = parseImportJSON(json)
-    if (parsed.version < 4) {
+      if (parsed.version < 4) {
       const migrated =
         parsed.version === 1 ? migrateV1State(parsed) : migrateToV4(parsed as AppState)
       if (migrated) {
-        setState({ ...migrated, dataSource: 'user' })
+        setState({ ...migrateState(migrated), dataSource: 'user' })
         return
       }
     }
-    setState({ ...parsed, dataSource: 'user' })
+    setState({ ...migrateState(parsed), dataSource: 'user' })
   }, [])
 
   const dismissDemoBanner = useCallback(() => {

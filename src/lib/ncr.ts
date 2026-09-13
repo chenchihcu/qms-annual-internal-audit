@@ -28,6 +28,11 @@ export function normalizeNCRList(ncrs: Array<Partial<NCR> & Pick<NCR, 'id' | 'nc
   return ncrs.map(normalizeNCR)
 }
 
+export interface NcrCloseGateResult {
+  ok: boolean
+  missing: string[]
+}
+
 export function generateNCRNumber(year: number, index: number): string {
   return `NCR-${year}-${String(index).padStart(3, '0')}`
 }
@@ -131,4 +136,30 @@ export function ensureNcrFromObservation(
   })
 
   return { ncrs: [...existingNcrs, ncr], ncrId: ncr.id }
+}
+
+export function isNcrOpen(ncr: NCR): boolean {
+  return ncr.status === '開立' || ncr.status === '矯正中'
+}
+
+export function isNcrClosed(ncr: NCR): boolean {
+  return ncr.status === '結案'
+}
+
+const CLOSE_REQUIRED_LABELS: Array<{ key: keyof NCR; label: string }> = [
+  { key: 'rootCause', label: '根本原因' },
+  { key: 'correctiveAction', label: '矯正措施' },
+  { key: 'verificationEvidence', label: '驗證／結案佐證' },
+]
+
+export function validateNcrClose(ncr: NCR): NcrCloseGateResult {
+  const missing = CLOSE_REQUIRED_LABELS.filter(({ key }) => !String(ncr[key] ?? '').trim()).map(
+    ({ label }) => label,
+  )
+  return { ok: missing.length === 0, missing }
+}
+
+export function canTransitionNcrStatus(ncr: NCR, nextStatus: NCRStatus): NcrCloseGateResult {
+  if (nextStatus !== '結案') return { ok: true, missing: [] }
+  return validateNcrClose(ncr)
 }

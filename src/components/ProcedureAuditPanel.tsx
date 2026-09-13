@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { carryPlanDatesToAudit } from '../lib/auditDates'
+import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
 import { isSeedChecklistItem } from '../lib/checklistItem'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import type { Judgment } from '../types'
@@ -62,10 +64,34 @@ export function ProcedureAuditPanel({
       ? company.audits.find((a) => a.qpCode === qpCode && a.departmentId === departmentId)
       : undefined
 
+  const planRow = company.planRows.find(
+    (row) => row.qpCode === qpCode && row.departmentId === departmentId,
+  )
+
   useEffect(() => {
-    if (!qpCode || !departmentId || persistedAudit) return
-    updateAudit(getOrCreateAudit(qpCode, departmentId))
-  }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
+    if (!qpCode || !departmentId) return
+    if (!persistedAudit) {
+      updateAudit(getOrCreateAudit(qpCode, departmentId))
+      return
+    }
+    if (!planRow) return
+    const carried = carryPlanDatesToAudit(planRow, persistedAudit, settings.auditYear)
+    if (
+      carried.notifyDate !== persistedAudit.notifyDate ||
+      carried.auditDate !== persistedAudit.auditDate ||
+      carried.plannedMonth !== persistedAudit.plannedMonth
+    ) {
+      updateAudit(carried)
+    }
+  }, [
+    qpCode,
+    departmentId,
+    persistedAudit,
+    planRow,
+    settings.auditYear,
+    getOrCreateAudit,
+    updateAudit,
+  ])
 
   if (!qpCode || !departmentId) {
     return <p className="text-muted">請先於年度計畫建立程序稽核項目</p>
@@ -74,6 +100,8 @@ export function ProcedureAuditPanel({
   const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
+  const complete = isProcedureComplete(audit)
+  const pendingCount = countPendingItems(audit.items)
   const categories = [...new Set(audit.items.map((i) => i.category))]
 
   const handleHeaderChange = (field: string, value: string) => {
@@ -201,10 +229,24 @@ export function ProcedureAuditPanel({
           </table>
         </div>
 
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm text-muted">
-            程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
-          </p>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <p className="text-muted">
+              程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
+            </p>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                complete
+                  ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+              }`}
+            >
+              {complete ? '查檢已完成' : `查檢未完成（尚餘 ${pendingCount} 項未判定）`}
+            </span>
+            {audit.plannedMonth && (
+              <span className="text-xs text-muted">計畫月份：{audit.plannedMonth} 月</span>
+            )}
+          </div>
           <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)}>
             新增稽核項目
           </Button>
@@ -219,6 +261,9 @@ export function ProcedureAuditPanel({
                 <th className="border border-line p-2 w-12">NO</th>
                 <th className="border border-line p-2">稽核內容</th>
                 <th className="border border-line p-2 w-28">判定</th>
+                <th className="border border-line p-2 w-24">抽樣</th>
+                <th className="border border-line p-2 w-32">客觀證據</th>
+                <th className="border border-line p-2 w-24">AS9100</th>
                 <th className="border border-line p-2">內容說明</th>
                 <th className="border border-line p-2 w-24 no-print">操作</th>
               </tr>
@@ -264,6 +309,41 @@ export function ProcedureAuditPanel({
                         ))}
                       </select>
                       <span className="print-only">{item.judgment && <Badge label={item.judgment} />}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                        placeholder="例：3 件"
+                        value={item.sampleSize ?? ''}
+                        onChange={(e) =>
+                          updateChecklistItem(audit.id, item.id, { sampleSize: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{item.sampleSize}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                        placeholder="例：QR-05-01"
+                        value={item.objectiveEvidence ?? ''}
+                        onChange={(e) =>
+                          updateChecklistItem(audit.id, item.id, {
+                            objectiveEvidence: e.target.value,
+                          })
+                        }
+                      />
+                      <span className="print-only">{item.objectiveEvidence}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                        placeholder="例：7.1.5"
+                        value={item.as9100Clause ?? ''}
+                        onChange={(e) =>
+                          updateChecklistItem(audit.id, item.id, { as9100Clause: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{item.as9100Clause}</span>
                     </td>
                     <td className="border border-line p-2 align-top">
                       {expandedDesc.has(item.id) ? (

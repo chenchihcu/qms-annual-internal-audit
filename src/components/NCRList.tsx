@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { isNcrStale } from '../lib/ncr'
-import type { NCRStatus } from '../types'
+import { canTransitionNcrStatus, isNcrStale, validateNcrClose } from '../lib/ncr'
+import type { NCRClassification, NCRStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
+const CLASSIFICATIONS: NCRClassification[] = ['重大', '輕微']
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
@@ -47,11 +48,33 @@ export function NCRList({ store }: { store: AuditStore }) {
     departmentId: company.planRows[0]?.departmentId ?? '',
     description: '',
   })
+  const [closeErrors, setCloseErrors] = useState<Record<string, string>>({})
 
   const planRowOptions = company.planRows.map((r) => ({
     value: `${r.qpCode}|${r.departmentId}`,
     label: `${r.qpCode} · ${r.department}`,
   }))
+
+  const handleStatusChange = (ncrId: string, nextStatus: NCRStatus) => {
+    const ncr = company.ncrs.find((n) => n.id === ncrId)
+    if (!ncr) return
+
+    const gate = canTransitionNcrStatus(ncr, nextStatus)
+    if (!gate.ok) {
+      setCloseErrors((prev) => ({
+        ...prev,
+        [ncrId]: `無法結案：尚缺 ${gate.missing.join('、')}`,
+      }))
+      return
+    }
+
+    setCloseErrors((prev) => {
+      const next = { ...prev }
+      delete next[ncrId]
+      return next
+    })
+    updateNCR(ncrId, { status: nextStatus })
+  }
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -91,7 +114,7 @@ export function NCRList({ store }: { store: AuditStore }) {
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
           <p className="text-sm text-muted">
-            查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。
+            查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。結案後年度計畫月格將自動更新為矯正圓滿。
           </p>
         </div>
 
@@ -107,6 +130,9 @@ export function NCRList({ store }: { store: AuditStore }) {
           <div className="space-y-4">
             {company.ncrs.map((ncr) => {
               const stale = isNcrStale(ncr, company.audits)
+              const closeHint = closeErrors[ncr.id]
+              const gate = validateNcrClose(ncr)
+
               return (
                 <article
                   key={ncr.id}
@@ -120,10 +146,11 @@ export function NCRList({ store }: { store: AuditStore }) {
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="no-print">
+                      <div className="no-print min-w-[140px]">
                         <Select
+                          label="狀態"
                           value={ncr.status}
-                          onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
+                          onChange={(v) => handleStatusChange(ncr.id, v as NCRStatus)}
                           options={STATUSES.map((s) => ({ value: s, label: s }))}
                         />
                       </div>
@@ -134,6 +161,18 @@ export function NCRList({ store }: { store: AuditStore }) {
                   {stale && (
                     <p className="mb-3 text-xs font-medium text-amber-700 dark:text-amber-300">
                       查檢已非不符，建議結案
+                    </p>
+                  )}
+
+                  {closeHint && (
+                    <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">
+                      {closeHint}
+                    </p>
+                  )}
+
+                  {ncr.status !== '結案' && !gate.ok && (
+                    <p className="mb-3 text-xs text-muted">
+                      結案前須填：{gate.missing.join('、')}
                     </p>
                   )}
 
@@ -153,6 +192,35 @@ export function NCRList({ store }: { store: AuditStore }) {
                         onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
                       />
                       <p className="print-only text-sm">{ncr.date}</p>
+                    </div>
+                    <Select
+                      label="重大／輕微"
+                      value={ncr.classification ?? ''}
+                      onChange={(v) =>
+                        updateNCR(ncr.id, { classification: (v || undefined) as NCRClassification })
+                      }
+                      options={[
+                        { value: '', label: '—' },
+                        ...CLASSIFICATIONS.map((c) => ({ value: c, label: c })),
+                      ]}
+                    />
+                    <Input
+                      label="責任者"
+                      value={ncr.responsiblePerson ?? ''}
+                      onChange={(v) => updateNCR(ncr.id, { responsiblePerson: v })}
+                    />
+                    <Input
+                      label="期限"
+                      type="date"
+                      value={ncr.dueDate ?? ''}
+                      onChange={(v) => updateNCR(ncr.id, { dueDate: v })}
+                    />
+                    <div className="md:col-span-2">
+                      <NcrField
+                        label="遏制／圍堵措施"
+                        value={ncr.containment ?? ''}
+                        onChange={(v) => updateNCR(ncr.id, { containment: v })}
+                      />
                     </div>
                     <NcrField
                       label="根本原因"

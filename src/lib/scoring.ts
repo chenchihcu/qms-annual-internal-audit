@@ -23,9 +23,10 @@ function resolveScoreStatus(
   notApplicable: number,
   totalItems: number,
 ): ScoreStatus {
+  if (pending > 0) return 'unevaluated'
   if (applicable > 0) return 'scored'
   if (totalItems > 0 && notApplicable === totalItems) return 'not_applicable'
-  if (pending > 0 || totalItems === 0) return 'unevaluated'
+  if (totalItems === 0) return 'unevaluated'
   return 'unevaluated'
 }
 
