@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { resolveCarryForwardTarget } from '../lib/carryForward'
 import type { ObservationStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -23,6 +24,7 @@ export function Observations({ store }: { store: AuditStore }) {
   )
 
   const [regenConfirm, setRegenConfirm] = useState(false)
+  const [carryError, setCarryError] = useState<string | null>(null)
   const [newObs, setNewObs] = useState({
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
     departmentId: company.planRows[0]?.departmentId ?? '',
@@ -50,9 +52,23 @@ export function Observations({ store }: { store: AuditStore }) {
     became_ncr: '已轉 NCR',
   }
 
+  const tryCarryForwardObservation = (obsId: string, qpCode: string, departmentId: string) => {
+    const target = resolveCarryForwardTarget(company, qpCode, departmentId)
+    if (!target) {
+      setCarryError(`找不到 ${qpCode} 對應的年度計畫列，請先於年度計畫確認程序。`)
+      return
+    }
+    setCarryError(null)
+    carryForwardObservation(obsId, target.qpCode, target.departmentId)
+  }
+
   const importCarryForwardOnly = () => {
+    setCarryError(null)
     for (const obs of priorObs.filter((o) => o.status === 'open' && !o.carriedToYear)) {
-      carryForwardObservation(obs.id, obs.qpCode || 'QP-01', obs.departmentId)
+      const target = resolveCarryForwardTarget(company, obs.qpCode || 'QP-01', obs.departmentId)
+      if (target) {
+        carryForwardObservation(obs.id, target.qpCode, target.departmentId)
+      }
     }
     for (const ncr of openPriorNCR.filter((n) => !n.carriedToYear)) {
       carryForwardNCR(ncr.id, ncr.qpCode, ncr.departmentId)
@@ -134,6 +150,11 @@ export function Observations({ store }: { store: AuditStore }) {
 
       <Card>
         <h2 className="mb-2 text-lg font-semibold text-ink">跨年觀察事項追蹤</h2>
+        {carryError && (
+          <p className="mb-3 text-sm text-red-600 no-print" role="alert">
+            {carryError}
+          </p>
+        )}
         <h3 className="mb-3 font-medium text-ink">前年度觀察事項（{priorObs.length}）</h3>
         {priorObs.length === 0 ? (
           <p className="text-sm text-muted">無前年度觀察事項</p>
@@ -146,7 +167,7 @@ export function Observations({ store }: { store: AuditStore }) {
                   <span className="font-medium text-ink">{obs.qpCode} · {obs.department}</span>
                   <Badge label={statusLabel[obs.status]} />
                   {obs.carriedToYear && (
-                    <span className="text-xs text-primary">已帶入 {obs.carriedToYear} 年</span>
+                    <span className="text-xs text-primary">已帶入 {obs.carriedToYear}</span>
                   )}
                 </div>
                 <p className="text-sm">{obs.content}</p>
@@ -156,7 +177,7 @@ export function Observations({ store }: { store: AuditStore }) {
                     <Button
                       variant="secondary"
                       onClick={() =>
-                        carryForwardObservation(obs.id, obs.qpCode, obs.departmentId)
+                        tryCarryForwardObservation(obs.id, obs.qpCode, obs.departmentId)
                       }
                     >
                       帶入 {currentYear} 年查檢表

@@ -23,6 +23,7 @@ import {
   shouldPropagateAuditAuditorsToPlan,
   shouldPropagatePlanAuditorsToAudit,
 } from '../lib/auditorSync'
+import { applyObservationCarryForward, resolveCarryForwardTarget } from '../lib/carryForward'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { markAuditNotified } from '../lib/auditNotice'
 import {
@@ -656,61 +657,18 @@ export function useAuditStore() {
     (obsId: string, qpCode: string, departmentId: string) => {
       setState((s) => {
         const co = s.companies[s.activeCompanyId]
-        const obs = co.observations.find((o) => o.id === obsId)
-        if (!obs || obs.carriedToYear) return s
-
-        const auditId = `audit-${qpCode}-${departmentId}`
-        let audit = co.audits.find((a) => a.id === auditId)
-        const dept = co.departments.find((d) => d.id === departmentId)
-        const entry = PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === qpCode && e.departmentId === departmentId,
+        const next = applyObservationCarryForward(
+          co,
+          obsId,
+          qpCode,
+          departmentId,
+          s.settings.auditYear,
         )
-        if (!dept || !entry) return s
-
-        if (!audit) {
-          audit = {
-            id: auditId,
-            qpCode,
-            departmentId,
-            department: dept.name,
-            process: entry.process,
-            documents: entry.documents,
-            notifyDate: '',
-            auditDate: '',
-            departmentManager: dept.owner,
-            auditors: dept.defaultAuditors,
-            auditCategory: entry.auditCategory,
-            items: createChecklistForProcedure(qpCode, dept.name),
-          }
-        }
-
-        const newItemId = `chk-cf-${Date.now()}`
-        const newItem: ChecklistItem = {
-          id: newItemId,
-          category: '跨年追蹤',
-          no: audit.items.length + 1,
-          content: `[${obs.year}年觀察事項] ${obs.content}`,
-          judgment: null,
-          description: obs.description,
-          sourceYear: obs.year,
-          carriedFromId: obs.id,
-          procedureRef: qpCode,
-          origin: 'carryforward',
-        }
-
-        const audits = co.audits.some((a) => a.id === audit!.id)
-          ? co.audits.map((a) =>
-              a.id === audit!.id ? { ...a, items: [...a.items, newItem] } : a,
-            )
-          : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
-
-        const observations = co.observations.map((o) =>
-          o.id === obsId
-            ? { ...o, carriedToYear: s.settings.auditYear, carriedToChecklistId: newItemId }
-            : o,
-        )
-
-        return patchCompany(s, s.activeCompanyId, { audits, observations })
+        if (!next) return s
+        return patchCompany(s, s.activeCompanyId, {
+          audits: next.audits,
+          observations: next.observations,
+        })
       })
     },
     [],
@@ -722,28 +680,26 @@ export function useAuditStore() {
       const ncr = co.ncrs.find((n) => n.id === ncrId)
       if (!ncr || ncr.status === '結案' || ncr.carriedToYear) return s
 
-      const auditId = `audit-${qpCode}-${departmentId}`
+      const target = resolveCarryForwardTarget(co, qpCode, departmentId)
+      if (!target) return s
+
+      const auditId = auditIdForPlanRow(target.qpCode, target.departmentId)
       let audit = co.audits.find((a) => a.id === auditId)
-      const dept = co.departments.find((d) => d.id === departmentId)
-      const entry = PROCEDURE_PLAN_TEMPLATE.find(
-        (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-      ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
-      if (!dept || !entry) return s
 
       if (!audit) {
         audit = {
           id: auditId,
-          qpCode,
-          departmentId,
-          department: dept.name,
-          process: entry.process,
-          documents: entry.documents,
+          qpCode: target.qpCode,
+          departmentId: target.departmentId,
+          department: target.dept.name,
+          process: target.entry.process,
+          documents: target.entry.documents,
           notifyDate: '',
           auditDate: '',
-          departmentManager: dept.owner,
-          auditors: dept.defaultAuditors,
-          auditCategory: entry.auditCategory,
-          items: createChecklistForProcedure(qpCode, dept.name),
+          departmentManager: target.dept.owner,
+          auditors: target.dept.defaultAuditors,
+          auditCategory: target.entry.auditCategory,
+          items: createChecklistForProcedure(target.qpCode, target.dept.name),
         }
       }
 
@@ -757,7 +713,7 @@ export function useAuditStore() {
         judgment: null,
         description: '前年度未結案不符合追蹤',
         sourceYear: year,
-        procedureRef: qpCode,
+        procedureRef: target.qpCode,
         origin: 'carryforward',
       }
 
@@ -782,28 +738,26 @@ export function useAuditStore() {
         const sug = co.suggestions.find((sg) => sg.id === sugId)
         if (!sug || sug.status === 'closed') return s
 
-        const auditId = `audit-${qpCode}-${departmentId}`
+        const target = resolveCarryForwardTarget(co, qpCode, departmentId)
+        if (!target) return s
+
+        const auditId = auditIdForPlanRow(target.qpCode, target.departmentId)
         let audit = co.audits.find((a) => a.id === auditId)
-        const dept = co.departments.find((d) => d.id === departmentId)
-        const entry = PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-        )
-        if (!dept || !entry) return s
 
         if (!audit) {
           audit = {
             id: auditId,
-            qpCode,
-            departmentId,
-            department: dept.name,
-            process: entry.process,
-            documents: entry.documents,
+            qpCode: target.qpCode,
+            departmentId: target.departmentId,
+            department: target.dept.name,
+            process: target.entry.process,
+            documents: target.entry.documents,
             notifyDate: '',
             auditDate: '',
-            departmentManager: dept.owner,
-            auditors: dept.defaultAuditors,
-            auditCategory: entry.auditCategory,
-            items: createChecklistForProcedure(qpCode, dept.name),
+            departmentManager: target.dept.owner,
+            auditors: target.dept.defaultAuditors,
+            auditCategory: target.entry.auditCategory,
+            items: createChecklistForProcedure(target.qpCode, target.dept.name),
           }
         }
 
@@ -816,7 +770,7 @@ export function useAuditStore() {
           judgment: null,
           description: sug.progress,
           sourceYear: sug.year,
-          procedureRef: qpCode,
+          procedureRef: target.qpCode,
           origin: 'carryforward',
         }
 
