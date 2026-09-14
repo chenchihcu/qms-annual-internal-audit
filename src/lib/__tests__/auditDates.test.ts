@@ -58,4 +58,11 @@ describe('carryPlanDatesToAudit', () => {
     expect(carried.notifyDate).toBe('2026-01-01')
     expect(carried.auditDate).toBe('2026-01-15')
   })
+
+  it('uses selected month when opening from plan month cell click', () => {
+    const carried = carryPlanDatesToAudit(row, emptyAudit, 2026, 2)
+    expect(carried.plannedMonth).toBe(2)
+    expect(carried.notifyDate).toBe('2026-02-01')
+    expect(carried.auditDate).toBe('2026-02-15')
+  })
 })

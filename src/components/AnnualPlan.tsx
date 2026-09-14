@@ -5,6 +5,13 @@ import { checkPlanRowImpartiality } from '../lib/impartiality'
 import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
 import {
+  buildFormExportFilename,
+  exportAnnualPlanExcel,
+  exportAnnualPlanPdf,
+  formatPlanFilterCount,
+  planFilterPrintSubtitle,
+} from '../lib/formExport'
+import {
   describeStakeholderScheduleEffect,
   filterPlanRowsByStakeholder,
   stakeholderTagHint,
@@ -14,6 +21,7 @@ import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus, StakeholderTag } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { FormExportButtons } from './ui/FormExportButtons'
 import { FormPrintButton } from './ui/FormPrintButton'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
@@ -42,7 +50,7 @@ export function AnnualPlan({
   onNavigate,
 }: {
   store: AuditStore
-  onNavigate: (tab: TabId, auditKey?: string) => void
+  onNavigate: (tab: TabId, auditKey?: string, ncrId?: string, planMonth?: number) => void
 }) {
   const {
     state,
@@ -52,6 +60,7 @@ export function AnnualPlan({
     updatePlanRow,
     setPlanMonthStatus,
     updateDepartment,
+    getProcedureTitle,
   } = store
   const { settings, company } = state
   const canEdit = canEditPlan(settings.viewRole)
@@ -65,9 +74,29 @@ export function AnnualPlan({
   const [regenConfirm, setRegenConfirm] = useState(false)
   const [stakeholderFilter, setStakeholderFilter] = useState<StakeholderTag | null>(null)
 
+  const totalPlanRows = company.planRows.length
   const visiblePlanRows = useMemo(
     () => filterPlanRowsByStakeholder(company.planRows, stakeholderFilter, company.departments),
     [company.planRows, company.departments, stakeholderFilter],
+  )
+  const filterCountLabel = formatPlanFilterCount(visiblePlanRows.length, totalPlanRows)
+  const printFilterSubtitle = planFilterPrintSubtitle(
+    stakeholderFilter,
+    visiblePlanRows.length,
+    totalPlanRows,
+  )
+  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-01')
+  const exportContext = useMemo(
+    () => ({
+      settings,
+      company,
+      rows: visiblePlanRows,
+      filterTag: stakeholderFilter,
+      visibleCount: visiblePlanRows.length,
+      totalCount: totalPlanRows,
+      getProcedureTitle,
+    }),
+    [settings, company, visiblePlanRows, stakeholderFilter, totalPlanRows, getProcedureTitle],
   )
 
   const handleMonthCellClick = useCallback(
@@ -84,7 +113,7 @@ export function AnnualPlan({
         setPlanMonthStatus(row.id, monthIndex, cycleMonthStatus(manual ?? status))
         return
       }
-      onNavigate('audit', `${row.qpCode}|${row.departmentId}`)
+      onNavigate('audit', `${row.qpCode}|${row.departmentId}`, undefined, monthIndex + 1)
     },
     [onNavigate, setPlanMonthStatus, canEdit],
   )
@@ -279,7 +308,15 @@ export function AnnualPlan({
               <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
             ))}
           </div>
-          <FormPrintButton />
+          <div className="flex flex-wrap items-end gap-2">
+            <FormExportButtons
+              formId="QR-28-01"
+              filenameBase={exportFilenameBase}
+              onExportExcel={() => exportAnnualPlanExcel(exportContext)}
+              onExportPdf={() => exportAnnualPlanPdf(exportContext)}
+            />
+            <FormPrintButton />
+          </div>
         </div>
         <p className="mb-4 text-xs text-muted no-print">
           預設依查檢／NCR 自動更新月格；點擊月格開啟程序稽核；Alt+點擊或右鍵可手動覆寫
@@ -315,20 +352,23 @@ export function AnnualPlan({
               {tag}
             </button>
           ))}
-          {stakeholderFilter && (
-            <span className="text-xs text-muted">
-              顯示 {visiblePlanRows.length} / {company.planRows.length} 列
-            </span>
-          )}
+          <span className="text-xs font-medium text-ink" aria-live="polite">
+            {filterCountLabel}
+          </span>
         </div>
 
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="年度內部稽核計畫 QR-28-01"
-          subtitle={`主任稽核員：${settings.leadAuditor}${
-            company.keyCustomerName?.trim() ? ` · 主要客戶：${company.keyCustomerName}` : ''
-          }`}
+          subtitle={[
+            `主任稽核員：${settings.leadAuditor}`,
+            company.keyCustomerName?.trim() ? `主要客戶：${company.keyCustomerName}` : '',
+            `計畫窗口：${settings.planWindowStart} ～ ${settings.planWindowEnd}`,
+            printFilterSubtitle,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         />
 
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">

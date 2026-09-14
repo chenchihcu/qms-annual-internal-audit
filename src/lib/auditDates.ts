@@ -31,13 +31,22 @@ export function resolvePlannedMonth(row: PlanRow, audit: ProcedureAudit, auditYe
   return null
 }
 
-/** 計畫排定月帶入查檢表標頭；計畫為排程依據，開啟查檢時與計畫月同步 */
+function resolveTargetPlannedMonth(row: PlanRow, selectedMonth?: number | null): number | null {
+  if (selectedMonth != null && selectedMonth >= 1 && selectedMonth <= 12) {
+    const idx = selectedMonth - 1
+    if (row.months[idx]) return selectedMonth
+  }
+  return resolvePlannedMonthFromPlan(row)
+}
+
+/** 計畫排定月帶入查檢表標頭；可指定點選月格（1–12），否則取第一個排定月 */
 export function carryPlanDatesToAudit(
   row: PlanRow,
   audit: ProcedureAudit,
   auditYear: number,
+  selectedMonth?: number | null,
 ): ProcedureAudit {
-  const plannedMonth = resolvePlannedMonthFromPlan(row)
+  const plannedMonth = resolveTargetPlannedMonth(row, selectedMonth)
   if (!plannedMonth) return audit
 
   return {

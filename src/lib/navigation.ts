@@ -56,6 +56,8 @@ export interface HashState {
   tab: TabId
   auditKey?: string
   ncrId?: string
+  /** 由年度計畫月格點擊帶入的計畫月份（1–12） */
+  planMonth?: number
 }
 
 export function parseAppHash(hash: string): HashState {
@@ -66,19 +68,33 @@ export function parseAppHash(hash: string): HashState {
   const tab = isValidTabId(tabParam) ? tabParam : 'settings'
   const auditKey = params.get('audit') ?? undefined
   const ncrId = params.get('ncr') ?? undefined
-  return { tab, auditKey, ncrId }
+  const planMonthRaw = params.get('planMonth')
+  const planMonthParsed = planMonthRaw ? Number(planMonthRaw) : NaN
+  const planMonth =
+    Number.isFinite(planMonthParsed) && planMonthParsed >= 1 && planMonthParsed <= 12
+      ? planMonthParsed
+      : undefined
+  return { tab, auditKey, ncrId, planMonth }
 }
 
-export function buildAppHash(tab: TabId, auditKey?: string, ncrId?: string): string {
+export function buildAppHash(
+  tab: TabId,
+  auditKey?: string,
+  ncrId?: string,
+  planMonth?: number,
+): string {
   const params = new URLSearchParams()
   params.set('tab', tab)
   if (auditKey) params.set('audit', auditKey)
   if (ncrId) params.set('ncr', ncrId)
+  if (planMonth !== undefined && planMonth >= 1 && planMonth <= 12) {
+    params.set('planMonth', String(planMonth))
+  }
   return `#${params.toString()}`
 }
 
-export function syncHash(tab: TabId, auditKey?: string, ncrId?: string) {
-  const next = buildAppHash(tab, auditKey, ncrId)
+export function syncHash(tab: TabId, auditKey?: string, ncrId?: string, planMonth?: number) {
+  const next = buildAppHash(tab, auditKey, ncrId, planMonth)
   if (window.location.hash !== next) {
     window.history.replaceState(null, '', next)
   }

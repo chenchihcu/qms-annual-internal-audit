@@ -4,6 +4,12 @@ import { canTransitionNcrStatus, isNcrStale, validateNcrClose } from '../lib/ncr
 import type { NCRClassification, NCRStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
+import {
+  buildFormExportFilename,
+  exportNcrExcel,
+  exportNcrPdf,
+} from '../lib/formExport'
+import { FormExportButtons } from './ui/FormExportButtons'
 import { FormPrintButton } from './ui/FormPrintButton'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { AttachmentField } from './ui/AttachmentField'
@@ -79,6 +85,12 @@ export function NCRList({
   const canEdit = canEditNcrFields(settings.viewRole)
   const canClose = canCloseNcr(settings.viewRole)
   const canAdd = canAddManualNcr(settings.viewRole)
+  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-03')
+  const exportContext = {
+    settings,
+    company,
+    ncrs: company.ncrs,
+  }
   const statusOptions = STATUSES.filter((s) => s !== '結案' || canClose).map((s) => ({
     value: s,
     label: s,
@@ -156,13 +168,24 @@ export function NCRList({
               查檢表判定「不符」時自動匯入；請填寫根本原因、矯正措施與驗證佐證後結案。結案後年度計畫月格將自動更新為矯正圓滿。
             </p>
           </div>
-          <FormPrintButton />
+          <div className="flex flex-wrap items-end gap-2">
+            <FormExportButtons
+              formId="QR-28-03"
+              filenameBase={exportFilenameBase}
+              onExportExcel={() => exportNcrExcel(exportContext)}
+              onExportPdf={() => exportNcrPdf(exportContext)}
+            />
+            <FormPrintButton />
+          </div>
         </div>
 
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="不符合事項清單 QR-28-03"
+          subtitle={
+            company.keyCustomerName?.trim() ? `主要客戶：${company.keyCustomerName}` : undefined
+          }
         />
 
         {company.ncrs.length === 0 ? (
