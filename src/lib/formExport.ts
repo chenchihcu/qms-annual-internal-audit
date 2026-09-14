@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatAttachmentNamesForPrint } from './attachments'
-import { buildQr2801PrintHeaderMeta } from './printForm'
+import { buildQr2801PrintHeaderMeta, buildQr2802PrintHeaderMeta } from './printForm'
 import { ensurePdfChineseFont } from './pdfFont'
 import { getDisplayMonthStatus } from './planStatus'
 import type {
@@ -53,15 +53,42 @@ export function buildFormExportFilename(
   return `${slug}_${formId}_${date}`
 }
 
-function triggerDownload(data: Uint8Array | ArrayBuffer, filename: string, mime: string): void {
-  const bytes = data instanceof Uint8Array ? Uint8Array.from(data) : new Uint8Array(data)
-  const blob = new Blob([bytes], { type: mime })
+const REVOKE_DOWNLOAD_URL_MS = 1000
+
+function assertNonEmptyExportBytes(data: Uint8Array, label: string): void {
+  if (!data?.length) {
+    throw new Error(`匯出失敗：${label} 產生的檔案為空`)
+  }
+}
+
+function wrapExportError(label: string, err: unknown): Error {
+  if (err instanceof Error && err.message.startsWith('匯出失敗')) return err
+  const detail = err instanceof Error ? err.message : String(err)
+  return new Error(`匯出 ${label} 失敗：${detail}`)
+}
+
+/** 觸發瀏覽器下載；供 UI 與單元測試使用 */
+export function triggerBlobDownload(data: Uint8Array, filename: string, mime: string): void {
+  assertNonEmptyExportBytes(data, filename)
+  const blob = new Blob([Uint8Array.from(data)], { type: mime })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = filename
+  anchor.rel = 'noopener'
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
   anchor.click()
-  URL.revokeObjectURL(url)
+  window.setTimeout(() => {
+    URL.revokeObjectURL(url)
+    anchor.remove()
+  }, REVOKE_DOWNLOAD_URL_MS)
+}
+
+/** 預載 PDF 中文字型，避免首次匯出長時間無回應 */
+export async function preloadPdfExportFont(): Promise<void> {
+  const doc = new jsPDF()
+  await ensurePdfChineseFont(doc)
 }
 
 function monthStatusLabel(
@@ -132,60 +159,66 @@ export function buildAnnualPlanSheetAoa(ctx: AnnualPlanExportContext): string[][
 }
 
 export function exportAnnualPlanExcel(ctx: AnnualPlanExportContext): Uint8Array {
-  const aoa = buildAnnualPlanSheetAoa(ctx)
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '年度計畫')
-  return new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+  try {
+    const aoa = buildAnnualPlanSheetAoa(ctx)
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '年度計畫')
+    const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+    assertNonEmptyExportBytes(bytes, 'Excel')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('Excel', err)
+  }
 }
 
 export async function exportAnnualPlanPdf(ctx: AnnualPlanExportContext): Promise<Uint8Array> {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  await ensurePdfChineseFont(doc)
+  try {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    await ensurePdfChineseFont(doc)
 
-  let y = 14
-  for (const line of planHeaderRows(ctx)) {
-    if (line.length === 0) {
-      y += 4
-      continue
+    const headerLines = planHeaderRows(ctx)
+    let y = 14
+    for (const line of headerLines) {
+      if (line.length === 0) {
+        y += 4
+        continue
+      }
+      doc.setFontSize(line === headerLines[0] ? 14 : 10)
+      doc.text(line[0], 14, y)
+      y += line === headerLines[0] ? 8 : 6
     }
-    doc.setFontSize(line === planHeaderRows(ctx)[0] ? 14 : 10)
-    doc.text(line[0], 14, y)
-    y += line === planHeaderRows(ctx)[0] ? 8 : 6
+
+    const table = planTableRows(ctx)
+    autoTable(doc, {
+      head: [table[0]],
+      body: table.slice(1),
+      startY: y,
+      styles: { font: 'NotoSansTC', fontSize: 7 },
+      headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
+    })
+
+    const bytes = new Uint8Array(doc.output('arraybuffer'))
+    assertNonEmptyExportBytes(bytes, 'PDF')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('PDF', err)
   }
-
-  const table = planTableRows(ctx)
-  autoTable(doc, {
-    head: [table[0]],
-    body: table.slice(1),
-    startY: y,
-    styles: { font: 'NotoSansTC', fontSize: 7 },
-    headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
-  })
-
-  return new Uint8Array(doc.output('arraybuffer'))
 }
 
 function checklistHeaderRows(ctx: ChecklistExportContext): string[][] {
   const { audit, company, settings } = ctx
-  const title = ctx.getProcedureTitle(audit.qpCode, audit.department)
+  const printMeta = buildQr2802PrintHeaderMeta(audit, company, ctx.getProcedureTitle)
   const rows: string[][] = [
     [company.name],
     [`${settings.auditYear} 年 · 內部稽核查檢表 QR-28-02`],
-    [`${audit.qpCode} ${title} · ${audit.auditCategory}`],
-  ]
-  if (company.keyCustomerName?.trim()) {
-    rows.push([`主要客戶：${company.keyCustomerName}`])
-  }
-  rows.push(
+    [printMeta.subtitle],
+    ...printMeta.detailLines.map((line) => [line]),
     [`被稽核部門：${audit.department}`],
     [`通知日期：${audit.notifyDate} · 實施日期：${audit.auditDate}`],
     [`稽核人員：${audit.auditors}`],
-  )
-  if (audit.plannedMonth) {
-    rows.push([`計畫月份：${audit.plannedMonth} 月`])
-  }
-  rows.push([])
+    [],
+  ]
   return rows
 }
 
@@ -220,39 +253,51 @@ export function buildChecklistSheetAoa(ctx: ChecklistExportContext): string[][] 
 }
 
 export function exportChecklistExcel(ctx: ChecklistExportContext): Uint8Array {
-  const aoa = buildChecklistSheetAoa(ctx)
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '查檢表')
-  return new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+  try {
+    const aoa = buildChecklistSheetAoa(ctx)
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, '查檢表')
+    const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+    assertNonEmptyExportBytes(bytes, 'Excel')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('Excel', err)
+  }
 }
 
 export async function exportChecklistPdf(ctx: ChecklistExportContext): Promise<Uint8Array> {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  await ensurePdfChineseFont(doc)
+  try {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    await ensurePdfChineseFont(doc)
 
-  let y = 14
-  const headers = checklistHeaderRows(ctx)
-  for (const line of headers) {
-    if (line.length === 0) {
-      y += 4
-      continue
+    const headers = checklistHeaderRows(ctx)
+    let y = 14
+    for (const line of headers) {
+      if (line.length === 0) {
+        y += 4
+        continue
+      }
+      doc.setFontSize(line === headers[0] ? 14 : 10)
+      doc.text(line[0], 14, y)
+      y += line === headers[0] ? 8 : 6
     }
-    doc.setFontSize(line === headers[0] ? 14 : 10)
-    doc.text(line[0], 14, y)
-    y += line === headers[0] ? 8 : 6
+
+    const table = checklistTableRows(ctx.audit)
+    autoTable(doc, {
+      head: [table[0]],
+      body: table.slice(1),
+      startY: y,
+      styles: { font: 'NotoSansTC', fontSize: 7 },
+      headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
+    })
+
+    const bytes = new Uint8Array(doc.output('arraybuffer'))
+    assertNonEmptyExportBytes(bytes, 'PDF')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('PDF', err)
   }
-
-  const table = checklistTableRows(ctx.audit)
-  autoTable(doc, {
-    head: [table[0]],
-    body: table.slice(1),
-    startY: y,
-    styles: { font: 'NotoSansTC', fontSize: 7 },
-    headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
-  })
-
-  return new Uint8Array(doc.output('arraybuffer'))
 }
 
 function ncrHeaderRows(ctx: NcrExportContext): string[][] {
@@ -260,9 +305,10 @@ function ncrHeaderRows(ctx: NcrExportContext): string[][] {
   const rows: string[][] = [
     [company.name],
     [`${settings.auditYear} 年 · 不符合事項清單 QR-28-03`],
+    [`主任稽核員：${settings.leadAuditor}`],
   ]
   if (company.keyCustomerName?.trim()) {
-    rows.push([`主要客戶：${company.keyCustomerName}`])
+    rows.push([`主要客戶：${company.keyCustomerName.trim()}`])
   }
   rows.push([])
   return rows
@@ -303,47 +349,63 @@ export function buildNcrSheetAoa(ctx: NcrExportContext): string[][] {
 }
 
 export function exportNcrExcel(ctx: NcrExportContext): Uint8Array {
-  const aoa = buildNcrSheetAoa(ctx)
-  const ws = XLSX.utils.aoa_to_sheet(aoa)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'NCR')
-  return new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+  try {
+    const aoa = buildNcrSheetAoa(ctx)
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'NCR')
+    const bytes = new Uint8Array(XLSX.write(wb, { bookType: 'xlsx', type: 'array' }))
+    assertNonEmptyExportBytes(bytes, 'Excel')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('Excel', err)
+  }
 }
 
 export async function exportNcrPdf(ctx: NcrExportContext): Promise<Uint8Array> {
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-  await ensurePdfChineseFont(doc)
+  try {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    await ensurePdfChineseFont(doc)
 
-  let y = 14
-  const headers = ncrHeaderRows(ctx)
-  for (const line of headers) {
-    if (line.length === 0) {
-      y += 4
-      continue
+    const headers = ncrHeaderRows(ctx)
+    let y = 14
+    for (const line of headers) {
+      if (line.length === 0) {
+        y += 4
+        continue
+      }
+      doc.setFontSize(line === headers[0] ? 14 : 10)
+      doc.text(line[0], 14, y)
+      y += line === headers[0] ? 8 : 6
     }
-    doc.setFontSize(line === headers[0] ? 14 : 10)
-    doc.text(line[0], 14, y)
-    y += line === headers[0] ? 8 : 6
+
+    const table = ncrTableRows(ctx.ncrs)
+    autoTable(doc, {
+      head: [table[0]],
+      body: table.slice(1),
+      startY: y,
+      styles: { font: 'NotoSansTC', fontSize: 7 },
+      headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
+    })
+
+    const bytes = new Uint8Array(doc.output('arraybuffer'))
+    assertNonEmptyExportBytes(bytes, 'PDF')
+    return bytes
+  } catch (err) {
+    throw wrapExportError('PDF', err)
   }
-
-  const table = ncrTableRows(ctx.ncrs)
-  autoTable(doc, {
-    head: [table[0]],
-    body: table.slice(1),
-    startY: y,
-    styles: { font: 'NotoSansTC', fontSize: 7 },
-    headStyles: { font: 'NotoSansTC', fillColor: [241, 245, 249] },
-  })
-
-  return new Uint8Array(doc.output('arraybuffer'))
 }
 
 export function downloadFormExcel(data: Uint8Array, filenameBase: string): void {
-  triggerDownload(data, `${filenameBase}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  triggerBlobDownload(
+    data,
+    `${filenameBase}.xlsx`,
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
 }
 
 export function downloadFormPdf(data: Uint8Array, filenameBase: string): void {
-  triggerDownload(data, `${filenameBase}.pdf`, 'application/pdf')
+  triggerBlobDownload(data, `${filenameBase}.pdf`, 'application/pdf')
 }
 
 /** 供測試：xlsx 檔案魔數 */

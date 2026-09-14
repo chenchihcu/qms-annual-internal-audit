@@ -28,6 +28,9 @@ export function FormExportButtons({
     setBusy('excel')
     try {
       const data = onExportExcel()
+      if (!data?.length) {
+        throw new Error('匯出失敗：產生的 Excel 檔案為空')
+      }
       downloadFormExcel(data, filenameBase)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -41,6 +44,9 @@ export function FormExportButtons({
     setBusy('pdf')
     try {
       const data = await onExportPdf()
+      if (!data?.length) {
+        throw new Error('匯出失敗：產生的 PDF 檔案為空')
+      }
       downloadFormPdf(data, filenameBase)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
