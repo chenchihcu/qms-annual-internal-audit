@@ -11,7 +11,9 @@ import { Suggestions } from './components/Suggestions'
 import { PreAuditPrep } from './components/PreAuditPrep'
 import { RiskAssessment } from './components/RiskAssessment'
 import { SettingsPanel } from './components/SettingsPanel'
+import { ClauseMappingPanel } from './components/ClauseMappingPanel'
 import { TAB_GROUPS, parseAppHash, syncHash } from './lib/navigation'
+import { VIEW_ROLE_LABELS, type ViewRole } from './types'
 import { shouldShowDemoBanner } from './lib/demoMode'
 import { getStoredTheme, toggleTheme } from './lib/theme'
 import { DemoBanner } from './components/DemoBanner'
@@ -61,6 +63,7 @@ function App() {
   const [ncrId, setNcrId] = useState<string | undefined>(initialHash.ncrId)
   const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
   const { settings, activeCompanyId, company } = store.state
+  const viewRole = settings.viewRole ?? 'lead_auditor'
 
   useEffect(() => {
     syncHash(tab, auditKey, ncrId)
@@ -147,6 +150,24 @@ function App() {
               >
                 {isDark ? '淺色' : '深色'}
               </button>
+              <div className="flex items-center gap-2">
+                <label htmlFor="view-role" className="sr-only">
+                  檢視角色
+                </label>
+                <select
+                  id="view-role"
+                  value={viewRole}
+                  onChange={(e) => store.updateViewRole(e.target.value as ViewRole)}
+                  className={`rounded-lg border border-line bg-surface px-2 py-1.5 text-sm ${FOCUS_RING}`}
+                  aria-label="檢視角色"
+                >
+                  {(Object.keys(VIEW_ROLE_LABELS) as ViewRole[]).map((role) => (
+                    <option key={role} value={role}>
+                      {VIEW_ROLE_LABELS[role]}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button
                 type="button"
                 className={`rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-page ${FOCUS_RING}`}
@@ -240,6 +261,11 @@ function App() {
         {tab === 'prep' && (
           <TabErrorBoundary>
             <PreAuditPrep store={store} />
+          </TabErrorBoundary>
+        )}
+        {tab === 'clauses' && (
+          <TabErrorBoundary>
+            <ClauseMappingPanel store={store} />
           </TabErrorBoundary>
         )}
         {tab === 'risk' && (

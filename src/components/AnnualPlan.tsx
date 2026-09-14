@@ -9,6 +9,7 @@ import {
   filterPlanRowsByStakeholder,
   stakeholderTagHint,
 } from '../lib/stakeholderSchedule'
+import { canEditPlan, isReadOnlyRole } from '../lib/userRole'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus, StakeholderTag } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
@@ -53,6 +54,8 @@ export function AnnualPlan({
     updateDepartment,
   } = store
   const { settings, company } = state
+  const canEdit = canEditPlan(settings.viewRole)
+  const readOnly = isReadOnlyRole(settings.viewRole)
 
   const [yearDraft, setYearDraft] = useState(String(settings.auditYear))
   const [yearDialog, setYearDialog] = useState<{ open: boolean; newYear: number }>({
@@ -76,14 +79,14 @@ export function AnnualPlan({
       status: MonthStatus,
       manual: MonthStatus | null | undefined,
     ) => {
-      if (!scheduled) return
+      if (!scheduled || !canEdit) return
       if (e.altKey || e.shiftKey) {
         setPlanMonthStatus(row.id, monthIndex, cycleMonthStatus(manual ?? status))
         return
       }
       onNavigate('audit', `${row.qpCode}|${row.departmentId}`)
     },
-    [onNavigate, setPlanMonthStatus, company.planRows],
+    [onNavigate, setPlanMonthStatus, canEdit],
   )
 
   const handleMonthCellContextMenu = useCallback(
@@ -95,11 +98,11 @@ export function AnnualPlan({
       manual: MonthStatus | null | undefined,
       scheduled: MonthStatus,
     ) => {
-      if (!scheduled) return
+      if (!scheduled || !canEdit) return
       e.preventDefault()
       setPlanMonthStatus(row.id, monthIndex, cycleMonthStatus(manual ?? status))
     },
-    [setPlanMonthStatus, company.planRows],
+    [setPlanMonthStatus, canEdit],
   )
 
   const requestYearChange = (raw: string) => {
@@ -207,7 +210,9 @@ export function AnnualPlan({
               請先設定各部門標籤，再執行自動編排。標籤影響排程優先序與月份分佈（客戶／法規/認證 → 窗口前段；經營層 → 提高優先序）。
             </p>
           </div>
-          <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
+          <Button disabled={!canEdit || readOnly} onClick={() => setRegenConfirm(true)}>
+            依日期與利害關係人自動編排
+          </Button>
         </div>
 
         <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
@@ -386,6 +391,7 @@ export function AnnualPlan({
                     <input
                       className={`w-full rounded border border-line bg-surface px-1 py-0.5 text-sm no-print ${FOCUS_RING}`}
                       value={row.auditors}
+                      disabled={!canEdit || readOnly}
                       onChange={(e) => updatePlanRow(row.id, { auditors: e.target.value })}
                       title={rowWarning?.message}
                     />

@@ -6,6 +6,14 @@ import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { FormPrintButton } from './ui/FormPrintButton'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { AttachmentField } from './ui/AttachmentField'
+import { normalizeAttachments } from '../lib/attachments'
+import {
+  canAddManualNcr,
+  canCloseNcr,
+  canEditNcrFields,
+  isReadOnlyRole,
+} from '../lib/userRole'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 const CLASSIFICATIONS: NCRClassification[] = ['重大', '輕微']
@@ -19,12 +27,14 @@ function NcrField({
   onChange,
   rows = 2,
   printValue,
+  disabled = false,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   rows?: number
   printValue?: string
+  disabled?: boolean
 }) {
   return (
     <div>
@@ -33,6 +43,7 @@ function NcrField({
         className={`w-full rounded border border-line bg-surface px-2 py-1.5 text-sm no-print ${FOCUS_RING}`}
         rows={rows}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
       />
       <p className="print-only whitespace-pre-wrap text-sm">{printValue ?? value}</p>
@@ -64,6 +75,15 @@ export function NCRList({
     }
   }, [selectedNcrId])
 
+  const readOnly = isReadOnlyRole(settings.viewRole)
+  const canEdit = canEditNcrFields(settings.viewRole)
+  const canClose = canCloseNcr(settings.viewRole)
+  const canAdd = canAddManualNcr(settings.viewRole)
+  const statusOptions = STATUSES.filter((s) => s !== '結案' || canClose).map((s) => ({
+    value: s,
+    label: s,
+  }))
+
   const planRowOptions = company.planRows.map((r) => ({
     value: `${r.qpCode}|${r.departmentId}`,
     label: `${r.qpCode} · ${r.department}`,
@@ -94,6 +114,9 @@ export function NCRList({
     <div className="space-y-6 print-area qr-form">
       <Card className="no-print">
         <h2 className="mb-2 text-lg font-semibold text-ink">手動新增 NCR</h2>
+        {!canAdd && (
+          <p className="mb-2 text-xs text-muted">目前角色無法手動新增 NCR。</p>
+        )}
         <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <Select
@@ -112,6 +135,7 @@ export function NCRList({
           />
           <div className="flex items-end">
             <Button
+              disabled={!canAdd}
               onClick={() => {
                 if (!newNcr.description.trim()) return
                 addManualNCR(newNcr)
@@ -175,8 +199,11 @@ export function NCRList({
                           label="狀態"
                           value={ncr.status}
                           onChange={(v) => handleStatusChange(ncr.id, v as NCRStatus)}
-                          options={STATUSES.map((s) => ({ value: s, label: s }))}
+                          options={statusOptions}
                         />
+                        {!canClose && ncr.status !== '結案' && (
+                          <p className="mt-1 text-xs text-muted">受稽部門無法將 NCR 結案</p>
+                        )}
                       </div>
                       <span className="print-only"><Badge label={ncr.status} /></span>
                     </div>
@@ -204,6 +231,7 @@ export function NCRList({
                     <NcrField
                       label="不符合描述"
                       value={ncr.description}
+                      disabled={readOnly || !canEdit}
                       onChange={(v) => updateNCR(ncr.id, { description: v })}
                       rows={3}
                     />
@@ -213,6 +241,7 @@ export function NCRList({
                         type="date"
                         className={`w-full rounded border border-line bg-surface px-2 py-1.5 text-sm no-print ${FOCUS_RING}`}
                         value={ncr.date}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
                       />
                       <p className="print-only text-sm">{ncr.date}</p>
@@ -260,8 +289,17 @@ export function NCRList({
                       <NcrField
                         label="驗證／結案佐證"
                         value={ncr.verificationEvidence}
+                        disabled={readOnly || !canEdit}
                         onChange={(v) => updateNCR(ncr.id, { verificationEvidence: v })}
                         rows={3}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <AttachmentField
+                        label="NCR 佐證附件"
+                        attachments={normalizeAttachments(ncr.attachments)}
+                        disabled={readOnly || !canEdit}
+                        onChange={(attachments) => updateNCR(ncr.id, { attachments })}
                       />
                     </div>
                   </div>

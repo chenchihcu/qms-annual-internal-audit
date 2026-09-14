@@ -5,12 +5,15 @@ import type {
   ChecklistItem,
   CompanyData,
   CompanyId,
+  ExternalAuditDaySchedule,
+  ExternalAuditScheduleEntry,
   NCR,
   Observation,
   PlanRow,
   ExternalAuditPrepItemState,
   ProcedureAudit,
   ThirdPartySuggestion,
+  ViewRole,
 } from '../types'
 import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
 import { migrateState } from '../lib/migrate'
@@ -35,6 +38,11 @@ import type { MonthStatus } from '../types'
 import { loadStateFromStorage, saveStateToStorage } from '../lib/storage'
 import { applyAuditYearChange } from '../lib/settingsYear'
 import { parseImportJSON } from '../lib/importSummary'
+import {
+  applySpreadsheetImport,
+  type SpreadsheetRow,
+} from '../lib/spreadsheetImport'
+import { canCloseNcr } from '../lib/userRole'
 
 function patchCompany(
   state: AppState,
@@ -344,6 +352,9 @@ export function useAuditStore() {
 
       const merged = { ...current, ...patch }
       if (patch.status && patch.status !== current.status) {
+        if (patch.status === '結案' && !canCloseNcr(s.settings.viewRole)) {
+          return s
+        }
         const gate = canTransitionNcrStatus(merged, patch.status)
         if (!gate.ok) {
           return s
@@ -542,6 +553,76 @@ export function useAuditStore() {
     },
     [],
   )
+
+  const updateViewRole = useCallback((viewRole: ViewRole) => {
+    setState((s) => ({
+      ...s,
+      settings: { ...s.settings, viewRole },
+    }))
+  }, [])
+
+  const importSpreadsheet = useCallback(
+    (companyId: CompanyId, rows: SpreadsheetRow[]) => {
+      setState((s) => applySpreadsheetImport(s, companyId, rows).state)
+    },
+    [],
+  )
+
+  const updateExternalAuditSchedule = useCallback(
+    (patch: Partial<ExternalAuditDaySchedule>) => {
+      setState((s) => ({
+        ...s,
+        externalAuditSchedule: {
+          ...(s.externalAuditSchedule ?? {
+            year: s.settings.auditYear,
+            auditDate: s.settings.externalAuditDate ?? '',
+            companyProductHighlights: { jiurun: '', zhenglongxing: '' },
+            entries: [],
+          }),
+          ...patch,
+        },
+      }))
+    },
+    [],
+  )
+
+  const updateExternalScheduleEntry = useCallback(
+    (id: string, patch: Partial<ExternalAuditScheduleEntry>) => {
+      setState((s) => {
+        const schedule = s.externalAuditSchedule
+        if (!schedule) return s
+        return {
+          ...s,
+          externalAuditSchedule: {
+            ...schedule,
+            entries: schedule.entries.map((e) => (e.id === id ? { ...e, ...patch } : e)),
+          },
+        }
+      })
+    },
+    [],
+  )
+
+  const addExternalScheduleEntry = useCallback(() => {
+    setState((s) => {
+      const schedule = s.externalAuditSchedule
+      if (!schedule) return s
+      const entry: ExternalAuditScheduleEntry = {
+        id: `sched-${Date.now()}`,
+        timeStart: '09:00',
+        timeEnd: '10:00',
+        activity: '',
+        location: '',
+        productModels: '',
+        companyFocus: 'both',
+        remark: '',
+      }
+      return {
+        ...s,
+        externalAuditSchedule: { ...schedule, entries: [...schedule.entries, entry] },
+      }
+    })
+  }, [])
 
   const updateExternalPrepSequence = useCallback(
     (
@@ -818,6 +899,11 @@ export function useAuditStore() {
     addObservation,
     updateSuggestion,
     addSuggestion,
+    updateViewRole,
+    importSpreadsheet,
+    updateExternalAuditSchedule,
+    updateExternalScheduleEntry,
+    addExternalScheduleEntry,
     updateExternalPrepItem,
     updateExternalPrepSequence,
     resetInternalAuditCompleteOverride,

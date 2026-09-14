@@ -3,6 +3,8 @@ import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { autoArrangePlan } from '../lib/planner'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
+import { createDefaultExternalAuditSchedule } from '../lib/externalAuditSchedule'
+import { DEFAULT_VIEW_ROLE } from '../types'
 import { normalizeNCRList } from '../lib/ncr'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
@@ -80,6 +82,7 @@ const settings = {
   externalAuditDate: '2026-09-15',
   managementReviewDate: '2026-12-10',
   scoringRules: DEFAULT_SCORING_RULES,
+  viewRole: DEFAULT_VIEW_ROLE,
 }
 
 type PartialItem = {
@@ -185,19 +188,24 @@ function createCompanyData(companyId: CompanyId): CompanyData {
     )
     planRows = applyDemoImpartialityConflicts(planRows, companyId)
 
+    const qp16Audit = buildAudit('QP-16', 'dept-qa', [
+      {
+        no: 1,
+        judgment: '不符',
+        description: '不合格品隔離區標示不完整',
+        objectiveEvidence: '現場巡檢紀錄',
+      },
+    ])
+    qp16Audit.items = qp16Audit.items.map((item) =>
+      item.no === 1 ? { ...item, as9100Clause: '8.7' } : item,
+    )
+
     let audits = [
       buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }], {
         fullyJudged: true,
         withEvidence: true,
       }),
-      buildAudit('QP-16', 'dept-qa', [
-        {
-          no: 1,
-          judgment: '不符',
-          description: '不合格品隔離區標示不完整',
-          objectiveEvidence: '現場巡檢紀錄',
-        },
-      ]),
+      qp16Audit,
       buildAudit('QP-20', 'dept-admin', [{ no: 1, judgment: '符合' }]),
     ]
     audits = syncAuditsWithPlan(planRows, audits)
@@ -361,8 +369,12 @@ export function createDemoState(): AppState {
     settings,
     companies,
     externalAuditPrep: prep,
+    externalAuditSchedule: createDefaultExternalAuditSchedule(
+      settings.auditYear,
+      settings.externalAuditDate ?? `${settings.auditYear}-09-15`,
+    ),
     dataSource: 'demo',
-    version: 12,
+    version: 13,
   }
 }
 
