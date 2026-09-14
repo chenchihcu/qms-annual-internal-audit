@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
+import { countMissingEvidenceItems } from '../lib/checklistEvidence'
 import { isSeedChecklistItem } from '../lib/checklistItem'
 import { checkAuditImpartiality } from '../lib/impartiality'
 import { findNcrForChecklistItem } from '../lib/ncr'
@@ -109,6 +110,7 @@ export function ProcedureAuditPanel({
   const score = scoreProcedureAudit(audit, settings.scoringRules)
   const complete = isProcedureComplete(audit)
   const pendingCount = countPendingItems(audit.items)
+  const missingEvidenceCount = countMissingEvidenceItems(audit.items)
   const categories = [...new Set(audit.items.map((i) => i.category))]
   const impartialityWarning = checkAuditImpartiality(audit, company.departments)
 
@@ -168,7 +170,9 @@ export function ProcedureAuditPanel({
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="內部稽核查檢表 QR-28-02"
-          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
+          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}${
+            company.keyCustomerName?.trim() ? ` · 主要客戶：${company.keyCustomerName}` : ''
+          }`}
         />
 
         <div className="overflow-x-auto">
@@ -267,7 +271,11 @@ export function ProcedureAuditPanel({
                   : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
               }`}
             >
-              {complete ? '查檢已完成' : `查檢未完成（尚餘 ${pendingCount} 項未判定）`}
+              {complete
+                ? '查檢已完成'
+                : pendingCount > 0
+                  ? `查檢未完成（尚餘 ${pendingCount} 項未判定）`
+                  : `查檢未完成（尚餘 ${missingEvidenceCount} 項缺客觀證據）`}
             </span>
             {audit.plannedMonth && (
               <span className="text-xs text-muted">計畫月份：{audit.plannedMonth} 月</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { carryPlanDatesToAudit } from '../auditDates'
+import { carryPlanDatesToAudit, resolvePlannedMonthFromPlan } from '../auditDates'
 import type { PlanRow, ProcedureAudit } from '../../types'
 
 const row: PlanRow = {
@@ -15,7 +15,7 @@ const row: PlanRow = {
   owner: '陳智富',
   auditors: '王稽核',
   auditCategory: '系統稽核',
-  months: Array(12).fill(null).map((_, i) => (i === 2 ? '擬定' : null)) as PlanRow['months'],
+  months: Array(12).fill(null).map((_, i) => (i <= 1 ? '擬定' : null)) as PlanRow['months'],
   manualOverride: false,
 }
 
@@ -34,22 +34,28 @@ const emptyAudit: ProcedureAudit = {
   items: [],
 }
 
+describe('resolvePlannedMonthFromPlan', () => {
+  it('uses first scheduled month from plan row', () => {
+    expect(resolvePlannedMonthFromPlan(row)).toBe(1)
+  })
+})
+
 describe('carryPlanDatesToAudit', () => {
   it('fills notify and audit dates from first scheduled month when empty', () => {
     const carried = carryPlanDatesToAudit(row, emptyAudit, 2026)
-    expect(carried.plannedMonth).toBe(3)
-    expect(carried.notifyDate).toBe('2026-03-01')
-    expect(carried.auditDate).toBe('2026-03-15')
+    expect(carried.plannedMonth).toBe(1)
+    expect(carried.notifyDate).toBe('2026-01-01')
+    expect(carried.auditDate).toBe('2026-01-15')
   })
 
-  it('does not overwrite existing header dates', () => {
+  it('overwrites drifted dates to match plan schedule', () => {
     const carried = carryPlanDatesToAudit(
       row,
-      { ...emptyAudit, notifyDate: '2026-04-01', auditDate: '2026-04-20', plannedMonth: 4 },
+      { ...emptyAudit, notifyDate: '2026-03-01', auditDate: '2026-03-15', plannedMonth: 3 },
       2026,
     )
-    expect(carried.notifyDate).toBe('2026-04-01')
-    expect(carried.auditDate).toBe('2026-04-20')
-    expect(carried.plannedMonth).toBe(4)
+    expect(carried.plannedMonth).toBe(1)
+    expect(carried.notifyDate).toBe('2026-01-01')
+    expect(carried.auditDate).toBe('2026-01-15')
   })
 })
