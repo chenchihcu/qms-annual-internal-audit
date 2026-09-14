@@ -14,6 +14,7 @@ import { SettingsPanel } from './components/SettingsPanel'
 import { ClauseMappingPanel } from './components/ClauseMappingPanel'
 import { TAB_GROUPS, parseAppHash, syncHash } from './lib/navigation'
 import { VIEW_ROLE_LABELS, type ViewRole } from './types'
+import { preloadPdfExportFont } from './lib/formExport'
 import { shouldShowDemoBanner } from './lib/demoMode'
 import { getStoredTheme, toggleTheme } from './lib/theme'
 import { DemoBanner } from './components/DemoBanner'
@@ -65,6 +66,12 @@ function App() {
   const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
   const { settings, activeCompanyId, company } = store.state
   const viewRole = settings.viewRole ?? 'lead_auditor'
+
+  useEffect(() => {
+    void preloadPdfExportFont().catch(() => {
+      // 首次匯出時仍會重試並在 UI 顯示錯誤
+    })
+  }, [])
 
   useEffect(() => {
     syncHash(tab, auditKey, ncrId, planMonth)

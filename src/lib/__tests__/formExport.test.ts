@@ -1,16 +1,22 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, afterEach } from 'vitest'
 import { createDemoState } from '../../data/demoData'
 import {
   buildAnnualPlanSheetAoa,
   buildChecklistSheetAoa,
   buildFormExportFilename,
+  downloadFormExcel,
+  downloadFormPdf,
   exportAnnualPlanExcel,
+  exportAnnualPlanPdf,
   exportChecklistExcel,
+  exportChecklistPdf,
   exportNcrExcel,
+  exportNcrPdf,
   formatPlanFilterCount,
   isPdfBytes,
   isXlsxBytes,
   planFilterPrintSubtitle,
+  triggerBlobDownload,
 } from '../formExport'
 import { filterPlanRowsByStakeholder } from '../stakeholderSchedule'
 import { carryPlanDatesToAudit } from '../auditDates'
@@ -168,11 +174,10 @@ describe('form export bytes', () => {
     expect(isXlsxBytes(ncrXlsx)).toBe(true)
   })
 
-  it('produces pdf bytes for annual plan export', async () => {
-    const { exportAnnualPlanPdf } = await import('../formExport')
+  it('produces pdf bytes for annual plan, checklist, and ncr', async () => {
     const state = createDemoState()
     const company = state.companies.jiurun
-    const pdf = await exportAnnualPlanPdf({
+    const planPdf = await exportAnnualPlanPdf({
       settings: state.settings,
       company,
       rows: company.planRows,
@@ -181,6 +186,108 @@ describe('form export bytes', () => {
       totalCount: company.planRows.length,
       getProcedureTitle,
     })
-    expect(isPdfBytes(pdf)).toBe(true)
+    expect(isPdfBytes(planPdf)).toBe(true)
+
+    const audit = company.audits[0]
+    const checklistPdf = await exportChecklistPdf({
+      settings: state.settings,
+      company,
+      audit,
+      getProcedureTitle,
+    })
+    expect(isPdfBytes(checklistPdf)).toBe(true)
+
+    const ncrPdf = await exportNcrPdf({
+      settings: state.settings,
+      company,
+      ncrs: company.ncrs,
+    })
+    expect(isPdfBytes(ncrPdf)).toBe(true)
+  })
+
+  it('includes 計畫月份 and attachment filenames in checklist export', () => {
+    const state = createDemoState()
+    const company = state.companies.jiurun
+    const audit = {
+      ...company.audits[0],
+      plannedMonth: 2,
+    }
+    const aoa = buildChecklistSheetAoa({
+      settings: state.settings,
+      company,
+      audit,
+      getProcedureTitle,
+    })
+    const flat = aoa.flat().map(String)
+    expect(flat.some((cell) => cell.includes('計畫月份：2 月'))).toBe(true)
+    expect(flat.some((cell) => cell.includes('附件檔名'))).toBe(true)
+  })
+
+  it('produces xlsx and pdf for zhenglongxing company', async () => {
+    const state = createDemoState()
+    const company = state.companies.zhenglongxing
+    const ctx = {
+      settings: state.settings,
+      company,
+      rows: company.planRows,
+      filterTag: null,
+      visibleCount: company.planRows.length,
+      totalCount: company.planRows.length,
+      getProcedureTitle,
+    }
+    expect(isXlsxBytes(exportAnnualPlanExcel(ctx))).toBe(true)
+    expect(isPdfBytes(await exportAnnualPlanPdf(ctx))).toBe(true)
+    expect(buildFormExportFilename(company.name, 'QR-28-01')).toContain('正隆興精密')
+  })
+})
+
+describe('triggerBlobDownload', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.useRealTimers()
+  })
+
+  it('creates blob URL and clicks download anchor', () => {
+    vi.useFakeTimers()
+    const click = vi.fn()
+    const anchor = document.createElement('a')
+    anchor.click = click
+    vi.spyOn(document, 'createElement').mockReturnValue(anchor)
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock-url')
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const appendChild = vi.spyOn(document.body, 'appendChild')
+
+    triggerBlobDownload(new Uint8Array([1, 2, 3]), '九潤精密_QR-28-01_2026-09-14.xlsx', 'application/octet-stream')
+
+    expect(createObjectURL).toHaveBeenCalled()
+    expect(appendChild).toHaveBeenCalledWith(anchor)
+    expect(anchor.download).toBe('九潤精密_QR-28-01_2026-09-14.xlsx')
+    expect(click).toHaveBeenCalled()
+
+    vi.runAllTimers()
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('throws when bytes are empty', () => {
+    expect(() => triggerBlobDownload(new Uint8Array(), 'empty.xlsx', 'application/octet-stream')).toThrow(
+      '匯出失敗',
+    )
+  })
+
+  it('downloadFormExcel and downloadFormPdf set correct filenames on anchor', () => {
+    vi.useFakeTimers()
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const anchor = document.createElement('a')
+    anchor.click = vi.fn()
+    vi.spyOn(document, 'createElement').mockReturnValue(anchor)
+    vi.spyOn(document.body, 'appendChild').mockImplementation(() => anchor)
+
+    const bytes = new Uint8Array([1, 2, 3])
+    downloadFormExcel(bytes, 'test_QR-28-01_2026-09-14')
+    expect(anchor.download).toBe('test_QR-28-01_2026-09-14.xlsx')
+
+    downloadFormPdf(bytes, 'test_QR-28-02_2026-09-14')
+    expect(anchor.download).toBe('test_QR-28-02_2026-09-14.pdf')
   })
 })

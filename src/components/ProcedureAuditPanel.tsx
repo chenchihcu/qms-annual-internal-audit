@@ -92,6 +92,23 @@ export function ProcedureAuditPanel({
     (row) => row.qpCode === qpCode && row.departmentId === departmentId,
   )
 
+  const audit =
+    qpCode && departmentId ? persistedAudit ?? getOrCreateAudit(qpCode, departmentId) : null
+
+  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-02')
+  const exportContext = useMemo(
+    () =>
+      audit
+        ? {
+            settings,
+            company,
+            audit,
+            getProcedureTitle,
+          }
+        : null,
+    [settings, company, audit, getProcedureTitle],
+  )
+
   useEffect(() => {
     if (!qpCode || !departmentId) return
     if (!persistedAudit) {
@@ -123,11 +140,9 @@ export function ProcedureAuditPanel({
     updateAudit,
   ])
 
-  if (!qpCode || !departmentId) {
+  if (!qpCode || !departmentId || !audit || !exportContext) {
     return <p className="text-muted">請先於年度計畫建立程序稽核項目</p>
   }
-
-  const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
   const complete = isProcedureComplete(audit)
@@ -138,17 +153,7 @@ export function ProcedureAuditPanel({
   const readOnly = isReadOnlyRole(settings.viewRole)
   const canEdit = canEditChecklist(settings.viewRole)
   const canNotify = canMarkAuditNotified(settings.viewRole)
-  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-02')
   const printHeaderMeta = buildQr2802PrintHeaderMeta(audit, company, getProcedureTitle)
-  const exportContext = useMemo(
-    () => ({
-      settings,
-      company,
-      audit,
-      getProcedureTitle,
-    }),
-    [settings, company, audit, getProcedureTitle],
-  )
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
