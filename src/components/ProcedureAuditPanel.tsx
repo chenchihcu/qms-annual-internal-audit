@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
+import {
+  buildFormExportFilename,
+  exportChecklistExcel,
+  exportChecklistPdf,
+} from '../lib/formExport'
+import { buildQr2802PrintHeaderMeta } from '../lib/printForm'
 import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
 import { countMissingEvidenceItems } from '../lib/checklistEvidence'
 import { isSeedChecklistItem } from '../lib/checklistItem'
@@ -10,6 +16,7 @@ import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import type { Judgment } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { FormExportButtons } from './ui/FormExportButtons'
 import { FormPrintButton } from './ui/FormPrintButton'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import { PrintDocHeader } from './ui/PrintDocHeader'
@@ -29,12 +36,14 @@ const FOCUS_RING =
 interface ProcedureAuditPanelProps {
   store: AuditStore
   selectedKey?: string
+  selectedPlanMonth?: number
   onSelectedKeyChange?: (key: string) => void
 }
 
 export function ProcedureAuditPanel({
   store,
   selectedKey: selectedKeyProp,
+  selectedPlanMonth,
   onSelectedKeyChange,
 }: ProcedureAuditPanelProps) {
   const {
@@ -90,7 +99,12 @@ export function ProcedureAuditPanel({
       return
     }
     if (!planRow) return
-    const carried = carryPlanDatesToAudit(planRow, persistedAudit, settings.auditYear)
+    const carried = carryPlanDatesToAudit(
+      planRow,
+      persistedAudit,
+      settings.auditYear,
+      selectedPlanMonth,
+    )
     if (
       carried.notifyDate !== persistedAudit.notifyDate ||
       carried.auditDate !== persistedAudit.auditDate ||
@@ -104,6 +118,7 @@ export function ProcedureAuditPanel({
     persistedAudit,
     planRow,
     settings.auditYear,
+    selectedPlanMonth,
     getOrCreateAudit,
     updateAudit,
   ])
@@ -123,6 +138,17 @@ export function ProcedureAuditPanel({
   const readOnly = isReadOnlyRole(settings.viewRole)
   const canEdit = canEditChecklist(settings.viewRole)
   const canNotify = canMarkAuditNotified(settings.viewRole)
+  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-02')
+  const printHeaderMeta = buildQr2802PrintHeaderMeta(audit, company, getProcedureTitle)
+  const exportContext = useMemo(
+    () => ({
+      settings,
+      company,
+      audit,
+      getProcedureTitle,
+    }),
+    [settings, company, audit, getProcedureTitle],
+  )
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
@@ -170,6 +196,12 @@ export function ProcedureAuditPanel({
               onChange={setSelectedKey}
               options={auditOptions}
             />
+            <FormExportButtons
+              formId="QR-28-02"
+              filenameBase={exportFilenameBase}
+              onExportExcel={() => exportChecklistExcel(exportContext)}
+              onExportPdf={() => exportChecklistPdf(exportContext)}
+            />
             <FormPrintButton />
           </div>
         </div>
@@ -180,9 +212,8 @@ export function ProcedureAuditPanel({
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="內部稽核查檢表 QR-28-02"
-          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}${
-            company.keyCustomerName?.trim() ? ` · 主要客戶：${company.keyCustomerName}` : ''
-          }`}
+          subtitle={printHeaderMeta.subtitle}
+          detailLines={printHeaderMeta.detailLines}
         />
 
         <div className="overflow-x-auto">

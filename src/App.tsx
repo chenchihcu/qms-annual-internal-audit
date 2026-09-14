@@ -61,13 +61,14 @@ function App() {
   const [tab, setTab] = useState<TabId>(initialHash.tab)
   const [auditKey, setAuditKey] = useState<string | undefined>(initialHash.auditKey)
   const [ncrId, setNcrId] = useState<string | undefined>(initialHash.ncrId)
+  const [planMonth, setPlanMonth] = useState<number | undefined>(initialHash.planMonth)
   const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
   const { settings, activeCompanyId, company } = store.state
   const viewRole = settings.viewRole ?? 'lead_auditor'
 
   useEffect(() => {
-    syncHash(tab, auditKey, ncrId)
-  }, [tab, auditKey, ncrId])
+    syncHash(tab, auditKey, ncrId, planMonth)
+  }, [tab, auditKey, ncrId, planMonth])
 
   useEffect(() => {
     const onHash = () => {
@@ -75,19 +76,26 @@ function App() {
       setTab(parsed.tab)
       setAuditKey(parsed.auditKey)
       setNcrId(parsed.ncrId)
+      setPlanMonth(parsed.planMonth)
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const navigate = useCallback((nextTab: TabId, nextAuditKey?: string, nextNcrId?: string) => {
-    setTab(nextTab)
-    if (nextAuditKey !== undefined) setAuditKey(nextAuditKey)
-    if (nextNcrId !== undefined) setNcrId(nextNcrId)
-  }, [])
+  const navigate = useCallback(
+    (nextTab: TabId, nextAuditKey?: string, nextNcrId?: string, nextPlanMonth?: number) => {
+      setTab(nextTab)
+      if (nextAuditKey !== undefined) setAuditKey(nextAuditKey)
+      if (nextNcrId !== undefined) setNcrId(nextNcrId)
+      if (nextPlanMonth !== undefined) setPlanMonth(nextPlanMonth)
+      else if (nextTab !== 'audit') setPlanMonth(undefined)
+    },
+    [],
+  )
 
   const handleAuditKeyChange = useCallback((key: string) => {
     setAuditKey(key)
+    setPlanMonth(undefined)
   }, [])
 
   const savedLabel = store.lastSavedAt
@@ -239,6 +247,7 @@ function App() {
             <ProcedureAuditPanel
               store={store}
               selectedKey={auditKey}
+              selectedPlanMonth={planMonth}
               onSelectedKeyChange={handleAuditKeyChange}
             />
           </TabErrorBoundary>
