@@ -2,13 +2,22 @@ import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { getSeedStats } from '../data/checklistLoader'
 import { summarizeImportState, parseImportJSON } from '../lib/importSummary'
+import { parseSpreadsheetCsv } from '../lib/spreadsheetImport'
+import { canImportSpreadsheet, isReadOnlyRole } from '../lib/userRole'
 import { Button, Card, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 
 export function SettingsPanel({ store }: { store: AuditStore }) {
-  const { state, updateSettings, exportJSON, importJSON, resetToDemo, clearAll } = store
+  const { state, updateSettings, exportJSON, importJSON, resetToDemo, clearAll, importSpreadsheet } =
+    store
   const fileRef = useRef<HTMLInputElement>(null)
+  const csvRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [csvError, setCsvError] = useState<string | null>(null)
+  const [pendingCsvRows, setPendingCsvRows] = useState<ReturnType<typeof parseSpreadsheetCsv>['rows'] | null>(
+    null,
+  )
+  const [pendingCsvSummary, setPendingCsvSummary] = useState<string | null>(null)
   const [pendingImport, setPendingImport] = useState<ReturnType<typeof summarizeImportState> | null>(
     null,
   )
@@ -61,6 +70,44 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
   }
 
   const seedStats = getSeedStats()
+  const readOnly = isReadOnlyRole(state.settings.viewRole)
+  const canImportCsv = canImportSpreadsheet(state.settings.viewRole)
+
+  const handleCsvSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const parsed = parseSpreadsheetCsv(reader.result as string)
+      if (parsed.errors.length) {
+        setCsvError(parsed.errors.join('；'))
+        setPendingCsvRows(null)
+        return
+      }
+      if (!parsed.rows.length) {
+        setCsvError('CSV 無有效資料列')
+        setPendingCsvRows(null)
+        return
+      }
+      setCsvError(null)
+      setPendingCsvRows(parsed.rows)
+      setPendingCsvSummary(
+        `將更新「${state.company.name}」：${parsed.rows.length} 列` +
+          (parsed.warnings.length ? `（${parsed.warnings.length} 則警告）` : ''),
+      )
+    }
+    reader.onerror = () => setCsvError('讀取 CSV 失敗')
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const confirmCsvImport = () => {
+    if (!pendingCsvRows) return
+    importSpreadsheet(state.activeCompanyId, pendingCsvRows)
+    setPendingCsvRows(null)
+    setPendingCsvSummary(null)
+    setCsvError(null)
+  }
 
   return (
     <div className="space-y-6">
@@ -104,6 +151,21 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
         }}
         onCancel={() => setClearConfirm(false)}
       />
+      <ConfirmDialog
+        open={pendingCsvSummary !== null}
+        title="確認 CSV 再匯入"
+        description={
+          pendingCsvSummary ??
+          '將合併更新目前公司的查檢表與計畫列，不會清除 NCR、觀察事項或其他公司資料。'
+        }
+        variant="danger"
+        confirmLabel="合併更新"
+        onConfirm={confirmCsvImport}
+        onCancel={() => {
+          setPendingCsvRows(null)
+          setPendingCsvSummary(null)
+        }}
+      />
 
       <Card>
         <h2 className="mb-2 text-lg font-semibold text-ink">查檢表種子（114 年度）</h2>
@@ -125,6 +187,7 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
             max={1}
             step="0.1"
             value={state.settings.scoringRules.conform}
+            disabled={readOnly}
             onChange={(v) =>
               updateSettings({
                 scoringRules: { ...state.settings.scoringRules, conform: Number(v) },
@@ -138,6 +201,7 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
             max={1}
             step="0.1"
             value={state.settings.scoringRules.nonConform}
+            disabled={readOnly}
             onChange={(v) =>
               updateSettings({
                 scoringRules: { ...state.settings.scoringRules, nonConform: Number(v) },
@@ -151,6 +215,7 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
             max={1}
             step="0.1"
             value={state.settings.scoringRules.observation}
+            disabled={readOnly}
             onChange={(v) =>
               updateSettings({
                 scoringRules: { ...state.settings.scoringRules, observation: Number(v) },
@@ -172,17 +237,47 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
         )}
         <div className="flex flex-wrap gap-3">
           <Button onClick={handleExport}>匯出 JSON</Button>
-          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
+          <Button variant="secondary" disabled={readOnly} onClick={() => fileRef.current?.click()}>
             匯入 JSON
           </Button>
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleFileSelect} />
-          <Button variant="secondary" onClick={() => setResetConfirm(true)}>
+          <Button variant="secondary" disabled={readOnly} onClick={() => setResetConfirm(true)}>
             還原示範資料
           </Button>
-          <Button variant="danger" onClick={() => setClearConfirm(true)}>
+          <Button variant="danger" disabled={readOnly} onClick={() => setClearConfirm(true)}>
             清除全部資料
           </Button>
         </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-2 text-lg font-semibold text-ink">CSV 再匯入（查檢表／計畫）</h2>
+        <p className="mb-3 text-sm text-muted">
+          合併更新目前公司的查檢表項目與年度計畫列，不會清除 NCR、觀察事項、建議追蹤或另一家公司資料。
+          欄位：recordType、qpCode、departmentId、no（查檢）、content、as9100Clause、auditors（計畫）等。
+        </p>
+        {csvError && (
+          <p
+            role="alert"
+            className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-100"
+          >
+            {csvError}
+          </p>
+        )}
+        <Button
+          variant="secondary"
+          disabled={!canImportCsv}
+          onClick={() => csvRef.current?.click()}
+        >
+          選擇 CSV 再匯入
+        </Button>
+        <input
+          ref={csvRef}
+          type="file"
+          accept=".csv,text/csv"
+          className="hidden"
+          onChange={handleCsvSelect}
+        />
       </Card>
 
       <Card>

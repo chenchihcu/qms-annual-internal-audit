@@ -20,6 +20,19 @@ export type SuggestionStatus = 'open' | 'closed'
 
 export type CompanyId = 'jiurun' | 'zhenglongxing'
 
+/** 多角色視圖：主任稽核員 / 受稽部門 / 警示只讀 */
+export type ViewRole = 'lead_auditor' | 'auditee' | 'alert_readonly'
+
+export interface EvidenceAttachment {
+  id: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  /** base64 data URL（本機儲存，無伺服器） */
+  dataUrl: string
+  addedAt: string
+}
+
 export interface ScoringRules {
   conform: number
   nonConform: number
@@ -35,6 +48,8 @@ export interface AuditSettings {
   externalAuditDate?: string
   managementReviewDate?: string
   scoringRules: ScoringRules
+  /** 多角色視圖（跨公司共用） */
+  viewRole?: ViewRole
 }
 
 export interface DepartmentProfile {
@@ -83,6 +98,8 @@ export interface ChecklistItem {
   objectiveEvidence?: string
   /** AS9100 條款 */
   as9100Clause?: string
+  /** 佐證附件（檔名 + base64，本機儲存） */
+  attachments?: EvidenceAttachment[]
   procedureRef?: string
   sourceYear?: number
   carriedFromId?: string
@@ -131,6 +148,8 @@ export interface NCR {
   containment?: string
   classification?: NCRClassification
   checklistItemId?: string
+  /** 佐證附件 */
+  attachments?: EvidenceAttachment[]
   /** 由跨年觀察事項「已轉 NCR」建立 */
   observationId?: string
   sourceYear?: number
@@ -176,6 +195,29 @@ export interface ExternalAuditPrepItemState {
   remark: string
 }
 
+/** 外稽當日行程一列 */
+export interface ExternalAuditScheduleEntry {
+  id: string
+  timeStart: string
+  timeEnd: string
+  activity: string
+  location: string
+  /** 展示機種／產品（供稽核員參考） */
+  productModels: string
+  /** 主要對應公司 */
+  companyFocus: CompanyId | 'both'
+  remark: string
+}
+
+/** 外稽當日行程（雙公司合併取證） */
+export interface ExternalAuditDaySchedule {
+  year: number
+  auditDate: string
+  /** 各公司當日重點機種摘要 */
+  companyProductHighlights: Record<CompanyId, string>
+  entries: ExternalAuditScheduleEntry[]
+}
+
 export interface ExternalAuditPrepState {
   year: number
   /** 未設定時依雙公司程序稽核資料自動判定 */
@@ -205,6 +247,8 @@ export interface AppState {
   settings: AuditSettings
   companies: Record<CompanyId, CompanyData>
   externalAuditPrep: ExternalAuditPrepState
+  /** 外稽當日行程／機種（依年度） */
+  externalAuditSchedule?: ExternalAuditDaySchedule
   /** 示範資料或使用者正式資料 */
   dataSource?: DataSource
   version: number
@@ -218,6 +262,7 @@ export type TabId =
   | 'observations'
   | 'suggestions'
   | 'prep'
+  | 'clauses'
   | 'risk'
   | 'settings'
 
@@ -253,3 +298,11 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
   nonConform: 0,
   observation: 0.5,
 }
+
+export const VIEW_ROLE_LABELS: Record<ViewRole, string> = {
+  lead_auditor: '主任稽核員',
+  auditee: '受稽部門',
+  alert_readonly: '警示只讀',
+}
+
+export const DEFAULT_VIEW_ROLE: ViewRole = 'lead_auditor'

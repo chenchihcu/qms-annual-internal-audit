@@ -13,6 +13,13 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 import { FormPrintButton } from './ui/FormPrintButton'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { AttachmentField } from './ui/AttachmentField'
+import {
+  canEditChecklist,
+  canMarkAuditNotified,
+  isReadOnlyRole,
+} from '../lib/userRole'
+import { normalizeAttachments } from '../lib/attachments'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -113,6 +120,9 @@ export function ProcedureAuditPanel({
   const missingEvidenceCount = countMissingEvidenceItems(audit.items)
   const categories = [...new Set(audit.items.map((i) => i.category))]
   const impartialityWarning = checkAuditImpartiality(audit, company.departments)
+  const readOnly = isReadOnlyRole(settings.viewRole)
+  const canEdit = canEditChecklist(settings.viewRole)
+  const canNotify = canMarkAuditNotified(settings.viewRole)
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
@@ -198,7 +208,7 @@ export function ProcedureAuditPanel({
                       value={audit.notifyDate}
                       onChange={(v) => handleHeaderChange('notifyDate', v)}
                     />
-                    {!audit.notifySent ? (
+                    {!audit.notifySent && canNotify ? (
                       <Button variant="secondary" onClick={() => markAuditAsNotified(audit.id)}>
                         標記已通知
                       </Button>
@@ -282,7 +292,7 @@ export function ProcedureAuditPanel({
             )}
           </div>
           <div className="flex flex-wrap gap-2 no-print">
-            {pendingCount > 0 && (
+            {pendingCount > 0 && canEdit && !readOnly && (
               <Button
                 variant="secondary"
                 onClick={() => setRemainingUnjudgedToConform(audit.id)}
@@ -290,9 +300,11 @@ export function ProcedureAuditPanel({
                 其餘未判定改符合
               </Button>
             )}
-            <Button variant="secondary" onClick={() => addChecklistItem(audit.id)}>
-              新增稽核項目
-            </Button>
+            {canEdit && !readOnly && (
+              <Button variant="secondary" onClick={() => addChecklistItem(audit.id)}>
+                新增稽核項目
+              </Button>
+            )}
           </div>
         </div>
 
@@ -328,6 +340,7 @@ export function ProcedureAuditPanel({
                         className={`w-full min-h-[4.5rem] resize-y rounded border border-line bg-surface px-2 py-1 text-sm leading-relaxed no-print ${FOCUS_RING}`}
                         rows={Math.min(6, Math.max(2, Math.ceil(item.content.length / 40)))}
                         value={item.content}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { content: e.target.value })
                         }
@@ -341,6 +354,7 @@ export function ProcedureAuditPanel({
                       <select
                         className={`w-full rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
                         value={item.judgment ?? ''}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, {
                             judgment: (e.target.value || null) as Judgment | null,
@@ -374,6 +388,7 @@ export function ProcedureAuditPanel({
                         className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         placeholder="例：3 件"
                         value={item.sampleSize ?? ''}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { sampleSize: e.target.value })
                         }
@@ -385,6 +400,7 @@ export function ProcedureAuditPanel({
                         className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         placeholder="例：QR-05-01"
                         value={item.objectiveEvidence ?? ''}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, {
                             objectiveEvidence: e.target.value,
@@ -398,6 +414,7 @@ export function ProcedureAuditPanel({
                         className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         placeholder="例：7.1.5"
                         value={item.as9100Clause ?? ''}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { as9100Clause: e.target.value })
                         }
@@ -410,6 +427,7 @@ export function ProcedureAuditPanel({
                           className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                           rows={2}
                           value={item.description}
+                          disabled={readOnly || !canEdit}
                           onChange={(e) =>
                             updateChecklistItem(audit.id, item.id, { description: e.target.value })
                           }
@@ -419,11 +437,19 @@ export function ProcedureAuditPanel({
                           className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                           placeholder="說明（點展開多行）"
                           value={item.description}
+                          disabled={readOnly || !canEdit}
                           onChange={(e) =>
                             updateChecklistItem(audit.id, item.id, { description: e.target.value })
                           }
                         />
                       )}
+                      <AttachmentField
+                        attachments={normalizeAttachments(item.attachments)}
+                        disabled={readOnly || !canEdit}
+                        onChange={(attachments) =>
+                          updateChecklistItem(audit.id, item.id, { attachments })
+                        }
+                      />
                       <button
                         type="button"
                         className={`mt-1 text-xs text-primary no-print hover:underline ${FOCUS_RING}`}
@@ -434,22 +460,24 @@ export function ProcedureAuditPanel({
                       <span className="print-only">{item.description}</span>
                     </td>
                     <td className="border border-line p-2 align-top no-print">
-                      {isSeedChecklistItem(item) ? (
-                        <button
-                          type="button"
-                          className={`text-xs text-muted hover:underline ${FOCUS_RING}`}
-                          onClick={() => markChecklistItemNA(audit.id, item.id)}
-                        >
-                          標不適用
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
-                          onClick={() => handleRemove(item.id, item.judgment === '不符')}
-                        >
-                          刪除
-                        </button>
+                      {canEdit && !readOnly && (
+                        isSeedChecklistItem(item) ? (
+                          <button
+                            type="button"
+                            className={`text-xs text-muted hover:underline ${FOCUS_RING}`}
+                            onClick={() => markChecklistItemNA(audit.id, item.id)}
+                          >
+                            標不適用
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
+                            onClick={() => handleRemove(item.id, item.judgment === '不符')}
+                          >
+                            刪除
+                          </button>
+                        )
                       )}
                     </td>
                   </tr>

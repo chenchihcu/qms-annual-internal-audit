@@ -83,6 +83,7 @@ export function Input({
   id,
   min,
   max,
+  disabled,
 }: {
   label?: string
   value: string | number
@@ -93,6 +94,7 @@ export function Input({
   id?: string
   min?: number
   max?: number
+  disabled?: boolean
 }) {
   const inputId = id ?? (label ? `input-${label.replace(/\s/g, '-')}` : undefined)
   return (
@@ -104,9 +106,10 @@ export function Input({
         step={step}
         min={min}
         max={max}
+        disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:opacity-50 ${FOCUS_RING}`}
       />
     </label>
   )

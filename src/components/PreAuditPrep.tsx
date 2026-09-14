@@ -1,6 +1,9 @@
 import type { AuditStore } from '../hooks/useAuditStore'
-import type { ExternalAuditPrepItemState } from '../types'
+import type { CompanyId, ExternalAuditPrepItemState } from '../types'
+import { COMPANY_LABELS } from '../types'
 import type { PrepScopeMode } from '../lib/externalAuditPrep'
+import { companyFocusLabel } from '../lib/externalAuditSchedule'
+import { canEditExternalPrep, isReadOnlyRole } from '../lib/userRole'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
   computeInternalAuditComplete,
@@ -52,10 +55,12 @@ function ScopeCells({
   mode,
   item,
   onUpdate,
+  disabled = false,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
+  disabled?: boolean
 }) {
   if (mode === 'both_separate') {
     return (
@@ -67,6 +72,7 @@ function ScopeCells({
               aria-label="九潤精密"
               className={`no-print h-4 w-4 ${FOCUS_RING}`}
               checked={item.jiurunDone}
+              disabled={disabled}
               onChange={(e) => onUpdate({ jiurunDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.jiurunDone ? '■' : '□'}</span>
@@ -80,6 +86,7 @@ function ScopeCells({
               aria-label="正隆興精密"
               className={`no-print h-4 w-4 ${FOCUS_RING}`}
               checked={item.zhenglongxingDone}
+              disabled={disabled}
               onChange={(e) => onUpdate({ zhenglongxingDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.zhenglongxingDone ? '■' : '□'}</span>
@@ -98,6 +105,7 @@ function ScopeCells({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.mergedDone}
+            disabled={disabled}
             onChange={(e) => onUpdate({ mergedDone: e.target.checked })}
           />
           <span className="print-only text-xs">{item.mergedDone ? '■' : '□'}</span>
@@ -123,11 +131,13 @@ function DoneCell({
   item,
   done,
   onUpdate,
+  disabled = false,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
   done: boolean
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
+  disabled?: boolean
 }) {
   if (mode === 'site_scope') {
     return (
@@ -137,6 +147,7 @@ function DoneCell({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.completed}
+            disabled={disabled}
             onChange={(e) => onUpdate({ completed: e.target.checked })}
           />
           <span className="print-only text-xs">{item.completed ? '■' : '□'}</span>
@@ -165,8 +176,14 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     updateExternalPrepItem,
     updateExternalPrepSequence,
     resetInternalAuditCompleteOverride,
+    updateExternalAuditSchedule,
+    updateExternalScheduleEntry,
+    addExternalScheduleEntry,
   } = store
-  const { settings, externalAuditPrep, companies } = state
+  const { settings, externalAuditPrep, externalAuditSchedule, companies } = state
+  const readOnly = isReadOnlyRole(settings.viewRole)
+  const canEdit = canEditExternalPrep(settings.viewRole)
+  const schedule = externalAuditSchedule
   const { done, total } = countPrepProgress(externalAuditPrep)
   const warnings = evaluatePrepSequence(externalAuditPrep, companies)
   const internalAuditSummary = computeInternalAuditComplete(companies)
@@ -176,6 +193,158 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
+      {schedule && (
+        <Card>
+          <h2 className="mb-2 text-lg font-semibold text-ink">外稽當日行程／機種</h2>
+          <p className="mb-4 text-sm text-muted">
+            雙公司合併取證 — 供第三方稽核員當日參考；機種摘要依公司分開維護。
+          </p>
+          <div className="mb-4 grid gap-3 sm:grid-cols-2">
+            {(Object.keys(COMPANY_LABELS) as CompanyId[]).map((id) => (
+              <label key={id} className="block text-sm">
+                <span className="mb-1 block font-medium text-ink">{COMPANY_LABELS[id]} 重點機種</span>
+                <input
+                  className={`w-full rounded border border-line bg-surface px-3 py-2 text-sm no-print ${FOCUS_RING}`}
+                  value={schedule.companyProductHighlights[id]}
+                  disabled={readOnly || !canEdit}
+                  onChange={(e) =>
+                    updateExternalAuditSchedule({
+                      companyProductHighlights: {
+                        ...schedule.companyProductHighlights,
+                        [id]: e.target.value,
+                      },
+                    })
+                  }
+                />
+                <span className="print-only">{schedule.companyProductHighlights[id]}</span>
+              </label>
+            ))}
+            <label className="block text-sm sm:col-span-2">
+              <span className="mb-1 block font-medium text-ink">外稽日期</span>
+              <input
+                type="date"
+                className={`w-full max-w-xs rounded border border-line bg-surface px-3 py-2 text-sm no-print ${FOCUS_RING}`}
+                value={schedule.auditDate}
+                disabled={readOnly || !canEdit}
+                onChange={(e) => updateExternalAuditSchedule({ auditDate: e.target.value })}
+              />
+              <span className="print-only">{schedule.auditDate}</span>
+            </label>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-page text-left text-muted">
+                  <th className="border border-line p-2 w-24">時間</th>
+                  <th className="border border-line p-2">活動</th>
+                  <th className="border border-line p-2 w-28">地點</th>
+                  <th className="border border-line p-2 w-36">機種／產品</th>
+                  <th className="border border-line p-2 w-28">公司</th>
+                  <th className="border border-line p-2 w-32">備註</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schedule.entries.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="border border-line p-2 align-top">
+                      <div className="flex gap-1 no-print">
+                        <input
+                          type="time"
+                          className="w-full rounded border border-line px-1 py-1 text-xs"
+                          value={entry.timeStart}
+                          disabled={readOnly || !canEdit}
+                          onChange={(e) =>
+                            updateExternalScheduleEntry(entry.id, { timeStart: e.target.value })
+                          }
+                        />
+                        <input
+                          type="time"
+                          className="w-full rounded border border-line px-1 py-1 text-xs"
+                          value={entry.timeEnd}
+                          disabled={readOnly || !canEdit}
+                          onChange={(e) =>
+                            updateExternalScheduleEntry(entry.id, { timeEnd: e.target.value })
+                          }
+                        />
+                      </div>
+                      <span className="print-only">
+                        {entry.timeStart}–{entry.timeEnd}
+                      </span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
+                        value={entry.activity}
+                        disabled={readOnly || !canEdit}
+                        onChange={(e) =>
+                          updateExternalScheduleEntry(entry.id, { activity: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{entry.activity}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
+                        value={entry.location}
+                        disabled={readOnly || !canEdit}
+                        onChange={(e) =>
+                          updateExternalScheduleEntry(entry.id, { location: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{entry.location}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
+                        value={entry.productModels}
+                        disabled={readOnly || !canEdit}
+                        onChange={(e) =>
+                          updateExternalScheduleEntry(entry.id, { productModels: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{entry.productModels}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <select
+                        className="w-full rounded border border-line px-1 py-1 text-xs no-print"
+                        value={entry.companyFocus}
+                        disabled={readOnly || !canEdit}
+                        onChange={(e) =>
+                          updateExternalScheduleEntry(entry.id, {
+                            companyFocus: e.target.value as CompanyId | 'both',
+                          })
+                        }
+                      >
+                        <option value="both">雙公司</option>
+                        <option value="jiurun">{COMPANY_LABELS.jiurun}</option>
+                        <option value="zhenglongxing">{COMPANY_LABELS.zhenglongxing}</option>
+                      </select>
+                      <span className="print-only">{companyFocusLabel(entry.companyFocus)}</span>
+                    </td>
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className="w-full rounded border border-line px-2 py-1 text-xs no-print"
+                        value={entry.remark}
+                        disabled={readOnly || !canEdit}
+                        onChange={(e) =>
+                          updateExternalScheduleEntry(entry.id, { remark: e.target.value })
+                        }
+                      />
+                      <span className="print-only">{entry.remark}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {canEdit && !readOnly && (
+            <Button variant="secondary" className="mt-3" onClick={() => addExternalScheduleEntry()}>
+              新增行程列
+            </Button>
+          )}
+        </Card>
+      )}
+
       <Card>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -219,6 +388,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 type="checkbox"
                 className={`h-4 w-4 ${FOCUS_RING}`}
                 checked={effectiveInternalComplete}
+                disabled={readOnly || !canEdit}
                 onChange={(e) =>
                   updateExternalPrepSequence({
                     internalAuditCompleteOverride: e.target.checked,
@@ -230,7 +400,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 <span className="text-xs text-muted">（自動）</span>
               )}
             </label>
-            {internalAuditOverride !== undefined && (
+            {internalAuditOverride !== undefined && canEdit && !readOnly && (
               <Button
                 variant="secondary"
                 className="text-xs"
@@ -245,6 +415,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 type="checkbox"
                 className={`h-4 w-4 ${FOCUS_RING}`}
                 checked={externalAuditPrep.managementReviewComplete}
+                disabled={readOnly || !canEdit}
                 onChange={(e) =>
                   updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
                 }
@@ -338,12 +509,14 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                     <ScopeCells
                       mode={mode}
                       item={itemState}
+                      disabled={readOnly || !canEdit}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <DoneCell
                       mode={mode}
                       item={itemState}
                       done={done}
+                      disabled={readOnly || !canEdit}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <td className="border p-2 align-top">
@@ -354,6 +527,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                         className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
                         placeholder="備註"
                         value={itemState.remark}
+                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateExternalPrepItem(itemState.id, { remark: e.target.value })
                         }

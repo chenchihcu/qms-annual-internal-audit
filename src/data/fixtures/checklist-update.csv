@@ -1,0 +1,4 @@
+recordType,qpCode,departmentId,no,content,as9100Clause,sampleSize,objectiveEvidence,auditors,riskLevel,process,documents,auditCategory
+checklist,QP-16,dept-qa,1,不合格品隔離與標示須完整可追蹤,8.7,5 批,QR-16-01 紀錄,,,,
+checklist,QP-28,dept-qa,1,內部稽核計畫與執行須符合程序,9.2,1 份,QR-28-01,,,,
+plan,QP-16,dept-qa,,,,,,王稽核,高,製程/最終檢驗,QP-16,系統稽核

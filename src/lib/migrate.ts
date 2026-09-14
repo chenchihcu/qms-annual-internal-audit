@@ -2,10 +2,13 @@ import { createDemoState } from '../data/demoData'
 import { migrateChecklistItem } from './checklistEvidence'
 import { carryPlanDatesToAudit } from './auditDates'
 import { normalizeAuditNotice } from './auditNotice'
+import { normalizeAttachments } from './attachments'
+import { normalizeExternalAuditSchedule } from './externalAuditSchedule'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
+import { DEFAULT_VIEW_ROLE } from '../types'
 
-export const CURRENT_STORAGE_VERSION = 12
+export const CURRENT_STORAGE_VERSION = 13
 
 const DERIVED_STATUSES: MonthStatus[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
 
@@ -55,7 +58,10 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
     const row = planById.get(`plan-${audit.qpCode}-${audit.departmentId}`)
     const withItems = normalizeAuditNotice({
       ...audit,
-      items: audit.items.map(migrateChecklistItem),
+      items: audit.items.map((item) => ({
+        ...migrateChecklistItem(item),
+        attachments: normalizeAttachments(item.attachments),
+      })),
     })
     return row ? carryPlanDatesToAudit(row, withItems, auditYear) : withItems
   })
@@ -65,7 +71,10 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
     keyCustomerName: company.keyCustomerName ?? '',
     planRows,
     audits,
-    ncrs: company.ncrs.map(migrateNcr),
+    ncrs: company.ncrs.map((ncr) => ({
+      ...migrateNcr(ncr),
+      attachments: normalizeAttachments(ncr.attachments),
+    })),
   }
 }
 
@@ -102,6 +111,31 @@ export function migrateState(raw: AppState): AppState {
     next = {
       ...next,
       companies: refreshDemoCompanies(),
+    }
+  }
+
+  next = {
+    ...next,
+    settings: {
+      ...next.settings,
+      viewRole: next.settings.viewRole ?? DEFAULT_VIEW_ROLE,
+    },
+    externalAuditSchedule: normalizeExternalAuditSchedule(
+      next.externalAuditSchedule,
+      next.settings.auditYear,
+      next.settings.externalAuditDate ?? `${next.settings.auditYear}-09-15`,
+    ),
+  }
+
+  if (fromVersion < 13 && next.dataSource === 'demo') {
+    next = {
+      ...next,
+      companies: refreshDemoCompanies(),
+      externalAuditSchedule: normalizeExternalAuditSchedule(
+        undefined,
+        next.settings.auditYear,
+        next.settings.externalAuditDate ?? `${next.settings.auditYear}-09-15`,
+      ),
     }
   }
 

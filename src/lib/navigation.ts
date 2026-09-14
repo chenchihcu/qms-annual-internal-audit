@@ -33,7 +33,10 @@ export const TAB_GROUPS: TabGroup[] = [
   },
   {
     label: '外部',
-    tabs: [{ id: 'prep', label: '外部稽核準備' }],
+    tabs: [
+      { id: 'prep', label: '外部稽核準備' },
+      { id: 'clauses', label: '條款對照' },
+    ],
   },
   {
     label: '總覽',
