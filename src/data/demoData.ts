@@ -294,6 +294,7 @@ export function createDemoState(): AppState {
     companies[id] = {
       ...createCompanyData(id),
       name: COMPANY_LABELS[id],
+      keyCustomerName: id === 'zhenglongxing' ? COMPANY_LABELS.jiurun : '',
     }
   }
 
@@ -308,7 +309,7 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 9,
+    version: 11,
   }
 }
 

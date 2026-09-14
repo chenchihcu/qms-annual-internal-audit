@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   collectNCRsFromAudits,
   canTransitionNcrStatus,
+  ensureNcrFromChecklistObservation,
   ensureNcrFromObservation,
+  findNcrForChecklistItem,
   findNcrForObservation,
   isNcrStale,
   findChecklistItem,
@@ -106,6 +108,46 @@ const sampleObservation = (): Observation => ({
   content: '文件回收未簽收',
   description: '建議補強簽收紀錄',
   status: 'became_ncr',
+})
+
+describe('ensureNcrFromChecklistObservation', () => {
+  it('creates NCR from 觀察 checklist item', () => {
+    const itemId = 'chk-obs-1'
+    const audit = baseAudit([
+      {
+        id: itemId,
+        category: '測試',
+        no: 1,
+        content: '文件未更新',
+        judgment: '觀察',
+        description: '建議補強',
+      },
+    ])
+    const { ncrs, ncrId } = ensureNcrFromChecklistObservation(audit, itemId, [], 2026)
+    expect(ncrId).toBe(`ncr-obs-chk-${itemId}`)
+    expect(ncrs).toHaveLength(1)
+    expect(ncrs[0].status).toBe('開立')
+    expect(ncrs[0].checklistItemId).toBe(itemId)
+    expect(findNcrForChecklistItem(ncrs, itemId)?.ncrNumber).toMatch(/^NCR-2026-/)
+  })
+
+  it('does not duplicate NCR for same checklist item', () => {
+    const itemId = 'chk-obs-2'
+    const audit = baseAudit([
+      {
+        id: itemId,
+        category: '測試',
+        no: 1,
+        content: 'c',
+        judgment: '觀察',
+        description: '',
+      },
+    ])
+    const first = ensureNcrFromChecklistObservation(audit, itemId, [], 2026)
+    const second = ensureNcrFromChecklistObservation(audit, itemId, first.ncrs, 2026)
+    expect(second.ncrs).toHaveLength(1)
+    expect(second.ncrId).toBe(first.ncrId)
+  })
 })
 
 describe('ensureNcrFromObservation', () => {

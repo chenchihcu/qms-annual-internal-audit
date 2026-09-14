@@ -1,10 +1,11 @@
 import { createDemoState } from '../data/demoData'
 import { migrateChecklistItem } from './checklistEvidence'
 import { carryPlanDatesToAudit } from './auditDates'
+import { normalizeAuditNotice } from './auditNotice'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
 
-export const CURRENT_STORAGE_VERSION = 9
+export const CURRENT_STORAGE_VERSION = 11
 
 const DERIVED_STATUSES: MonthStatus[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
 
@@ -52,15 +53,16 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
 
   const audits = company.audits.map((audit) => {
     const row = planById.get(`plan-${audit.qpCode}-${audit.departmentId}`)
-    const withItems = {
+    const withItems = normalizeAuditNotice({
       ...audit,
       items: audit.items.map(migrateChecklistItem),
-    }
+    })
     return row ? carryPlanDatesToAudit(row, withItems, auditYear) : withItems
   })
 
   return {
     ...company,
+    keyCustomerName: company.keyCustomerName ?? '',
     planRows,
     audits,
     ncrs: company.ncrs.map(migrateNcr),

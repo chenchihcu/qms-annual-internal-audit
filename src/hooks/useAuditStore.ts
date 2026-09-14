@@ -21,9 +21,11 @@ import {
   shouldPropagatePlanAuditorsToAudit,
 } from '../lib/auditorSync'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
+import { markAuditNotified } from '../lib/auditNotice'
 import {
   canTransitionNcrStatus,
   collectNCRsFromAudits,
+  ensureNcrFromChecklistObservation,
   ensureNcrFromObservation,
   generateNCRNumber,
 } from '../lib/ncr'
@@ -85,6 +87,10 @@ export function useAuditStore() {
 
   const switchCompany = useCallback((companyId: CompanyId) => {
     setState((s) => ({ ...s, activeCompanyId: companyId }))
+  }, [])
+
+  const updateCompany = useCallback((patch: Partial<Pick<CompanyData, 'keyCustomerName'>>) => {
+    setState((s) => patchCompany(s, s.activeCompanyId, patch))
   }, [])
 
   const updateDepartment = useCallback(
@@ -198,6 +204,7 @@ export function useAuditStore() {
         process: entry?.process ?? qpCode,
         documents: entry?.documents ?? qpCode,
         notifyDate: '',
+        notifySent: false,
         auditDate: '',
         departmentManager: dept?.owner ?? '',
         auditors,
@@ -382,6 +389,16 @@ export function useAuditStore() {
     [],
   )
 
+  const markAuditAsNotified = useCallback((auditId: string) => {
+    setState((s) => {
+      const co = s.companies[s.activeCompanyId]
+      const audit = co.audits.find((a) => a.id === auditId)
+      if (!audit) return s
+      const audits = co.audits.map((a) => (a.id === auditId ? markAuditNotified(a) : a))
+      return patchCompany(s, s.activeCompanyId, { audits })
+    })
+  }, [])
+
   const updateObservation = useCallback((id: string, patch: Partial<Observation>) => {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
@@ -404,6 +421,43 @@ export function useAuditStore() {
         ),
         ncrs,
       })
+    })
+  }, [])
+
+  const convertObservationToNcr = useCallback((id: string) => {
+    setState((s) => {
+      const co = s.companies[s.activeCompanyId]
+      const obs = co.observations.find((o) => o.id === id)
+      if (!obs || obs.status === 'became_ncr') return s
+
+      let ncrs = co.ncrs
+      let ncrId = obs.ncrId
+      const result = ensureNcrFromObservation({ ...obs, status: 'became_ncr' }, ncrs, s.settings.auditYear)
+      ncrs = result.ncrs
+      ncrId = result.ncrId
+
+      return patchCompany(s, s.activeCompanyId, {
+        observations: co.observations.map((o) =>
+          o.id === id ? { ...o, status: 'became_ncr' as const, ncrId: ncrId ?? o.ncrId } : o,
+        ),
+        ncrs,
+      })
+    })
+  }, [])
+
+  const convertChecklistObservationToNcr = useCallback((auditId: string, itemId: string) => {
+    setState((s) => {
+      const co = s.companies[s.activeCompanyId]
+      const audit = co.audits.find((a) => a.id === auditId)
+      if (!audit) return s
+      const result = ensureNcrFromChecklistObservation(
+        audit,
+        itemId,
+        co.ncrs,
+        s.settings.auditYear,
+      )
+      if (!result.ncrId) return s
+      return patchCompany(s, s.activeCompanyId, { ncrs: result.ncrs })
     })
   }, [])
 
@@ -743,6 +797,7 @@ export function useAuditStore() {
     saveError,
     updateSettings,
     switchCompany,
+    updateCompany,
     updateDepartment,
     regeneratePlan,
     updatePlanRow,
@@ -757,6 +812,9 @@ export function useAuditStore() {
     updateNCR,
     addManualNCR,
     updateObservation,
+    convertObservationToNcr,
+    convertChecklistObservationToNcr,
+    markAuditAsNotified,
     addObservation,
     updateSuggestion,
     addSuggestion,

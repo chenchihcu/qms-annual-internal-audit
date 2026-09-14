@@ -3,10 +3,14 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
 import { isSeedChecklistItem } from '../lib/checklistItem'
+import { checkAuditImpartiality } from '../lib/impartiality'
+import { findNcrForChecklistItem } from '../lib/ncr'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import type { Judgment } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { FormPrintButton } from './ui/FormPrintButton'
+import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
@@ -34,6 +38,8 @@ export function ProcedureAuditPanel({
     removeChecklistItem,
     markChecklistItemNA,
     setRemainingUnjudgedToConform,
+    markAuditAsNotified,
+    convertChecklistObservationToNcr,
     getProcedureTitle,
   } = store
 
@@ -104,6 +110,7 @@ export function ProcedureAuditPanel({
   const complete = isProcedureComplete(audit)
   const pendingCount = countPendingItems(audit.items)
   const categories = [...new Set(audit.items.map((i) => i.category))]
+  const impartialityWarning = checkAuditImpartiality(audit, company.departments)
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
@@ -144,13 +151,18 @@ export function ProcedureAuditPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 no-print">
           <h2 className="text-lg font-semibold text-ink">內部稽核查檢表（QR-28-02）</h2>
-          <Select
-            label="查檢表"
-            value={selectedKey}
-            onChange={setSelectedKey}
-            options={auditOptions}
-          />
+          <div className="flex flex-wrap items-end gap-3">
+            <Select
+              label="查檢表"
+              value={selectedKey}
+              onChange={setSelectedKey}
+              options={auditOptions}
+            />
+            <FormPrintButton />
+          </div>
         </div>
+
+        <ImpartialityBanner warning={impartialityWarning} />
 
         <PrintDocHeader
           companyName={company.name}
@@ -175,14 +187,27 @@ export function ProcedureAuditPanel({
                   <label htmlFor="audit-notify-date">通知日期</label>
                 </td>
                 <td className="border border-line p-2">
-                  <Input
-                    id="audit-notify-date"
-                    type="date"
-                    value={audit.notifyDate}
-                    onChange={(v) => handleHeaderChange('notifyDate', v)}
-                    className="no-print"
-                  />
-                  <span className="print-only">{audit.notifyDate}</span>
+                  <div className="flex flex-wrap items-center gap-2 no-print">
+                    <Input
+                      id="audit-notify-date"
+                      type="date"
+                      value={audit.notifyDate}
+                      onChange={(v) => handleHeaderChange('notifyDate', v)}
+                    />
+                    {!audit.notifySent ? (
+                      <Button variant="secondary" onClick={() => markAuditAsNotified(audit.id)}>
+                        標記已通知
+                      </Button>
+                    ) : (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950 dark:text-green-200">
+                        已通知
+                      </span>
+                    )}
+                  </div>
+                  <span className="print-only">
+                    {audit.notifyDate}
+                    {audit.notifySent ? '（已通知）' : ''}
+                  </span>
                 </td>
               </tr>
               <tr>
@@ -320,6 +345,21 @@ export function ProcedureAuditPanel({
                         ))}
                       </select>
                       <span className="print-only">{item.judgment && <Badge label={item.judgment} />}</span>
+                      {item.judgment === '觀察' && (
+                        <div className="mt-1 no-print">
+                          {findNcrForChecklistItem(company.ncrs, item.id) ? (
+                            <span className="text-xs text-primary">已轉 NCR</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`text-xs text-primary hover:underline ${FOCUS_RING}`}
+                              onClick={() => convertChecklistObservationToNcr(audit.id, item.id)}
+                            >
+                              轉成 NCR
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="border border-line p-2 align-top">
                       <input

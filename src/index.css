@@ -57,6 +57,12 @@ html.dark {
 }
 
 @media print {
+  body.printing-qr-form > #root > div > header,
+  body.printing-qr-form > #root > div > footer,
+  body.printing-qr-form > #root > div > main > *:not(.print-area) {
+    display: none !important;
+  }
+
   iframe[src*="netlify"],
   #netlify-badge,
   .netlify-badge,

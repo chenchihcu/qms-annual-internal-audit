@@ -8,6 +8,8 @@ export function Observations({ store }: { store: AuditStore }) {
   const {
     state,
     updateObservation,
+    convertObservationToNcr,
+    convertChecklistObservationToNcr,
     carryForwardObservation,
     carryForwardNCR,
     regeneratePlan,
@@ -32,11 +34,13 @@ export function Observations({ store }: { store: AuditStore }) {
     audit.items
       .filter((item) => item.judgment === '觀察')
       .map((item) => ({
-        id: item.id,
+        auditId: audit.id,
+        itemId: item.id,
         label: `${audit.qpCode} · ${audit.department}`,
         content: item.content,
         description: item.description,
         sourceYear: item.sourceYear,
+        hasNcr: company.ncrs.some((n) => n.checklistItemId === item.id),
       })),
   )
 
@@ -147,7 +151,7 @@ export function Observations({ store }: { store: AuditStore }) {
                 </div>
                 <p className="text-sm">{obs.content}</p>
                 <p className="mt-1 text-xs text-muted">{obs.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2 no-print">
+                <div className="mt-3 flex flex-wrap items-end gap-2 no-print">
                   {!obs.carriedToYear && (
                     <Button
                       variant="secondary"
@@ -157,6 +161,12 @@ export function Observations({ store }: { store: AuditStore }) {
                     >
                       帶入 {currentYear} 年查檢表
                     </Button>
+                  )}
+                  {obs.status === 'open' && (
+                    <Button onClick={() => convertObservationToNcr(obs.id)}>轉成 NCR</Button>
+                  )}
+                  {obs.status === 'became_ncr' && (
+                    <span className="text-xs text-primary">已轉 NCR</span>
                   )}
                   <Select
                     label="狀態"
@@ -207,11 +217,23 @@ export function Observations({ store }: { store: AuditStore }) {
         ) : (
           <ul className="space-y-2 text-sm">
             {auditObservations.map((obs) => (
-              <li key={obs.id} className="rounded border border-line p-3">
+              <li key={obs.itemId} className="rounded border border-line p-3">
                 <span className="font-medium text-ink">{obs.label}：</span>{obs.content}
                 {obs.sourceYear && (
                   <span className="ml-2 text-xs text-amber-600 dark:text-amber-400">（源自 {obs.sourceYear} 年）</span>
                 )}
+                <div className="mt-2 no-print">
+                  {obs.hasNcr ? (
+                    <span className="text-xs text-primary">已轉 NCR</span>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={() => convertChecklistObservationToNcr(obs.auditId, obs.itemId)}
+                    >
+                      轉成 NCR
+                    </Button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
