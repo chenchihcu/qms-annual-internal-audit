@@ -1,5 +1,6 @@
-import type { AppState, CompanyData, CompanyId } from '../types'
+import type { AppState, CompanyData, CompanyId, PlanRow, ProcedureAudit } from '../types'
 import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
+import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { autoArrangePlan } from '../lib/planner'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
 import { normalizeNCRList } from '../lib/ncr'
@@ -81,11 +82,18 @@ const settings = {
   scoringRules: DEFAULT_SCORING_RULES,
 }
 
+type PartialItem = {
+  no: number
+  judgment: '符合' | '不符' | '觀察' | '不適用'
+  description?: string
+  objectiveEvidence?: string
+}
+
 function buildAudit(
   qpCode: string,
   departmentId: string,
-  partialItems: Array<{ no: number; judgment: '符合' | '不符' | '觀察' | '不適用'; description?: string }>,
-  options?: { fullyJudged?: boolean },
+  partialItems: PartialItem[],
+  options?: { fullyJudged?: boolean; withEvidence?: boolean },
 ) {
   const dept = departments.find((d) => d.id === departmentId)
   if (!dept) {
@@ -104,11 +112,22 @@ function buildAudit(
     if (item) {
       item.judgment = p.judgment
       item.description = p.description ?? ''
+      if (p.objectiveEvidence) item.objectiveEvidence = p.objectiveEvidence
     }
   })
   if (options?.fullyJudged) {
     items.forEach((checkItem) => {
       if (!checkItem.judgment) checkItem.judgment = '符合'
+    })
+  }
+  if (options?.withEvidence) {
+    items.forEach((checkItem) => {
+      if (
+        (checkItem.judgment === '符合' || checkItem.judgment === '不符') &&
+        !checkItem.objectiveEvidence?.trim()
+      ) {
+        checkItem.objectiveEvidence = `${qpCode}-demo-紀錄`
+      }
     })
   }
   return {
@@ -118,9 +137,8 @@ function buildAudit(
     department: dept.name,
     process: entry.process,
     documents: entry.documents,
-    notifyDate: '2026-03-01',
-    auditDate: '2026-03-15',
-    plannedMonth: 3,
+    notifyDate: '',
+    auditDate: '',
     departmentManager: dept.owner,
     auditors: dept.defaultAuditors,
     auditCategory: entry.auditCategory,
@@ -128,11 +146,32 @@ function buildAudit(
   }
 }
 
+function syncAuditsWithPlan(planRows: PlanRow[], audits: ProcedureAudit[]): ProcedureAudit[] {
+  const planByKey = new Map(planRows.map((row) => [`${row.qpCode}|${row.departmentId}`, row]))
+  return audits.map((audit) => {
+    const row = planByKey.get(`${audit.qpCode}|${audit.departmentId}`)
+    return row ? carryPlanDatesToAudit(row, audit, settings.auditYear) : audit
+  })
+}
+
+function applyDemoImpartialityConflicts(planRows: PlanRow[], companyId: CompanyId): PlanRow[] {
+  const conflictQp = companyId === 'jiurun' ? 'QP-16' : 'QP-05'
+  const conflictDeptId = 'dept-qa'
+  const dept = departments.find((d) => d.id === conflictDeptId)
+  if (!dept) return planRows
+
+  return planRows.map((row) =>
+    row.qpCode === conflictQp && row.departmentId === conflictDeptId
+      ? { ...row, auditors: dept.owner }
+      : row,
+  )
+}
+
 function createCompanyData(companyId: CompanyId): CompanyData {
   const companySuffix = companyId === 'jiurun' ? 'jiurun' : 'zlx'
 
   if (companyId === 'jiurun') {
-    const planRows = autoArrangePlan(
+    let planRows = autoArrangePlan(
       {
         departments,
         planEntries: PROCEDURE_PLAN_TEMPLATE,
@@ -144,14 +183,24 @@ function createCompanyData(companyId: CompanyId): CompanyData {
       },
       { leadAuditor: settings.leadAuditor },
     )
+    planRows = applyDemoImpartialityConflicts(planRows, companyId)
 
-    const audits = [
-      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }], { fullyJudged: true }),
+    let audits = [
+      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }], {
+        fullyJudged: true,
+        withEvidence: true,
+      }),
       buildAudit('QP-16', 'dept-qa', [
-        { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
+        {
+          no: 1,
+          judgment: '不符',
+          description: '不合格品隔離區標示不完整',
+          objectiveEvidence: '現場巡檢紀錄',
+        },
       ]),
       buildAudit('QP-20', 'dept-admin', [{ no: 1, judgment: '符合' }]),
     ]
+    audits = syncAuditsWithPlan(planRows, audits)
 
     const ncrs = normalizeNCRList([
       {
@@ -228,7 +277,7 @@ function createCompanyData(companyId: CompanyId): CompanyData {
     }
   }
 
-  const planRows = autoArrangePlan(
+  let planRows = autoArrangePlan(
     {
       departments,
       planEntries: PROCEDURE_PLAN_TEMPLATE,
@@ -240,20 +289,24 @@ function createCompanyData(companyId: CompanyId): CompanyData {
     },
     { leadAuditor: settings.leadAuditor },
   )
+  planRows = applyDemoImpartialityConflicts(planRows, companyId)
 
-  const audits = [
+  let audits = [
     buildAudit(
       'QP-28',
       'dept-qa',
       [
-        { no: 1, judgment: '符合' },
-        { no: 2, judgment: '符合' },
+        { no: 1, judgment: '符合', objectiveEvidence: 'QP-28-內稽紀錄' },
+        { no: 2, judgment: '符合', objectiveEvidence: 'QP-28-內稽紀錄' },
       ],
-      { fullyJudged: true },
+      { fullyJudged: true, withEvidence: true },
     ),
     buildAudit('QP-05', 'dept-qa', [{ no: 1, judgment: '符合' }]),
-    buildAudit('QP-21', 'dept-prod', [{ no: 1, judgment: '觀察', description: '首件檢查紀錄偶缺簽名' }]),
+    buildAudit('QP-21', 'dept-prod', [
+      { no: 1, judgment: '觀察', description: '首件檢查紀錄偶缺簽名' },
+    ]),
   ]
+  audits = syncAuditsWithPlan(planRows, audits)
 
   return {
     name: '',
@@ -309,7 +362,7 @@ export function createDemoState(): AppState {
     companies,
     externalAuditPrep: prep,
     dataSource: 'demo',
-    version: 11,
+    version: 12,
   }
 }
 

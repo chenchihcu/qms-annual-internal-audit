@@ -46,3 +46,17 @@ export function migrateChecklistItem(item: ChecklistItem): ChecklistItem {
     description: parsed.remainder,
   }
 }
+
+/** 符合／不符須填客觀證據才算完成與計分 */
+export function itemNeedsObjectiveEvidence(item: ChecklistItem): boolean {
+  return item.judgment === '符合' || item.judgment === '不符'
+}
+
+export function itemHasObjectiveEvidence(item: ChecklistItem): boolean {
+  return Boolean(item.objectiveEvidence?.trim())
+}
+
+export function countMissingEvidenceItems(items: ChecklistItem[]): number {
+  return items.filter((item) => itemNeedsObjectiveEvidence(item) && !itemHasObjectiveEvidence(item))
+    .length
+}

@@ -20,13 +20,14 @@ const baseRow = (overrides: Partial<PlanRow> = {}): PlanRow => ({
   ...overrides,
 })
 
-const item = (judgment: ChecklistItem['judgment']): ChecklistItem => ({
+const item = (judgment: ChecklistItem['judgment'], objectiveEvidence = 'QR-01'): ChecklistItem => ({
   id: 'chk-1',
   category: '測試',
   no: 1,
   content: '項目',
   judgment,
   description: '',
+  objectiveEvidence: judgment === '符合' || judgment === '不符' ? objectiveEvidence : '',
 })
 
 const baseAudit = (items: ChecklistItem[], partial: Partial<ProcedureAudit> = {}): ProcedureAudit => ({

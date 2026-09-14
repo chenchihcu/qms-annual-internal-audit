@@ -210,6 +210,13 @@ export function AnnualPlan({
           <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
         </div>
 
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <p className="text-sm font-medium text-ink">公正性規則</p>
+          <p className="mt-1 text-sm text-muted">
+            稽核人員不得稽核其自身所屬部門（含與被稽核部門主管相同或相近之人員）。計畫表若違反此規則，稽核人員欄位下方將顯示 ⚠ 公正性 提醒。
+          </p>
+        </div>
+
         <div className="mb-6 rounded-lg border border-line bg-page/40 p-4">
           <Input
             label="主要客戶（選填，例：九潤精密）"

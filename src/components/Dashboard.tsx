@@ -83,7 +83,7 @@ function DualNavKpiCard({
 
 export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
-  const summary = calculateAnnualScore(company.audits, settings.scoringRules)
+  const summary = calculateAnnualScore(company.audits, settings.scoringRules, company.planRows)
   const riskGroups = buildDashboardRiskTiles(company, settings.scoringRules)
   const todayWork = buildTodayWork(company, settings.auditYear)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
@@ -110,10 +110,19 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
   })
 
-  const overallPercent =
-    summary.overallStatus === 'scored' && summary.overallScore !== null
-      ? summary.overallScore
+  const progressPercent =
+    summary.scheduledProcedures > 0
+      ? Math.round((summary.scoredProcedures / summary.scheduledProcedures) * 1000) / 10
       : 0
+
+  const annualScoreHint =
+    summary.allScheduledScored && summary.overallStatus === 'scored'
+      ? '全部已評程序加權'
+      : summary.scoredProcedures > 0
+        ? `已評 ${summary.scoredProcedures} / ${summary.scheduledProcedures} 程序 · 尚有未評`
+        : summary.scheduledProcedures > 0
+          ? `計畫 ${summary.scheduledProcedures} 程序 · 尚無已評`
+          : '尚無排程程序'
 
   const handleTileClick = (auditKey: string) => {
     if (!auditKey) return
@@ -191,7 +200,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         <KpiCard
           title={`年度總分 · ${company.name}`}
           value={overallDisplay}
-          hint={summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序'}
+          hint={annualScoreHint}
         />
         <KpiCard
           title="不符合（NCR）"
@@ -226,20 +235,22 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         />
       </div>
 
-      {summary.overallStatus === 'scored' && (
+      {summary.scheduledProcedures > 0 && (
         <Card className="no-print">
-          <p className="text-sm text-muted">年度總分進度</p>
+          <p className="text-sm text-muted">
+            程序評分進度（{summary.scoredProcedures} / {summary.scheduledProcedures}）
+          </p>
           <div
             className="mt-2 h-2 rounded-full bg-page"
             role="progressbar"
-            aria-valuenow={overallPercent}
+            aria-valuenow={progressPercent}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="年度總分"
+            aria-label="程序評分進度"
           >
             <div
               className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(overallPercent, 100)}%` }}
+              style={{ width: `${Math.min(progressPercent, 100)}%` }}
             />
           </div>
         </Card>

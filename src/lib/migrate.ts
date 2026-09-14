@@ -5,7 +5,7 @@ import { normalizeAuditNotice } from './auditNotice'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
 
-export const CURRENT_STORAGE_VERSION = 11
+export const CURRENT_STORAGE_VERSION = 12
 
 const DERIVED_STATUSES: MonthStatus[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
 
@@ -92,6 +92,13 @@ export function migrateState(raw: AppState): AppState {
   }
 
   if (fromVersion < 9 && next.dataSource === 'demo') {
+    next = {
+      ...next,
+      companies: refreshDemoCompanies(),
+    }
+  }
+
+  if (fromVersion < 12 && next.dataSource === 'demo') {
     next = {
       ...next,
       companies: refreshDemoCompanies(),
