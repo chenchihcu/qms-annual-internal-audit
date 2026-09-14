@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatAttachmentNamesForPrint } from './attachments'
+import { buildQr2801PrintHeaderMeta } from './printForm'
 import { ensurePdfChineseFont } from './pdfFont'
 import { getDisplayMonthStatus } from './planStatus'
 import type {
@@ -77,21 +78,22 @@ function monthStatusLabel(
 
 function planHeaderRows(ctx: AnnualPlanExportContext): string[][] {
   const { settings, company } = ctx
+  const printMeta = buildQr2801PrintHeaderMeta(
+    settings,
+    company,
+    ctx.filterTag
+      ? { tag: ctx.filterTag, visible: ctx.visibleCount, total: ctx.totalCount }
+      : null,
+  )
   const rows: string[][] = [
     [company.name],
     [`${settings.auditYear} 年 · 年度內部稽核計畫 ${'QR-28-01'}`],
-    [`主任稽核員：${settings.leadAuditor}`],
+    [printMeta.subtitle],
+    ...printMeta.detailLines.map((line) => [line]),
+    [
+      `外部稽核：${settings.externalAuditDate ?? '—'} · 管理審查：${settings.managementReviewDate ?? '—'}`,
+    ],
   ]
-  if (company.keyCustomerName?.trim()) {
-    rows.push([`主要客戶：${company.keyCustomerName}`])
-  }
-  rows.push(
-    [`計畫窗口：${settings.planWindowStart} ～ ${settings.planWindowEnd}`],
-    [`外部稽核：${settings.externalAuditDate ?? '—'} · 管理審查：${settings.managementReviewDate ?? '—'}`],
-  )
-  if (ctx.filterTag) {
-    rows.push([`篩選：${ctx.filterTag} · 顯示 ${ctx.visibleCount}／${ctx.totalCount} 列`])
-  }
   rows.push([])
   return rows
 }

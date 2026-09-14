@@ -9,8 +9,8 @@ import {
   exportAnnualPlanExcel,
   exportAnnualPlanPdf,
   formatPlanFilterCount,
-  planFilterPrintSubtitle,
 } from '../lib/formExport'
+import { buildQr2801PrintHeaderMeta } from '../lib/printForm'
 import {
   describeStakeholderScheduleEffect,
   filterPlanRowsByStakeholder,
@@ -80,10 +80,12 @@ export function AnnualPlan({
     [company.planRows, company.departments, stakeholderFilter],
   )
   const filterCountLabel = formatPlanFilterCount(visiblePlanRows.length, totalPlanRows)
-  const printFilterSubtitle = planFilterPrintSubtitle(
-    stakeholderFilter,
-    visiblePlanRows.length,
-    totalPlanRows,
+  const printHeaderMeta = buildQr2801PrintHeaderMeta(
+    settings,
+    company,
+    stakeholderFilter
+      ? { tag: stakeholderFilter, visible: visiblePlanRows.length, total: totalPlanRows }
+      : null,
   )
   const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-01')
   const exportContext = useMemo(
@@ -361,14 +363,8 @@ export function AnnualPlan({
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="年度內部稽核計畫 QR-28-01"
-          subtitle={[
-            `主任稽核員：${settings.leadAuditor}`,
-            company.keyCustomerName?.trim() ? `主要客戶：${company.keyCustomerName}` : '',
-            `計畫窗口：${settings.planWindowStart} ～ ${settings.planWindowEnd}`,
-            printFilterSubtitle,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+          subtitle={printHeaderMeta.subtitle}
+          detailLines={printHeaderMeta.detailLines}
         />
 
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">

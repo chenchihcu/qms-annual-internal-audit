@@ -6,6 +6,7 @@ import {
   exportChecklistExcel,
   exportChecklistPdf,
 } from '../lib/formExport'
+import { buildQr2802PrintHeaderMeta } from '../lib/printForm'
 import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
 import { countMissingEvidenceItems } from '../lib/checklistEvidence'
 import { isSeedChecklistItem } from '../lib/checklistItem'
@@ -138,6 +139,7 @@ export function ProcedureAuditPanel({
   const canEdit = canEditChecklist(settings.viewRole)
   const canNotify = canMarkAuditNotified(settings.viewRole)
   const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-02')
+  const printHeaderMeta = buildQr2802PrintHeaderMeta(audit, company, getProcedureTitle)
   const exportContext = useMemo(
     () => ({
       settings,
@@ -210,9 +212,8 @@ export function ProcedureAuditPanel({
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="內部稽核查檢表 QR-28-02"
-          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}${
-            company.keyCustomerName?.trim() ? ` · 主要客戶：${company.keyCustomerName}` : ''
-          }`}
+          subtitle={printHeaderMeta.subtitle}
+          detailLines={printHeaderMeta.detailLines}
         />
 
         <div className="overflow-x-auto">
