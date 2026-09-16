@@ -3,8 +3,10 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { exportAllAuditsExcel, exportAuditExcel, exportAuditHtml } from '../lib/formExport'
 import { buildAppHash } from '../lib/navigation'
 import { scoreProcedureAudit } from '../lib/scoring'
+import { canCompleteAuditReport } from '../lib/workflowStatus'
 import type { Judgment } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -40,6 +42,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
   )
 
   const [newPlanKey, setNewPlanKey] = useState(company.planRows[0] ? `${company.planRows[0].qpCode}|${company.planRows[0].departmentId}` : '')
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
 
   useEffect(() => {
     ensureAllAudits()
@@ -72,6 +75,8 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
   const teamValidation = planning
     ? validateAuditStart({ ...audit, team })
     : { errors: [], warnings: [] }
+  const completeCheck = canCompleteAuditReport(audit, settings.scoringRules)
+  const canStart = planning && teamValidation.errors.length === 0
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -163,7 +168,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
         <section className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 no-print">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><h3 className="font-semibold">稽核團隊與開始前資格檢查</h3><p className="text-xs text-slate-500">依此次公司、QP、受稽單位與實際日期檢查；陪稽人員不列入獨立判定團隊。</p></div>
-            <div className="flex items-center gap-2"><Badge label={audit.status ?? '規劃中'} /><Button disabled={!planning} onClick={() => { const result = startAudit(audit.id); if (!result.canStart) window.alert(`無法開始稽核：\n${result.errors.join('\n')}`) }}>開始稽核</Button></div>
+            <div className="flex items-center gap-2"><Badge label={audit.status ?? '規劃中'} /><Button disabled={!canStart} onClick={() => { const result = startAudit(audit.id); if (!result.canStart) window.alert(`無法開始稽核：\n${result.errors.join('\n')}`) }}>開始稽核</Button></div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Input label="計畫日期" type="date" value={audit.plannedDate ?? ''} onChange={(value) => updateAudit({ ...audit, plannedDate: value })} disabled={!planning} />
@@ -185,7 +190,21 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
             <h4 className="font-semibold text-slate-800">稽核開始時固定的來源快照</h4>
             {(audit.procedureCodeSnapshot || audit.procedureVersion || audit.formalRecordLocationSnapshot) ? <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-3"><span><strong>程序：</strong>{[audit.procedureCodeSnapshot, audit.procedureVersion].filter(Boolean).join('／')}</span><span><strong>正式紀錄位置：</strong>{audit.formalRecordLocationSnapshot || '未留存'}</span><span><strong>適用標準：</strong>{audit.standardSnapshot?.join('、') || '未留存'}</span></div> : <p className="mt-2 text-xs text-amber-800">此事件沒有稽核開始時的來源快照；系統不補寫未被保存的歷史資料，請以正式紀錄核對。</p>}
           </div>}
-          {audit.status === '執行中' && <div className="mt-3"><Button variant="secondary" disabled={!audit.reportReference?.trim()} onClick={() => updateAudit({ ...audit, status: '已回報' })}>完成回報</Button>{!audit.reportReference?.trim() && <span className="ml-2 text-xs text-slate-500">填寫正式紀錄編號後才能回報</span>}</div>}
+          {audit.status === '執行中' && <div className="mt-3"><Button variant="secondary" disabled={!completeCheck.ready} onClick={() => setShowCompleteDialog(true)}>完成回報</Button>{!completeCheck.ready && <span className="ml-2 text-xs text-slate-500">{completeCheck.gaps.join('；')}</span>}</div>}
+          {showCompleteDialog && (
+            <ConfirmDialog
+              open
+              title="確認完成回報？"
+              description="回報後查檢判定、客觀證據與內容說明將鎖定，無法從畫面解除。請確認正式紀錄編號與全部查檢項已判定完成。"
+              confirmLabel="確認回報"
+              variant="danger"
+              onConfirm={() => {
+                updateAudit({ ...audit, status: '已回報' })
+                setShowCompleteDialog(false)
+              }}
+              onCancel={() => setShowCompleteDialog(false)}
+            />
+          )}
           {reported && (
             <div className="mt-4 flex flex-wrap gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
               <span className="font-medium text-green-900">已回報 — 後續處理：</span>
@@ -202,10 +221,10 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
           </Button>
         </div>
 
-        <div className="space-y-3 lg:hidden">
+        <div className="space-y-3 lg:hidden print:hidden">
           {audit.items.map((item) => <article key={item.id} className={`rounded-lg border p-4 ${item.sourceYear ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200'}`}><div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-500">{item.category} · NO {item.no}</span>{item.judgment && <Badge label={item.judgment} />}</div><textarea className="min-h-20 w-full rounded border border-slate-300 px-3 py-2 text-sm" value={item.content} onChange={(e) => updateChecklistItem(audit.id, item.id, { content: e.target.value })} aria-label={`稽核內容 ${item.no}`} disabled={reported} /><Select label="判定" value={item.judgment ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { judgment: (value || null) as Judgment | null })} options={[{ value: '', label: '待判定' }, ...JUDGMENTS.map((value) => ({ value, label: value }))]} disabled={reported} />{item.judgment === '不適用' && <Input label="不適用理由" value={item.notApplicableReason ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { notApplicableReason: value })} disabled={reported} />}<Input label="客觀證據引用" value={item.evidenceReference ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { evidenceReference: value })} disabled={reported} /><textarea className="mt-3 min-h-20 w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="客觀證據與內容說明" aria-label={`內容說明 ${item.no}`} value={item.description} onChange={(e) => updateChecklistItem(audit.id, item.id, { description: e.target.value })} disabled={reported} />{!reported && item.origin && item.origin !== 'seed' && <button type="button" className="mt-2 min-h-11 text-sm text-red-700" onClick={() => removeChecklistItem(audit.id, item.id)}>刪除此自訂項目</button>}</article>)}
         </div>
-        <div className="hidden overflow-x-auto lg:block">
+        <div className="hidden overflow-x-auto lg:block print:block">
           <table className="qr-checklist w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">

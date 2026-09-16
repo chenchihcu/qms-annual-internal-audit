@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { backupFilename, describeBackup, parseBackupJson } from '../lib/backup'
 import { downloadBlob } from '../lib/download'
@@ -6,6 +6,8 @@ import { exportAllAuditsExcel, exportAllFormsExcel, exportStandardExcel } from '
 import { buildAppHash, getTabWorkflow, PROCEDURE_LIFECYCLE_STEPS } from '../lib/navigation'
 import { CHECKLIST_SEED, getSeedStats, isSeedFinalized, seedImportProgress } from '../data/checklistLoader'
 import { Button, Card, Input, Select } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
+import { PrintDocHeader } from './ui/PrintDocHeader'
 import type { CompanyId } from '../types'
 
 export type SettingsSection = 'standard' | 'procedure' | 'system'
@@ -13,6 +15,10 @@ export type SettingsSection = 'standard' | 'procedure' | 'system'
 export function SettingsPanel({ store, section }: { store: AuditStore; section: SettingsSection }) {
   const { state, updateSettings, updateCompanyAuditProfile, exportJSON, importJSON, resetToDemo, clearAll } = store
   const fileRef = useRef<HTMLInputElement>(null)
+  const [pendingRestore, setPendingRestore] = useState<{ json: string; summary: string } | null>(null)
+  const [showDemoDialog, setShowDemoDialog] = useState(false)
+  const [showClearDialog, setShowClearDialog] = useState(false)
+  const [restoreStatus, setRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -22,16 +28,31 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
       try {
         const json = reader.result as string
         const preview = parseBackupJson(json)
-        const msg = `確定還原備份？\n\n${describeBackup(preview)}\n\n目前資料將被覆寫（localStorage v6）。`
-        if (!confirm(msg)) return
-        importJSON(json)
-        alert('還原成功')
+        setPendingRestore({ json, summary: describeBackup(preview) })
+        setRestoreStatus(null)
       } catch (err) {
-        alert(err instanceof Error ? err.message : '還原失敗：備份格式錯誤')
+        setRestoreStatus({
+          type: 'error',
+          message: err instanceof Error ? err.message : '還原失敗：備份格式錯誤',
+        })
       }
     }
     reader.readAsText(file)
     e.target.value = ''
+  }
+
+  const confirmRestore = () => {
+    if (!pendingRestore) return
+    try {
+      importJSON(pendingRestore.json)
+      setRestoreStatus({ type: 'success', message: '還原成功' })
+    } catch (err) {
+      setRestoreStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : '還原失敗：備份格式錯誤',
+      })
+    }
+    setPendingRestore(null)
   }
 
   const handleBackup = () => {
@@ -66,7 +87,12 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
 
   return (
     <div className="space-y-6">
-      {section === 'standard' && <Card>
+      {section === 'standard' && <Card className="print-area qr-form">
+        <PrintDocHeader
+          companyName={state.company.name}
+          auditYear={state.settings.auditYear}
+          formTitle="適用標準與證書範圍"
+        />
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold">標準適用性與公司／廠區</h2>
@@ -256,12 +282,31 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
           </Button>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={handleRestore} />
         </div>
+        {restoreStatus && (
+          <p
+            className={`mt-3 text-sm ${restoreStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}
+            role="status"
+          >
+            {restoreStatus.message}
+          </p>
+        )}
+        {pendingRestore && (
+          <ConfirmDialog
+            open
+            title="確定還原備份？"
+            description={`${pendingRestore.summary}\n\n目前資料將被覆寫（localStorage v6）。`}
+            confirmLabel="確認還原"
+            variant="danger"
+            onConfirm={confirmRestore}
+            onCancel={() => setPendingRestore(null)}
+          />
+        )}
       </Card>
 
       <Card>
         <h2 className="mb-4 text-lg font-semibold">QR-28 表單匯出（Excel）</h2>
         <p className="mb-4 text-sm text-slate-500">
-          一次匯出 QR-28-01 年度計畫、全部 QR-28-02 程序查檢表、QR-28-03 不符合、建議追蹤與稽核前準備（多工作表）。
+          一次匯出 QR-28-01 年度計畫、全部 QR-28-02 程序查檢表、QR-28-03 不符合、QR-02-01 方案風險、適用標準、人員合格名單、觀察台帳、建議追蹤與稽核前準備（多工作表）。
           各 tab 亦可單獨匯出。
         </p>
         <div className="flex flex-wrap gap-3">
@@ -277,7 +322,38 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
       <Card>
         <h2 className="mb-4 text-lg font-semibold">資料檢查與危險操作</h2>
         <p className="mb-4 text-sm text-slate-600">目前資料版本 v{state.version}；{state.people.length} 名人員、{Object.keys(state.yearArchives).length + 1} 個年度資料集。執行前請先下載完整備份。</p>
-        <div className="mb-5 flex flex-wrap gap-3"><Button variant="secondary" onClick={() => { if (confirm('確定還原為示範資料？')) resetToDemo() }}>還原示範資料</Button><Button variant="danger" onClick={() => { if (confirm('確定清除所有資料？此操作無法復原。')) clearAll() }}>清除全部資料</Button></div>
+        <div className="mb-5 flex flex-wrap gap-3">
+          <Button variant="secondary" onClick={() => setShowDemoDialog(true)}>還原示範資料</Button>
+          <Button variant="danger" onClick={() => setShowClearDialog(true)}>清除全部資料</Button>
+        </div>
+        {showDemoDialog && (
+          <ConfirmDialog
+            open
+            title="還原為示範資料？"
+            description="目前所有工作資料將被示範資料取代。建議先下載完整備份。"
+            confirmLabel="確認還原"
+            variant="danger"
+            onConfirm={() => {
+              resetToDemo()
+              setShowDemoDialog(false)
+            }}
+            onCancel={() => setShowDemoDialog(false)}
+          />
+        )}
+        {showClearDialog && (
+          <ConfirmDialog
+            open
+            title="清除全部資料？"
+            description="此操作無法復原，將清除 localStorage 中所有年度與公司資料。執行前請先下載完整備份。"
+            confirmLabel="確認清除"
+            variant="danger"
+            onConfirm={() => {
+              clearAll()
+              setShowClearDialog(false)
+            }}
+            onCancel={() => setShowClearDialog(false)}
+          />
+        )}
         <h3 className="mb-2 font-semibold">關於</h3>
         <p className="text-sm text-slate-600">
           QMS 年度內部稽核系統 v6 — 程序導向（QP 查檢表）、雙公司切換、

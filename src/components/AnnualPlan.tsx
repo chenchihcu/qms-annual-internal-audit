@@ -2,11 +2,14 @@ import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportAnnualPlanExcel, exportAnnualPlanHtml } from '../lib/formExport'
 import { autoArrangePlan, cycleMonthStatus } from '../lib/planner'
+import { buildEffectiveProcedureRisks } from '../lib/risk'
+import { getPdcaOverview } from '../lib/workflowStatus'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus } from '../types'
 import { leadAuditorCandidates } from '../lib/personnel'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -25,11 +28,49 @@ function statusShort(status: MonthStatus): string {
 export function AnnualPlan({ store }: { store: AuditStore }) {
   const { state, replacePlanRows, updatePlanRow, setPlanMonthStatus, updateDepartment, updateSettings, switchAuditYear } =
     store
-  const { settings, company, people, annualPersonnelAssignments } = state
+  const { settings, company, people, annualPersonnelAssignments, yearArchives } = state
   const [previewRows, setPreviewRows] = useState<typeof company.planRows | null>(null)
+  const [yearOverride, setYearOverride] = useState<string | null>(null)
+  const [pendingYear, setPendingYear] = useState<number | null>(null)
+  const yearDraft = yearOverride ?? String(settings.auditYear)
+
+  const buildYearSwitchDescription = (targetYear: number) => {
+    const pdca = getPdcaOverview(state)
+    const restoreNote = yearArchives[String(targetYear)]
+      ? `將還原 ${targetYear} 年已封存的計畫、事件與準備資料。`
+      : `將建立 ${targetYear} 年空白年度資料集（計畫與事件需重新建立）。`
+    const gapNote = !pdca.annualCloseReady && pdca.annualCloseGaps.length > 0
+      ? `\n\n目前年度尚未達結案條件：\n${pdca.annualCloseGaps.slice(0, 4).map((g) => `· ${g.message}`).join('\n')}`
+      : ''
+    return `將封存 ${settings.auditYear} 年目前工作資料。\n${restoreNote}${gapNote}`
+  }
+
+  const handleYearDraftChange = (value: string) => {
+    setYearOverride(value)
+    const year = Number(value)
+    if (!Number.isInteger(year) || value.length !== 4 || year < 2000 || year > 2200) return
+    if (year === settings.auditYear) {
+      setYearOverride(null)
+      return
+    }
+    setPendingYear(year)
+  }
+
+  const confirmYearSwitch = () => {
+    if (pendingYear == null) return
+    switchAuditYear(pendingYear)
+    setPendingYear(null)
+    setYearOverride(null)
+  }
+
+  const cancelYearSwitch = () => {
+    setPendingYear(null)
+    setYearOverride(null)
+  }
+
   const previewPlan = () => {
     const openCount = company.observations.filter((item) => item.status === 'open').length + company.suggestions.filter((item) => item.status === 'open').length + company.ncrs.filter((item) => item.status !== '結案').length
-    setPreviewRows(autoArrangePlan({ departments: company.departments, planEntries: PROCEDURE_PLAN_TEMPLATE, auditYear: settings.auditYear, planWindowStart: settings.planWindowStart, planWindowEnd: settings.planWindowEnd, managementReviewDate: settings.managementReviewDate, existingRows: company.planRows, openCarryForwardCount: openCount, procedureRisks: company.procedureRisks }, { leadAuditor: settings.leadAuditor }))
+    setPreviewRows(autoArrangePlan({ departments: company.departments, planEntries: PROCEDURE_PLAN_TEMPLATE, auditYear: settings.auditYear, planWindowStart: settings.planWindowStart, planWindowEnd: settings.planWindowEnd, managementReviewDate: settings.managementReviewDate, existingRows: company.planRows, openCarryForwardCount: openCount, procedureRisks: buildEffectiveProcedureRisks(company) }, { leadAuditor: settings.leadAuditor }))
   }
 
   return (
@@ -43,11 +84,8 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           <Input
             label="稽核年度"
             type="number"
-            value={settings.auditYear}
-            onChange={(value) => {
-              const year = Number(value)
-              if (Number.isInteger(year) && value.length === 4) switchAuditYear(year)
-            }}
+            value={yearDraft}
+            onChange={handleYearDraftChange}
           />
           <Input label="計畫窗口起" type="date" value={settings.planWindowStart} onChange={(value) => updateSettings({ planWindowStart: value })} />
           <Input label="計畫窗口迄" type="date" value={settings.planWindowEnd} onChange={(value) => updateSettings({ planWindowEnd: value })} />
@@ -69,6 +107,17 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           <Input label="管理審查日期" type="date" value={settings.managementReviewDate ?? ''} onChange={(value) => updateSettings({ managementReviewDate: value })} />
         </div>
         <p className="mt-3 text-xs text-slate-500">切換年度會保存目前年度資料集；返回舊年度時還原其計畫、事件與準備資料。</p>
+        {pendingYear != null && (
+          <ConfirmDialog
+            open
+            title={`切換至 ${pendingYear} 年？`}
+            description={buildYearSwitchDescription(pendingYear)}
+            confirmLabel="確認切換"
+            variant={getPdcaOverview(state).annualCloseReady ? 'primary' : 'danger'}
+            onConfirm={confirmYearSwitch}
+            onCancel={cancelYearSwitch}
+          />
+        )}
       </Card>
 
       <Card className="print-break">
@@ -88,7 +137,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           </div>
         </div>
 
-        {previewRows && <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 no-print"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold text-blue-950">自動編排預覽</h3><p className="text-sm text-blue-800">共 {previewRows.length} 個程序；已執行事件不會被改寫，手動覆寫的計畫列會保留。</p></div><div className="flex gap-2"><Button onClick={() => { replacePlanRows(previewRows); setPreviewRows(null) }}>套用預覽</Button><Button variant="secondary" onClick={() => setPreviewRows(null)}>取消</Button></div></div><div className="mt-3 max-h-48 overflow-y-auto text-xs text-blue-950">{previewRows.map((row) => <div key={row.id} className="flex justify-between border-t border-blue-100 py-1"><span>{row.qpCode} · {row.department}</span><span>{row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程'}</span></div>)}</div></div>}
+        {previewRows && <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 no-print"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-semibold text-blue-950">自動編排預覽</h3><p className="text-sm text-blue-800">共 {previewRows.length} 個程序；手動覆寫（manualOverride）的計畫列會保留。</p></div><div className="flex gap-2"><Button onClick={() => { replacePlanRows(previewRows); setPreviewRows(null) }}>套用預覽</Button><Button variant="secondary" onClick={() => setPreviewRows(null)}>取消</Button></div></div><div className="mt-3 max-h-48 overflow-y-auto text-xs text-blue-950">{previewRows.map((row) => <div key={row.id} className="flex justify-between border-t border-blue-100 py-1"><span>{row.qpCode} · {row.department}</span><span>{row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程'}</span></div>)}</div></div>}
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
           {MONTH_STATUS_LEGEND.map((l) => (

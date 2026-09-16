@@ -3,6 +3,7 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { exportObservationsExcel } from '../lib/formExport'
 import type { ObservationStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
 
 export function Observations({ store }: { store: AuditStore }) {
   const {
@@ -27,6 +28,8 @@ export function Observations({ store }: { store: AuditStore }) {
   const [editId, setEditId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState({ content: '', description: '', owner: '', dueDate: '', closedAt: '', closeEvidence: '' })
   const [form, setForm] = useState({ sourceType: 'third_party_audit' as 'internal_audit' | 'third_party_audit', sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', departmentId: company.departments[0]?.id ?? '', content: '', description: '', owner: '', dueDate: '' })
+  const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
+  const [showImportDialog, setShowImportDialog] = useState(false)
   const allObservations = useMemo(() => [
     ...company.observations,
     ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.observations ?? []),
@@ -47,15 +50,21 @@ export function Observations({ store }: { store: AuditStore }) {
     (statusFilter === 'all' || item.status === statusFilter),
   ).sort((a, b) => (b.occurrenceDate ?? `${b.year}`).localeCompare(a.occurrenceDate ?? `${a.year}`)), [allObservations, yearFilter, sourceFilter, statusFilter])
 
+  const ledgerChecklistIds = new Set(
+    company.observations
+      .map((item) => item.sourceChecklistItemId)
+      .filter(Boolean),
+  )
   const auditObservations = company.audits.flatMap((audit) =>
     audit.items
-      .filter((item) => item.judgment === '觀察')
+      .filter((item) => item.judgment === '觀察' && !ledgerChecklistIds.has(item.id))
       .map((item) => ({
         id: item.id,
         label: `${audit.qpCode} · ${audit.department}`,
         content: item.content,
         description: item.description,
         sourceYear: item.sourceYear,
+        ledgerId: company.observations.find((obs) => obs.sourceChecklistItemId === item.id)?.id,
       })),
   )
 
@@ -65,19 +74,32 @@ export function Observations({ store }: { store: AuditStore }) {
     became_ncr: '已轉 NCR',
   }
 
+  const importableObs = priorObs.filter(
+    (o) => o.carriedToYear !== currentYear && !o.carryForwards?.some((entry) => entry.year === currentYear),
+  )
+  const importableNCR = openPriorNCR.filter(
+    (ncr) => !company.audits.some((audit) => audit.items.some((item) => item.sourceNcrId === ncr.id)),
+  )
+  const pendingNcrObs = pendingNcrId ? allObservations.find((o) => o.id === pendingNcrId) : undefined
+
   const importAllOpen = () => {
-    for (const obs of priorObs.filter((o) => o.carriedToYear !== currentYear && !o.carryForwards?.some((entry) => entry.year === currentYear))) {
+    for (const obs of importableObs) {
       const qp = obs.qpCode || 'QP-01'
       carryForwardObservation(obs.id, qp, obs.departmentId)
     }
-    for (const ncr of openPriorNCR) {
+    for (const ncr of importableNCR) {
       carryForwardNCR(ncr.id, ncr.qpCode, ncr.departmentId)
     }
     regeneratePlan()
+    setShowImportDialog(false)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-area qr-form">
+      <div className="print-only qr-form-header mb-4 text-center">
+        <h1 className="text-xl font-bold">{company.name}</h1>
+        <p className="text-sm">{currentYear} 年 · 觀察事項紀錄台帳</p>
+      </div>
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-lg font-semibold">觀察事項紀錄台帳</h2><p className="text-sm text-slate-500">內部稽核與第三方稽核的逐次紀錄、追蹤、跨年延續及結案證據。</p></div><div className="flex flex-wrap gap-2 no-print"><Button onClick={() => setShowForm((value) => !value)}>{showForm ? '收起登錄表單' : '登錄觀察事項'}</Button><Button variant="secondary" onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button></div></div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3"><Select label="年度" value={yearFilter} onChange={setYearFilter} options={[{ value: 'all', label: '全部年度' }, ...years.map((year) => ({ value: String(year), label: `${year} 年` }))]} /><Select label="來源" value={sourceFilter} onChange={setSourceFilter} options={[{ value: 'all', label: '全部來源' }, { value: 'internal_audit', label: '內部稽核' }, { value: 'third_party_audit', label: '第三方稽核' }]} /><Select label="狀態" value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: '全部狀態' }, { value: 'open', label: '待追蹤' }, { value: 'closed', label: '已結案' }, { value: 'became_ncr', label: '已轉 NCR' }]} /></div>
@@ -122,7 +144,7 @@ export function Observations({ store }: { store: AuditStore }) {
             <div className="flex flex-wrap gap-2"><Button disabled={!editDraft.content.trim()} onClick={() => { updateObservation(item.id, editDraft); setEditId(null) }}>儲存修改</Button><Button disabled={!editDraft.content.trim() || !editDraft.closedAt || !editDraft.closeEvidence?.trim()} onClick={() => { updateObservation(item.id, { ...editDraft, status: 'closed' }); setEditId(null) }}>儲存並結案</Button><Button variant="secondary" onClick={() => setEditId(null)}>取消</Button></div>
             {item.status === 'open' && <p className="text-xs text-slate-500">結案須填寫結案日期與結案證據，可一次按「儲存並結案」。</p>}
           </div> : <div className="mt-3 flex flex-wrap gap-2"><Button variant="secondary" disabled={item.status === 'became_ncr'} onClick={() => { setEditId(item.id); setEditDraft({ content: item.content, description: item.description, owner: item.owner ?? '', dueDate: item.dueDate ?? '', closedAt: item.closedAt || todayLocal, closeEvidence: item.closeEvidence ?? '' }) }}>編輯／結案</Button>
-            {item.status === 'open' && <><Button variant="secondary" onClick={() => convertObservationToNCR(item.id)}>轉為 NCR</Button></>}
+            {item.status === 'open' && <><Button variant="secondary" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button></>}
             {item.status === 'closed' && <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>}
           </div>}
           {item.status === 'open' && <div className="mt-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]"><Input label="追蹤日期" type="date" value={followDate[item.id] ?? todayLocal} onChange={(value) => setFollowDate({ ...followDate, [item.id]: value })} /><Input label="新增本次追蹤紀錄" value={followDraft[item.id] ?? ''} onChange={(value) => setFollowDraft({ ...followDraft, [item.id]: value })} /><Button variant="secondary" disabled={!followDraft[item.id]?.trim() || followDate[item.id] === ''} onClick={() => { addObservationFollowUp(item.id, followDate[item.id] ?? todayLocal, followDraft[item.id] ?? ''); setFollowDraft({ ...followDraft, [item.id]: '' }) }}>加入時間軸</Button></div>}
@@ -142,8 +164,8 @@ export function Observations({ store }: { store: AuditStore }) {
             </p>
           </div>
           <Button
-            disabled={priorObs.length === 0 && openPriorNCR.length === 0}
-            onClick={importAllOpen}
+            disabled={importableObs.length === 0 && importableNCR.length === 0}
+            onClick={() => setShowImportDialog(true)}
           >
             匯入全部待追蹤項目
           </Button>
@@ -209,10 +231,40 @@ export function Observations({ store }: { store: AuditStore }) {
         </div>
       </Card>
 
-      <Card>
-        <h3 className="mb-3 font-medium">{currentYear} 年度觀察事項（來自查檢表）</h3>
+      {pendingNcrObs && (
+        <ConfirmDialog
+          open
+          title="轉為 NCR？"
+          description={`將建立不符合紀錄，觀察事項狀態將變為「已轉 NCR」且無法從畫面復原。\n\n${pendingNcrObs.qpCode} · ${pendingNcrObs.department}\n${pendingNcrObs.content}`}
+          confirmLabel="確認轉換"
+          variant="danger"
+          onConfirm={() => {
+            convertObservationToNCR(pendingNcrObs.id)
+            setPendingNcrId(null)
+          }}
+          onCancel={() => setPendingNcrId(null)}
+        />
+      )}
+      {showImportDialog && (
+        <ConfirmDialog
+          open
+          title="匯入全部待追蹤項目？"
+          description={`將帶入 ${importableObs.length} 筆前年度觀察事項與 ${importableNCR.length} 筆未結案 NCR 至本年度查檢表，並重新自動編排年度計畫（手動覆寫的計畫列會保留）。`}
+          confirmLabel="確認匯入"
+          variant="danger"
+          onConfirm={importAllOpen}
+          onCancel={() => setShowImportDialog(false)}
+        />
+      )}
+
+      <Card className="print-area qr-form">
+        <div className="print-only qr-form-header mb-4 text-center">
+          <h1 className="text-xl font-bold">{company.name}</h1>
+          <p className="text-sm">{currentYear} 年 · 查檢表觀察判定（未同步台帳）</p>
+        </div>
+        <h3 className="mb-3 font-medium no-print">{currentYear} 年度觀察事項（來自查檢表 · 未進台帳）</h3>
         {auditObservations.length === 0 ? (
-          <p className="text-sm text-slate-500">查檢表判定「觀察」後會顯示於此。</p>
+          <p className="text-sm text-slate-500">查檢表判定「觀察」且已同步至台帳的項目，請在上方紀錄台帳追蹤。</p>
         ) : (
           <ul className="space-y-2 text-sm">
             {auditObservations.map((obs) => (
@@ -221,6 +273,7 @@ export function Observations({ store }: { store: AuditStore }) {
                 {obs.sourceYear && (
                   <span className="ml-2 text-xs text-amber-600">（源自 {obs.sourceYear} 年）</span>
                 )}
+                <p className="mt-1 text-xs text-slate-500">此項目尚未寫入觀察台帳；請在稽核執行頁確認判定或手動登錄。</p>
               </li>
             ))}
           </ul>
