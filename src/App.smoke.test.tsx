@@ -89,4 +89,48 @@ describe('App tab smoke', () => {
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(screen.getAllByRole('button', { name: '轉為 NCR' }).length).toBeGreaterThan(0)
   })
+
+  it('links start audit button to visible block reasons for planning events', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '稽核執行與證據' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+    })
+    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
+    const planningOption = Array.from(select.options).find(
+      (option) => option.text.includes('事件 ') && !option.text.match(/\d{4}-\d{2}-\d{2}/),
+    )
+    expect(planningOption).toBeTruthy()
+    fireEvent.change(select, { target: { value: planningOption!.value } })
+
+    const startBtn = screen.getByRole('button', { name: '開始稽核' })
+    expect(startBtn.getAttribute('aria-describedby')).toBe('audit-start-gaps')
+    const gaps = document.getElementById('audit-start-gaps')
+    expect(gaps).toBeTruthy()
+    expect(gaps!.textContent).toContain('阻擋：')
+    expect(startBtn.closest('span')?.getAttribute('title')).toContain('；')
+  })
+
+  it('asks before deleting custom checklist item and keeps item when cancelled', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '稽核執行與證據' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+    })
+    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
+    const planningOption = Array.from(select.options).find((option) => option.text.includes('事件 '))
+    expect(planningOption).toBeTruthy()
+    fireEvent.change(select, { target: { value: planningOption!.value } })
+
+    fireEvent.click(screen.getByRole('button', { name: '新增稽核項目' }))
+    const deleteBtn = screen.getAllByRole('button', { name: /刪除/ }).at(-1)
+    expect(deleteBtn).toBeTruthy()
+    fireEvent.click(deleteBtn!)
+
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('確認刪除查檢項')
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getAllByRole('button', { name: /刪除/ }).length).toBeGreaterThan(0)
+  })
 })

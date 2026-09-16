@@ -37,6 +37,7 @@ export const Button = forwardRef<HTMLButtonElement, {
   className?: string
   type?: 'button' | 'submit'
   disabled?: boolean
+  'aria-describedby'?: string
 }>(({
   children,
   onClick,
@@ -44,6 +45,7 @@ export const Button = forwardRef<HTMLButtonElement, {
   className = '',
   type = 'button',
   disabled,
+  'aria-describedby': ariaDescribedBy,
 }, ref) => {
   const variants = {
     primary: 'bg-blue-700 text-white hover:bg-blue-800',
@@ -56,6 +58,7 @@ export const Button = forwardRef<HTMLButtonElement, {
       ref={ref}
       type={type}
       disabled={disabled}
+      aria-describedby={ariaDescribedBy}
       onClick={onClick}
       className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 ${variants[variant]} ${className}`}
     >

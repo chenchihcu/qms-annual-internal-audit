@@ -7,7 +7,7 @@
 ```bash
 npm install
 npm run dev    # http://127.0.0.1:43123
-npm test       # 99 項單元／回歸／smoke 測試
+npm test       # 101 項單元／回歸／smoke 測試
 npm run build  # production bundle → dist/
 npm run preview -- --port 43124 --host 127.0.0.1
 ```
