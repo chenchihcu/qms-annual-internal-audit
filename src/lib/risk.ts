@@ -1,4 +1,4 @@
-import type { RiskLevel } from '../types'
+import type { CompanyData, ProcedureRiskRecord, RiskLevel } from '../types'
 
 export interface RiskResult {
   index: number
@@ -95,4 +95,30 @@ export function calculateProcedurePriority(input: ProcedurePriorityInput): Proce
   const score = Math.round(total)
   const level: RiskLevel = score >= 70 ? '高' : score >= 40 ? '中' : '低'
   return { score, level, provisional: missingFactors.length > 0, missingFactors }
+}
+
+/** Merge persisted procedureRisks with UI fallbacks so planner matches on-screen scores. */
+export function buildEffectiveProcedureRisks(company: CompanyData): ProcedureRiskRecord[] {
+  return company.planRows.map((plan) => {
+    const saved = company.procedureRisks?.find(
+      (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId,
+    )
+    const openNcr = company.ncrs.filter(
+      (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId && item.status !== '結案',
+    ).length
+    return {
+      id: saved?.id ?? `risk-${plan.qpCode}-${plan.departmentId}`,
+      qpCode: plan.qpCode,
+      departmentId: plan.departmentId,
+      inherentRisk: saved?.inherentRisk ?? (plan.riskLevel === '高' ? 5 : plan.riskLevel === '中' ? 3 : 1),
+      previousInternalNcrCount: saved?.previousInternalNcrCount,
+      previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
+      overdueOpenNcrCount: saved?.overdueOpenNcrCount ?? (openNcr ? Math.min(5, openNcr + 1) : undefined),
+      customerComplaintLevel: saved?.customerComplaintLevel,
+      changeImpact: saved?.changeImpact,
+      monthsSinceLastAudit: saved?.monthsSinceLastAudit,
+      evidenceReference: saved?.evidenceReference ?? '',
+      updatedAt: saved?.updatedAt ?? new Date().toISOString(),
+    }
+  })
 }

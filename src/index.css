@@ -20,6 +20,11 @@
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
+  }
+
   .no-print {
     display: none !important;
   }
@@ -30,7 +35,17 @@
 
   body {
     background: white;
-    font-size: 11pt;
+    font-size: 10.5pt;
+    color: #000;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-area {
+    width: 100%;
   }
 
   .print-break {
@@ -44,12 +59,19 @@
   .qr-form-header h1 {
     font-size: 16pt;
     letter-spacing: 0.05em;
+    margin-bottom: 4pt;
+  }
+
+  .qr-form-header p {
+    font-size: 11pt;
+    margin: 2pt 0;
   }
 
   .qr-header-table,
   .qr-checklist,
   .qr-plan-table {
     border: 1.5pt solid #000;
+    width: 100%;
   }
 
   .qr-header-table td,
@@ -60,10 +82,13 @@
   .qr-plan-table th {
     border: 0.75pt solid #000;
     padding: 4pt 6pt;
+    vertical-align: top;
+    word-break: break-word;
+    white-space: normal;
   }
 
   .qr-label {
-    background: #f0f0f0;
+    background: #f0f0f0 !important;
     font-weight: 600;
     width: 18%;
     white-space: nowrap;
@@ -74,12 +99,31 @@
     background: #e8e8e8 !important;
   }
 
+  .qr-checklist {
+    font-size: 9pt;
+  }
+
+  .qr-checklist td,
+  .qr-checklist th {
+    line-height: 1.35;
+  }
+
+  .qr-plan-table {
+    font-size: 8.5pt;
+  }
+
   table {
     page-break-inside: auto;
   }
 
   tr {
     page-break-inside: avoid;
+  }
+
+  .print-area .rounded-lg,
+  .print-area .rounded-xl,
+  .print-area .border {
+    box-shadow: none !important;
   }
 }
 

@@ -16,28 +16,27 @@ describe('workflow navigation/form mapping', () => {
     expect(ALL_TABS.find((entry) => entry.id === 'dashboard')?.formId).toBeUndefined()
   })
 
-  it('orders menu stages as an executable ISO-oriented audit workflow', () => {
+  it('orders menu stages as PDCA audit workflow', () => {
     expect(TAB_GROUPS.map((group) => group.label)).toEqual([
       '總覽',
-      '0 · 受控準則與程序',
-      '1 · 稽核方案管理',
-      '2 · 稽核資源與準備',
-      '3 · 稽核活動執行',
-      '4 · 稽核結果與改善',
+      'P · 方案規劃',
+      'D · 稽核執行',
+      'C · 結果與改善',
+      'A · 結案與改進',
       '系統管理',
     ])
     expect(ALL_TABS.map((entry) => entry.label)).toEqual([
       '稽核總覽',
       '標準',
       '程序',
-      '年度稽核計畫',
       '方案風險與優先順序',
+      '年度稽核計畫',
       '稽核員能力與任命',
-      '稽核啟動與活動準備',
       '稽核執行與證據',
       '不符合與矯正措施',
       '觀察事項與追蹤',
       '改善機會與建議',
+      '外部稽核前準備與序位',
       '系統設定',
     ])
   })
@@ -54,9 +53,13 @@ describe('workflow navigation/form mapping', () => {
     expect(buildAppHash('audit', 'event-1')).toBe('#tab=audit&audit=event-1')
   })
 
-  it('defines workflow metadata for every tab', () => {
+  it('defines workflow metadata for every tab in PDCA order', () => {
     expect(TAB_WORKFLOW).toHaveLength(12)
-    expect(getTabWorkflow('plan')?.nextTab).toBe('risk')
-    expect(getTabWorkflow('risk')?.prevTab).toBe('plan')
+    expect(getTabWorkflow('procedure')?.nextTab).toBe('risk')
+    expect(getTabWorkflow('risk')?.nextTab).toBe('plan')
+    expect(getTabWorkflow('plan')?.prevTab).toBe('risk')
+    expect(getTabWorkflow('personnel')?.nextTab).toBe('audit')
+    expect(getTabWorkflow('suggestions')?.nextTab).toBe('prep')
+    expect(getTabWorkflow('system-settings')?.nextTab).toBe('dashboard')
   })
 })

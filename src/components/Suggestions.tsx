@@ -3,6 +3,7 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { exportSuggestionsExcel } from '../lib/formExport'
 import type { SuggestionStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { PrintDocHeader } from './ui/PrintDocHeader'
 
 export function Suggestions({ store }: { store: AuditStore }) {
   const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
@@ -37,8 +38,13 @@ export function Suggestions({ store }: { store: AuditStore }) {
     company.planRows.filter((row) => row.qpCode === qp)
 
   return (
-    <div className="space-y-6 print-area">
+    <div className="space-y-6 print-area qr-form">
       <Card>
+        <PrintDocHeader
+          companyName={company.name}
+          auditYear={currentYear}
+          formTitle="第三方稽核建議事項一覽表"
+        />
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="mb-2 text-lg font-semibold">第三方稽核建議事項一覽表</h2>

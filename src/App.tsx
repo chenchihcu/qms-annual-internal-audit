@@ -134,7 +134,7 @@ function App() {
           </div>
         )}
         <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">正在載入頁面…</div>}>
-        <WorkflowGuide tab={tab} auditKey={auditKey} position="top" />
+        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="top" />
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
@@ -163,7 +163,7 @@ function App() {
               </TabErrorBoundary>
             )}
             {tab === 'prep' && (
-              <TabErrorBoundary tabLabel="稽核啟動與活動準備">
+              <TabErrorBoundary tabLabel="外部稽核前準備與序位">
                 <PreAuditPrep store={store} />
               </TabErrorBoundary>
             )}
@@ -198,7 +198,7 @@ function App() {
             <Dashboard state={store.state} onNavigate={setTab} />
           </TabErrorBoundary>
         )}
-        <WorkflowGuide tab={tab} auditKey={auditKey} position="bottom" />
+        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="bottom" />
         </Suspense>
       </main>
 

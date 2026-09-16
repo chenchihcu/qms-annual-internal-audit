@@ -35,6 +35,7 @@ import {
 import { isSeedChecklistItem } from '../lib/checklistItem'
 import { parseBackupJson, serializeBackup } from '../lib/backup'
 import { autoArrangePlan } from '../lib/planner'
+import { buildEffectiveProcedureRisks } from '../lib/risk'
 import { collectNCRsFromAudits, syncNCRDescriptions } from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
@@ -414,7 +415,7 @@ export function useAuditStore() {
           managementReviewDate: s.settings.managementReviewDate,
           existingRows: co.planRows,
           openCarryForwardCount: openCount,
-          procedureRisks: co.procedureRisks,
+          procedureRisks: buildEffectiveProcedureRisks(co),
         },
         { leadAuditor: s.settings.leadAuditor },
       )
@@ -1002,7 +1003,7 @@ export function useAuditStore() {
         if (!sug || sug.status === 'closed') return s
 
         const auditId = `audit-${qpCode}-${departmentId}`
-        let audit = co.audits.find((a) => a.id === auditId)
+        let audit = co.audits.find((a) => a.id === auditId && (a.status ?? '規劃中') === '規劃中')
         const dept = co.departments.find((d) => d.id === departmentId)
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === qpCode && e.departmentId === departmentId,
@@ -1010,8 +1011,9 @@ export function useAuditStore() {
         if (!dept || !entry) return s
 
         if (!audit) {
+          const baseId = co.audits.some((item) => item.id === auditId) ? nextId(`audit-${s.settings.auditYear}-${qpCode}-${departmentId}`) : auditId
           audit = {
-            id: auditId,
+            id: baseId,
             qpCode,
             departmentId,
             department: dept.name,
@@ -1025,7 +1027,6 @@ export function useAuditStore() {
             items: createChecklistForProcedure(qpCode, dept.name),
           }
         }
-
 
         if (audit.items.some((item) => item.carriedFromId === sug.id)) return s
 

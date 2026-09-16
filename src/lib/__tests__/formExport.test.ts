@@ -52,6 +52,8 @@ describe('form export smoke', () => {
   it('includes risk sheet in full workbook export', () => {
     const workbook = buildAllFormsWorkbook(createDemoState(), 'jiurun')
     expect(workbook.SheetNames).toContain('QR-02-01')
+    expect(workbook.SheetNames).toContain('適用標準')
+    expect(workbook.SheetNames).toContain('人員合格名單')
   })
 
   it('keeps worksheet names unique for repeated audit events', () => {

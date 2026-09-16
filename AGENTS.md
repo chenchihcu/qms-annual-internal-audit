@@ -24,7 +24,8 @@
 
 ## 工作流與導覽 SSOT
 
-- [ ] 十二 tab 的 purpose／entry／exit／prev／next 只寫在 [`src/lib/navigation.ts`](src/lib/navigation.ts) `TAB_WORKFLOW`；[`WorkflowGuide`](src/components/ui/WorkflowGuide.tsx) 與程序頁 `PROCEDURE_LIFECYCLE_STEPS` 只讀 SSOT，不在各頁重複銜接文案
+- [ ] 十二 tab 的 purpose／entry／exit／prev／next 只寫在 [`src/lib/navigation.ts`](src/lib/navigation.ts) `TAB_WORKFLOW`；完成度／缺口在 [`src/lib/workflowStatus.ts`](src/lib/workflowStatus.ts)；[`WorkflowGuide`](src/components/ui/WorkflowGuide.tsx) 與程序頁 `PROCEDURE_LIFECYCLE_STEPS` 只讀 SSOT，不在各頁重複銜接文案
+- [ ] PDCA 順序：P（標準→程序→風險→計畫→人員）→ D（稽核）→ C（NCR／觀察／建議）→ A（外部稽核前準備）；`buildEffectiveProcedureRisks` 供風險頁與計畫頁自動編排共用
 - [ ] `parseAppHash`／`buildAppHash`／`syncHash` 支援 `audit`；[`App.tsx`](src/App.tsx) 側欄切 tab 清 `audit`；[`ProcedureAuditPanel`](src/components/ProcedureAuditPanel.tsx) 消費並回寫 `auditKey`
 - [ ] 儀表板缺口卡與得分列可導向（`onNavigate` 或 `buildAppHash`），勿只顯示數字
 
@@ -45,7 +46,7 @@
 ## Release Gate（local-first SPA）
 
 - [ ] `npm run lint && npm test && npm run build` 全過才交付
-- [ ] dev（43123）+ preview（43124）至少 smoke：儀表板、年度計畫、程序稽核、設定
+- [ ] dev（43123）+ preview（43124）至少 smoke：稽核總覽、年度稽核計畫、稽核執行與證據、系統設定
 - [ ] 變更後跑 `demoData.smoke.test.ts`、`useAuditStore.migration.test.ts`、`App.smoke.test.tsx`
 - [ ] `App.smoke.test.tsx` 測 hash／導覽前 `beforeEach` 清 `window.location.hash`（避免 tab 測試污染）
 
@@ -53,7 +54,7 @@
 
 - [ ] 預設 stability fixes only；使用者明確要求工作流閉環時可改 product，仍須跑 release gate
 - [ ] 緊急 zip：排除 `node_modules`、`.git`、`dist`；附 SHA256
-- [ ] README 測試數與 `npm test` 實際數量一致（目前 84）
+- [ ] README 測試數與 `npm test` 實際數量一致（目前 99）
 
 ## 已知限制（勿假裝已解）
 

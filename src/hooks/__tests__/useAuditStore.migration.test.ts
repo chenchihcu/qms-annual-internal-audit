@@ -309,4 +309,35 @@ describe('audit event records', () => {
     act(() => result.current.updateChecklistItem(sourceAudit.id, started.items[0].id, { content: '不應改寫歷史' }))
     expect(result.current.state.company.audits.find((item) => item.id === sourceAudit.id)!.items[0].content).toBe(originalContent)
   })
+
+  it('does not carry forward suggestions into a reported audit event', () => {
+    const { result } = renderHook(() => useAuditStore())
+    let auditId = ''
+    act(() => { auditId = result.current.createAuditEvent('QP-28', 'dept-qa', '2026-06-01') })
+    const audit = result.current.state.company.audits.find((item) => item.id === auditId)!
+    act(() => {
+      result.current.updateAudit({
+        ...audit,
+        auditDate: '2026-06-01',
+        team: {
+          leadAuditorPersonId: result.current.state.people[0]?.id,
+          auditorPersonIds: [result.current.state.people[0]?.id].filter(Boolean) as string[],
+          escortPersonIds: [],
+          impartialityConfirmed: true,
+          impartialityNote: '陪稽安排',
+        },
+      })
+    })
+    act(() => result.current.startAudit(auditId))
+    act(() => {
+      const started = result.current.state.company.audits.find((item) => item.id === auditId)!
+      result.current.updateAudit({ ...started, status: '已回報', reportReference: 'RPT-LOCK' })
+    })
+    const beforeCount = result.current.state.company.audits.find((item) => item.id === auditId)!.items.length
+    const sugId = result.current.state.company.suggestions[0]?.id
+    expect(sugId).toBeTruthy()
+    act(() => result.current.carryForwardSuggestion(sugId!, 'QP-28', 'dept-qa'))
+    const afterCount = result.current.state.company.audits.find((item) => item.id === auditId)!.items.length
+    expect(afterCount).toBe(beforeCount)
+  })
 })

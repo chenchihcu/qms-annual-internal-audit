@@ -2,6 +2,7 @@ import { EXTERNAL_AUDIT_PREP_SEED } from './externalAuditPrep'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
 import { calculateProcedurePriority } from './risk'
+import { PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
 import type {
   AppState,
   CompanyAuditProfile,
@@ -249,6 +250,28 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
   return createSheet([['方案風險與優先順序 QR-02-01'], [], header, ...rows])
 }
 
+export function buildPersonnelSheet(state: AppState): SpreadsheetSheet {
+  const headers = ['姓名', '編號', '類型', '公司或機構', '責任單位', '角色', '狀態', '適用範圍', '有效日期']
+  const today = new Date().toISOString().slice(0, 10)
+  const rows = state.people.filter((person) => person.active).map((person) => {
+    const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
+    const qualStates = person.qualifications.map((item) => qualificationState(item, today))
+    const status = qualStates.includes('effective') ? '有效' : qualStates[0] ?? '待確認'
+    return [
+      person.name,
+      person.employeeNumber,
+      person.type === 'internal' ? '內部' : '外部',
+      person.affiliations.map((a) => a.companyId ? COMPANY_LABELS[a.companyId] : a.externalOrganization).filter(Boolean).join('、'),
+      person.affiliations.map((a) => a.departmentId).filter(Boolean).join('、'),
+      roles.map((role) => PERSONNEL_ROLE_LABELS[role]).join('、'),
+      status,
+      person.qualifications.flatMap((q) => [...q.standardVersions, ...q.procedureScopes, ...q.departmentScopes]).join('、'),
+      person.qualifications.map((q) => `${q.effectiveFrom || '待確認'}～${q.validityMode === 'no_expiry' ? '正式依據未訂期限' : q.effectiveTo || '待確認'}`).join('；'),
+    ]
+  })
+  return createSheet([[`${state.settings.auditYear} 年人員合格名單`], [], headers, ...rows])
+}
+
 export function buildStandardSheet(profile: CompanyAuditProfile, companyName: string): SpreadsheetSheet {
   const header = ['標準', '版本', '適用性', '依據引用', '證書範圍', '證書編號']
   const rows = profile.applicableStandards.map((standard) => [
@@ -351,6 +374,8 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
   }
   appendSheet(wb, buildNcrSheet(co, state.settings), sheetName('QR-28-03'))
   appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
+  appendSheet(wb, buildStandardSheet(state.companyAuditProfiles[companyId], companyLabel(state, companyId)), sheetName('適用標準'))
+  appendSheet(wb, buildPersonnelSheet(state), sheetName('人員合格名單'))
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
   appendSheet(wb, buildPrepSheet(state), sheetName('稽核前準備'))

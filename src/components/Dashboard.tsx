@@ -1,7 +1,7 @@
 import { calculateAnnualScore } from '../lib/scoring'
 import { buildAuditFocusOverview } from '../lib/planner'
 import { buildAppHash } from '../lib/navigation'
-import { validateAuditTeam } from '../lib/personnel'
+import { getPdcaOverview } from '../lib/workflowStatus'
 import type { AppState, TabId } from '../types'
 import { Badge, Card } from './ui/Badge'
 
@@ -10,32 +10,18 @@ interface DashboardProps {
   onNavigate?: (tab: TabId, auditKey?: string) => void
 }
 
-function auditCanStart(state: AppState, audit: AppState['companies'][keyof AppState['companies']]['audits'][0]): boolean {
-  const profile = state.companyAuditProfiles[state.activeCompanyId]
-  const standards = profile.applicableStandards
-    .filter((item) => item.confirmationStatus === 'confirmed')
-    .map((item) => `${item.name}:${item.version}`)
-  if (!audit.auditDate) return false
-  if (standards.length === 0) return false
-  if (!profile.auditProcedureCode.trim()) return false
-  if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') return false
-  if (!profile.formalRecordLocation.trim()) return false
-  const teamResult = validateAuditTeam(
-    state.people,
-    audit.team,
-    state.activeCompanyId,
-    audit.qpCode,
-    audit.departmentId,
-    audit.auditDate || audit.plannedDate || '',
-    standards,
-  )
-  return teamResult.canStart
-}
+const PDCA_SECTIONS = [
+  { key: 'plan' as const, label: 'P · 方案規劃', tab: 'standard' as TabId },
+  { key: 'do' as const, label: 'D · 稽核執行', tab: 'audit' as TabId },
+  { key: 'check' as const, label: 'C · 結果與改善', tab: 'ncr' as TabId },
+  { key: 'act' as const, label: 'A · 結案與改進', tab: 'prep' as TabId },
+]
 
 export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
   const summary = calculateAnnualScore(company.audits, settings.scoringRules)
   const focusRows = buildAuditFocusOverview(company.planRows)
+  const pdca = getPdcaOverview(state)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -43,9 +29,9 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     (sum, r) => sum + r.months.filter(Boolean).length,
     0,
   )
-  const personnelIssues = company.audits.filter(
-    (audit) => audit.status !== '已回報' && !auditCanStart(state, audit),
-  ).length
+  const inProgress = company.audits.filter((a) => a.status === '執行中').length
+  const reported = company.audits.filter((a) => a.status === '已回報').length
+  const notStarted = company.audits.filter((a) => !a.status || a.status === '規劃中').length
 
   const byCategory = {
     系統稽核: company.planRows.filter((r) => r.auditCategory === '系統稽核').length,
@@ -58,8 +44,66 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     else window.location.hash = buildAppHash(tab, auditKey).slice(1)
   }
 
+  const findAuditForRow = (qpCode: string, department: string) =>
+    company.audits.find((a) => a.qpCode === qpCode && a.department === department)
+
   return (
     <div className="space-y-6">
+      <Card className={pdca.annualCloseReady ? 'border-green-200 bg-green-50/30' : 'border-amber-200 bg-amber-50/30'}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">年度稽核 PDCA</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {settings.auditYear} 年 · {company.name} · 方案起始 → 執行 → 追蹤 → 結案
+            </p>
+          </div>
+          {pdca.annualCloseReady ? (
+            <span className="rounded-full bg-green-100 px-3 py-1 text-sm font-semibold text-green-800">可進行年度結案</span>
+          ) : (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900">年度結案尚待完成</span>
+          )}
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PDCA_SECTIONS.map((section) => {
+            const block = pdca[section.key]
+            return (
+              <button
+                key={section.key}
+                type="button"
+                className="rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-blue-300 hover:shadow-sm"
+                onClick={() => go(section.tab)}
+              >
+                <p className="text-xs font-bold text-slate-500">{section.label}</p>
+                <p className={`mt-1 text-sm font-semibold ${block.ready ? 'text-green-700' : 'text-amber-800'}`}>
+                  {block.ready ? '已就緒' : `${block.gaps.length} 項待處理`}
+                </p>
+                {block.gaps.slice(0, 2).map((gap) => (
+                  <p key={gap.message} className="mt-1 truncate text-xs text-slate-500">{gap.message}</p>
+                ))}
+              </button>
+            )
+          })}
+        </div>
+        {!pdca.annualCloseReady && pdca.annualCloseGaps.length > 0 && (
+          <ul className="mt-4 space-y-1 text-xs text-amber-900">
+            {pdca.annualCloseGaps.slice(0, 5).map((gap) => (
+              <li key={gap.message}>
+                {gap.tab ? (
+                  <button type="button" className="text-left underline hover:text-amber-950" onClick={() => go(gap.tab!)}>
+                    {gap.message}
+                  </button>
+                ) : gap.message}
+              </li>
+            ))}
+          </ul>
+        )}
+        {pdca.annualCloseReady && (
+          <p className="mt-3 text-sm text-green-800">
+            可在年度計畫切換新年，並至觀察事項／建議頁帶入待追蹤項目。
+          </p>
+        )}
+      </Card>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <p className="text-sm text-slate-500">年度總分 · {company.name}</p>
@@ -76,7 +120,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           type="button"
           className="text-left"
           onClick={() => go('ncr')}
-          aria-label={`不符合 NCR 共 ${company.ncrs.length} 件，未結案 ${openNCR} 件，前往不符合與矯正措施`}
+          aria-label={`不符合 NCR 共 ${company.ncrs.length} 件，未結案 ${openNCR} 件`}
         >
           <Card className="h-full transition hover:border-red-300 hover:shadow-sm">
             <p className="text-sm text-slate-500">不符合（NCR）</p>
@@ -88,47 +132,66 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           type="button"
           className="text-left"
           onClick={() => go('observations')}
-          aria-label={`觀察與建議待追蹤 ${openObs + openSug} 件`}
+          aria-label={`觀察待追蹤 ${openObs} 件`}
         >
           <Card className="h-full transition hover:border-amber-300 hover:shadow-sm">
-            <p className="text-sm text-slate-500">觀察 / 第三方建議</p>
-            <p className="mt-1 text-3xl font-bold text-amber-600">{openObs + openSug}</p>
-            <p className="mt-1 text-xs text-blue-700">台帳待追蹤 {openObs} · 建議 {openSug} · 點擊查看</p>
+            <p className="text-sm text-slate-500">觀察事項</p>
+            <p className="mt-1 text-3xl font-bold text-amber-600">{openObs}</p>
+            <p className="mt-1 text-xs text-blue-700">台帳待追蹤 · 點擊查看</p>
           </Card>
         </button>
         <button
           type="button"
           className="text-left"
-          onClick={() => go('plan')}
-          aria-label={`計畫稽核次數 ${plannedMonths}`}
+          onClick={() => go('suggestions')}
+          aria-label={`建議待追蹤 ${openSug} 件`}
         >
-          <Card className="h-full transition hover:border-slate-300 hover:shadow-sm">
-            <p className="text-sm text-slate-500">計畫稽核次數</p>
-            <p className="mt-1 text-3xl font-bold text-slate-800">{plannedMonths}</p>
-            <p className="text-xs text-blue-700">
-              系統 {byCategory.系統稽核} · 製程 {byCategory.製程稽核} · 型態 {byCategory.型態稽核} · 點擊查看
-            </p>
+          <Card className="h-full transition hover:border-violet-300 hover:shadow-sm">
+            <p className="text-sm text-slate-500">第三方建議</p>
+            <p className="mt-1 text-3xl font-bold text-violet-600">{openSug}</p>
+            <p className="mt-1 text-xs text-blue-700">待追蹤 · 點擊查看</p>
           </Card>
         </button>
       </div>
 
-      {personnelIssues > 0 && (
-        <Card className="border-amber-200 bg-amber-50/50">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-amber-950">開始前人員資格待處理</h2>
-              <p className="text-sm text-amber-800">{personnelIssues} 個尚未回報事件的團隊、資格範圍、標準／程序或客觀性確認未完成。</p>
-            </div>
-            <button
-              type="button"
-              className="min-h-11 rounded-lg border border-amber-400 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100"
-              onClick={() => go('personnel')}
-            >
-              前往人員合格名單（{personnelIssues} 件）
-            </button>
-          </div>
-        </Card>
-      )}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <button type="button" className="text-left" onClick={() => go('plan')}>
+          <Card className="h-full transition hover:border-slate-300 hover:shadow-sm">
+            <p className="text-sm text-slate-500">計畫稽核次數</p>
+            <p className="mt-1 text-3xl font-bold text-slate-800">{plannedMonths}</p>
+            <p className="text-xs text-blue-700">
+              系統 {byCategory.系統稽核} · 製程 {byCategory.製程稽核} · 型態 {byCategory.型態稽核}
+            </p>
+          </Card>
+        </button>
+        <button type="button" className="text-left" onClick={() => go('audit')}>
+          <Card className="h-full transition hover:border-blue-300 hover:shadow-sm">
+            <p className="text-sm text-slate-500">稽核事件</p>
+            <p className="mt-1 text-2xl font-bold text-blue-800">
+              {notStarted} / {inProgress} / {reported}
+            </p>
+            <p className="text-xs text-slate-500">未開始 · 執行中 · 已回報</p>
+          </Card>
+        </button>
+        <button type="button" className="text-left" onClick={() => go('standard')}>
+          <Card className="h-full transition hover:border-slate-300 hover:shadow-sm">
+            <p className="text-sm text-slate-500">方案規劃</p>
+            <p className={`mt-1 text-lg font-bold ${pdca.plan.ready ? 'text-green-700' : 'text-amber-800'}`}>
+              {pdca.plan.ready ? '已就緒' : '待完成'}
+            </p>
+            <p className="text-xs text-blue-700">標準 → 程序 → 風險 → 計畫 → 人員</p>
+          </Card>
+        </button>
+        <button type="button" className="text-left" onClick={() => go('prep')}>
+          <Card className="h-full transition hover:border-slate-300 hover:shadow-sm">
+            <p className="text-sm text-slate-500">外部稽核前準備</p>
+            <p className={`mt-1 text-lg font-bold ${pdca.act.ready ? 'text-green-700' : 'text-amber-800'}`}>
+              {pdca.act.ready ? '已就緒' : '待完成'}
+            </p>
+            <p className="text-xs text-blue-700">內稽 → 管審 → 外稽序位</p>
+          </Card>
+        </button>
+      </div>
 
       <Card>
         <h2 className="mb-4 text-lg font-semibold">稽核重點標示（QR-28-01 概覽）</h2>
@@ -146,17 +209,28 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
               </tr>
             </thead>
             <tbody>
-              {focusRows.map((row) => (
-                <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-slate-100">
-                  <td className="p-2 text-slate-500">{row.sheet}</td>
-                  <td className="p-2"><Badge label={row.riskLevel} /></td>
-                  <td className="p-2 font-medium">{row.qpCode}</td>
-                  <td className="p-2">{row.department}</td>
-                  <td className="p-2">{row.owner}</td>
-                  <td className="p-2 text-center">{row.itemCount}</td>
-                  <td className="p-2 text-slate-600">{row.auditCategory}</td>
-                </tr>
-              ))}
+              {focusRows.map((row) => {
+                const audit = findAuditForRow(row.qpCode, row.department)
+                return (
+                  <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-slate-100">
+                    <td className="p-2 text-slate-500">{row.sheet}</td>
+                    <td className="p-2"><Badge label={row.riskLevel} /></td>
+                    <td className="p-2">
+                      <button
+                        type="button"
+                        className="font-medium text-blue-800 underline-offset-2 hover:underline"
+                        onClick={() => go(audit ? 'audit' : 'plan', audit?.id)}
+                      >
+                        {row.qpCode}
+                      </button>
+                    </td>
+                    <td className="p-2">{row.department}</td>
+                    <td className="p-2">{row.owner}</td>
+                    <td className="p-2 text-center">{row.itemCount}</td>
+                    <td className="p-2 text-slate-600">{row.auditCategory}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

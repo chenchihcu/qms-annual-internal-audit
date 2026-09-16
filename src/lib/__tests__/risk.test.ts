@@ -5,7 +5,9 @@ import {
   suggestRiskBump,
   clampRiskValue,
   calculateProcedurePriority,
+  buildEffectiveProcedureRisks,
 } from '../risk'
+import type { CompanyData } from '../../types'
 
 describe('calculateRiskLevel', () => {
   it('returns 低 for index 1-4', () => {
@@ -65,5 +67,40 @@ describe('clampRiskValue', () => {
   it('clamps to valid range', () => {
     expect(clampRiskValue(0)).toBe(1)
     expect(clampRiskValue(6)).toBe(5)
+  })
+})
+
+describe('buildEffectiveProcedureRisks', () => {
+  const baseCompany = {
+    planRows: [
+      { id: 'p1', qpCode: 'QP-01', departmentId: 'd1', department: '品保', riskLevel: '高' as const, months: Array(12).fill(null), manualOverride: false },
+      { id: 'p2', qpCode: 'QP-02', departmentId: 'd2', department: '生產', riskLevel: '低' as const, months: Array(12).fill(null), manualOverride: false },
+    ],
+    procedureRisks: [
+      {
+        id: 'saved-1',
+        qpCode: 'QP-01',
+        departmentId: 'd1',
+        inherentRisk: 4,
+        evidenceReference: 'ev-1',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    ncrs: [
+      { id: 'n1', qpCode: 'QP-02', departmentId: 'd2', status: '開立' as const, ncrNumber: 'NCR-1', description: '', rootCause: '', correctiveAction: '', preventiveAction: '', responsibleUnit: '', dueDate: '', openedAt: '', closedAt: null },
+    ],
+  } as unknown as CompanyData
+
+  it('prefers persisted procedureRisks over plan fallbacks', () => {
+    const risks = buildEffectiveProcedureRisks(baseCompany)
+    expect(risks).toHaveLength(2)
+    expect(risks[0].inherentRisk).toBe(4)
+    expect(risks[0].evidenceReference).toBe('ev-1')
+  })
+
+  it('falls back to plan risk level when no saved record exists', () => {
+    const risks = buildEffectiveProcedureRisks(baseCompany)
+    expect(risks[1].inherentRisk).toBe(1)
+    expect(risks[1].overdueOpenNcrCount).toBe(2)
   })
 })

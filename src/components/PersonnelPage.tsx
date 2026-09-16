@@ -241,7 +241,11 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print-area qr-form">
+      <div className="print-only qr-form-header mb-4 text-center">
+        <h1 className="text-xl font-bold">人員合格名單</h1>
+        <p className="text-sm">{state.settings.auditYear} 年 · {state.company.name}</p>
+      </div>
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div><h2 className="text-lg font-semibold">人員合格名單</h2><p className="text-sm text-slate-500">{state.settings.auditYear} 年 · 資格、任命與陪稽安排共用同一人員主檔</p></div>
