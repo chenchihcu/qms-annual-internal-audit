@@ -1,11 +1,8 @@
 import type { ChecklistItem, ProcedureAudit, ScoringRules } from '../types'
 import { DEFAULT_SCORING_RULES } from '../types'
 
-export type ScoreStatus = 'scored' | 'unevaluated' | 'not_applicable'
-
 export interface ScoreResult {
   score: number | null
-  status: ScoreStatus
   totalItems: number
   applicableItems: number
   breakdown: {
@@ -15,18 +12,6 @@ export interface ScoreResult {
     notApplicable: number
     pending: number
   }
-}
-
-function resolveScoreStatus(
-  applicable: number,
-  pending: number,
-  notApplicable: number,
-  totalItems: number,
-): ScoreStatus {
-  if (applicable > 0) return 'scored'
-  if (totalItems > 0 && notApplicable === totalItems) return 'not_applicable'
-  if (pending > 0 || totalItems === 0) return 'unevaluated'
-  return 'unevaluated'
 }
 
 export function scoreChecklistItems(
@@ -71,18 +56,10 @@ export function scoreChecklistItems(
     }
   }
 
-  const status = resolveScoreStatus(
-    applicable,
-    breakdown.pending,
-    breakdown.notApplicable,
-    items.length,
-  )
-  const score =
-    status === 'scored' ? Math.round((numerator / applicable) * 1000) / 10 : null
+  const score = applicable === 0 ? null : (numerator / applicable) * 100
 
   return {
-    score,
-    status,
+    score: score == null ? null : Math.round(score * 10) / 10,
     totalItems: items.length,
     applicableItems: applicable,
     breakdown,
@@ -96,24 +73,12 @@ export function scoreProcedureAudit(
   return scoreChecklistItems(audit.items, rules)
 }
 
-export function formatScoreDisplay(result: ScoreResult): string {
-  if (result.status === 'scored' && result.score !== null) return `${result.score}%`
-  if (result.status === 'not_applicable') return '不適用'
-  return '未評'
-}
-
-export function hasAnyJudgment(audits: ProcedureAudit[]): boolean {
-  return audits.some((a) => a.items.some((i) => i.judgment !== null && i.judgment !== undefined))
-}
-
 export interface AnnualScoreSummary {
   overallScore: number | null
-  overallStatus: ScoreStatus
   departmentScores: Array<{
     auditId: string
     label: string
     score: number | null
-    status: ScoreStatus
     applicableItems: number
   }>
   totalNCR: number
@@ -130,7 +95,6 @@ export function calculateAnnualScore(
       auditId: audit.id,
       label: `${audit.qpCode} · ${audit.department}`,
       score: result.score,
-      status: result.status,
       applicableItems: result.applicableItems,
     }
   })
@@ -142,25 +106,23 @@ export function calculateAnnualScore(
 
   for (const audit of audits) {
     const result = scoreChecklistItems(audit.items, rules)
+    totalApplicable += result.applicableItems
     for (const item of audit.items) {
       if (item.judgment === '不符') totalNCR++
       if (item.judgment === '觀察') totalObservation++
     }
-    if (result.status === 'scored' && result.score !== null) {
-      totalApplicable += result.applicableItems
+    if (result.applicableItems > 0 && result.score != null) {
       totalNumerator += (result.score / 100) * result.applicableItems
     }
   }
 
-  const overallStatus: ScoreStatus = totalApplicable > 0 ? 'scored' : 'unevaluated'
   const overallScore =
-    overallStatus === 'scored'
-      ? Math.round((totalNumerator / totalApplicable) * 1000) / 10
-      : null
+    totalApplicable === 0
+      ? null
+      : Math.round((totalNumerator / totalApplicable) * 1000) / 10
 
   return {
     overallScore,
-    overallStatus,
     departmentScores,
     totalNCR,
     totalObservation,

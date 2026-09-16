@@ -44,3 +44,55 @@ export function suggestRiskBump(
   else if (scorePercent < 80) bump += 0.5
   return clampRiskValue(currentOccurrence + bump)
 }
+
+export const PROCEDURE_RISK_WEIGHTS = {
+  inherentRisk: 15,
+  previousInternalNcrCount: 20,
+  previousThirdPartyNcrCount: 15,
+  overdueOpenNcrCount: 15,
+  customerComplaintLevel: 15,
+  changeImpact: 10,
+  monthsSinceLastAudit: 10,
+} as const
+
+export interface ProcedurePriorityInput {
+  inherentRisk: number
+  previousInternalNcrCount?: number
+  previousThirdPartyNcrCount?: number
+  overdueOpenNcrCount?: number
+  customerComplaintLevel?: number
+  changeImpact?: number
+  monthsSinceLastAudit?: number
+}
+
+export interface ProcedurePriorityResult {
+  score: number
+  level: RiskLevel
+  provisional: boolean
+  missingFactors: string[]
+}
+
+const factorNames: Record<keyof ProcedurePriorityInput, string> = {
+  inherentRisk: '程序固有風險',
+  previousInternalNcrCount: '上次內稽 NCR',
+  previousThirdPartyNcrCount: '上次第三方稽核 NCR',
+  overdueOpenNcrCount: '逾期／未結 NCR',
+  customerComplaintLevel: '客戶抱怨',
+  changeImpact: '重大變更',
+  monthsSinceLastAudit: '距上次稽核時間',
+}
+
+/** 公司自訂的稽核優先順序模型；未知因素以中位數 3 暫估並明確標為暫定。 */
+export function calculateProcedurePriority(input: ProcedurePriorityInput): ProcedurePriorityResult {
+  const missingFactors: string[] = []
+  let total = 0
+  for (const key of Object.keys(PROCEDURE_RISK_WEIGHTS) as Array<keyof ProcedurePriorityInput>) {
+    const raw = input[key]
+    if (raw == null || Number.isNaN(raw)) missingFactors.push(factorNames[key])
+    const value = raw == null || Number.isNaN(raw) ? 3 : clampRiskValue(raw)
+    total += (value / 5) * PROCEDURE_RISK_WEIGHTS[key]
+  }
+  const score = Math.round(total)
+  const level: RiskLevel = score >= 70 ? '高' : score >= 40 ? '中' : '低'
+  return { score, level, provisional: missingFactors.length > 0, missingFactors }
+}

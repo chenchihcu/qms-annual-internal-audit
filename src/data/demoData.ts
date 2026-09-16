@@ -1,4 +1,4 @@
-import type { AppState, CompanyData, CompanyId } from '../types'
+import type { AppState, CompanyAuditProfile, CompanyData, CompanyId, Person } from '../types'
 import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
@@ -85,17 +85,25 @@ function buildAudit(
   departmentId: string,
   partialItems: Array<{ no: number; judgment: '符合' | '不符' | '觀察' | '不適用'; description?: string }>,
 ) {
-  const dept = departments.find((d) => d.id === departmentId)
-  if (!dept) {
-    throw new Error(`demoData: unknown departmentId ${departmentId}`)
-  }
-  const entry =
-    PROCEDURE_PLAN_TEMPLATE.find(
-      (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-    ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
+  let entry = PROCEDURE_PLAN_TEMPLATE.find(
+    (e) => e.qpCode === qpCode && e.departmentId === departmentId,
+  )
   if (!entry) {
-    throw new Error(`demoData: no plan entry for ${qpCode} / ${departmentId}`)
+    entry = PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
   }
+  if (!entry) {
+    throw new Error(
+      `buildAudit: no procedure plan entry for qpCode="${qpCode}" (departmentId="${departmentId}")`,
+    )
+  }
+
+  const dept = departments.find((d) => d.id === entry.departmentId)
+  if (!dept) {
+    throw new Error(
+      `buildAudit: department "${entry.departmentId}" not found for qpCode="${qpCode}"`,
+    )
+  }
+
   const items = createChecklistForProcedure(qpCode, dept.name)
   partialItems.forEach((p) => {
     const item = items.find((i) => i.no === p.no)
@@ -105,9 +113,9 @@ function buildAudit(
     }
   })
   return {
-    id: `audit-${qpCode}-${departmentId}`,
+    id: `audit-${qpCode}-${entry.departmentId}`,
     qpCode,
-    departmentId,
+    departmentId: entry.departmentId,
     department: dept.name,
     process: entry.process,
     documents: entry.documents,
@@ -117,7 +125,52 @@ function buildAudit(
     auditors: dept.defaultAuditors,
     auditCategory: entry.auditCategory,
     items,
+    year: settings.auditYear,
+    plannedDate: '2026-03-15',
+    status: '執行中' as const,
+    scope: `${dept.name}／${entry.process}`,
+    criteria: `${entry.qpCode} 與公司程序`,
+    procedureVersion: '待確認',
+    standardSnapshot: [],
+    team: {
+      auditorPersonIds: [],
+      escortPersonIds: [],
+      impartialityConfirmed: false,
+      impartialityNote: '',
+    },
   }
+}
+
+function createDemoPeople(): Person[] {
+  return ['王大明', '王稽核', '李稽核', '陳稽核'].map((name, index) => ({
+    id: `person-demo-${index + 1}`,
+    name,
+    employeeNumber: '',
+    type: 'internal' as const,
+    affiliations: [],
+    qualifications: [],
+    appointments: [],
+    active: true,
+    notes: '既有示範姓名，資格與所屬單位待確認',
+  }))
+}
+
+function createAuditProfiles(): Record<CompanyId, CompanyAuditProfile> {
+  return Object.fromEntries((['jiurun', 'zhenglongxing'] as CompanyId[]).map((companyId) => [
+    companyId,
+    {
+      companyId,
+      applicableStandards: [
+        { name: 'ISO 9001', version: '2015/Amd 1:2024', confirmationStatus: 'pending', evidenceReference: '' },
+        { name: 'AS9100', version: '2016 (Rev D)', confirmationStatus: 'pending', evidenceReference: '' },
+      ],
+      certificateScope: '',
+      certificateReference: '',
+      auditProcedureCode: 'QP-28',
+      auditProcedureVersion: '待確認',
+      formalRecordLocation: '',
+    },
+  ])) as Record<CompanyId, CompanyAuditProfile>
 }
 
 function createCompanyData(companySuffix: string): CompanyData {
@@ -233,19 +286,102 @@ export function createDemoState(): AppState {
     settings,
     companies,
     externalAuditPrep: prep,
-    version: 5,
+    people: createDemoPeople(),
+    annualPersonnelAssignments: [],
+    companyAuditProfiles: createAuditProfiles(),
+    yearArchives: {},
+    version: 6,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v5'
+export function createBlankState(): AppState {
+  const state = createDemoState()
+  state.people = []
+  state.annualPersonnelAssignments = []
+  ;(['jiurun', 'zhenglongxing'] as CompanyId[]).forEach((companyId) => {
+    const company = state.companies[companyId]
+    company.audits = []
+    company.ncrs = []
+    company.observations = []
+    company.suggestions = []
+    company.procedureRisks = []
+    company.planRows = company.planRows.map((row) => ({ ...row, months: Array.from({ length: 12 }, () => null), manualOverride: false }))
+  })
+  state.externalAuditPrep = createDefaultPrepState(state.settings.auditYear)
+  return state
+}
+
+export const STORAGE_KEY = 'qms-annual-internal-audit-v6'
 
 export function migrateToV4(raw: AppState): AppState {
-  if (raw.version >= 5 && raw.externalAuditPrep) return raw
+  if (raw.version >= 4 && raw.externalAuditPrep) return raw
   const demo = createDemoState()
   demo.activeCompanyId = raw.activeCompanyId
   demo.settings = raw.settings
   demo.companies = raw.companies
+  demo.version = 6
   return demo
+}
+
+export function migrateToV5(raw: AppState): AppState {
+  return migrateToV6(raw)
+}
+
+export function migrateToV6(raw: AppState): AppState {
+  const defaults = createDemoState()
+  const base = raw.version >= 4 && raw.externalAuditPrep ? raw : migrateToV4(raw)
+  const companyAuditProfiles = base.companyAuditProfiles ?? defaults.companyAuditProfiles
+  const companies = Object.fromEntries(
+    (['jiurun', 'zhenglongxing'] as CompanyId[]).map((companyId) => {
+      const company = base.companies[companyId] ?? defaults.companies[companyId]
+      const standards = companyAuditProfiles[companyId]?.applicableStandards
+        .filter((s) => s.confirmationStatus === 'confirmed')
+        .map((s) => `${s.name}:${s.version}`) ?? []
+      return [companyId, {
+        ...company,
+        audits: company.audits.map((audit) => ({
+          ...audit,
+          year: audit.year ?? base.settings.auditYear,
+          plannedDate: audit.plannedDate ?? audit.auditDate,
+          status: audit.status ?? (audit.auditDate ? '執行中' : '規劃中'),
+          scope: audit.scope ?? `${audit.department}／${audit.process}`,
+          criteria: audit.criteria ?? `${audit.qpCode} 與公司程序`,
+          procedureVersion: audit.procedureVersion ?? companyAuditProfiles[companyId]?.auditProcedureVersion ?? '待確認',
+          standardSnapshot: audit.standardSnapshot ?? standards,
+          team: audit.team ?? {
+            auditorPersonIds: [],
+            escortPersonIds: [],
+            impartialityConfirmed: false,
+            impartialityNote: '',
+          },
+          items: audit.items.map((item) => ({ ...item, origin: item.origin ?? (item.sourceYear ? 'carryforward' : 'seed') })),
+        })),
+      }]
+    }),
+  ) as Record<CompanyId, CompanyData>
+
+  const legacyPeople: Person[] = []
+  if (!base.people && base.version < 6) {
+    const addLegacy = (name: string, source: string) => {
+      if (!name.trim()) return
+      legacyPeople.push({ id: `legacy-${legacyPeople.length + 1}`, name, employeeNumber: '', type: 'internal', affiliations: [], qualifications: [], appointments: [], active: true, notes: `既有姓名／待配對；來源：${source}` })
+    }
+    addLegacy(base.settings.leadAuditor, 'leadAuditor')
+    ;(['jiurun', 'zhenglongxing'] as CompanyId[]).forEach((companyId) => {
+      base.companies[companyId]?.departments.forEach((department) => addLegacy(department.defaultAuditors, `${companyId}.defaultAuditors`))
+      base.companies[companyId]?.audits.forEach((audit) => addLegacy(audit.auditors, `${companyId}.${audit.id}.auditors`))
+    })
+  }
+
+  return {
+    ...base,
+    companies,
+    people: base.people ?? legacyPeople,
+    annualPersonnelAssignments: base.annualPersonnelAssignments ?? [],
+    companyAuditProfiles,
+    yearArchives: base.yearArchives ?? {},
+    version: 6,
+  }
 }
 
 /** 舊版 v1 遷移（若存在） */
@@ -257,6 +393,8 @@ export function migrateV1State(raw: unknown): AppState | null {
 
   const demo = createDemoState()
   demo.activeCompanyId = 'jiurun'
+  const legacySettings = old.settings as Partial<AppState['settings']>
+  demo.settings = { ...demo.settings, ...legacySettings, scoringRules: { ...demo.settings.scoringRules, ...legacySettings.scoringRules } }
   const company = demo.companies.jiurun
   company.departments = old.departments as CompanyData['departments']
   if (old.planRows) company.planRows = old.planRows as CompanyData['planRows']

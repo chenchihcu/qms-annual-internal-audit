@@ -37,7 +37,7 @@ async function clickTab(label) {
 }
 
 const tabs = []
-for (const label of ['儀表板', '年度計畫', '程序稽核', '稽核前準備']) {
+for (const label of ['稽核總覽', '年度稽核計畫', '稽核執行與證據', '稽核啟動與活動準備']) {
   try {
     tabs.push(await clickTab(label))
   } catch (e) {

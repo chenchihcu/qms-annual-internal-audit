@@ -14,9 +14,140 @@ export type InternalAuditCategory = '系統稽核' | '製程稽核' | '型態稽
 
 export type ObservationStatus = 'open' | 'closed' | 'became_ncr'
 
+export interface ObservationRevisionFields {
+  content: string
+  description: string
+  owner: string
+  dueDate: string
+  closedAt: string
+  closeEvidence: string
+  status: ObservationStatus
+}
+
 export type SuggestionStatus = 'open' | 'closed'
 
 export type CompanyId = 'jiurun' | 'zhenglongxing'
+
+export type AuditEventStatus = '規劃中' | '執行中' | '已回報'
+
+export type PersonType = 'internal' | 'external'
+
+export type PersonnelRole =
+  | 'internal_auditor'
+  | 'internal_lead_auditor'
+  | 'management_representative'
+  | 'annual_escort'
+  | 'third_party_lead_auditor'
+  | 'third_party_auditor'
+
+export type ValidityMode = 'fixed' | 'no_expiry' | 'pending'
+
+export type QualificationState = 'pending' | 'effective' | 'not_effective' | 'expired' | 'suspended' | 'ended'
+
+export interface PersonAffiliation {
+  id: string
+  companyId?: CompanyId
+  departmentId?: string
+  externalOrganization?: string
+  effectiveFrom?: string
+  effectiveTo?: string
+}
+
+export interface QualificationRecord {
+  id: string
+  role: Exclude<PersonnelRole, 'annual_escort'>
+  companyIds: CompanyId[]
+  standardVersions: string[]
+  procedureScopes: string[]
+  departmentScopes: string[]
+  documentTitle: string
+  documentNumber: string
+  documentLocation: string
+  assessedBy: string
+  assessmentDate: string
+  effectiveFrom: string
+  validityMode: ValidityMode
+  effectiveTo?: string
+  suspendedAt?: string
+  endedAt?: string
+  supersededAt?: string
+  revisionOfId?: string
+  revisedAt?: string
+  statusReason?: string
+}
+
+export interface RoleAppointment {
+  id: string
+  role: 'internal_lead_auditor' | 'management_representative'
+  companyId: CompanyId
+  documentReference: string
+  scope: string
+  effectiveFrom: string
+  effectiveTo?: string
+  supersededAt?: string
+  revisionOfId?: string
+  revisedAt?: string
+}
+
+export interface Person {
+  id: string
+  name: string
+  employeeNumber: string
+  type: PersonType
+  affiliations: PersonAffiliation[]
+  qualifications: QualificationRecord[]
+  appointments: RoleAppointment[]
+  active: boolean
+  notes: string
+}
+
+export interface AnnualPersonnelAssignment {
+  id: string
+  year: number
+  companyId: CompanyId
+  personId: string
+  role: 'internal_lead_auditor' | 'management_representative' | 'annual_escort'
+  departmentId?: string
+  scope?: string
+}
+
+export interface AuditTeamAssignment {
+  leadAuditorPersonId?: string
+  auditorPersonIds: string[]
+  escortPersonIds: string[]
+  impartialityConfirmed: boolean
+  impartialityNote: string
+}
+
+export interface AuditTeamSnapshotMember {
+  personId: string
+  name: string
+  role: 'lead' | 'auditor' | 'escort'
+  affiliation: string
+  qualificationReference: string
+  qualificationScope?: string
+  appointmentReference?: string
+}
+
+export interface AuditTeamSnapshot {
+  capturedAt: string
+  members: AuditTeamSnapshotMember[]
+}
+
+export interface CompanyAuditProfile {
+  companyId: CompanyId
+  applicableStandards: Array<{
+    name: 'ISO 9001' | 'AS9100'
+    version: string
+    confirmationStatus: 'pending' | 'confirmed'
+    evidenceReference: string
+  }>
+  certificateScope: string
+  certificateReference: string
+  auditProcedureCode: string
+  auditProcedureVersion: string
+  formalRecordLocation: string
+}
 
 export interface ScoringRules {
   conform: number
@@ -64,8 +195,6 @@ export interface PlanRow {
   manualOverride: boolean
 }
 
-export type ChecklistItemOrigin = 'seed' | 'custom' | 'carryforward'
-
 export interface ChecklistItem {
   id: string
   category: string
@@ -76,7 +205,10 @@ export interface ChecklistItem {
   procedureRef?: string
   sourceYear?: number
   carriedFromId?: string
-  origin?: ChecklistItemOrigin
+  sourceNcrId?: string
+  origin?: 'seed' | 'custom' | 'carryforward'
+  evidenceReference?: string
+  notApplicableReason?: string
 }
 
 /** QR-28-02 程序導向查檢表 */
@@ -93,6 +225,19 @@ export interface ProcedureAudit {
   auditors: string
   auditCategory: InternalAuditCategory
   items: ChecklistItem[]
+  year?: number
+  plannedDate?: string
+  status?: AuditEventStatus
+  scope?: string
+  criteria?: string
+  procedureVersion?: string
+  /** Frozen at audit start so later procedure-master edits cannot rewrite history. */
+  procedureCodeSnapshot?: string
+  formalRecordLocationSnapshot?: string
+  standardSnapshot?: string[]
+  team?: AuditTeamAssignment
+  teamSnapshot?: AuditTeamSnapshot
+  reportReference?: string
 }
 
 export interface NCR {
@@ -107,7 +252,15 @@ export interface NCR {
   status: NCRStatus
   checklistItemId?: string
   sourceYear?: number
-  carriedToYear?: number
+  sourceAuditId?: string
+  requirementSnapshot?: string
+  evidenceSnapshot?: string
+  findingSnapshot?: string
+  correctionReference?: string
+  correctiveActionReference?: string
+  effectivenessReference?: string
+  effectivenessVerifiedBy?: string
+  effectivenessVerifiedAt?: string
 }
 
 export interface Observation {
@@ -122,6 +275,19 @@ export interface Observation {
   status: ObservationStatus
   carriedToYear?: number
   carriedToChecklistId?: string
+  carryForwards?: Array<{ year: number; auditId: string; checklistItemId: string }>
+  convertedNcrId?: string
+  sourceType?: 'internal_audit' | 'third_party_audit'
+  sourceAuditId?: string
+  sourceChecklistItemId?: string
+  sourceReference?: string
+  occurrenceDate?: string
+  owner?: string
+  dueDate?: string
+  closedAt?: string
+  closeEvidence?: string
+  followUps?: Array<{ id: string; date: string; note: string }>
+  revisions?: Array<{ id: string; changedAt: string; before: ObservationRevisionFields; after: ObservationRevisionFields }>
 }
 
 /** 第三方稽核建議事項一覽表 */
@@ -129,6 +295,7 @@ export interface ThirdPartySuggestion {
   id: string
   year: number
   procedure: string
+  departmentId?: string
   issue: string
   progress: string
   responsibleUnit: string
@@ -162,6 +329,22 @@ export interface CompanyData {
   ncrs: NCR[]
   observations: Observation[]
   suggestions: ThirdPartySuggestion[]
+  procedureRisks?: ProcedureRiskRecord[]
+}
+
+export interface ProcedureRiskRecord {
+  id: string
+  qpCode: string
+  departmentId: string
+  inherentRisk: number
+  previousInternalNcrCount?: number
+  previousThirdPartyNcrCount?: number
+  overdueOpenNcrCount?: number
+  customerComplaintLevel?: number
+  changeImpact?: number
+  monthsSinceLastAudit?: number
+  evidenceReference: string
+  updatedAt: string
 }
 
 export interface AppState {
@@ -169,6 +352,14 @@ export interface AppState {
   settings: AuditSettings
   companies: Record<CompanyId, CompanyData>
   externalAuditPrep: ExternalAuditPrepState
+  people: Person[]
+  annualPersonnelAssignments: AnnualPersonnelAssignment[]
+  companyAuditProfiles: Record<CompanyId, CompanyAuditProfile>
+  yearArchives: Record<string, {
+    settings: AuditSettings
+    companies: Record<CompanyId, CompanyData>
+    externalAuditPrep: ExternalAuditPrepState
+  }>
   version: number
 }
 
@@ -181,7 +372,10 @@ export type TabId =
   | 'suggestions'
   | 'prep'
   | 'risk'
-  | 'settings'
+  | 'personnel'
+  | 'standard'
+  | 'procedure'
+  | 'system-settings'
 
 export const COMPANY_LABELS: Record<CompanyId, string> = {
   jiurun: '九潤精密',

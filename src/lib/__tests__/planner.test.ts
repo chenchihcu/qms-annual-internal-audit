@@ -119,6 +119,40 @@ describe('autoArrangePlan', () => {
     expect(rows[0].auditors).toBe('自訂')
   })
 
+  it('uses procedureRisks priority when provided', () => {
+    const departments = [
+      baseDept({ id: 'a', riskOccurrence: 1, riskSeverity: 1 }),
+      baseDept({ id: 'b', riskOccurrence: 1, riskSeverity: 1 }),
+    ]
+    const entries = [
+      { qpCode: 'QP-A', departmentId: 'a', departmentName: '管理部', process: 'A', documents: 'QP-A', auditCategory: '系統稽核' as const, owner: '主管' },
+      { qpCode: 'QP-B', departmentId: 'b', departmentName: '生產部', process: 'B', documents: 'QP-B', auditCategory: '系統稽核' as const, owner: '主管' },
+    ]
+    const rows = autoArrangePlan({
+      departments,
+      planEntries: entries,
+      auditYear: 2026,
+      planWindowStart: '2026-02-01',
+      planWindowEnd: '2026-11-30',
+      procedureRisks: [{
+        id: 'risk-low',
+        qpCode: 'QP-A',
+        departmentId: 'a',
+        inherentRisk: 5,
+        previousInternalNcrCount: 5,
+        previousThirdPartyNcrCount: 5,
+        overdueOpenNcrCount: 5,
+        customerComplaintLevel: 5,
+        changeImpact: 5,
+        monthsSinceLastAudit: 5,
+        evidenceReference: 'test',
+        updatedAt: '2026-01-01',
+      }],
+    })
+    expect(rows[0].qpCode).toBe('QP-A')
+    expect(rows[0].riskLevel).toBe('高')
+  })
+
   it('leaves buffer before management review month', () => {
     const departments = [baseDept()]
     const rows = autoArrangePlan({

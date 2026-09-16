@@ -1,137 +1,121 @@
-import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { exportNcrExcel } from '../lib/formExport'
+import { buildAppHash } from '../lib/navigation'
 import { isNcrStale } from '../lib/ncr'
 import type { NCRStatus } from '../types'
-import { Badge, Button, Card, Input, Select } from './ui/Badge'
-import { EmptyState } from './ui/EmptyState'
-import { PrintDocHeader } from './ui/PrintDocHeader'
+import { Badge, Button, Card, Select } from './ui/Badge'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-
 export function NCRList({ store }: { store: AuditStore }) {
-  const { state, updateNCR, addManualNCR } = store
+  const { state, updateNCR } = store
   const { company, settings } = state
-
-  const [newNcr, setNewNcr] = useState({
-    qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
-    departmentId: company.planRows[0]?.departmentId ?? '',
-    description: '',
-  })
-
-  const planRowOptions = company.planRows.map((r) => ({
-    value: `${r.qpCode}|${r.departmentId}`,
-    label: `${r.qpCode} · ${r.department}`,
-  }))
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <Card className="no-print">
-        <h2 className="mb-2 text-lg font-semibold text-ink">手動新增 NCR</h2>
-        <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Select
-            label="程序／部門"
-            value={`${newNcr.qpCode}|${newNcr.departmentId}`}
-            onChange={(v) => {
-              const [qp, dept] = v.split('|')
-              setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
-            }}
-            options={planRowOptions}
-          />
-          <Input
-            label="描述"
-            value={newNcr.description}
-            onChange={(v) => setNewNcr((s) => ({ ...s, description: v }))}
-          />
-          <div className="flex items-end">
-            <Button
-              onClick={() => {
-                if (!newNcr.description.trim()) return
-                addManualNCR(newNcr)
-                setNewNcr((s) => ({ ...s, description: '' }))
-              }}
-            >
-              新增 NCR
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">不符合事項清單（QR-28-03）</h2>
+            <p className="text-sm text-slate-500">查檢表判定「不符」時自動匯入</p>
+          </div>
+          <div className="no-print flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => exportNcrExcel(state, state.activeCompanyId)}>
+              匯出 Excel
             </Button>
           </div>
         </div>
-      </Card>
 
-      <Card>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
-          <p className="text-sm text-muted">查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。</p>
+        <div className="print-only qr-form-header mb-4 text-center">
+          <h1 className="text-xl font-bold">{company.name}</h1>
+          <p>{settings.auditYear} 不符合事項清單 QR-28-03</p>
         </div>
 
-        <PrintDocHeader
-          companyName={company.name}
-          auditYear={settings.auditYear}
-          formTitle="不符合事項清單 QR-28-03"
-        />
-
         {company.ncrs.length === 0 ? (
-          <EmptyState message="目前無不符合事項" />
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-6 text-sm text-slate-600">
+            <p>目前無不符合事項。</p>
+            <p className="mt-2">
+              請至
+              <a className="mx-1 font-medium text-blue-700 underline" href={buildAppHash('audit')}>稽核執行與證據</a>
+              完成查檢判定「不符」，或從觀察事項轉為 NCR。
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
             <table className="qr-checklist w-full border-collapse text-sm">
               <thead>
-                <tr className="bg-page text-left text-muted">
-                  <th className="border border-line p-2">NCR#</th>
-                  <th className="border border-line p-2">QP</th>
-                  <th className="border border-line p-2">部門</th>
-                  <th className="border border-line p-2">流程</th>
-                  <th className="border border-line p-2">描述</th>
-                  <th className="border border-line p-2">日期</th>
-                  <th className="border border-line p-2">狀態</th>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">NCR#</th>
+                  <th className="border p-2">來源</th>
+                  <th className="border p-2">QP</th>
+                  <th className="border p-2">部門</th>
+                  <th className="border p-2">流程</th>
+                  <th className="border p-2">描述</th>
+                  <th className="border p-2">日期</th>
+                  <th className="border p-2">狀態</th>
                 </tr>
               </thead>
               <tbody>
                 {company.ncrs.map((ncr) => {
                   const stale = isNcrStale(ncr, company.audits)
                   return (
-                    <tr key={ncr.id} className={stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
-                      <td className="border border-line p-2 font-mono text-xs">{ncr.ncrNumber}</td>
-                      <td className="border border-line p-2">{ncr.qpCode}</td>
-                      <td className="border border-line p-2">{ncr.department}</td>
-                      <td className="border border-line p-2">{ncr.process}</td>
-                      <td className="border border-line p-2">
-                        {stale && (
-                          <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                            查檢已非不符，建議結案
-                          </p>
-                        )}
-                        <textarea
-                          className={`w-full min-w-[200px] rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                          rows={2}
-                          value={ncr.description}
-                          onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
+                  <tr key={ncr.id} className={stale ? 'bg-amber-50/50' : ''}>
+                    <td className="border p-2 font-mono text-xs">
+                      {ncr.ncrNumber}
+                      {stale && <span className="mt-1 block text-xs text-amber-800">來源判定已變更</span>}
+                    </td>
+                    <td className="border p-2 text-xs">
+                      {ncr.sourceAuditId ? (
+                        <a className="text-blue-700 underline" href={buildAppHash('audit', ncr.sourceAuditId)}>稽核事件</a>
+                      ) : '—'}
+                    </td>
+                    <td className="border p-2">{ncr.qpCode}</td>
+                    <td className="border p-2">{ncr.department}</td>
+                    <td className="border p-2">{ncr.process}</td>
+                    <td className="border p-2">
+                      <textarea
+                        className="w-full min-w-[200px] rounded border border-slate-200 px-2 py-1 no-print"
+                        rows={2}
+                        aria-label={`NCR ${ncr.ncrNumber} 不符合描述`}
+                        value={ncr.description}
+                        onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
+                      />
+                      <span className="print-only">{ncr.description}</span>
+                      <div className="mt-2 grid gap-1 no-print">
+                        <input className="rounded border border-slate-200 px-2 py-1 text-xs" aria-label={`NCR ${ncr.ncrNumber} 立即矯正／處置引用`} placeholder="立即矯正／處置引用" value={ncr.correctionReference ?? ''} onChange={(e) => updateNCR(ncr.id, { correctionReference: e.target.value })} />
+                        <input className="rounded border border-slate-200 px-2 py-1 text-xs" aria-label={`NCR ${ncr.ncrNumber} 矯正措施／正式處置紀錄`} placeholder="矯正措施／正式處置紀錄" value={ncr.correctiveActionReference ?? ''} onChange={(e) => updateNCR(ncr.id, { correctiveActionReference: e.target.value })} />
+                        <input className="rounded border border-slate-200 px-2 py-1 text-xs" aria-label={`NCR ${ncr.ncrNumber} 效果確認紀錄`} placeholder="效果確認紀錄" value={ncr.effectivenessReference ?? ''} onChange={(e) => updateNCR(ncr.id, { effectivenessReference: e.target.value })} />
+                        <div className="grid grid-cols-2 gap-1"><input className="rounded border border-slate-200 px-2 py-1 text-xs" aria-label={`NCR ${ncr.ncrNumber} 效果確認人`} placeholder="確認人" value={ncr.effectivenessVerifiedBy ?? ''} onChange={(e) => updateNCR(ncr.id, { effectivenessVerifiedBy: e.target.value })} /><input type="date" className="rounded border border-slate-200 px-2 py-1 text-xs" aria-label={`NCR ${ncr.ncrNumber} 效果確認日期`} value={ncr.effectivenessVerifiedAt ?? ''} onChange={(e) => updateNCR(ncr.id, { effectivenessVerifiedAt: e.target.value })} /></div>
+                      </div>
+                    </td>
+                    <td className="border p-2">
+                      <input
+                        type="date"
+                        className="rounded border border-slate-200 px-1 no-print"
+                        aria-label={`NCR ${ncr.ncrNumber} 發生日`}
+                        value={ncr.date}
+                        onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
+                      />
+                      <span className="print-only">{ncr.date}</span>
+                    </td>
+                    <td className="border p-2">
+                      <div className="no-print">
+                        <Select
+                          ariaLabel={`NCR ${ncr.ncrNumber} 狀態`}
+                          value={ncr.status}
+                          onChange={(v) => {
+                            if (v === '結案' && (!ncr.correctiveActionReference || !ncr.effectivenessReference || !ncr.effectivenessVerifiedBy || !ncr.effectivenessVerifiedAt)) {
+                              window.alert('結案前須填寫矯正措施、效果確認紀錄、確認人與確認日期。')
+                              return
+                            }
+                            updateNCR(ncr.id, { status: v as NCRStatus })
+                          }}
+                          options={STATUSES.map((s) => ({ value: s, label: s }))}
                         />
-                        <span className="print-only">{ncr.description}</span>
-                      </td>
-                      <td className="border border-line p-2">
-                        <input
-                          type="date"
-                          className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
-                          value={ncr.date}
-                          onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
-                        />
-                        <span className="print-only">{ncr.date}</span>
-                      </td>
-                      <td className="border border-line p-2">
-                        <div className="no-print">
-                          <Select
-                            value={ncr.status}
-                            onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
-                            options={STATUSES.map((s) => ({ value: s, label: s }))}
-                          />
-                        </div>
-                        <span className="print-only"><Badge label={ncr.status} /></span>
-                      </td>
-                    </tr>
+                      </div>
+                      <span className="print-only"><Badge label={ncr.status} /></span>
+                    </td>
+                  </tr>
                   )
                 })}
               </tbody>

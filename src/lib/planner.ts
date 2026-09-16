@@ -1,4 +1,4 @@
-import type { DepartmentProfile, MonthStatus, PlanRow, RiskLevel } from '../types'
+import type { DepartmentProfile, MonthStatus, PlanRow, ProcedureRiskRecord, RiskLevel } from '../types'
 import type { ProcedurePlanEntry } from '../data/procedurePlan'
 import {
   countChecklistItems,
@@ -6,7 +6,7 @@ import {
   getProceduresRaw,
   isSeedFinalized,
 } from '../data/checklistLoader'
-import { calculateRiskLevel } from './risk'
+import { calculateProcedurePriority, calculateRiskLevel } from './risk'
 
 export const STAKEHOLDER_WEIGHTS: Record<string, number> = {
   客戶: 10,
@@ -25,6 +25,7 @@ export interface PlannerInput {
   managementReviewDate?: string
   existingRows?: PlanRow[]
   openCarryForwardCount?: number
+  procedureRisks?: ProcedureRiskRecord[]
 }
 
 export interface PlannerOptions {
@@ -115,7 +116,7 @@ function distributeMonths(
 }
 
 function emptyMonths(): MonthStatus[] {
-  return Array.from({ length: 12 }, () => null as MonthStatus)
+  return Array.from({ length: 12 }, () => null) as MonthStatus[]
 }
 
 export function autoArrangePlan(
@@ -131,9 +132,53 @@ export function autoArrangePlan(
     managementReviewDate,
     existingRows,
     openCarryForwardCount = 0,
+    procedureRisks = [],
   } = input
 
   const deptMap = new Map(departments.map((d) => [d.id, d]))
+  const riskMap = new Map(
+    procedureRisks.map((r) => [`${r.qpCode}|${r.departmentId}`, r]),
+  )
+
+  function resolveRiskLevel(entry: ProcedurePlanEntry, dept: DepartmentProfile): RiskLevel {
+    const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
+    if (saved) {
+      const values = {
+        inherentRisk: saved.inherentRisk,
+        previousInternalNcrCount: saved.previousInternalNcrCount,
+        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
+        overdueOpenNcrCount: saved.overdueOpenNcrCount,
+        customerComplaintLevel: saved.customerComplaintLevel,
+        changeImpact: saved.changeImpact,
+        monthsSinceLastAudit: saved.monthsSinceLastAudit,
+      }
+      return calculateProcedurePriority(values).level
+    }
+    const seedRisk = entry.riskLevel ?? '低'
+    const { level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
+    if (seedRisk === '高' || level === '高') return '高'
+    if (seedRisk === '中' || level === '中') return '中'
+    return '低'
+  }
+
+  function priorityScore(entry: ProcedurePlanEntry, dept: DepartmentProfile): number {
+    const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
+    if (saved) {
+      return calculateProcedurePriority({
+        inherentRisk: saved.inherentRisk,
+        previousInternalNcrCount: saved.previousInternalNcrCount,
+        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
+        overdueOpenNcrCount: saved.overdueOpenNcrCount,
+        customerComplaintLevel: saved.customerComplaintLevel,
+        changeImpact: saved.changeImpact,
+        monthsSinceLastAudit: saved.monthsSinceLastAudit,
+      }).score * 100
+    }
+    const riskOrder = { 高: 3, 中: 2, 低: 1 }
+    const seedRisk = riskOrder[entry.riskLevel ?? '低']
+    const deptPri = calculateDepartmentPriority(dept)
+    return seedRisk * 100 + deptPri
+  }
   const availableMonths = getWindowMonths(
     auditYear,
     planWindowStart,
@@ -151,14 +196,10 @@ export function autoArrangePlan(
   })
 
   const sortedEntries = [...planEntries].sort((a, b) => {
-    const riskOrder = { 高: 3, 中: 2, 低: 1 }
-    const ra = riskOrder[a.riskLevel ?? '低']
-    const rb = riskOrder[b.riskLevel ?? '低']
-    if (rb !== ra) return rb - ra
     const deptA = deptMap.get(a.departmentId)
     const deptB = deptMap.get(b.departmentId)
-    const priA = deptA ? calculateDepartmentPriority(deptA) : 0
-    const priB = deptB ? calculateDepartmentPriority(deptB) : 0
+    const priA = deptA ? priorityScore(a, deptA) : 0
+    const priB = deptB ? priorityScore(b, deptB) : 0
     if (priB !== priA) return priB - priA
     return a.qpCode.localeCompare(b.qpCode)
   })
@@ -176,14 +217,7 @@ export function autoArrangePlan(
       return
     }
 
-    const seedRisk = entry.riskLevel ?? '低'
-    const { level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
-    const riskLevel: RiskLevel =
-      seedRisk === '高' || level === '高'
-        ? '高'
-        : seedRisk === '中' || level === '中'
-          ? '中'
-          : '低'
+    const riskLevel = resolveRiskLevel(entry, dept)
 
     const freq = frequencyForRisk(riskLevel, openCarryForwardCount > 2 ? 1 : 0)
     const preferEarly =

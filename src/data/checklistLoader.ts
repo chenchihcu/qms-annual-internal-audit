@@ -164,7 +164,6 @@ export function createChecklistForProcedure(
         judgment: null,
         description: '',
         procedureRef: qpCode,
-        origin: 'seed',
       })
       globalNo++
     }

@@ -4,6 +4,7 @@ import {
   calculateRiskIndex,
   suggestRiskBump,
   clampRiskValue,
+  calculateProcedurePriority,
 } from '../risk'
 
 describe('calculateRiskLevel', () => {
@@ -20,6 +21,26 @@ describe('calculateRiskLevel', () => {
   it('returns 高 for index 15-25', () => {
     expect(calculateRiskLevel(3, 5)).toEqual({ index: 15, level: '高' })
     expect(calculateRiskLevel(5, 5)).toEqual({ index: 25, level: '高' })
+  })
+})
+
+describe('calculateProcedurePriority', () => {
+  it('marks missing evidence factors as provisional', () => {
+    const result = calculateProcedurePriority({ inherentRisk: 5 })
+    expect(result.provisional).toBe(true)
+    expect(result.missingFactors).toContain('客戶抱怨')
+  })
+
+  it('calculates a complete high-priority result', () => {
+    const result = calculateProcedurePriority({ inherentRisk: 5, previousInternalNcrCount: 5, previousThirdPartyNcrCount: 5, overdueOpenNcrCount: 4, customerComplaintLevel: 5, changeImpact: 4, monthsSinceLastAudit: 4 })
+    expect(result.provisional).toBe(false)
+    expect(result.level).toBe('高')
+  })
+
+  it('tracks prior third-party NCR independently from internal audit NCR', () => {
+    const baseline = { inherentRisk: 3, previousInternalNcrCount: 1, previousThirdPartyNcrCount: 1, overdueOpenNcrCount: 1, customerComplaintLevel: 1, changeImpact: 1, monthsSinceLastAudit: 1 }
+    const increasedExternal = calculateProcedurePriority({ ...baseline, previousThirdPartyNcrCount: 5 })
+    expect(increasedExternal.score).toBeGreaterThan(calculateProcedurePriority(baseline).score)
   })
 })
 
