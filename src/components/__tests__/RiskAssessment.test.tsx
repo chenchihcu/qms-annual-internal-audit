@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../../App'
 
-describe('RiskAssessment card layout', () => {
+describe('RiskAssessment matrix layout', () => {
   beforeEach(() => {
     window.location.hash = ''
   })
 
-  it('shows grouped scales, missing chips, and provisional hints when expanded', async () => {
+  it('shows matrix table and persists factor on cell click', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '方案風險與優先順序' }))
 
@@ -15,41 +15,33 @@ describe('RiskAssessment card layout', () => {
       expect(screen.getByText('風險指標評估（QR-02-01）')).toBeTruthy()
     })
 
-    const firstCard = document.querySelector('details[data-risk-key]') as HTMLDetailsElement
-    expect(firstCard).toBeTruthy()
-    fireEvent.click(firstCard.querySelector('summary')!)
+    const matrix = document.querySelector('[data-risk-matrix]')
+    expect(matrix).toBeTruthy()
 
-    expect(within(firstCard).getByText('歷史結果', { exact: true })).toBeTruthy()
-    expect(within(firstCard).getByText('現況壓力', { exact: true })).toBeTruthy()
-    expect(within(firstCard).getByText('時間', { exact: true })).toBeTruthy()
-    expect(within(firstCard).getByRole('radiogroup', { name: '固有風險（1–5）' })).toBeTruthy()
+    const firstRow = document.querySelector('[data-risk-key]') as HTMLTableRowElement
+    expect(firstRow).toBeTruthy()
 
-    const missingHints = within(firstCard).getAllByText('尚未填寫 · 分數暫估 3')
-    expect(missingHints.length).toBeGreaterThan(0)
+    const complaintBtn = within(firstRow).getByRole('button', { name: /客訴/ })
+    fireEvent.click(complaintBtn)
 
-    const chip = within(firstCard).queryByRole('button', { name: '客戶抱怨' })
-    if (chip) {
-      expect(chip).toBeTruthy()
-    }
+    await waitFor(() => {
+      expect(complaintBtn.textContent).toBe('1')
+    })
   })
 
-  it('persists customer complaint selection and removes missing chip', async () => {
+  it('workflow guide shows summary gap not per-row list', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '方案風險與優先順序' }))
 
     await waitFor(() => {
-      expect(document.querySelector('details[data-risk-key]')).toBeTruthy()
+      expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()
     })
 
-    const firstCard = document.querySelector('details[data-risk-key]') as HTMLDetailsElement
-    fireEvent.click(firstCard.querySelector('summary')!)
-
-    const complaintGroup = within(firstCard).getByRole('radiogroup', { name: '客戶抱怨（1–5）' })
-    fireEvent.click(within(complaintGroup).getByRole('radio', { name: '4' }))
-
-    await waitFor(() => {
-      expect(within(complaintGroup).getByRole('radio', { name: '4' }).getAttribute('aria-checked')).toBe('true')
-    })
-    expect(within(firstCard).queryByRole('button', { name: '客戶抱怨' })).toBeNull()
+    const guide = document.querySelector('[data-workflow-guide="top"]')!
+    const gapItems = guide.querySelectorAll('li')
+    expect(gapItems.length).toBeLessThanOrEqual(3)
+    if (gapItems.length > 0) {
+      expect(gapItems[0].textContent).toMatch(/固有風險已存檔 \d+\/\d+/)
+    }
   })
 })

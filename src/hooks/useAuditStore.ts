@@ -31,6 +31,7 @@ import {
 import {
   findActiveLeadAppointment,
   findMatchingAuditQualification,
+  formatScopeList,
   resolveLeadAuditorPersonId,
   validateAuditTeam,
 } from '../lib/personnel'
@@ -234,9 +235,9 @@ function buildTeamSnapshot(state: AppState, audit: ProcedureAudit): AuditTeamSna
       ? `陪同／協調：${audit.scope || `${audit.qpCode} ${audit.department}`}`
       : qualification
         ? [
-            qualification.standardVersions.join('、') || '全部已確認標準',
-            qualification.procedureScopes.join('、') || '全部程序',
-            qualification.departmentScopes.join('、') || '全部責任單位',
+            formatScopeList(qualification.standardVersions, '全部已確認標準'),
+            formatScopeList(qualification.procedureScopes, '全部程序'),
+            formatScopeList(qualification.departmentScopes, '全部責任單位'),
           ].join('／')
         : ''
     members.push({
@@ -914,27 +915,18 @@ export function useAuditStore() {
 
   const updateExternalPrepSequence = useCallback(
     (patch: {
-      companyId?: CompanyId
       internalAuditComplete?: boolean
       managementReviewComplete?: boolean
       externalAuditDate?: string
     }) => {
       setState((s) => {
-        const { companyId, internalAuditComplete, managementReviewComplete, externalAuditDate } = patch
+        const { internalAuditComplete, managementReviewComplete, externalAuditDate } = patch
         const prep = { ...s.externalAuditPrep }
-        if (companyId != null) {
-          if (internalAuditComplete != null) {
-            prep.internalAuditComplete = {
-              ...prep.internalAuditComplete,
-              [companyId]: internalAuditComplete,
-            }
-          }
-          if (managementReviewComplete != null) {
-            prep.managementReviewComplete = {
-              ...prep.managementReviewComplete,
-              [companyId]: managementReviewComplete,
-            }
-          }
+        if (internalAuditComplete != null) {
+          prep.internalAuditComplete = internalAuditComplete
+        }
+        if (managementReviewComplete != null) {
+          prep.managementReviewComplete = managementReviewComplete
         }
         if (externalAuditDate !== undefined) {
           prep.externalAuditDate = externalAuditDate

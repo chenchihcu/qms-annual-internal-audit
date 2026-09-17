@@ -2,7 +2,7 @@ import { EXTERNAL_AUDIT_PREP_SEED } from './externalAuditPrep'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
 import { calculateProcedurePriority } from './risk'
-import { PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
+import { formatQualificationScopeSummary, PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
 import type {
   AppState,
   AuditSettings,
@@ -267,7 +267,7 @@ export function buildPersonnelSheet(state: AppState, companyId: CompanyId): Spre
       person.affiliations.map((a) => a.departmentId).filter(Boolean).join('、'),
       roles.map((role) => PERSONNEL_ROLE_LABELS[role]).join('、'),
       status,
-      person.qualifications.flatMap((q) => [...q.standardVersions, ...q.procedureScopes, ...q.departmentScopes]).join('、'),
+      person.qualifications.map((q) => formatQualificationScopeSummary(q)).join('；'),
       person.qualifications.map((q) => `${q.effectiveFrom || '待確認'}～${q.validityMode === 'no_expiry' ? '正式依據未訂期限' : q.effectiveTo || '待確認'}`).join('；'),
     ]
   })

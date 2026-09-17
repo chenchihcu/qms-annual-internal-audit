@@ -2,12 +2,29 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { AnnualPersonnelAssignment, Person, PersonnelRole, QualificationRecord, RoleAppointment, ValidityMode } from '../types'
 import { COMPANY_LABELS } from '../types'
-import { PERSONNEL_ROLE_LABELS, QUALIFICATION_STATE_LABELS, personRoles, qualificationState } from '../lib/personnel'
+import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
+import {
+  formatQualificationScopeSummary,
+  PERSONNEL_ROLE_LABELS,
+  QUALIFICATION_SCOPE_ALL,
+  QUALIFICATION_STATE_LABELS,
+  personRoles,
+  qualificationState,
+} from '../lib/personnel'
 import { downloadBlob, safeFilename } from '../lib/download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook } from '../lib/simpleXlsx'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 
 const ROLES = Object.keys(PERSONNEL_ROLE_LABELS) as PersonnelRole[]
+
+const isAuditorRole = (role: PersonnelRole) => role === 'internal_auditor' || role === 'internal_lead_auditor'
+const isThirdPartyRole = (role: PersonnelRole) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'
+const isEscortRole = (role: PersonnelRole) => role === 'annual_escort'
+const isManagementRepRole = (role: PersonnelRole) => role === 'management_representative'
+const skipsQualification = (role: PersonnelRole) => isEscortRole(role) || isManagementRepRole(role) || isThirdPartyRole(role)
+
+const UNIQUE_QP_CODES = [...new Set(PROCEDURE_PLAN_TEMPLATE.map((entry) => entry.qpCode))].sort()
+
 interface FormState {
   id?: string
   name: string
@@ -17,9 +34,9 @@ interface FormState {
   departmentId: string
   externalOrganization: string
   role: PersonnelRole
-  standards: string
-  procedures: string
-  departments: string
+  standards: string[]
+  procedures: string[]
+  departments: string[]
   documentTitle: string
   documentNumber: string
   documentLocation: string
@@ -38,12 +55,17 @@ interface FormState {
 
 const blankForm = (): FormState => ({
   name: '', employeeNumber: '', type: 'internal', companyId: 'jiurun', departmentId: '', externalOrganization: '',
-  role: 'internal_auditor', standards: '', procedures: '', departments: '', documentTitle: '', documentNumber: '',
-  documentLocation: '', assessedBy: '', assessmentDate: '', effectiveFrom: '', affiliationFrom: '', affiliationTo: '', validityMode: 'pending', effectiveTo: '',
+  role: 'internal_auditor', standards: [], procedures: [], departments: [],
+  documentTitle: '', documentNumber: '', documentLocation: '', assessedBy: '', assessmentDate: '',
+  effectiveFrom: '', affiliationFrom: '', affiliationTo: '', validityMode: 'pending', effectiveTo: '',
   suspendedAt: '', endedAt: '', statusReason: '', notes: '',
 })
 
-const split = (value: string) => value.split(/[,，\n]/).map((item) => item.trim()).filter(Boolean)
+function parseScopeField(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) return [...value]
+  if (!value?.trim()) return []
+  return value.split(/[,，\n]/).map((item) => item.trim()).filter(Boolean)
+}
 
 function appointmentState(appointment: RoleAppointment, date: string) {
   if (!appointment.documentReference || !appointment.effectiveFrom) return 'pending'
@@ -71,6 +93,53 @@ function primaryState(person: Person, date: string, year: number, assignments: A
   return QUALIFICATION_STATE_LABELS[states[0]]
 }
 
+function ScopeCheckboxGroup({
+  label,
+  allLabel,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  allLabel: string
+  options: { value: string; label: string }[]
+  value: string[]
+  onChange: (next: string[]) => void
+}) {
+  const isAll = value.includes(QUALIFICATION_SCOPE_ALL)
+  const toggleItem = (itemValue: string, checked: boolean) => {
+    if (checked) onChange([...value.filter((v) => v !== QUALIFICATION_SCOPE_ALL), itemValue])
+    else onChange(value.filter((v) => v !== itemValue))
+  }
+  return (
+    <div className="block sm:col-span-2 lg:col-span-3">
+      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <label className="flex min-h-8 items-center gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm">
+        <input
+          type="checkbox"
+          checked={isAll}
+          onChange={(event) => onChange(event.target.checked ? [QUALIFICATION_SCOPE_ALL] : [])}
+        />
+        {allLabel}
+      </label>
+      <div className="mt-2 grid max-h-36 gap-1 overflow-y-auto rounded border border-slate-200 p-2 sm:grid-cols-2 lg:grid-cols-3">
+        {options.map((option) => (
+          <label key={option.value} className="flex items-start gap-2 text-xs leading-snug">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              disabled={isAll}
+              checked={!isAll && value.includes(option.value)}
+              onChange={(event) => toggleItem(option.value, event.target.checked)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function PersonnelPage({ store }: { store: AuditStore }) {
   const { state, addPerson, updatePerson, deactivatePerson, upsertAnnualPersonnelAssignment } = store
   const [search, setSearch] = useState('')
@@ -82,6 +151,24 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const [editing, setEditing] = useState<FormState | null>(null)
   const [dirty, setDirty] = useState(false)
   const today = new Date().toISOString().slice(0, 10)
+
+  const standardOptions = useMemo(
+    () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards.map((standard) => ({
+      value: `${standard.name}:${standard.version}`,
+      label: `${standard.name} ${standard.version}`,
+    })),
+    [state.companyAuditProfiles, state.activeCompanyId],
+  )
+
+  const procedureOptions = useMemo(
+    () => UNIQUE_QP_CODES.map((code) => ({ value: code, label: code })),
+    [],
+  )
+
+  const departmentOptions = useMemo(
+    () => state.company.departments.map((department) => ({ value: department.id, label: department.name })),
+    [state.company.departments],
+  )
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
@@ -100,7 +187,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     const status = primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)
     const matchesCompany = companyFilter === 'all' || person.affiliations.some((item) => item.companyId === companyFilter)
     const matchesDepartment = departmentFilter === 'all' || person.affiliations.some((item) => item.departmentId === departmentFilter)
-    const scopeText = person.qualifications.map((qualification) => [...qualification.standardVersions, ...qualification.procedureScopes, ...qualification.departmentScopes].join(' ')).join(' ')
+    const scopeText = person.qualifications.map((qualification) => formatQualificationScopeSummary(qualification)).join(' ')
     const matchesScope = scopeText.toLowerCase().includes(scopeFilter.toLowerCase())
     return matchesSearch && matchesRole && matchesCompany && matchesDepartment && matchesScope && (statusFilter === 'all' || status === statusFilter)
   }), [state.people, state.settings.auditYear, state.annualPersonnelAssignments, search, roleFilter, statusFilter, companyFilter, departmentFilter, scopeFilter, today])
@@ -119,14 +206,25 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     setEditing({
       ...blankForm(), id: person.id, name: person.name, employeeNumber: person.employeeNumber, type: person.type,
       companyId: affiliation?.companyId ?? '', departmentId: affiliation?.departmentId ?? '', externalOrganization: affiliation?.externalOrganization ?? '',
-      role, standards: qualification?.standardVersions.join(', ') ?? '',
-      procedures: qualification?.procedureScopes.join(', ') ?? '', departments: qualification?.departmentScopes.join(', ') ?? '',
-      documentTitle: qualification?.documentTitle ?? appointment?.documentReference ?? '', documentNumber: qualification?.documentNumber ?? '',
-      documentLocation: qualification?.documentLocation ?? '', assessedBy: qualification?.assessedBy ?? '',
-      assessmentDate: qualification?.assessmentDate ?? '', effectiveFrom: qualification?.effectiveFrom ?? '',
-      affiliationFrom: affiliation?.effectiveFrom ?? '', affiliationTo: affiliation?.effectiveTo ?? '',
-      validityMode: qualification?.validityMode ?? 'pending', effectiveTo: qualification?.effectiveTo ?? '',
-      suspendedAt: qualification?.suspendedAt ?? '', endedAt: qualification?.endedAt ?? '', statusReason: qualification?.statusReason ?? '',
+      role,
+      standards: qualification?.standardVersions ?? [],
+      procedures: qualification?.procedureScopes ?? [],
+      departments: qualification?.departmentScopes.length
+        ? qualification.departmentScopes
+        : parseScopeField(appointment?.scope),
+      documentTitle: qualification?.documentTitle ?? appointment?.documentReference ?? '',
+      documentNumber: qualification?.documentNumber ?? '',
+      documentLocation: qualification?.documentLocation ?? '',
+      assessedBy: qualification?.assessedBy ?? '',
+      assessmentDate: qualification?.assessmentDate ?? '',
+      effectiveFrom: qualification?.effectiveFrom ?? appointment?.effectiveFrom ?? '',
+      affiliationFrom: affiliation?.effectiveFrom ?? '',
+      affiliationTo: affiliation?.effectiveTo ?? '',
+      validityMode: qualification?.validityMode ?? 'pending',
+      effectiveTo: qualification?.effectiveTo ?? appointment?.effectiveTo ?? '',
+      suspendedAt: qualification?.suspendedAt ?? '',
+      endedAt: qualification?.endedAt ?? '',
+      statusReason: qualification?.statusReason ?? '',
       notes: person.notes,
     })
     setDirty(false)
@@ -139,9 +237,11 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     const appointment = person?.appointments.find((item) => item.role === role && item.companyId === editing.companyId)
     patchForm({
       role,
-      standards: qualification?.standardVersions.join(', ') ?? '',
-      procedures: qualification?.procedureScopes.join(', ') ?? '',
-      departments: qualification?.departmentScopes.join(', ') ?? appointment?.scope ?? '',
+      standards: qualification?.standardVersions ?? [],
+      procedures: qualification?.procedureScopes ?? [],
+      departments: qualification?.departmentScopes.length
+        ? qualification.departmentScopes
+        : parseScopeField(appointment?.scope),
       documentTitle: qualification?.documentTitle ?? appointment?.documentReference ?? '',
       documentNumber: qualification?.documentNumber ?? '',
       documentLocation: qualification?.documentLocation ?? '',
@@ -170,54 +270,94 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       companyId: editing.companyId || undefined,
       departmentId: editing.departmentId || undefined,
       externalOrganization: editing.externalOrganization || undefined,
-      effectiveFrom: editing.affiliationFrom || undefined,
-      effectiveTo: editing.affiliationTo || undefined,
+      effectiveFrom: editing.affiliationFrom || existing?.affiliations.find((item) => item.companyId === editing.companyId)?.effectiveFrom || undefined,
+      effectiveTo: editing.affiliationTo || existing?.affiliations.find((item) => item.companyId === editing.companyId)?.effectiveTo || undefined,
     }
     const existingQualification = existing?.qualifications.toReversed().find((item) => item.role === editing.role && (!item.supersededAt || item.supersededAt > today) && (
       editing.companyId ? item.companyIds.includes(editing.companyId) : item.companyIds.length === 0
     ))
-    const qualification: QualificationRecord | null = editing.role === 'annual_escort' || editing.role === 'management_representative' ? null : {
+    const preservedHidden = {
+      documentLocation: editing.documentLocation || existingQualification?.documentLocation || '',
+      assessmentDate: editing.assessmentDate || existingQualification?.assessmentDate || '',
+      suspendedAt: editing.suspendedAt || existingQualification?.suspendedAt,
+      endedAt: editing.endedAt || existingQualification?.endedAt,
+      statusReason: editing.statusReason || existingQualification?.statusReason,
+    }
+    const qualification: QualificationRecord | null = skipsQualification(editing.role) ? null : {
       id: existingQualification?.id ?? `qual-${crypto.randomUUID()}`,
       role: editing.role as QualificationRecord['role'],
-      companyIds: editing.companyId ? [editing.companyId] : [], standardVersions: split(editing.standards),
-      procedureScopes: split(editing.procedures), departmentScopes: split(editing.departments),
-      documentTitle: editing.documentTitle, documentNumber: editing.documentNumber, documentLocation: editing.documentLocation,
-      assessedBy: editing.assessedBy, assessmentDate: editing.assessmentDate, effectiveFrom: editing.effectiveFrom,
-      validityMode: editing.validityMode, effectiveTo: editing.effectiveTo || undefined,
-      suspendedAt: editing.suspendedAt || undefined, endedAt: editing.endedAt || undefined, statusReason: editing.statusReason || undefined,
+      companyIds: editing.companyId ? [editing.companyId] : [],
+      standardVersions: [...editing.standards],
+      procedureScopes: [...editing.procedures],
+      departmentScopes: [...editing.departments],
+      documentTitle: editing.documentTitle,
+      documentNumber: editing.documentNumber,
+      documentLocation: preservedHidden.documentLocation,
+      assessedBy: editing.assessedBy,
+      assessmentDate: preservedHidden.assessmentDate,
+      effectiveFrom: editing.effectiveFrom,
+      validityMode: editing.validityMode,
+      effectiveTo: editing.effectiveTo || undefined,
+      suspendedAt: preservedHidden.suspendedAt,
+      endedAt: preservedHidden.endedAt,
+      statusReason: preservedHidden.statusReason,
     }
     const revisionDate = editing.effectiveFrom || today
-    const qualifications = (existing?.qualifications ?? []).map((item) => item.id === existingQualification?.id
-      ? { ...item, supersededAt: revisionDate, statusReason: item.statusReason || `由 ${revisionDate} 修訂紀錄取代` }
-      : item)
-    if (qualification && (existingQualification || editing.documentTitle.trim() || editing.documentNumber.trim() || editing.assessedBy.trim())) qualifications.push({
-      ...qualification,
-      id: `qual-${crypto.randomUUID()}`,
-      revisionOfId: existingQualification?.id,
-      revisedAt: new Date().toISOString(),
-    })
+    const qualifications = skipsQualification(editing.role)
+      ? [...(existing?.qualifications ?? [])]
+      : (existing?.qualifications ?? []).map((item) => item.id === existingQualification?.id
+        ? { ...item, supersededAt: revisionDate, statusReason: item.statusReason || `由 ${revisionDate} 修訂紀錄取代` }
+        : item)
+    if (qualification && (existingQualification || editing.documentTitle.trim() || editing.documentNumber.trim() || editing.assessedBy.trim())) {
+      qualifications.push({
+        ...qualification,
+        id: `qual-${crypto.randomUUID()}`,
+        revisionOfId: existingQualification?.id,
+        revisedAt: new Date().toISOString(),
+      })
+    }
     const affiliations = [...(existing?.affiliations ?? [])]
     const affiliationIndex = affiliations.findIndex((item) => item.companyId === affiliation.companyId && item.externalOrganization === affiliation.externalOrganization)
     if (affiliationIndex >= 0) affiliations[affiliationIndex] = { ...affiliations[affiliationIndex], ...affiliation }
     else affiliations.push(affiliation)
+    const appointmentScope = editing.departments.length > 0 ? editing.departments.join('、') : undefined
     const existingAppointment = existing?.appointments.toReversed().find((item) => item.role === editing.role && item.companyId === editing.companyId && (!item.supersededAt || item.supersededAt > today))
     const appointments = (existing?.appointments ?? []).map((item) => item.id === existingAppointment?.id
       ? { ...item, supersededAt: revisionDate }
       : item)
-    if ((editing.role === 'management_representative' || editing.role === 'internal_lead_auditor') && editing.companyId) appointments.push({
-      id: `appointment-${crypto.randomUUID()}`,
-      role: editing.role, companyId: editing.companyId, documentReference: `${editing.documentTitle} ${editing.documentNumber}`.trim(),
-      scope: editing.departments, effectiveFrom: editing.effectiveFrom, effectiveTo: editing.effectiveTo || undefined,
-      revisionOfId: existingAppointment?.id, revisedAt: new Date().toISOString(),
-    })
+    if ((isManagementRepRole(editing.role) || editing.role === 'internal_lead_auditor') && editing.companyId) {
+      appointments.push({
+        id: `appointment-${crypto.randomUUID()}`,
+        role: editing.role as 'internal_lead_auditor' | 'management_representative',
+        companyId: editing.companyId,
+        documentReference: `${editing.documentTitle} ${editing.documentNumber}`.trim(),
+        scope: appointmentScope ?? '',
+        effectiveFrom: editing.effectiveFrom,
+        effectiveTo: editing.effectiveTo || undefined,
+        revisionOfId: existingAppointment?.id,
+        revisedAt: new Date().toISOString(),
+      })
+    }
     const person: Omit<Person, 'id'> = {
-      name: editing.name.trim(), employeeNumber: editing.employeeNumber.trim(), type: editing.type,
-      affiliations, qualifications, appointments, active: existing?.active ?? true, notes: editing.notes,
+      name: editing.name.trim(),
+      employeeNumber: (editing.employeeNumber || existing?.employeeNumber || '').trim(),
+      type: editing.type,
+      affiliations,
+      qualifications,
+      appointments,
+      active: existing?.active ?? true,
+      notes: editing.notes || existing?.notes || '',
     }
     const savedId = existing ? (updatePerson(existing.id, person), existing.id) : addPerson(person)
-    if ((editing.role === 'annual_escort' || editing.role === 'internal_lead_auditor' || editing.role === 'management_representative') && editing.companyId) {
-      upsertAnnualPersonnelAssignment({ year: state.settings.auditYear, companyId: editing.companyId, personId: savedId,
-        role: editing.role, departmentId: editing.departmentId || undefined, scope: editing.departments || undefined })
+    if ((isEscortRole(editing.role) || editing.role === 'internal_lead_auditor' || isManagementRepRole(editing.role)) && editing.companyId) {
+      upsertAnnualPersonnelAssignment({
+        year: state.settings.auditYear,
+        companyId: editing.companyId,
+        personId: savedId,
+        role: editing.role as AnnualPersonnelAssignment['role'],
+        departmentId: editing.departmentId || undefined,
+        scope: appointmentScope,
+      })
     }
     setEditing(null)
     setDirty(false)
@@ -230,7 +370,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       責任單位: person.affiliations.map((a) => a.departmentId).filter(Boolean).join('、'),
       角色: personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、'),
       狀態: primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments),
-      適用範圍: person.qualifications.flatMap((q) => [...q.standardVersions, ...q.procedureScopes, ...q.departmentScopes]).join('、'),
+      適用範圍: person.qualifications.map((q) => formatQualificationScopeSummary(q)).join('；'),
       有效日期: person.qualifications.map((q) => `${q.effectiveFrom || '待確認'}～${q.validityMode === 'no_expiry' ? '正式依據未訂期限' : q.effectiveTo || '待確認'}`).join('；'),
     }))
     const headers = ['姓名', '編號', '類型', '公司或機構', '責任單位', '角色', '狀態', '適用範圍', '有效日期'] as const
@@ -239,6 +379,13 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     const buffer = writeWorkbook(book)
     downloadBlob(new Blob([buffer.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), safeFilename([`人員合格名單_${state.settings.auditYear}.xlsx`]))
   }
+
+  const showExternalOrg = editing?.type === 'external'
+  const showCompanyFields = editing && !isThirdPartyRole(editing.role)
+  const showDepartment = editing && (showCompanyFields || isEscortRole(editing.role))
+  const showAuditorScopes = editing && isAuditorRole(editing.role)
+  const showAuditorValidity = editing && isAuditorRole(editing.role)
+  const showAppointmentDocs = editing && (isAuditorRole(editing.role) || isManagementRepRole(editing.role))
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -265,31 +412,60 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         <h3 className="mb-4 font-semibold">{editing.id ? '編輯人員與資格' : '新增人員與資格'}</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input label="姓名 *" value={editing.name} onChange={(v) => patchForm({ name: v })} />
-          <Input label="人員編號" value={editing.employeeNumber} onChange={(v) => patchForm({ employeeNumber: v })} />
           <Select label="人員類型" value={editing.type} onChange={(v) => patchForm({ type: v as FormState['type'] })} options={[{ value: 'internal', label: '內部人員' }, { value: 'external', label: '外部人員' }]} />
-          <Select label="公司" value={editing.companyId} onChange={(v) => patchForm({ companyId: v as FormState['companyId'] })} options={[{ value: '', label: '不適用／待確認' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
-          <Select label="責任單位" value={editing.departmentId} onChange={(v) => patchForm({ departmentId: v })} options={[{ value: '', label: '待確認' }, ...state.company.departments.map((d) => ({ value: d.id, label: d.name }))]} />
-          <Input label="外部機構" value={editing.externalOrganization} onChange={(v) => patchForm({ externalOrganization: v })} />
-          <Input label="任職／服務生效日" type="date" value={editing.affiliationFrom} onChange={(v) => patchForm({ affiliationFrom: v })} />
-          <Input label="任職／服務終止日" type="date" value={editing.affiliationTo} onChange={(v) => patchForm({ affiliationTo: v })} />
+          {showExternalOrg && <Input label="外部機構" value={editing.externalOrganization} onChange={(v) => patchForm({ externalOrganization: v })} />}
+          {showCompanyFields && (
+            <Select label="公司" value={editing.companyId} onChange={(v) => patchForm({ companyId: v as FormState['companyId'] })} options={[{ value: '', label: '不適用／待確認' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
+          )}
+          {showDepartment && (
+            <Select label="責任單位" value={editing.departmentId} onChange={(v) => patchForm({ departmentId: v })} options={[{ value: '', label: '待確認' }, ...state.company.departments.map((d) => ({ value: d.id, label: d.name }))]} />
+          )}
           <Select label="角色／資格類別" value={editing.role} onChange={(v) => selectRole(v as PersonnelRole)} options={ROLES.map((role) => ({ value: role, label: PERSONNEL_ROLE_LABELS[role] }))} />
-          <Input label="標準與版本（逗號分隔）" value={editing.standards} onChange={(v) => patchForm({ standards: v })} />
-          <Input label="可稽核程序（QP，逗號分隔）" value={editing.procedures} onChange={(v) => patchForm({ procedures: v })} />
-          <Input label="可稽核單位／陪同範圍" value={editing.departments} onChange={(v) => patchForm({ departments: v })} />
-          <Input label="正式文件名稱" value={editing.documentTitle} onChange={(v) => patchForm({ documentTitle: v })} />
-          <Input label="文件編號" value={editing.documentNumber} onChange={(v) => patchForm({ documentNumber: v })} />
-          <Input label="文件位置／連結" value={editing.documentLocation} onChange={(v) => patchForm({ documentLocation: v })} />
-          <Input label="評定／確認人" value={editing.assessedBy} onChange={(v) => patchForm({ assessedBy: v })} />
-          <Input label="評定日期" type="date" value={editing.assessmentDate} onChange={(v) => patchForm({ assessmentDate: v })} />
-          <Input label="生效日期" type="date" value={editing.effectiveFrom} onChange={(v) => patchForm({ effectiveFrom: v })} />
-          <Select label="有效期間" value={editing.validityMode} onChange={(v) => patchForm({ validityMode: v as ValidityMode })} options={[{ value: 'fixed', label: '固定到期日' }, { value: 'no_expiry', label: '正式依據未訂固定期限' }, { value: 'pending', label: '期限待確認' }]} />
-          {editing.validityMode === 'fixed' && <Input label="到期日" type="date" value={editing.effectiveTo} onChange={(v) => patchForm({ effectiveTo: v })} />}
-          {editing.role !== 'annual_escort' && editing.role !== 'management_representative' && <Input label="資格暫停日期" type="date" value={editing.suspendedAt} onChange={(v) => patchForm({ suspendedAt: v })} />}
-          {editing.role !== 'annual_escort' && editing.role !== 'management_representative' && <Input label="資格終止日期" type="date" value={editing.endedAt} onChange={(v) => patchForm({ endedAt: v })} />}
-          {editing.role !== 'annual_escort' && editing.role !== 'management_representative' && <Input label="暫停／終止原因" value={editing.statusReason} onChange={(v) => patchForm({ statusReason: v })} />}
-          <Input label="備註" value={editing.notes} onChange={(v) => patchForm({ notes: v })} />
+          {showAuditorScopes && (
+            <>
+              <ScopeCheckboxGroup
+                label="標準與版本"
+                allLabel="本公司全部已確認標準"
+                options={standardOptions}
+                value={editing.standards}
+                onChange={(standards) => patchForm({ standards })}
+              />
+              <ScopeCheckboxGroup
+                label="可稽核程序（QP）"
+                allLabel="全部程序"
+                options={procedureOptions}
+                value={editing.procedures}
+                onChange={(procedures) => patchForm({ procedures })}
+              />
+              <ScopeCheckboxGroup
+                label="可稽核單位"
+                allLabel="全部責任單位"
+                options={departmentOptions}
+                value={editing.departments}
+                onChange={(departments) => patchForm({ departments })}
+              />
+            </>
+          )}
+          {showAppointmentDocs && (
+            <>
+              <Input label="正式文件名稱" value={editing.documentTitle} onChange={(v) => patchForm({ documentTitle: v })} />
+              <Input label="文件編號" value={editing.documentNumber} onChange={(v) => patchForm({ documentNumber: v })} />
+            </>
+          )}
+          {showAuditorScopes && (
+            <Input label="評定／確認人" value={editing.assessedBy} onChange={(v) => patchForm({ assessedBy: v })} />
+          )}
+          {(showAppointmentDocs || showAuditorScopes) && (
+            <Input label="生效日期" type="date" value={editing.effectiveFrom} onChange={(v) => patchForm({ effectiveFrom: v })} />
+          )}
+          {showAuditorValidity && (
+            <>
+              <Select label="有效期間" value={editing.validityMode} onChange={(v) => patchForm({ validityMode: v as ValidityMode })} options={[{ value: 'fixed', label: '固定到期日' }, { value: 'no_expiry', label: '正式依據未訂固定期限' }, { value: 'pending', label: '期限待確認' }]} />
+              {editing.validityMode === 'fixed' && <Input label="到期日" type="date" value={editing.effectiveTo} onChange={(v) => patchForm({ effectiveTo: v })} />}
+            </>
+          )}
         </div>
-        <p className="mt-3 text-xs text-slate-500">系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。</p>
+        <p className="mt-3 text-xs text-slate-500">系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。空白範圍不算「全部」，開始稽核時仍須符合當次 QP 與單位。</p>
         <div className="mt-5 flex gap-2"><Button onClick={save} disabled={!editing.name.trim()}>儲存</Button><Button variant="secondary" onClick={cancel}>取消</Button></div>
       </Card>}
 
@@ -297,7 +473,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         <div className="space-y-3 lg:hidden">
           {rows.map((person) => <article key={person.id} className="rounded-lg border border-slate-200 p-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">{person.name}</h3><p className="text-xs text-slate-500">{person.employeeNumber || '無編號'}</p></div><Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} /></div><p className="mt-2 text-sm">{personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '角色待確認'}</p><div className="mt-3 flex gap-2 no-print"><Button variant="secondary" onClick={() => openEdit(person)}>編輯</Button>{person.active && <Button variant="ghost" onClick={() => window.confirm(`停用 ${person.name}？歷史事件仍會保留快照。`) && deactivatePerson(person.id)}>停用</Button>}</div></article>)}
         </div>
-        <div className="hidden overflow-x-auto lg:block"><table className="w-full border-collapse text-sm"><thead><tr className="bg-slate-50 text-left"><th className="border p-2">姓名／編號</th><th className="border p-2">公司或機構</th><th className="border p-2">責任單位</th><th className="border p-2">角色</th><th className="border p-2">狀態</th><th className="border p-2">適用範圍</th><th className="border p-2">有效日期</th><th className="border p-2 no-print">操作</th></tr></thead><tbody>{rows.map((person) => { const affiliation = person.affiliations[0]; const qualification = currentQualification(person, undefined, today); return <tr key={person.id}><td className="border p-2 font-medium">{person.name}<span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span></td><td className="border p-2">{affiliation?.companyId ? COMPANY_LABELS[affiliation.companyId] : affiliation?.externalOrganization || '待確認'}</td><td className="border p-2">{state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}</td><td className="border p-2">{personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '待確認'}</td><td className="border p-2"><Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} /></td><td className="border p-2 text-xs">{qualification ? [...qualification.standardVersions, ...qualification.procedureScopes, ...qualification.departmentScopes].join('、') || '範圍待確認' : '—'}</td><td className="border p-2 text-xs">{qualification ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}` : '—'}</td><td className="border p-2 no-print"><div className="flex gap-1"><Button variant="ghost" onClick={() => openEdit(person)}>編輯</Button>{person.active && <Button variant="ghost" onClick={() => window.confirm(`停用 ${person.name}？`) && deactivatePerson(person.id)}>停用</Button>}</div></td></tr> })}</tbody></table></div>
+        <div className="hidden overflow-x-auto lg:block"><table className="w-full border-collapse text-sm"><thead><tr className="bg-slate-50 text-left"><th className="border p-2">姓名／編號</th><th className="border p-2">公司或機構</th><th className="border p-2">責任單位</th><th className="border p-2">角色</th><th className="border p-2">狀態</th><th className="border p-2">適用範圍</th><th className="border p-2">有效日期</th><th className="border p-2 no-print">操作</th></tr></thead><tbody>{rows.map((person) => { const affiliation = person.affiliations[0]; const qualification = currentQualification(person, undefined, today); return <tr key={person.id}><td className="border p-2 font-medium">{person.name}<span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span></td><td className="border p-2">{affiliation?.companyId ? COMPANY_LABELS[affiliation.companyId] : affiliation?.externalOrganization || '待確認'}</td><td className="border p-2">{state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}</td><td className="border p-2">{personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '待確認'}</td><td className="border p-2"><Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} /></td><td className="border p-2 text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td><td className="border p-2 text-xs">{qualification ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}` : '—'}</td><td className="border p-2 no-print"><div className="flex gap-1"><Button variant="ghost" onClick={() => openEdit(person)}>編輯</Button>{person.active && <Button variant="ghost" onClick={() => window.confirm(`停用 ${person.name}？`) && deactivatePerson(person.id)}>停用</Button>}</div></td></tr> })}</tbody></table></div>
         {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-500">沒有符合條件的人員</p>}
       </Card>
     </div>

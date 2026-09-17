@@ -57,6 +57,12 @@ export function standardReady(state: AppState, companyId: CompanyId = state.acti
   return true
 }
 
+export function stakeholdersReady(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+  const co = companyFor(state, companyId)
+  if (co.departments.length === 0) return false
+  return co.departments.every((dept) => dept.stakeholders.length >= 1)
+}
+
 export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
   const co = companyFor(state, companyId)
   return co.planRows.every((row) =>
@@ -124,6 +130,7 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   const planGaps: WorkflowGap[] = []
   if (!standardReady(state, companyId)) planGaps.push({ message: '適用標準與證書依據未完整', tab: 'standard' })
   if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '程序來源三欄未齊全', tab: 'procedure' })
+  if (!stakeholdersReady(state, companyId)) planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'stakeholders' })
   if (!riskPersistedForAllRows(state, companyId)) planGaps.push({ message: '方案風險尚未全部存檔', tab: 'risk' })
   if (!planScheduled(state, companyId)) planGaps.push({ message: '年度計畫月格或窗口未排定', tab: 'plan' })
   if (!leadAuditorAppointed(state, companyId)) planGaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
@@ -188,6 +195,7 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
     case 'dashboard': return 'overview'
     case 'standard':
     case 'procedure':
+    case 'stakeholders':
     case 'risk':
     case 'plan':
     case 'personnel':
@@ -249,17 +257,28 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = gaps.length === 0
       break
 
-    case 'risk':
-      for (const row of co.planRows) {
-        const saved = co.procedureRisks?.find(
-          (r) => r.qpCode === row.qpCode && r.departmentId === row.departmentId,
-        )
-        if (!saved || saved.inherentRisk < 1) {
-          gaps.push({ message: `${row.qpCode} · ${row.department} 尚未存檔固有風險` })
+    case 'stakeholders':
+      for (const dept of co.departments) {
+        if (dept.stakeholders.length < 1) {
+          gaps.push({ message: `${dept.name}尚未標註利害關係人` })
         }
       }
       ready = gaps.length === 0
       break
+
+    case 'risk': {
+      const total = co.planRows.length
+      const savedCount = co.planRows.filter((row) =>
+        co.procedureRisks?.some(
+          (r) => r.qpCode === row.qpCode && r.departmentId === row.departmentId && r.inherentRisk >= 1,
+        ),
+      ).length
+      if (savedCount < total) {
+        gaps.push({ message: `固有風險已存檔 ${savedCount}/${total}` })
+      }
+      ready = savedCount === total
+      break
+    }
 
     case 'plan': {
       const planSettings = companySettingsFor(state, companyId)

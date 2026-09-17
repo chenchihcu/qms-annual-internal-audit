@@ -160,7 +160,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="qr-plan-table w-full min-w-[1000px] border-collapse text-sm">
+          <table className="qr-plan-table w-full min-w-[960px] border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
                 <th className="border p-2">項次</th>

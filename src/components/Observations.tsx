@@ -30,6 +30,7 @@ export function Observations({ store }: { store: AuditStore }) {
   const [form, setForm] = useState({ sourceType: 'third_party_audit' as 'internal_audit' | 'third_party_audit', sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', departmentId: company.departments[0]?.id ?? '', content: '', description: '', owner: '', dueDate: '' })
   const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const allObservations = useMemo(() => [
     ...company.observations,
     ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.observations ?? []),
@@ -125,34 +126,124 @@ export function Observations({ store }: { store: AuditStore }) {
 
       <Card>
         <h3 className="mb-3 font-semibold">觀察事項紀錄（{records.length}）</h3>
-        <div className="space-y-3">{records.map((item) => <article key={item.id} className="rounded-lg border border-slate-200 p-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <div className="flex flex-wrap items-center gap-2"><Badge label={`${item.year}年`} /><Badge label={(item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'} /><Badge label={statusLabel[item.status]} /></div>
-              <h4 className="mt-2 font-semibold">{item.qpCode} · {item.department}</h4>
-              <p className="text-xs text-slate-500">{item.occurrenceDate || '日期待確認'} · {item.sourceReference || item.sourceAuditId || '來源待確認'}</p>
-            </div>
-            <span className="text-xs text-slate-500">責任人：{item.owner || '待指定'} · 到期：{item.dueDate || '待確認'}</span>
+        {records.length === 0 ? (
+          <p className="py-6 text-center text-sm text-slate-500">目前篩選條件沒有紀錄</p>
+        ) : (
+          <div className="space-y-1">
+            {records.map((item) => {
+              const expanded = expandedId === item.id || editId === item.id
+              const sourceLabel = (item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'
+              return (
+                <div key={item.id} className="rounded-lg border border-slate-200">
+                  <div
+                    className={`flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between ${expanded ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}
+                  >
+                    <button
+                      type="button"
+                      className="min-w-0 flex-1 text-left"
+                      onClick={() => setExpandedId(expanded && editId !== item.id ? null : item.id)}
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge label={`${item.year}年`} />
+                        <Badge label={sourceLabel} />
+                        <Badge label={statusLabel[item.status]} />
+                        <span className="font-medium text-slate-800">{item.qpCode} · {item.department}</span>
+                      </div>
+                      <p className="mt-1 truncate text-sm text-slate-700">{item.content}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {item.occurrenceDate || '日期待確認'} · 責任 {item.owner || '待指定'} · 到期 {item.dueDate || '待確認'}
+                      </p>
+                    </button>
+                    <div className="flex flex-wrap gap-2 no-print" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="secondary"
+                        disabled={item.status === 'became_ncr'}
+                        onClick={() => {
+                          setExpandedId(item.id)
+                          setEditId(item.id)
+                          setEditDraft({
+                            content: item.content,
+                            description: item.description,
+                            owner: item.owner ?? '',
+                            dueDate: item.dueDate ?? '',
+                            closedAt: item.closedAt || todayLocal,
+                            closeEvidence: item.closeEvidence ?? '',
+                          })
+                        }}
+                      >
+                        編輯／結案
+                      </Button>
+                      {item.status === 'open' && (
+                        <Button variant="secondary" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button>
+                      )}
+                      {item.status === 'closed' && (
+                        <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
+                      )}
+                    </div>
+                  </div>
+                  {expanded && (
+                    <div className="border-t border-slate-100 p-3">
+                      <p className="text-sm text-slate-600">{item.description}</p>
+                      {(item.followUps ?? []).length > 0 && (
+                        <div className="mt-3 space-y-1 border-l-2 border-slate-200 pl-3">
+                          {[...(item.followUps ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((entry) => (
+                            <p key={entry.id} className="text-xs">
+                              <span className="font-medium">{entry.date || '未填日期'}</span> · {entry.note}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {!!item.revisions?.length && (
+                        <details className="mt-3 text-xs text-slate-600">
+                          <summary className="cursor-pointer font-medium">修訂歷程（{item.revisions.length}）</summary>
+                          <div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-3">
+                            {item.revisions.map((revision) => (
+                              <div key={revision.id}>
+                                <p className="font-medium">{new Date(revision.changedAt).toLocaleString('zh-TW')}</p>
+                                {([
+                                  ['content', '觀察事項'], ['description', '處理說明'], ['owner', '責任人'], ['dueDate', '預定完成日'], ['closedAt', '結案日期'], ['closeEvidence', '結案證據'], ['status', '狀態'],
+                                ] as const).filter(([field]) => revision.before[field] !== revision.after[field]).map(([field, label]) => (
+                                  <p key={field}>{label}：{revision.before[field] || '空白'} → {revision.after[field] || '空白'}</p>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      {editId === item.id ? (
+                        <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Input label="觀察事項" value={editDraft.content} onChange={(value) => setEditDraft({ ...editDraft, content: value })} />
+                            <Input label="處理要求／說明" value={editDraft.description} onChange={(value) => setEditDraft({ ...editDraft, description: value })} />
+                            <Input label="責任人" value={editDraft.owner} onChange={(value) => setEditDraft({ ...editDraft, owner: value })} />
+                            <Input label="預定完成日" type="date" value={editDraft.dueDate} onChange={(value) => setEditDraft({ ...editDraft, dueDate: value })} />
+                            <Input label="結案日期" type="date" value={editDraft.closedAt} onChange={(value) => setEditDraft({ ...editDraft, closedAt: value })} />
+                            <Input label="結案證據／紀錄" value={editDraft.closeEvidence} onChange={(value) => setEditDraft({ ...editDraft, closeEvidence: value })} />
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button disabled={!editDraft.content.trim()} onClick={() => { updateObservation(item.id, editDraft); setEditId(null) }}>儲存修改</Button>
+                            <Button disabled={!editDraft.content.trim() || !editDraft.closedAt || !editDraft.closeEvidence?.trim()} onClick={() => { updateObservation(item.id, { ...editDraft, status: 'closed' }); setEditId(null) }}>儲存並結案</Button>
+                            <Button variant="secondary" onClick={() => setEditId(null)}>取消</Button>
+                          </div>
+                          {item.status === 'open' && <p className="text-xs text-slate-500">結案須填寫結案日期與結案證據，可一次按「儲存並結案」。</p>}
+                        </div>
+                      ) : item.status === 'open' ? (
+                        <div className="mt-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]">
+                          <Input label="追蹤日期" type="date" value={followDate[item.id] ?? todayLocal} onChange={(value) => setFollowDate({ ...followDate, [item.id]: value })} />
+                          <Input label="新增本次追蹤紀錄" value={followDraft[item.id] ?? ''} onChange={(value) => setFollowDraft({ ...followDraft, [item.id]: value })} />
+                          <Button variant="secondary" disabled={!followDraft[item.id]?.trim() || followDate[item.id] === ''} onClick={() => { addObservationFollowUp(item.id, followDate[item.id] ?? todayLocal, followDraft[item.id] ?? ''); setFollowDraft({ ...followDraft, [item.id]: '' }) }}>加入時間軸</Button>
+                        </div>
+                      ) : null}
+                      {item.status === 'closed' && <p className="mt-2 text-xs text-green-700">結案：{item.closedAt} · {item.closeEvidence}</p>}
+                      {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{company.ncrs.find((n) => n.id === item.convertedNcrId)?.ncrNumber ?? item.convertedNcrId}</p>}
+                      {item.carriedToYear && <p className="mt-2 text-xs text-blue-700">已帶入 {item.carriedToYear} 年查檢表</p>}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-          <p className="mt-3 text-sm">{item.content}</p><p className="mt-1 text-sm text-slate-500">{item.description}</p>
-          <div className="mt-3 space-y-1 border-l-2 border-slate-200 pl-3">{[...(item.followUps ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((entry) => <p key={entry.id} className="text-xs"><span className="font-medium">{entry.date || '未填日期'}</span> · {entry.note}</p>)}</div>
-          {!!item.revisions?.length && <details className="mt-3 text-xs text-slate-600"><summary className="cursor-pointer font-medium">修訂歷程（{item.revisions.length}）</summary><div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-3">{item.revisions.map((revision) => <div key={revision.id}><p className="font-medium">{new Date(revision.changedAt).toLocaleString('zh-TW')}</p>{([
-            ['content', '觀察事項'], ['description', '處理說明'], ['owner', '責任人'], ['dueDate', '預定完成日'], ['closedAt', '結案日期'], ['closeEvidence', '結案證據'], ['status', '狀態'],
-          ] as const).filter(([field]) => revision.before[field] !== revision.after[field]).map(([field, label]) => <p key={field}>{label}：{revision.before[field] || '空白'} → {revision.after[field] || '空白'}</p>)}</div>)}</div></details>}
-          {editId === item.id ? <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
-            <div className="grid gap-3 sm:grid-cols-2"><Input label="觀察事項" value={editDraft.content} onChange={(value) => setEditDraft({ ...editDraft, content: value })} /><Input label="處理要求／說明" value={editDraft.description} onChange={(value) => setEditDraft({ ...editDraft, description: value })} /><Input label="責任人" value={editDraft.owner} onChange={(value) => setEditDraft({ ...editDraft, owner: value })} /><Input label="預定完成日" type="date" value={editDraft.dueDate} onChange={(value) => setEditDraft({ ...editDraft, dueDate: value })} /><Input label="結案日期" type="date" value={editDraft.closedAt} onChange={(value) => setEditDraft({ ...editDraft, closedAt: value })} /><Input label="結案證據／紀錄" value={editDraft.closeEvidence} onChange={(value) => setEditDraft({ ...editDraft, closeEvidence: value })} /></div>
-            <div className="flex flex-wrap gap-2"><Button disabled={!editDraft.content.trim()} onClick={() => { updateObservation(item.id, editDraft); setEditId(null) }}>儲存修改</Button><Button disabled={!editDraft.content.trim() || !editDraft.closedAt || !editDraft.closeEvidence?.trim()} onClick={() => { updateObservation(item.id, { ...editDraft, status: 'closed' }); setEditId(null) }}>儲存並結案</Button><Button variant="secondary" onClick={() => setEditId(null)}>取消</Button></div>
-            {item.status === 'open' && <p className="text-xs text-slate-500">結案須填寫結案日期與結案證據，可一次按「儲存並結案」。</p>}
-          </div> : <div className="mt-3 flex flex-wrap gap-2"><Button variant="secondary" disabled={item.status === 'became_ncr'} onClick={() => { setEditId(item.id); setEditDraft({ content: item.content, description: item.description, owner: item.owner ?? '', dueDate: item.dueDate ?? '', closedAt: item.closedAt || todayLocal, closeEvidence: item.closeEvidence ?? '' }) }}>編輯／結案</Button>
-            {item.status === 'open' && <><Button variant="secondary" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button></>}
-            {item.status === 'closed' && <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>}
-          </div>}
-          {item.status === 'open' && <div className="mt-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]"><Input label="追蹤日期" type="date" value={followDate[item.id] ?? todayLocal} onChange={(value) => setFollowDate({ ...followDate, [item.id]: value })} /><Input label="新增本次追蹤紀錄" value={followDraft[item.id] ?? ''} onChange={(value) => setFollowDraft({ ...followDraft, [item.id]: value })} /><Button variant="secondary" disabled={!followDraft[item.id]?.trim() || followDate[item.id] === ''} onClick={() => { addObservationFollowUp(item.id, followDate[item.id] ?? todayLocal, followDraft[item.id] ?? ''); setFollowDraft({ ...followDraft, [item.id]: '' }) }}>加入時間軸</Button></div>}
-          {item.status === 'closed' && <p className="mt-2 text-xs text-green-700">結案：{item.closedAt} · {item.closeEvidence}</p>}
-          {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{company.ncrs.find((n) => n.id === item.convertedNcrId)?.ncrNumber ?? item.convertedNcrId}</p>}
-          {item.carriedToYear && <p className="mt-2 text-xs text-blue-700">已帶入 {item.carriedToYear} 年查檢表</p>}
-        </article>)}</div>
-        {records.length === 0 && <p className="py-6 text-center text-sm text-slate-500">目前篩選條件沒有紀錄</p>}
+        )}
       </Card>
 
       <Card className="no-print">
@@ -173,39 +264,32 @@ export function Observations({ store }: { store: AuditStore }) {
 
         <div className="mt-6">
           <h3 className="mb-3 font-medium">前年度觀察事項（{priorObs.length}）</h3>
-        {priorObs.length === 0 ? (
-          <p className="text-sm text-slate-500">無前年度觀察事項</p>
-        ) : (
-          <div className="space-y-3">
-            {priorObs.map((obs) => (
-              <div key={obs.id} className="rounded-lg border border-slate-200 p-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge label={`${obs.year}年`} />
-                  <span className="font-medium">{obs.qpCode} · {obs.department}</span>
-                  <Badge label={statusLabel[obs.status]} />
-                  {obs.carriedToYear && (
-                    <span className="text-xs text-blue-600">已帶入 {obs.carriedToYear} 年</span>
-                  )}
-                </div>
-                <p className="text-sm">{obs.content}</p>
-                <p className="mt-1 text-xs text-slate-500">{obs.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2 no-print">
+          {priorObs.length === 0 ? (
+            <p className="text-sm text-slate-500">無前年度觀察事項</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {priorObs.map((obs) => (
+                <li key={obs.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2">
+                  <span className="min-w-0 truncate">
+                    <Badge label={`${obs.year}年`} />
+                    <span className="ml-2 font-medium">{obs.qpCode} · {obs.department}</span>
+                    <span className="ml-2 text-slate-600">{obs.content}</span>
+                    {obs.carriedToYear && (
+                      <span className="ml-2 text-xs text-blue-600">已帶入 {obs.carriedToYear} 年</span>
+                    )}
+                  </span>
                   {obs.carriedToYear !== currentYear && !obs.carryForwards?.some((entry) => entry.year === currentYear) && (
                     <Button
                       variant="secondary"
-                      onClick={() =>
-                        carryForwardObservation(obs.id, obs.qpCode, obs.departmentId)
-                      }
+                      onClick={() => carryForwardObservation(obs.id, obs.qpCode, obs.departmentId)}
                     >
                       帶入 {currentYear} 年查檢表
                     </Button>
                   )}
-                  <span className="text-xs text-slate-500">請在上方紀錄台帳維護追蹤與結案。</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="mt-6 border-t border-slate-200 pt-5">

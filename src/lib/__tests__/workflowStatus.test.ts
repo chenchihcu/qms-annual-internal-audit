@@ -6,6 +6,7 @@ import {
   getPdcaOverview,
   getTabWorkflowStatus,
   standardReady,
+  stakeholdersReady,
 } from '../workflowStatus'
 
 describe('workflowStatus', () => {
@@ -33,6 +34,20 @@ describe('workflowStatus', () => {
     const state = createDemoState()
     state.companies.jiurun.procedureRisks = []
     expect(canProceedToNextTab(state, 'risk')).toBe(false)
+    const status = getTabWorkflowStatus(state, 'risk')
+    expect(status.gaps).toHaveLength(1)
+    expect(status.gaps[0].message).toMatch(/固有風險已存檔 \d+\/\d+/)
+  })
+
+  it('requires stakeholder tags for stakeholders tab exit', () => {
+    const state = createDemoState()
+    expect(stakeholdersReady(state, 'jiurun')).toBe(true)
+    expect(canProceedToNextTab(state, 'stakeholders')).toBe(true)
+    state.companies.jiurun.departments[0].stakeholders = []
+    expect(stakeholdersReady(state, 'jiurun')).toBe(false)
+    expect(canProceedToNextTab(state, 'stakeholders')).toBe(false)
+    const overview = getPdcaOverview(state, 'jiurun')
+    expect(overview.plan.gaps.some((gap) => gap.tab === 'stakeholders')).toBe(true)
   })
 
   it('blocks complete report when pending checklist items remain', () => {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Person, QualificationRecord } from '../../types'
-import { qualificationState, validateAuditTeam } from '../personnel'
+import {
+  formatScopeList,
+  QUALIFICATION_SCOPE_ALL,
+  qualificationState,
+  scopeIncludes,
+  validateAuditTeam,
+} from '../personnel'
 
 const qualification = (patch: Partial<QualificationRecord> = {}): QualificationRecord => ({
   id: 'q1', role: 'internal_lead_auditor', companyIds: ['jiurun'], standardVersions: ['ISO 9001:2015'],
@@ -68,5 +74,34 @@ describe('personnel qualification validation', () => {
       }],
     }
     expect(validateAuditTeam([appointed], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01').canStart).toBe(true)
+  })
+
+  it('treats scope sentinel as matching any procedure, department, and confirmed standard', () => {
+    const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
+    const allScopes = {
+      ...person,
+      qualifications: [qualification({
+        procedureScopes: [QUALIFICATION_SCOPE_ALL],
+        departmentScopes: [QUALIFICATION_SCOPE_ALL],
+        standardVersions: [QUALIFICATION_SCOPE_ALL],
+      })],
+    }
+    expect(validateAuditTeam([allScopes], team, 'jiurun', 'QP-01', 'dept-admin', '2026-06-01', ['ISO 9001:2015']).canStart).toBe(true)
+  })
+
+  it('still blocks when explicit procedure list excludes the audit event', () => {
+    const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
+    const narrow = { ...person, qualifications: [qualification({ procedureScopes: ['QP-01'] })] }
+    const result = validateAuditTeam([narrow], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
+    expect(result.canStart).toBe(false)
+    expect(result.errors.some((error) => error.includes('缺少符合此次範圍'))).toBe(true)
+  })
+
+  it('formats scope lists without printing the sentinel', () => {
+    expect(scopeIncludes([QUALIFICATION_SCOPE_ALL], 'QP-99')).toBe(true)
+    expect(scopeIncludes(['QP-28'], 'QP-01')).toBe(false)
+    expect(formatScopeList([], '全部程序')).toBe('範圍待確認')
+    expect(formatScopeList([QUALIFICATION_SCOPE_ALL], '全部程序')).toBe('全部程序')
+    expect(formatScopeList(['QP-28', 'QP-01'], '全部程序')).toBe('QP-28、QP-01')
   })
 })

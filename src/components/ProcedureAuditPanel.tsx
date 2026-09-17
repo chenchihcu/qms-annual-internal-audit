@@ -289,10 +289,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
           </Button>
         </div>
 
-        <div className="space-y-3 lg:hidden print:hidden">
-          {audit.items.map((item) => <article key={item.id} className={`rounded-lg border p-4 ${item.sourceYear ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200'}`}><div className="mb-2 flex items-center justify-between gap-2"><span className="text-xs font-bold text-slate-500">{item.category} · NO {item.no}</span>{item.judgment && <Badge label={item.judgment} />}</div><textarea className="min-h-20 w-full rounded border border-slate-300 px-3 py-2 text-sm" value={item.content} onChange={(e) => updateChecklistItem(audit.id, item.id, { content: e.target.value })} aria-label={`稽核內容 ${item.no}`} disabled={reported} /><Select label="判定" value={item.judgment ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { judgment: (value || null) as Judgment | null })} options={[{ value: '', label: '待判定' }, ...JUDGMENTS.map((value) => ({ value, label: value }))]} disabled={reported} />{item.judgment === '不適用' && <Input label="不適用理由" value={item.notApplicableReason ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { notApplicableReason: value })} disabled={reported} />}<Input label="客觀證據引用" value={item.evidenceReference ?? ''} onChange={(value) => updateChecklistItem(audit.id, item.id, { evidenceReference: value })} disabled={reported} /><textarea className="mt-3 min-h-20 w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="客觀證據與內容說明" aria-label={`內容說明 ${item.no}`} value={item.description} onChange={(e) => updateChecklistItem(audit.id, item.id, { description: e.target.value })} disabled={reported} />{!reported && item.origin && item.origin !== 'seed' && <button type="button" className="mt-2 min-h-11 text-sm text-red-700" onClick={() => setPendingDeleteItemId(item.id)}>刪除此自訂項目</button>}</article>)}
-        </div>
-        <div className="hidden overflow-x-auto lg:block print:block">
+        <div className="overflow-x-auto print:block">
           <table className="qr-checklist w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">

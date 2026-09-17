@@ -296,8 +296,8 @@ export function createDemoState(): AppState {
 
   const prep = createDefaultPrepState(baseCompanySettings.auditYear)
   prep.externalAuditDate = '2026-09-15'
-  prep.internalAuditComplete = { jiurun: true, zhenglongxing: false }
-  prep.managementReviewComplete = { jiurun: false, zhenglongxing: false }
+  prep.internalAuditComplete = true
+  prep.managementReviewComplete = false
   prep.items[0].jiurunDone = true
   prep.items[0].zhenglongxingDone = true
 

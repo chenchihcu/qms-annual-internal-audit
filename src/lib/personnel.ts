@@ -26,6 +26,29 @@ export const QUALIFICATION_STATE_LABELS: Record<QualificationState, string> = {
   ended: '已終止',
 }
 
+/** Sentinel: scope array contains only this value when user selects「全部」. */
+export const QUALIFICATION_SCOPE_ALL = '*'
+
+export function scopeIncludes(scopes: string[], value: string): boolean {
+  if (scopes.includes(QUALIFICATION_SCOPE_ALL)) return true
+  return scopes.includes(value)
+}
+
+export function formatScopeList(scopes: string[], allLabel: string): string {
+  if (scopes.length === 0) return '範圍待確認'
+  if (scopes.includes(QUALIFICATION_SCOPE_ALL)) return allLabel
+  return scopes.join('、')
+}
+
+export function formatQualificationScopeSummary(qualification: QualificationRecord): string {
+  const parts = [
+    formatScopeList(qualification.standardVersions, '全部標準'),
+    formatScopeList(qualification.procedureScopes, '全部程序'),
+    formatScopeList(qualification.departmentScopes, '全部責任單位'),
+  ].filter((part) => part !== '範圍待確認')
+  return parts.length > 0 ? parts.join('／') : '範圍待確認'
+}
+
 export function qualificationState(
   qualification: QualificationRecord,
   onDate: string,
@@ -62,13 +85,15 @@ function qualificationMatchesScope(
 ) {
   const roleMatch = q.role === 'internal_auditor' || q.role === 'internal_lead_auditor'
   const companyMatch = q.companyIds.includes(companyId)
-  const procedureMatch = q.procedureScopes.includes(qpCode)
-  const departmentMatch = q.departmentScopes.includes(departmentId)
+  const procedureMatch = scopeIncludes(q.procedureScopes, qpCode)
+  const departmentMatch = scopeIncludes(q.departmentScopes, departmentId)
   const normalized = q.standardVersions.map((value) => value.toLowerCase().replace(/\s+/g, ''))
-  const standardMatch = requiredStandards.length === 0 || requiredStandards.every((required) => {
-    const name = required.split(':')[0].toLowerCase().replace(/\s+/g, '')
-    return normalized.some((value) => value.includes(name))
-  })
+  const standardMatch = requiredStandards.length === 0
+    || scopeIncludes(q.standardVersions, QUALIFICATION_SCOPE_ALL)
+    || requiredStandards.every((required) => {
+      const name = required.split(':')[0].toLowerCase().replace(/\s+/g, '')
+      return normalized.some((value) => value.includes(name))
+    })
   return roleMatch && companyMatch && procedureMatch && departmentMatch && standardMatch && qualificationState(q, onDate) === 'effective'
 }
 

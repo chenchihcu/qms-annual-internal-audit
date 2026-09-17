@@ -22,6 +22,7 @@ export const TAB_GROUPS: TabGroup[] = [
     tabs: [
       { id: 'standard', label: '標準', formId: 'standards-form' },
       { id: 'procedure', label: '程序', formId: 'procedure-settings-form' },
+      { id: 'stakeholders', label: '利害關係人', formId: 'stakeholders-form' },
       { id: 'risk', label: '方案風險與優先順序', formId: 'risk-assessment-form' },
       { id: 'plan', label: '年度稽核計畫', formId: 'annual-plan-form' },
       { id: 'personnel', label: '稽核員能力與任命', formId: 'personnel-form' },
@@ -91,16 +92,26 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     exit: '程序來源三欄齊全',
     outputs: '開始稽核閘門輸入（程序三欄）',
     prevTab: 'standard',
+    nextTab: 'stakeholders',
+  },
+  {
+    id: 'stakeholders',
+    label: '利害關係人',
+    purpose: '標定各部門利害關係人與部門風險（O×S），作為自動編排排序／頻率的輸入。',
+    entry: '程序來源已備',
+    exit: '每個部門至少一個利害關係人標籤',
+    outputs: 'departments[].stakeholders／riskOccurrence／riskSeverity（不直接改月格）',
+    prevTab: 'procedure',
     nextTab: 'risk',
   },
   {
     id: 'risk',
     label: '方案風險與優先順序',
     purpose: '評估全部 QP 的七因素優先順序，並可套用至月格。',
-    entry: '程序來源已備',
-    exit: '各 QP 風險已存檔（固有風險至少一項）',
+    entry: '部門利害關係人已標註',
+    exit: '各 QP 固有風險已存檔（其餘因素可暫定）',
     outputs: 'procedureRisks、QR-02-01 Excel',
-    prevTab: 'procedure',
+    prevTab: 'stakeholders',
     nextTab: 'plan',
   },
   {
@@ -195,10 +206,11 @@ export function getTabWorkflow(tab: TabId): TabWorkflow | undefined {
 export const PROCEDURE_LIFECYCLE_STEPS: Array<{ step: string; tab: TabId; note: string }> = [
   { step: '01', tab: 'standard', note: '確認適用標準與證書依據。' },
   { step: '02', tab: 'procedure', note: '本頁完成版本與紀錄位置。' },
-  { step: '03', tab: 'risk', note: '評估 QP 優先順序。' },
-  { step: '04', tab: 'plan', note: '依風險安排稽核月份。' },
-  { step: '05', tab: 'personnel', note: '確認稽核團隊資格與任命。' },
-  { step: '06', tab: 'audit', note: '執行查檢並留存證據。' },
+  { step: '03', tab: 'stakeholders', note: '標定部門利害關係人與 O×S。' },
+  { step: '04', tab: 'risk', note: '評估 QP 優先順序。' },
+  { step: '05', tab: 'plan', note: '依風險安排稽核月份。' },
+  { step: '06', tab: 'personnel', note: '確認稽核團隊資格與任命。' },
+  { step: '07', tab: 'audit', note: '執行查檢並留存證據。' },
 ]
 
 const VALID_TABS = new Set<TabId>(ALL_TABS.map((t) => t.id))

@@ -1,5 +1,5 @@
 import type { AuditStore } from '../hooks/useAuditStore'
-import type { CompanyId, CompanyRelationship, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
+import type { CompanyRelationship, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
 import { COMPANY_LABELS, relationshipCheckKey } from '../types'
 import type { PrepScopeMode } from '../lib/externalAuditPrep'
 import {
@@ -271,43 +271,33 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
         {/* 序位橫幅 */}
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位（內稽→管審→外稽；依公司分別確認）</p>
+          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位（內稽→管審→外稽；兩家公司同一順序）</p>
           <div className="space-y-3 text-sm">
             <div>
-              <p className="mb-2 font-medium text-slate-700">1. 內部稽核完成</p>
-              <div className="flex flex-wrap gap-2">
-                {(['jiurun', 'zhenglongxing'] as CompanyId[]).map((companyId) => (
-                  <label key={companyId} className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={externalAuditPrep.internalAuditComplete[companyId]}
-                      onChange={(e) =>
-                        updateExternalPrepSequence({ companyId, internalAuditComplete: e.target.checked })
-                      }
-                    />
-                    <span>{COMPANY_LABELS[companyId]}</span>
-                  </label>
-                ))}
-              </div>
+              <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={externalAuditPrep.internalAuditComplete}
+                  onChange={(e) =>
+                    updateExternalPrepSequence({ internalAuditComplete: e.target.checked })
+                  }
+                />
+                <span className="font-medium text-slate-700">1. 內部稽核完成</span>
+              </label>
             </div>
             <div>
-              <p className="mb-2 font-medium text-slate-700">2. 管理審查完成</p>
-              <div className="flex flex-wrap gap-2">
-                {(['jiurun', 'zhenglongxing'] as CompanyId[]).map((companyId) => (
-                  <label key={companyId} className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={externalAuditPrep.managementReviewComplete[companyId]}
-                      onChange={(e) =>
-                        updateExternalPrepSequence({ companyId, managementReviewComplete: e.target.checked })
-                      }
-                    />
-                    <span>{COMPANY_LABELS[companyId]}</span>
-                  </label>
-                ))}
-              </div>
+              <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={externalAuditPrep.managementReviewComplete}
+                  onChange={(e) =>
+                    updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
+                  }
+                />
+                <span className="font-medium text-slate-700">2. 管理審查完成</span>
+              </label>
             </div>
             <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
               <span className="font-medium">3. 外部稽核</span>

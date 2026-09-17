@@ -33,16 +33,22 @@ export const EXTERNAL_AUDIT_PREP_SEED = prepSeed as {
 
 export const DEFAULT_COMPANY_RELATIONSHIPS = relationshipSeed as CompanyRelationship[]
 
-function emptyCompanyFlags(): Record<CompanyId, boolean> {
-  return { jiurun: false, zhenglongxing: false }
+function normalizeSequenceFlag(
+  value: boolean | Record<CompanyId, boolean> | undefined,
+): boolean {
+  if (typeof value === 'boolean') return value
+  if (value && typeof value === 'object') {
+    return COMPANY_IDS.every((id) => Boolean(value[id]))
+  }
+  return false
 }
 
 export function createDefaultPrepState(year: number): ExternalAuditPrepState {
   return {
     year,
     externalAuditDate: undefined,
-    internalAuditComplete: emptyCompanyFlags(),
-    managementReviewComplete: emptyCompanyFlags(),
+    internalAuditComplete: false,
+    managementReviewComplete: false,
     relationshipChecks: {},
     items: EXTERNAL_AUDIT_PREP_SEED.items.map((item) => ({
       id: `prep-${item.no}`,
@@ -63,37 +69,14 @@ export function migratePrepState(
   },
   externalAuditDateFromSettings?: string,
 ): ExternalAuditPrepState {
-  if (
-    old.internalAuditComplete
-    && typeof old.internalAuditComplete === 'object'
-    && old.relationshipChecks
-  ) {
-    return {
-      year: old.year ?? new Date().getFullYear(),
-      externalAuditDate: old.externalAuditDate ?? externalAuditDateFromSettings,
-      internalAuditComplete: old.internalAuditComplete,
-      managementReviewComplete: old.managementReviewComplete ?? emptyCompanyFlags(),
-      relationshipChecks: old.relationshipChecks,
-      items: old.items ?? createDefaultPrepState(old.year ?? new Date().getFullYear()).items,
-    }
-  }
-
-  const internalLegacy = old.internalAuditComplete
-  const managementLegacy = old.managementReviewComplete
-  const internalAuditComplete = typeof internalLegacy === 'boolean'
-    ? { jiurun: internalLegacy, zhenglongxing: internalLegacy }
-    : emptyCompanyFlags()
-  const managementReviewComplete = typeof managementLegacy === 'boolean'
-    ? { jiurun: managementLegacy, zhenglongxing: managementLegacy }
-    : emptyCompanyFlags()
-
+  const year = old.year ?? new Date().getFullYear()
   return {
-    year: old.year ?? new Date().getFullYear(),
+    year,
     externalAuditDate: old.externalAuditDate ?? externalAuditDateFromSettings,
-    internalAuditComplete,
-    managementReviewComplete,
+    internalAuditComplete: normalizeSequenceFlag(old.internalAuditComplete),
+    managementReviewComplete: normalizeSequenceFlag(old.managementReviewComplete),
     relationshipChecks: old.relationshipChecks ?? {},
-    items: old.items ?? createDefaultPrepState(old.year ?? new Date().getFullYear()).items,
+    items: old.items ?? createDefaultPrepState(year).items,
   }
 }
 
@@ -195,11 +178,9 @@ export function evaluatePrepSequence(context: PrepSequenceContext): PrepSequence
     )
   }
 
-  const sequenceWarning = COMPANY_IDS.some(
-    (id) => prep.managementReviewComplete[id] && !prep.internalAuditComplete[id],
-  )
+  const sequenceWarning = prep.managementReviewComplete && !prep.internalAuditComplete
   if (sequenceWarning) {
-    messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求（請依公司分別確認）。')
+    messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求。')
   }
 
   return { openNcrCount, openNcrByCompany, ncrWarning, sequenceWarning, messages }

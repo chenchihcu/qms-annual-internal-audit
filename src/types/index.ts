@@ -332,8 +332,8 @@ export interface ExternalAuditPrepItemState {
 export interface ExternalAuditPrepState {
   year: number
   externalAuditDate?: string
-  internalAuditComplete: Record<CompanyId, boolean>
-  managementReviewComplete: Record<CompanyId, boolean>
+  internalAuditComplete: boolean
+  managementReviewComplete: boolean
   relationshipChecks: Record<string, boolean>
   items: ExternalAuditPrepItemState[]
 }
@@ -407,6 +407,7 @@ export type TabId =
   | 'suggestions'
   | 'prep'
   | 'risk'
+  | 'stakeholders'
   | 'personnel'
   | 'standard'
   | 'procedure'

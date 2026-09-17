@@ -70,13 +70,13 @@ function App() {
   const activeLabel = activeEntry?.label ?? '稽核總覽'
   const renderSidebar = () => (
     <div className="flex h-full flex-col">
-      <button type="button" onClick={() => setTab('dashboard')} className="m-4 rounded-xl bg-blue-800 p-4 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
+      <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
         <span className="block text-xs font-medium text-blue-100">首頁</span>
         <span className="mt-1 block text-lg font-bold">QMS 年度內部稽核</span>
-        <span className="mt-1 block text-xs text-blue-100">{headerScope}</span>
+        <span className="mt-1 block text-xs leading-snug text-blue-100">{headerScope}</span>
       </button>
       <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
-        {TAB_GROUPS.map((group) => <div key={group.label} className="mb-4"><p className="px-3 pb-1 text-xs font-bold tracking-wide text-slate-400">{group.label}</p>{group.tabs.map((item) => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`mb-1 min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} aria-current={tab === item.id ? 'page' : undefined} aria-controls={item.formId}>{item.label}</button>)}</div>)}
+        {TAB_GROUPS.map((group) => <div key={group.label} className="mb-4"><p className="px-3 pb-1 text-xs font-bold tracking-wide text-slate-400">{group.label}</p>{group.tabs.map((item) => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`mb-1 min-h-11 w-full whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} aria-current={tab === item.id ? 'page' : undefined} aria-controls={item.formId}>{item.label}</button>)}</div>)}
       </nav>
       <p className="border-t border-slate-100 p-4 text-xs text-slate-400">資料儲存於本機 · v7</p>
     </div>
@@ -84,8 +84,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 lg:flex">
-      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white no-print lg:block">{renderSidebar()}</aside>
-      <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
+      <aside className="hidden w-56 shrink-0 border-r border-slate-200 bg-white no-print lg:block">{renderSidebar()}</aside>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-56 border-r border-slate-200 bg-white transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
       {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => setMobileMenuOpen(false)} />}
 
       <div className="min-w-0 flex-1">

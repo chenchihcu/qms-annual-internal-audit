@@ -6,6 +6,7 @@ import {
   getPrepTemplate,
   isItemDone,
   itemHasCallout,
+  migratePrepState,
   EXTERNAL_AUDIT_PREP_SEED,
   DEFAULT_COMPANY_RELATIONSHIPS,
 } from '../externalAuditPrep'
@@ -137,10 +138,10 @@ describe('evaluatePrepSequence', () => {
     expect(result.messages.some((m) => m.includes('九潤 1'))).toBe(true)
   })
 
-  it('warns when management review done before internal audit for a company', () => {
+  it('warns when management review done before internal audit', () => {
     const prep = createDefaultPrepState(2026)
-    prep.managementReviewComplete.jiurun = true
-    prep.internalAuditComplete.jiurun = false
+    prep.managementReviewComplete = true
+    prep.internalAuditComplete = false
     const result = evaluatePrepSequence({
       prep,
       companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
@@ -153,8 +154,8 @@ describe('evaluatePrepSequence', () => {
 
   it('no sequence warning when order is correct', () => {
     const prep = createDefaultPrepState(2026)
-    prep.internalAuditComplete = { jiurun: true, zhenglongxing: true }
-    prep.managementReviewComplete = { jiurun: true, zhenglongxing: true }
+    prep.internalAuditComplete = true
+    prep.managementReviewComplete = true
     const result = evaluatePrepSequence({
       prep,
       companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
@@ -162,6 +163,36 @@ describe('evaluatePrepSequence', () => {
       yearArchives: {},
     })
     expect(result.sequenceWarning).toBe(false)
+  })
+})
+
+describe('migratePrepState', () => {
+  it('preserves boolean flags', () => {
+    const migrated = migratePrepState({
+      year: 2026,
+      internalAuditComplete: true,
+      managementReviewComplete: false,
+      relationshipChecks: {},
+      items: createDefaultPrepState(2026).items,
+    })
+    expect(migrated.internalAuditComplete).toBe(true)
+    expect(migrated.managementReviewComplete).toBe(false)
+  })
+
+  it('normalizes per-company record to true only when both companies are checked', () => {
+    const migratedBoth = migratePrepState({
+      internalAuditComplete: { jiurun: true, zhenglongxing: true },
+      managementReviewComplete: { jiurun: true, zhenglongxing: true },
+    } as Parameters<typeof migratePrepState>[0])
+    expect(migratedBoth.internalAuditComplete).toBe(true)
+    expect(migratedBoth.managementReviewComplete).toBe(true)
+
+    const migratedMixed = migratePrepState({
+      internalAuditComplete: { jiurun: true, zhenglongxing: false },
+      managementReviewComplete: { jiurun: false, zhenglongxing: false },
+    } as Parameters<typeof migratePrepState>[0])
+    expect(migratedMixed.internalAuditComplete).toBe(false)
+    expect(migratedMixed.managementReviewComplete).toBe(false)
   })
 })
 

@@ -6,10 +6,10 @@ describe('workflow navigation/form mapping', () => {
     const entries = ALL_TABS.filter((entry) => entry.id !== 'dashboard')
     const formIds = entries.map((entry) => entry.formId)
 
-    expect(entries).toHaveLength(11)
+    expect(entries).toHaveLength(12)
     expect(formIds.every((id): id is string => Boolean(id))).toBe(true)
     expect(new Set(formIds).size).toBe(entries.length)
-    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(12)
+    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(13)
   })
 
   it('keeps the dashboard as the overview entry without a workflow form', () => {
@@ -29,6 +29,7 @@ describe('workflow navigation/form mapping', () => {
       '稽核總覽',
       '標準',
       '程序',
+      '利害關係人',
       '方案風險與優先順序',
       '年度稽核計畫',
       '稽核員能力與任命',
@@ -54,8 +55,10 @@ describe('workflow navigation/form mapping', () => {
   })
 
   it('defines workflow metadata for every tab in PDCA order', () => {
-    expect(TAB_WORKFLOW).toHaveLength(12)
-    expect(getTabWorkflow('procedure')?.nextTab).toBe('risk')
+    expect(TAB_WORKFLOW).toHaveLength(13)
+    expect(getTabWorkflow('procedure')?.nextTab).toBe('stakeholders')
+    expect(getTabWorkflow('stakeholders')?.nextTab).toBe('risk')
+    expect(getTabWorkflow('risk')?.prevTab).toBe('stakeholders')
     expect(getTabWorkflow('risk')?.nextTab).toBe('plan')
     expect(getTabWorkflow('plan')?.prevTab).toBe('risk')
     expect(getTabWorkflow('personnel')?.nextTab).toBe('audit')

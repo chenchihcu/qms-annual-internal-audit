@@ -99,7 +99,7 @@ export function WorkflowGuide({ tab, state, auditKey, position }: WorkflowGuideP
         ) : (
           <span
             className="min-h-11 cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-medium text-slate-400"
-            title={status.gaps.map((g) => g.message).join('；') || '請先完成本頁終點'}
+            title={status.gaps[0]?.message || '請先完成本頁終點'}
             aria-disabled="true"
           >
             下一步：{nextLabel}（尚待完成）

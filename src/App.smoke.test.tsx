@@ -6,6 +6,7 @@ const TAB_LABELS = [
   '稽核總覽',
   '標準',
   '程序',
+  '利害關係人',
   '方案風險與優先順序',
   '年度稽核計畫',
   '稽核員能力與任命',
@@ -22,7 +23,7 @@ describe('App tab smoke', () => {
     window.location.hash = ''
   })
 
-  it('renders all twelve tabs without crashing', () => {
+  it('renders all thirteen tabs without crashing', () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
