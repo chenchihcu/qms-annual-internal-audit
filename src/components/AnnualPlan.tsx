@@ -36,13 +36,14 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
 
   const buildYearSwitchDescription = (targetYear: number) => {
     const pdca = getPdcaOverview(state)
-    const restoreNote = yearArchives[String(targetYear)]
-      ? `將還原 ${targetYear} 年已封存的計畫、事件與準備資料。`
-      : `將建立 ${targetYear} 年空白年度資料集（計畫與事件需重新建立）。`
+    const archived = yearArchives[String(targetYear)]?.companies[state.activeCompanyId]
+    const restoreNote = archived
+      ? `將還原 ${company.name} ${targetYear} 年已封存的計畫與事件。`
+      : `將建立 ${company.name} ${targetYear} 年空白年度台帳（計畫與事件需重新建立）。`
     const gapNote = !pdca.annualCloseReady && pdca.annualCloseGaps.length > 0
-      ? `\n\n目前年度尚未達結案條件：\n${pdca.annualCloseGaps.slice(0, 4).map((g) => `· ${g.message}`).join('\n')}`
+      ? `\n\n目前公司年度尚未達結案條件：\n${pdca.annualCloseGaps.slice(0, 4).map((g) => `· ${g.message}`).join('\n')}`
       : ''
-    return `將封存 ${settings.auditYear} 年目前工作資料。\n${restoreNote}${gapNote}`
+    return `只封存 ${company.name} ${settings.auditYear} 年台帳；另一家與外稽準備年度（${state.externalAuditPrep.year}）不變。\n${restoreNote}${gapNote}`
   }
 
   const handleYearDraftChange = (value: string) => {
@@ -103,10 +104,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           />
           <Input label="主任稽核員（紙本顯示姓名）" value={settings.leadAuditor} onChange={(value) => updateSettings({ leadAuditor: value })} />
           <Input label="年度起算日" type="date" value={settings.yearStart} onChange={(value) => updateSettings({ yearStart: value })} />
-          <Input label="外部稽核日期" type="date" value={settings.externalAuditDate ?? ''} onChange={(value) => updateSettings({ externalAuditDate: value })} />
           <Input label="管理審查日期" type="date" value={settings.managementReviewDate ?? ''} onChange={(value) => updateSettings({ managementReviewDate: value })} />
         </div>
-        <p className="mt-3 text-xs text-slate-500">切換年度會保存目前年度資料集；返回舊年度時還原其計畫、事件與準備資料。</p>
+        <p className="mt-3 text-xs text-slate-500">
+          切換年度只影響目前公司（{company.name}）台帳；外部稽核日期請至「外部稽核前準備」設定。
+        </p>
         {pendingYear != null && (
           <ConfirmDialog
             open

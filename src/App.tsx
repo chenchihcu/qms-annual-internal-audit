@@ -52,7 +52,10 @@ function App() {
   const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
   const { tab, auditKey } = hashState
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const { settings, activeCompanyId, company } = store.state
+  const { settings, activeCompanyId, company, externalAuditPrep } = store.state
+  const headerScope = tab === 'prep'
+    ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
+    : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
   const setTab = (next: TabId, nextAuditKey?: string) => {
     setHashState({ tab: next, auditKey: nextAuditKey })
     syncHash(next, nextAuditKey)
@@ -70,12 +73,12 @@ function App() {
       <button type="button" onClick={() => setTab('dashboard')} className="m-4 rounded-xl bg-blue-800 p-4 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
         <span className="block text-xs font-medium text-blue-100">首頁</span>
         <span className="mt-1 block text-lg font-bold">QMS 年度內部稽核</span>
-        <span className="mt-1 block text-xs text-blue-100">{company.name} · {settings.auditYear}</span>
+        <span className="mt-1 block text-xs text-blue-100">{headerScope}</span>
       </button>
       <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
         {TAB_GROUPS.map((group) => <div key={group.label} className="mb-4"><p className="px-3 pb-1 text-xs font-bold tracking-wide text-slate-400">{group.label}</p>{group.tabs.map((item) => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`mb-1 min-h-11 w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} aria-current={tab === item.id ? 'page' : undefined} aria-controls={item.formId}>{item.label}</button>)}</div>)}
       </nav>
-      <p className="border-t border-slate-100 p-4 text-xs text-slate-400">資料儲存於本機 · v6</p>
+      <p className="border-t border-slate-100 p-4 text-xs text-slate-400">資料儲存於本機 · v7</p>
     </div>
   )
 
@@ -94,7 +97,7 @@ function App() {
               <button type="button" onClick={() => setTab('dashboard')} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-bold text-blue-800 lg:hidden" aria-label="回到首頁">首頁</button>
               <div className="min-h-11 px-2 text-left">
                 <span className="block truncate text-lg font-bold text-slate-900">{activeLabel}</span>
-                <span className="block truncate text-xs text-slate-500">{company.name} · {settings.auditYear} 年</span>
+                <span className="block truncate text-xs text-slate-500">{headerScope}</span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">

@@ -166,7 +166,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
   {
     id: 'prep',
     label: '外部稽核前準備與序位',
-    purpose: '完成雙公司外部稽核前準備與內稽→管審→外稽序位。',
+    purpose: '完成雙公司共用外稽準備表與內稽→管審→外稽序位（台帳仍分倉）。',
     entry: '內部稽核與改善追蹤後',
     exit: '準備清單全數完成且序位無異常',
     outputs: '稽核前準備 Excel',

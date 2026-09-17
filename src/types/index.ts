@@ -161,9 +161,24 @@ export interface AuditSettings {
   yearStart: string
   planWindowStart: string
   planWindowEnd: string
-  externalAuditDate?: string
   managementReviewDate?: string
   scoringRules: ScoringRules
+}
+
+export type CompanyRelationshipKind = 'primary_customer'
+
+export interface CompanyRelationship {
+  id: string
+  from: CompanyId
+  to: CompanyId
+  relation: CompanyRelationshipKind
+  prepItemNo: number
+  label: string
+}
+
+export interface YearArchiveEntry {
+  companies: Partial<Record<CompanyId, CompanyData>>
+  companySettings: Partial<Record<CompanyId, AuditSettings>>
 }
 
 export interface DepartmentProfile {
@@ -316,8 +331,10 @@ export interface ExternalAuditPrepItemState {
 
 export interface ExternalAuditPrepState {
   year: number
-  internalAuditComplete: boolean
-  managementReviewComplete: boolean
+  externalAuditDate?: string
+  internalAuditComplete: Record<CompanyId, boolean>
+  managementReviewComplete: Record<CompanyId, boolean>
+  relationshipChecks: Record<string, boolean>
   items: ExternalAuditPrepItemState[]
 }
 
@@ -349,18 +366,36 @@ export interface ProcedureRiskRecord {
 
 export interface AppState {
   activeCompanyId: CompanyId
-  settings: AuditSettings
+  companySettings: Record<CompanyId, AuditSettings>
   companies: Record<CompanyId, CompanyData>
   externalAuditPrep: ExternalAuditPrepState
+  companyRelationships: CompanyRelationship[]
   people: Person[]
   annualPersonnelAssignments: AnnualPersonnelAssignment[]
   companyAuditProfiles: Record<CompanyId, CompanyAuditProfile>
-  yearArchives: Record<string, {
-    settings: AuditSettings
-    companies: Record<CompanyId, CompanyData>
-    externalAuditPrep: ExternalAuditPrepState
-  }>
+  yearArchives: Record<string, YearArchiveEntry>
+  prepArchives?: Record<string, ExternalAuditPrepState>
   version: number
+  /** v6 legacy — migration only; not persisted in v7 */
+  settings?: AuditSettings
+}
+
+export function relationshipCheckKey(
+  from: CompanyId,
+  to: CompanyId,
+  relation: CompanyRelationshipKind,
+): string {
+  return `${from}:${to}:${relation}`
+}
+
+export function companySettingsFor(state: AppState, companyId: CompanyId = state.activeCompanyId): AuditSettings {
+  return state.companySettings[companyId]
+}
+
+export const COMPANY_IDS: CompanyId[] = ['jiurun', 'zhenglongxing']
+
+export function otherCompanyId(companyId: CompanyId): CompanyId {
+  return companyId === 'jiurun' ? 'zhenglongxing' : 'jiurun'
 }
 
 export type TabId =

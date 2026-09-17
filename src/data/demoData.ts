@@ -1,7 +1,20 @@
-import type { AppState, CompanyAuditProfile, CompanyData, CompanyId, Person } from '../types'
-import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
+import type {
+  AppState,
+  AuditSettings,
+  CompanyAuditProfile,
+  CompanyData,
+  CompanyId,
+  ExternalAuditPrepState,
+  Person,
+  YearArchiveEntry,
+} from '../types'
+import { COMPANY_IDS, COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
-import { createDefaultPrepState } from '../lib/externalAuditPrep'
+import {
+  createDefaultPrepState,
+  DEFAULT_COMPANY_RELATIONSHIPS,
+  migratePrepState,
+} from '../lib/externalAuditPrep'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
@@ -69,15 +82,20 @@ const departments = [
   },
 ].map((d) => ({ ...d, stakeholders: [...d.stakeholders] }))
 
-const settings = {
+const baseCompanySettings: AuditSettings = {
   auditYear: 2026,
   leadAuditor: '王大明',
   yearStart: '2026-01-01',
   planWindowStart: '2026-02-01',
   planWindowEnd: '2026-11-30',
-  externalAuditDate: '2026-09-15',
   managementReviewDate: '2026-12-10',
   scoringRules: DEFAULT_SCORING_RULES,
+}
+
+function createCompanySettings(): Record<CompanyId, AuditSettings> {
+  return Object.fromEntries(
+    COMPANY_IDS.map((id) => [id, { ...baseCompanySettings, scoringRules: { ...baseCompanySettings.scoringRules } }]),
+  ) as Record<CompanyId, AuditSettings>
 }
 
 function buildAudit(
@@ -125,7 +143,7 @@ function buildAudit(
     auditors: dept.defaultAuditors,
     auditCategory: entry.auditCategory,
     items,
-    year: settings.auditYear,
+    year: baseCompanySettings.auditYear,
     plannedDate: '2026-03-15',
     status: '執行中' as const,
     scope: `${dept.name}／${entry.process}`,
@@ -178,13 +196,13 @@ function createCompanyData(companySuffix: string): CompanyData {
     {
       departments,
       planEntries: PROCEDURE_PLAN_TEMPLATE,
-      auditYear: settings.auditYear,
-      planWindowStart: settings.planWindowStart,
-      planWindowEnd: settings.planWindowEnd,
-      managementReviewDate: settings.managementReviewDate,
+      auditYear: baseCompanySettings.auditYear,
+      planWindowStart: baseCompanySettings.planWindowStart,
+      planWindowEnd: baseCompanySettings.planWindowEnd,
+      managementReviewDate: baseCompanySettings.managementReviewDate,
       openCarryForwardCount: 2,
     },
-    { leadAuditor: settings.leadAuditor },
+    { leadAuditor: baseCompanySettings.leadAuditor },
   )
 
   const audits = [
@@ -276,21 +294,25 @@ export function createDemoState(): AppState {
     }
   }
 
-  const prep = createDefaultPrepState(settings.auditYear)
-  prep.internalAuditComplete = true
+  const prep = createDefaultPrepState(baseCompanySettings.auditYear)
+  prep.externalAuditDate = '2026-09-15'
+  prep.internalAuditComplete = { jiurun: true, zhenglongxing: false }
+  prep.managementReviewComplete = { jiurun: false, zhenglongxing: false }
   prep.items[0].jiurunDone = true
   prep.items[0].zhenglongxingDone = true
 
   return {
     activeCompanyId: 'jiurun',
-    settings,
+    companySettings: createCompanySettings(),
     companies,
     externalAuditPrep: prep,
+    companyRelationships: DEFAULT_COMPANY_RELATIONSHIPS.map((rel) => ({ ...rel })),
     people: createDemoPeople(),
     annualPersonnelAssignments: [],
     companyAuditProfiles: createAuditProfiles(),
     yearArchives: {},
-    version: 6,
+    prepArchives: {},
+    version: 7,
   }
 }
 
@@ -307,24 +329,80 @@ export function createBlankState(): AppState {
     company.procedureRisks = []
     company.planRows = company.planRows.map((row) => ({ ...row, months: Array.from({ length: 12 }, () => null), manualOverride: false }))
   })
-  state.externalAuditPrep = createDefaultPrepState(state.settings.auditYear)
+  state.externalAuditPrep = createDefaultPrepState(state.companySettings.jiurun.auditYear)
   return state
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v6'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v7'
+export const LEGACY_STORAGE_KEY_V6 = 'qms-annual-internal-audit-v6'
+
+function stripExternalAuditDate(settings: AuditSettings): AuditSettings {
+  const { externalAuditDate: _removed, ...rest } = settings as AuditSettings & { externalAuditDate?: string }
+  return rest
+}
+
+function cloneSettings(settings: AuditSettings): AuditSettings {
+  return {
+    ...settings,
+    scoringRules: { ...settings.scoringRules },
+  }
+}
+
+function legacyAuditYear(base: AppState, companyId: CompanyId, fallback: number): number {
+  return base.companySettings?.[companyId]?.auditYear
+    ?? base.companySettings?.jiurun?.auditYear
+    ?? base.settings?.auditYear
+    ?? fallback
+}
+
+function migrateLegacyYearArchives(
+  archives: AppState['yearArchives'] | Record<string, unknown> | undefined,
+): Record<string, YearArchiveEntry> {
+  if (!archives) return {}
+  const next: Record<string, YearArchiveEntry> = {}
+  for (const [year, entry] of Object.entries(archives)) {
+    const legacy = entry as {
+      settings?: AuditSettings
+      companies?: Partial<Record<CompanyId, CompanyData>>
+      companySettings?: Partial<Record<CompanyId, AuditSettings>>
+      externalAuditPrep?: ExternalAuditPrepState
+    }
+    if (legacy.companySettings || !legacy.settings) {
+      next[year] = {
+        companies: legacy.companies ?? {},
+        companySettings: legacy.companySettings ?? {},
+      }
+      continue
+    }
+    const settings = stripExternalAuditDate(cloneSettings(legacy.settings))
+    next[year] = {
+      companies: legacy.companies ?? {},
+      companySettings: {
+        jiurun: cloneSettings(settings),
+        zhenglongxing: cloneSettings(settings),
+      },
+    }
+  }
+  return next
+}
 
 export function migrateToV4(raw: AppState): AppState {
   if (raw.version >= 4 && raw.externalAuditPrep) return raw
   const demo = createDemoState()
   demo.activeCompanyId = raw.activeCompanyId
-  demo.settings = raw.settings
+  if (raw.settings) {
+    const shared = stripExternalAuditDate(cloneSettings(raw.settings))
+    demo.companySettings = Object.fromEntries(
+      COMPANY_IDS.map((id) => [id, cloneSettings(shared)]),
+    ) as Record<CompanyId, AuditSettings>
+  }
   demo.companies = raw.companies
-  demo.version = 6
-  return demo
+  demo.version = 7
+  return migrateToV7(demo)
 }
 
 export function migrateToV5(raw: AppState): AppState {
-  return migrateToV6(raw)
+  return migrateToV7(raw)
 }
 
 export function migrateToV6(raw: AppState): AppState {
@@ -341,7 +419,7 @@ export function migrateToV6(raw: AppState): AppState {
         ...company,
         audits: company.audits.map((audit) => ({
           ...audit,
-          year: audit.year ?? base.settings.auditYear,
+          year: audit.year ?? legacyAuditYear(base, companyId, defaults.companySettings.jiurun.auditYear),
           plannedDate: audit.plannedDate ?? audit.auditDate,
           status: audit.status ?? (audit.auditDate ? '執行中' : '規劃中'),
           scope: audit.scope ?? `${audit.department}／${audit.process}`,
@@ -366,7 +444,7 @@ export function migrateToV6(raw: AppState): AppState {
       if (!name.trim()) return
       legacyPeople.push({ id: `legacy-${legacyPeople.length + 1}`, name, employeeNumber: '', type: 'internal', affiliations: [], qualifications: [], appointments: [], active: true, notes: `既有姓名／待配對；來源：${source}` })
     }
-    addLegacy(base.settings.leadAuditor, 'leadAuditor')
+    addLegacy(base.companySettings?.jiurun?.leadAuditor ?? base.settings?.leadAuditor ?? '', 'leadAuditor')
     ;(['jiurun', 'zhenglongxing'] as CompanyId[]).forEach((companyId) => {
       base.companies[companyId]?.departments.forEach((department) => addLegacy(department.defaultAuditors, `${companyId}.defaultAuditors`))
       base.companies[companyId]?.audits.forEach((audit) => addLegacy(audit.auditors, `${companyId}.${audit.id}.auditors`))
@@ -379,8 +457,60 @@ export function migrateToV6(raw: AppState): AppState {
     people: base.people ?? legacyPeople,
     annualPersonnelAssignments: base.annualPersonnelAssignments ?? [],
     companyAuditProfiles,
-    yearArchives: base.yearArchives ?? {},
+    yearArchives: migrateLegacyYearArchives(base.yearArchives),
     version: 6,
+  }
+}
+
+export function migrateToV7(raw: AppState): AppState {
+  const v6 = raw.companySettings ? raw : migrateToV6(raw)
+  if (v6.version >= 7 && v6.companySettings) {
+    return {
+      ...v6,
+      companyRelationships: v6.companyRelationships ?? DEFAULT_COMPANY_RELATIONSHIPS.map((rel) => ({ ...rel })),
+      externalAuditPrep: migratePrepState(v6.externalAuditPrep),
+      yearArchives: migrateLegacyYearArchives(v6.yearArchives),
+      prepArchives: v6.prepArchives ?? {},
+      version: 7,
+    }
+  }
+
+  if (v6.companySettings) {
+    return {
+      ...v6,
+      companyRelationships: v6.companyRelationships ?? DEFAULT_COMPANY_RELATIONSHIPS.map((rel) => ({ ...rel })),
+      externalAuditPrep: migratePrepState(v6.externalAuditPrep),
+      yearArchives: migrateLegacyYearArchives(v6.yearArchives),
+      prepArchives: v6.prepArchives ?? {},
+      version: 7,
+      settings: undefined,
+    }
+  }
+
+  const legacySettings = v6.settings ?? createCompanySettings().jiurun
+  const externalAuditDate = (legacySettings as AuditSettings & { externalAuditDate?: string }).externalAuditDate
+  const sharedSettings = stripExternalAuditDate(cloneSettings(legacySettings))
+  const companySettings = Object.fromEntries(
+    COMPANY_IDS.map((id) => [id, cloneSettings(sharedSettings)]),
+  ) as Record<CompanyId, AuditSettings>
+
+  const prepArchives: Record<string, ExternalAuditPrepState> = { ...(v6.prepArchives ?? {}) }
+  for (const [year, archive] of Object.entries(v6.yearArchives ?? {})) {
+    const legacy = archive as { externalAuditPrep?: ExternalAuditPrepState }
+    if (legacy.externalAuditPrep) {
+      prepArchives[year] = migratePrepState(legacy.externalAuditPrep, externalAuditDate)
+    }
+  }
+
+  return {
+    ...v6,
+    companySettings,
+    companyRelationships: DEFAULT_COMPANY_RELATIONSHIPS.map((rel) => ({ ...rel })),
+    externalAuditPrep: migratePrepState(v6.externalAuditPrep, externalAuditDate),
+    yearArchives: migrateLegacyYearArchives(v6.yearArchives),
+    prepArchives,
+    version: 7,
+    settings: undefined,
   }
 }
 
@@ -393,8 +523,18 @@ export function migrateV1State(raw: unknown): AppState | null {
 
   const demo = createDemoState()
   demo.activeCompanyId = 'jiurun'
-  const legacySettings = old.settings as Partial<AppState['settings']>
-  demo.settings = { ...demo.settings, ...legacySettings, scoringRules: { ...demo.settings.scoringRules, ...legacySettings.scoringRules } }
+  const legacySettings = old.settings as Partial<AuditSettings> & { externalAuditDate?: string }
+  const merged = {
+    ...demo.companySettings.jiurun,
+    ...legacySettings,
+    scoringRules: { ...demo.companySettings.jiurun.scoringRules, ...legacySettings.scoringRules },
+  }
+  if (legacySettings.externalAuditDate) {
+    demo.externalAuditPrep.externalAuditDate = legacySettings.externalAuditDate
+  }
+  demo.companySettings = Object.fromEntries(
+    COMPANY_IDS.map((id) => [id, { ...merged, scoringRules: { ...merged.scoringRules } }]),
+  ) as Record<CompanyId, AuditSettings>
   const company = demo.companies.jiurun
   company.departments = old.departments as CompanyData['departments']
   if (old.planRows) company.planRows = old.planRows as CompanyData['planRows']

@@ -2,7 +2,7 @@ import { countPrepProgress, evaluatePrepSequence } from './externalAuditPrep'
 import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
 import type { AppState, CompanyId, TabId } from '../types'
-import { DEFAULT_SCORING_RULES } from '../types'
+import { companySettingsFor, DEFAULT_SCORING_RULES } from '../types'
 
 export type PdcaPhase = 'P' | 'D' | 'C' | 'A' | 'overview' | 'system'
 
@@ -68,7 +68,7 @@ export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = 
 
 export function planScheduled(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
   const co = companyFor(state, companyId)
-  const { settings } = state
+  const settings = companySettingsFor(state, companyId)
   if (!settings.planWindowStart?.trim() || !settings.planWindowEnd?.trim()) return false
   if (!settings.leadAuditor?.trim()) return false
   const hasMonth = co.planRows.some((row) => row.months.some(Boolean))
@@ -76,11 +76,12 @@ export function planScheduled(state: AppState, companyId: CompanyId = state.acti
 }
 
 export function leadAuditorAppointed(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
-  const date = state.settings.planWindowEnd || `${state.settings.auditYear}-12-31`
+  const settings = companySettingsFor(state, companyId)
+  const date = settings.planWindowEnd || `${settings.auditYear}-12-31`
   return Boolean(resolveLeadAuditorPersonId(
     state.people,
     companyId,
-    state.settings.auditYear,
+    settings.auditYear,
     state.annualPersonnelAssignments,
     date,
   ))
@@ -92,9 +93,14 @@ export function auditStarted(state: AppState, companyId: CompanyId = state.activ
 }
 
 export function prepComplete(state: AppState): boolean {
-  const progress = countPrepProgress(state.externalAuditPrep)
+  const progress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
   if (progress.done < progress.total) return false
-  const warnings = evaluatePrepSequence(state.externalAuditPrep, state.companies)
+  const warnings = evaluatePrepSequence({
+    prep: state.externalAuditPrep,
+    companies: state.companies,
+    companySettings: state.companySettings,
+    yearArchives: state.yearArchives,
+  })
   return !warnings.sequenceWarning
 }
 
@@ -141,11 +147,16 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   if (openSug > 0) checkGaps.push({ message: `待追蹤建議 ${openSug} 件`, tab: 'suggestions' })
 
   const actGaps: WorkflowGap[] = []
-  const prepProgress = countPrepProgress(state.externalAuditPrep)
+  const prepProgress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
   if (prepProgress.done < prepProgress.total) {
     actGaps.push({ message: `外部稽核前準備 ${prepProgress.done}/${prepProgress.total}`, tab: 'prep' })
   }
-  const prepWarnings = evaluatePrepSequence(state.externalAuditPrep, state.companies)
+  const prepWarnings = evaluatePrepSequence({
+    prep: state.externalAuditPrep,
+    companies: state.companies,
+    companySettings: state.companySettings,
+    yearArchives: state.yearArchives,
+  })
   if (prepWarnings.sequenceWarning) {
     actGaps.push({ message: '管審／內稽序位異常', tab: 'prep' })
   }
@@ -250,15 +261,17 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = gaps.length === 0
       break
 
-    case 'plan':
-      if (!state.settings.planWindowStart?.trim()) gaps.push({ message: '計畫窗口起始日尚未設定' })
-      if (!state.settings.planWindowEnd?.trim()) gaps.push({ message: '計畫窗口結束日尚未設定' })
-      if (!state.settings.leadAuditor?.trim()) gaps.push({ message: '主任稽核員尚未設定' })
+    case 'plan': {
+      const planSettings = companySettingsFor(state, companyId)
+      if (!planSettings.planWindowStart?.trim()) gaps.push({ message: '計畫窗口起始日尚未設定' })
+      if (!planSettings.planWindowEnd?.trim()) gaps.push({ message: '計畫窗口結束日尚未設定' })
+      if (!planSettings.leadAuditor?.trim()) gaps.push({ message: '主任稽核員尚未設定' })
       if (!co.planRows.some((row) => row.months.some(Boolean))) {
         gaps.push({ message: '至少須排定一個程序月格' })
       }
       ready = gaps.length === 0
       break
+    }
 
     case 'personnel':
       if (!leadAuditorAppointed(state, companyId)) {
@@ -287,11 +300,16 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       break
 
     case 'prep': {
-      const progress = countPrepProgress(state.externalAuditPrep)
+      const progress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
       if (progress.done < progress.total) {
         gaps.push({ message: `準備清單 ${progress.done}/${progress.total} 項完成` })
       }
-      const warnings = evaluatePrepSequence(state.externalAuditPrep, state.companies)
+      const warnings = evaluatePrepSequence({
+        prep: state.externalAuditPrep,
+        companies: state.companies,
+        companySettings: state.companySettings,
+        yearArchives: state.yearArchives,
+      })
       if (warnings.sequenceWarning) gaps.push({ message: '管審／內稽序位異常' })
       if (warnings.ncrWarning) advisories.push({ message: warnings.messages[0] ?? '尚有未結案 NCR' })
       ready = gaps.length === 0

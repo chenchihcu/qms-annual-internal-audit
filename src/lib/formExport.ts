@@ -5,12 +5,13 @@ import { calculateProcedurePriority } from './risk'
 import { PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
 import type {
   AppState,
+  AuditSettings,
   CompanyAuditProfile,
   CompanyData,
   CompanyId,
   ProcedureAudit,
 } from '../types'
-import { COMPANY_LABELS } from '../types'
+import { COMPANY_LABELS, companySettingsFor } from '../types'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -46,7 +47,7 @@ function uniqueSheetName(wb: SpreadsheetWorkbook, base: string): string {
 }
 
 /** QR-28-01 年度計畫 */
-export function buildAnnualPlanSheet(co: CompanyData, settings: AppState['settings']): SpreadsheetSheet {
+export function buildAnnualPlanSheet(co: CompanyData, settings: AuditSettings): SpreadsheetSheet {
   const header = [
     '項次',
     '風險',
@@ -78,11 +79,11 @@ export function buildAnnualPlanSheet(co: CompanyData, settings: AppState['settin
 export function exportAnnualPlanExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()
-  appendSheet(wb, buildAnnualPlanSheet(co, state.settings), sheetName('QR-28-01'))
+  appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-01'))
   const fn = safeFilename([
     'QR-28-01_年度計畫',
     companyLabel(state, companyId),
-    String(state.settings.auditYear),
+    String(companySettingsFor(state, companyId).auditYear),
   ]) + '.xlsx'
   writeWorkbook(wb, fn)
 }
@@ -163,13 +164,13 @@ export function exportAllAuditsExcel(state: AppState, companyId: CompanyId): voi
   const fn = safeFilename([
     'QR-28-02_全部程序查檢表',
     label,
-    String(state.settings.auditYear),
+    String(companySettingsFor(state, companyId).auditYear),
   ]) + '.xlsx'
   writeWorkbook(wb, fn)
 }
 
 /** QR-28-03 不符合事項 */
-export function buildNcrSheet(co: CompanyData, settings: AppState['settings']): SpreadsheetSheet {
+export function buildNcrSheet(co: CompanyData, settings: AuditSettings): SpreadsheetSheet {
   const title = [[`${co.name} · ${settings.auditYear} 不符合事項清單 QR-28-03`]]
   const header = ['NCR#', '來源事件', 'QP', '部門', '流程', '要求快照', '證據快照', '發現快照', '日期', '狀態', '矯正措施', '效果確認', '確認人', '確認日']
   const rows = co.ncrs.map((ncr) => [
@@ -194,11 +195,11 @@ export function buildNcrSheet(co: CompanyData, settings: AppState['settings']): 
 export function exportNcrExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()
-  appendSheet(wb, buildNcrSheet(co, state.settings), sheetName('QR-28-03'))
+  appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-03'))
   const fn = safeFilename([
     'QR-28-03_不符合事項',
     companyLabel(state, companyId),
-    String(state.settings.auditYear),
+    String(companySettingsFor(state, companyId).auditYear),
   ]) + '.xlsx'
   writeWorkbook(wb, fn)
 }
@@ -250,11 +251,12 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
   return createSheet([['方案風險與優先順序 QR-02-01'], [], header, ...rows])
 }
 
-export function buildPersonnelSheet(state: AppState): SpreadsheetSheet {
+export function buildPersonnelSheet(state: AppState, companyId: CompanyId): SpreadsheetSheet {
   const headers = ['姓名', '編號', '類型', '公司或機構', '責任單位', '角色', '狀態', '適用範圍', '有效日期']
   const today = new Date().toISOString().slice(0, 10)
+  const auditYear = companySettingsFor(state, companyId).auditYear
   const rows = state.people.filter((person) => person.active).map((person) => {
-    const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
+    const roles = personRoles(person, auditYear, state.annualPersonnelAssignments)
     const qualStates = person.qualifications.map((item) => qualificationState(item, today))
     const status = qualStates.includes('effective') ? '有效' : qualStates[0] ?? '待確認'
     return [
@@ -269,7 +271,7 @@ export function buildPersonnelSheet(state: AppState): SpreadsheetSheet {
       person.qualifications.map((q) => `${q.effectiveFrom || '待確認'}～${q.validityMode === 'no_expiry' ? '正式依據未訂期限' : q.effectiveTo || '待確認'}`).join('；'),
     ]
   })
-  return createSheet([[`${state.settings.auditYear} 年人員合格名單`], [], headers, ...rows])
+  return createSheet([[`${auditYear} 年人員合格名單`], [], headers, ...rows])
 }
 
 export function buildStandardSheet(profile: CompanyAuditProfile, companyName: string): SpreadsheetSheet {
@@ -289,21 +291,21 @@ export function exportRiskExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()
   appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
-  writeWorkbook(wb, safeFilename(['QR-02-01_方案風險', companyLabel(state, companyId), String(state.settings.auditYear)]) + '.xlsx')
+  writeWorkbook(wb, safeFilename(['QR-02-01_方案風險', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function exportObservationsExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
-  writeWorkbook(wb, safeFilename(['觀察事項台帳', companyLabel(state, companyId), String(state.settings.auditYear)]) + '.xlsx')
+  writeWorkbook(wb, safeFilename(['觀察事項台帳', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function exportSuggestionsExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
-  writeWorkbook(wb, safeFilename(['建議追蹤', companyLabel(state, companyId), String(state.settings.auditYear)]) + '.xlsx')
+  writeWorkbook(wb, safeFilename(['建議追蹤', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function exportPrepExcel(state: AppState): void {
@@ -316,7 +318,7 @@ export function exportStandardExcel(state: AppState, companyId: CompanyId): void
   const profile = state.companyAuditProfiles[companyId]
   const wb = createWorkbook()
   appendSheet(wb, buildStandardSheet(profile, companyLabel(state, companyId)), sheetName('適用標準'))
-  writeWorkbook(wb, safeFilename(['適用標準', companyLabel(state, companyId), String(state.settings.auditYear)]) + '.xlsx')
+  writeWorkbook(wb, safeFilename(['適用標準', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function buildObservationsSheet(co: CompanyData): SpreadsheetSheet {
@@ -356,7 +358,7 @@ export function exportAllFormsExcel(state: AppState, companyId: CompanyId): void
   const fn = safeFilename([
     'QMS表單匯出',
     companyLabel(state, companyId),
-    String(state.settings.auditYear),
+    String(companySettingsFor(state, companyId).auditYear),
   ]) + '.xlsx'
   writeWorkbook(wb, fn)
 }
@@ -364,7 +366,7 @@ export function exportAllFormsExcel(state: AppState, companyId: CompanyId): void
 export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): SpreadsheetWorkbook {
   const co = state.companies[companyId]
   const wb = createWorkbook()
-  appendSheet(wb, buildAnnualPlanSheet(co, state.settings), sheetName('QR-28-01'))
+  appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-01'))
   for (const audit of co.audits) {
     appendSheet(
       wb,
@@ -372,10 +374,10 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
       uniqueSheetName(wb, `02_${audit.qpCode}_${audit.auditDate || audit.plannedDate || audit.id.slice(-6)}`),
     )
   }
-  appendSheet(wb, buildNcrSheet(co, state.settings), sheetName('QR-28-03'))
+  appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-03'))
   appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
   appendSheet(wb, buildStandardSheet(state.companyAuditProfiles[companyId], companyLabel(state, companyId)), sheetName('適用標準'))
-  appendSheet(wb, buildPersonnelSheet(state), sheetName('人員合格名單'))
+  appendSheet(wb, buildPersonnelSheet(state, companyId), sheetName('人員合格名單'))
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
   appendSheet(wb, buildPrepSheet(state), sheetName('稽核前準備'))
@@ -425,7 +427,7 @@ function esc(s: string): string {
 /** Print-ready HTML for annual plan */
 export function exportAnnualPlanHtml(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
-  const settings = state.settings
+  const settings = companySettingsFor(state, companyId)
   const monthHeaders = MONTHS.map((m) => `<th>${m}</th>`).join('')
   const body = co.planRows
     .map(
@@ -452,7 +454,7 @@ export function exportAnnualPlanHtml(state: AppState, companyId: CompanyId): voi
 export function buildExportWorkbookSmoke(state: AppState, companyId: CompanyId): SpreadsheetWorkbook {
   const co = state.companies[companyId]
   const wb = createWorkbook()
-  appendSheet(wb, buildAnnualPlanSheet(co, state.settings), 'QR-28-01')
-  appendSheet(wb, buildNcrSheet(co, state.settings), 'QR-28-03')
+  appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), 'QR-28-01')
+  appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), 'QR-28-03')
   return wb
 }

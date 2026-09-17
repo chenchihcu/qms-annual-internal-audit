@@ -1,17 +1,25 @@
 import { createDefaultPrepState } from './externalAuditPrep'
 import type { AppState } from '../types'
+import { companySettingsFor } from '../types'
 
 export function applyAuditYearChange(
   state: AppState,
+  companyId: AppState['activeCompanyId'],
   newYear: number,
   resetExternalPrep: boolean,
 ): AppState {
-  const settings = { ...state.settings, auditYear: newYear }
+  const current = companySettingsFor(state, companyId)
+  const nextSettings = { ...current, auditYear: newYear }
   let externalAuditPrep = state.externalAuditPrep
-  if (newYear !== state.externalAuditPrep.year) {
-    externalAuditPrep = resetExternalPrep
-      ? createDefaultPrepState(newYear)
-      : { ...state.externalAuditPrep, year: newYear }
+  if (resetExternalPrep && newYear !== state.externalAuditPrep.year) {
+    externalAuditPrep = createDefaultPrepState(newYear)
   }
-  return { ...state, settings, externalAuditPrep }
+  return {
+    ...state,
+    companySettings: {
+      ...state.companySettings,
+      [companyId]: nextSettings,
+    },
+    externalAuditPrep,
+  }
 }

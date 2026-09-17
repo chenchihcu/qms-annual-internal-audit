@@ -10,9 +10,10 @@
 
 ## localStorage 與遷移
 
-- [ ] 現行 key：`qms-annual-internal-audit-v6`（`STORAGE_KEY`）
-- [ ] `loadState` 順序：v5 → v4 migrate → v1 migrate → demo fallback；JSON parse 失敗不得 crash
-- [ ]  bump storage 時：實作 `migrateToV*`，加 migration test，README 註明升級步驟
+- [ ] 現行 key：`qms-annual-internal-audit-v7`（`STORAGE_KEY`）；legacy v6 key 仍可讀並遷移
+- [ ] `loadState` 順序：v7 → v6 migrate → v5 → v4 → v1 → demo fallback；`version > 7` 拒絕降版；JSON parse 失敗不得 crash
+- [ ] v7：`companySettings` per `CompanyId`；`yearArchives` 稀疏 per-company；`prepArchives` 獨立於公司切年
+- [ ] bump storage 時：實作 `migrateToV*`，加 migration test，README 註明升級步驟
 
 ## Crash-Safe UI
 
@@ -34,7 +35,9 @@
 - [ ] `procedureRisks` 須傳入 [`autoArrangePlan`](src/lib/planner.ts)／`regeneratePlan`；風險頁改月格走預覽→`replacePlanRows`，保留 `manualOverride`
 - [ ] 跨年台帳（觀察／建議）合併 `yearArchives`；store 用 `findObservation`／`findSuggestion`／`findNCR` 搜 current + archives；`carryForward*` 須更新 archive 來源
 - [ ] 建議須有 `addSuggestion`；切年後歷史建議仍可在 UI 看見
-- [ ] 主任稽核員：`settings.leadAuditor`（紙本字串）與 `team.leadAuditorPersonId`（事件）分軌；`createAuditEvent` 可預填，不強制覆寫歷史事件
+- [ ] 主任稽核員：`companySettings[id].leadAuditor`（紙本字串）與 `team.leadAuditorPersonId`（事件）分軌；store 投影 `syncedState.settings` 給 UI
+- [ ] 切年 `switchYearState` 只封存 active company；不動另一家、不動 `externalAuditPrep`（除非 `switchPrepYear`）
+- [ ] 外稽準備：`evaluatePrepSequence` 回傳 `openNcrByCompany`；第 15 項需 `relationshipChecks`；`externalAuditPrep.externalAuditDate` 不在 `companySettings`
 - [ ] NCR：`isNcrStale` 標示過期，不自動刪；觀察 `convertedNcrId` 顯示 `ncrNumber` 非內部 id
 - [ ] 儀表板人員警示與 `validateAuditStartState` 閘門一致；觀察卡讀台帳 `observations` + open suggestions，勿混查檢「觀察」判定次數
 
@@ -54,7 +57,7 @@
 
 - [ ] 預設 stability fixes only；使用者明確要求工作流閉環時可改 product，仍須跑 release gate
 - [ ] 緊急 zip：排除 `node_modules`、`.git`、`dist`；附 SHA256
-- [ ] README 測試數與 `npm test` 實際數量一致（目前 99）
+- [ ] README 測試數與 `npm test` 實際數量一致（目前 117）
 
 ## 已知限制（勿假裝已解）
 

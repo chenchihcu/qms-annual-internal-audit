@@ -272,7 +272,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
         <h2 className="mb-4 text-lg font-semibold">資料備份與還原</h2>
         <p className="mb-4 text-sm text-slate-500">
           完整備份含雙公司資料、設定、外部稽核前準備與版本號。儲存於 localStorage key
-          <code className="mx-1 rounded bg-slate-100 px-1">qms-annual-internal-audit-v6</code>。
+          <code className="mx-1 rounded bg-slate-100 px-1">qms-annual-internal-audit-v7</code>。
           還原前會確認覆寫；舊版 v5/v4/v1 備份會自動遷移。
         </p>
         <div className="flex flex-wrap gap-3">
@@ -294,7 +294,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
           <ConfirmDialog
             open
             title="確定還原備份？"
-            description={`${pendingRestore.summary}\n\n目前資料將被覆寫（localStorage v6）。`}
+            description={`${pendingRestore.summary}\n\n目前資料將被覆寫（localStorage v7）。`}
             confirmLabel="確認還原"
             variant="danger"
             onConfirm={confirmRestore}
@@ -307,6 +307,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
         <h2 className="mb-4 text-lg font-semibold">QR-28 表單匯出（Excel）</h2>
         <p className="mb-4 text-sm text-slate-500">
           一次匯出 QR-28-01 年度計畫、全部 QR-28-02 程序查檢表、QR-28-03 不符合、QR-02-01 方案風險、適用標準、人員合格名單、觀察台帳、建議追蹤與稽核前準備（多工作表）。
+          評分規則與年度設定僅套用目前公司；稽核前準備工作表為雙公司共用。
           各 tab 亦可單獨匯出。
         </p>
         <div className="flex flex-wrap gap-3">
@@ -356,7 +357,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
         )}
         <h3 className="mb-2 font-semibold">關於</h3>
         <p className="text-sm text-slate-600">
-          QMS 年度內部稽核系統 v6 — 程序導向（QP 查檢表）、雙公司切換、
+          QMS 年度內部稽核系統 v7 — 程序導向（QP 查檢表）、雙公司台帳分倉、
           對應 QR-28-01/02/03/04/05 及 QR-02-01 風險矩陣。
           目前公司：{state.company.name}
         </p>

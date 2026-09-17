@@ -15,7 +15,7 @@ describe('form export smoke', () => {
 
   it('annual plan sheet has header row matching UI columns', () => {
     const state = createDemoState()
-    const ws = buildAnnualPlanSheet(state.companies.jiurun, state.settings)
+    const ws = buildAnnualPlanSheet(state.companies.jiurun, state.companySettings.jiurun)
     const rows = ws.rows
     const header = rows.find((r) => r[0] === '項次')
     expect(header).toBeDefined()
@@ -25,7 +25,7 @@ describe('form export smoke', () => {
 
   it('NCR sheet includes demo NCR row', () => {
     const state = createDemoState()
-    const ws = buildNcrSheet(state.companies.jiurun, state.settings)
+    const ws = buildNcrSheet(state.companies.jiurun, state.companySettings.jiurun)
     const text = sheetToCsv(ws)
     expect(text).toContain('NCR-2026-001')
     expect(text).toContain('QR-28-03')

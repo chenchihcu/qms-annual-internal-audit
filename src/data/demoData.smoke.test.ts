@@ -13,10 +13,11 @@ describe('createDemoState smoke', () => {
     expect(() => createDemoState()).not.toThrow()
   })
 
-  it('uses v6 storage key and version', () => {
+  it('uses v7 storage key and version', () => {
     const state = createDemoState()
-    expect(state.version).toBe(6)
-    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v6')
+    expect(state.version).toBe(7)
+    expect(state.companySettings.jiurun.auditYear).toBe(state.companySettings.zhenglongxing.auditYear)
+    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v7')
   })
 
   it('demo audits align to PROCEDURE_PLAN_TEMPLATE', () => {

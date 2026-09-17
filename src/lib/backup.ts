@@ -1,11 +1,12 @@
 import {
   createDemoState,
   migrateToV6,
+  migrateToV7,
   migrateV1State,
   STORAGE_KEY,
 } from '../data/demoData'
 import type { AppState, CompanyId } from '../types'
-import { COMPANY_LABELS } from '../types'
+import { COMPANY_IDS, COMPANY_LABELS, companySettingsFor } from '../types'
 
 export const BACKUP_FORMAT = 'qms-annual-internal-audit-backup' as const
 export const MIN_BACKUP_VERSION = 1
@@ -25,28 +26,39 @@ function isObject(v: unknown): v is Record<string, unknown> {
 export function validateAppState(raw: unknown): raw is AppState {
   if (!isObject(raw)) return false
   if (typeof raw.version !== 'number' || raw.version < MIN_BACKUP_VERSION) return false
-  if (!isObject(raw.settings) || typeof raw.settings.auditYear !== 'number') return false
   if (!isObject(raw.companies)) return false
-  for (const id of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
+  for (const id of COMPANY_IDS) {
     const co = raw.companies[id]
     if (!isObject(co)) return false
     if (!Array.isArray(co.departments) || !Array.isArray(co.planRows)) return false
     if (!Array.isArray(co.audits) || !Array.isArray(co.ncrs)) return false
   }
   if (raw.activeCompanyId !== 'jiurun' && raw.activeCompanyId !== 'zhenglongxing') return false
+  if (raw.version >= 7) {
+    if (!isObject(raw.companySettings)) return false
+    for (const id of COMPANY_IDS) {
+      const settings = raw.companySettings[id]
+      if (!isObject(settings) || typeof settings.auditYear !== 'number') return false
+    }
+    return true
+  }
+  if (!isObject(raw.settings) || typeof raw.settings.auditYear !== 'number') return false
   return true
 }
 
 export function migrateImportedState(raw: AppState): AppState {
-  if (raw.version > 6) throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
+  if (raw.version > 7) throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
+  if (raw.version >= 7 && raw.companySettings) {
+    return migrateToV7(raw)
+  }
   if (raw.version >= 6 && raw.externalAuditPrep) {
-    return migrateToV6(raw)
+    return migrateToV7(migrateToV6(raw))
   }
   if (raw.version === 1) {
     const migrated = migrateV1State(raw)
-    if (migrated) return migrateToV6(migrated)
+    if (migrated) return migrateToV7(migrateToV6(migrated))
   }
-  return migrateToV6(raw)
+  return migrateToV7(migrateToV6(raw))
 }
 
 export function parseBackupJson(json: string): AppState {
@@ -65,7 +77,7 @@ export function parseBackupJson(json: string): AppState {
   if (isObject(stateRaw) && stateRaw.version === 1) {
     const migrated = migrateV1State(stateRaw)
     if (!migrated) throw new Error('備份內容不完整或版本不支援')
-    return migrateToV6(migrated)
+    return migrateToV7(migrateToV6(migrated))
   }
 
   if (!validateAppState(stateRaw)) {
@@ -76,17 +88,18 @@ export function parseBackupJson(json: string): AppState {
 }
 
 export function serializeBackup(state: AppState): string {
+  const { settings: _legacy, ...persisted } = state
   const envelope: BackupEnvelope = {
     _format: BACKUP_FORMAT,
     exportedAt: new Date().toISOString(),
     storageKey: STORAGE_KEY,
-    state,
+    state: persisted as AppState,
   }
   return JSON.stringify(envelope, null, 2)
 }
 
 export function backupFilename(state: AppState): string {
-  const year = state.settings.auditYear
+  const year = companySettingsFor(state).auditYear
   return `QMS備份_${year}_${new Date().toISOString().slice(0, 10)}.json`
 }
 
@@ -96,10 +109,15 @@ export function backupRoundTrip(state: AppState): AppState {
 }
 
 export function describeBackup(state: AppState): string {
-  const companies = (['jiurun', 'zhenglongxing'] as CompanyId[])
+  const companies = (COMPANY_IDS as CompanyId[])
     .map((id) => `${COMPANY_LABELS[id]}(${state.companies[id].audits.length}稽核)`)
     .join('、')
-  return `${state.settings.auditYear} 年度 · ${companies} · v${state.version}`
+  const jiurunYear = state.companySettings.jiurun.auditYear
+  const zlxYear = state.companySettings.zhenglongxing.auditYear
+  const yearLabel = jiurunYear === zlxYear
+    ? `${jiurunYear} 年度`
+    : `九潤 ${jiurunYear}／正隆興 ${zlxYear}`
+  return `${yearLabel} · ${companies} · v${state.version}`
 }
 
 /** Demo fallback must remain valid after failed parse in loadState. */

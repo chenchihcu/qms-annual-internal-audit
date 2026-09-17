@@ -3,7 +3,9 @@ import { renderHook, act } from '@testing-library/react'
 import {
   createDemoState,
   migrateToV6,
+  migrateToV7,
   STORAGE_KEY,
+  LEGACY_STORAGE_KEY_V6,
 } from '../../data/demoData'
 import { useAuditStore } from '../useAuditStore'
 
@@ -11,28 +13,32 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-describe('migrateToV6', () => {
-  it('preserves state and adds v6 personnel data', () => {
+describe('migrateToV7', () => {
+  it('preserves state and exposes per-company settings', () => {
     const demo = createDemoState()
-    const migrated = migrateToV6(demo)
-    expect(migrated.version).toBe(6)
+    const migrated = migrateToV7(migrateToV6({ ...demo, version: 6, settings: demo.companySettings.jiurun } as typeof demo))
+    expect(migrated.version).toBe(7)
+    expect(migrated.companySettings.jiurun.auditYear).toBe(demo.companySettings.jiurun.auditYear)
+    expect(migrated.companySettings.zhenglongxing.auditYear).toBe(demo.companySettings.zhenglongxing.auditYear)
+    expect(migrated.companyRelationships.length).toBeGreaterThan(0)
+    expect(migrated.externalAuditPrep.internalAuditComplete).toEqual(expect.objectContaining({ jiurun: expect.any(Boolean) }))
     expect(migrated.people).toBeDefined()
     expect(migrated.externalAuditPrep).toBeDefined()
     expect(migrated.companies.jiurun.audits.length).toBeGreaterThan(0)
   })
 
-  it('upgrades v4-shaped state to version 6', () => {
+  it('upgrades v4-shaped state to version 7', () => {
     const demo = createDemoState()
-    const v4Like = { ...demo, version: 4 as const }
-    const migrated = migrateToV6(v4Like)
-    expect(migrated.version).toBe(6)
+    const v4Like = { ...demo, version: 4 as const, settings: demo.companySettings.jiurun }
+    const migrated = migrateToV7(migrateToV6(v4Like))
+    expect(migrated.version).toBe(7)
     expect(migrated.externalAuditPrep).toBeDefined()
   })
 
   it('keeps legacy names pending without inferring qualifications', () => {
     const demo = createDemoState()
-    const legacy = { ...demo, version: 5, people: undefined, annualPersonnelAssignments: undefined, companyAuditProfiles: undefined, yearArchives: undefined } as unknown as Parameters<typeof migrateToV6>[0]
-    const migrated = migrateToV6(legacy)
+    const legacy = { ...demo, version: 5, people: undefined, annualPersonnelAssignments: undefined, companyAuditProfiles: undefined, yearArchives: undefined, settings: demo.companySettings.jiurun } as unknown as Parameters<typeof migrateToV6>[0]
+    const migrated = migrateToV7(migrateToV6(legacy))
     expect(migrated.people.length).toBeGreaterThan(0)
     expect(migrated.people.every((person) => person.qualifications.length === 0)).toBe(true)
     expect(migrated.people.some((person) => person.notes.includes('待配對'))).toBe(true)
@@ -40,12 +46,12 @@ describe('migrateToV6', () => {
 })
 
 describe('localStorage load parity', () => {
-  it('loads v6 key directly', () => {
+  it('loads v7 key directly', () => {
     const demo = createDemoState()
     localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.settings.auditYear).toBe(demo.settings.auditYear)
+    expect(result.current.state.settings.auditYear).toBe(demo.companySettings.jiurun.auditYear)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
   })
 
@@ -64,16 +70,27 @@ describe('localStorage load parity', () => {
     localStorage.setItem('qms-annual-internal-audit-v5', JSON.stringify({ ...demo, version: 5 }))
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.version).toBe(6)
+    expect(result.current.state.version).toBe(7)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
     expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
   })
 
-  it('migrates v1 key to v6 on load', () => {
+  it('migrates legacy v6 key to v7 on load', () => {
+    const demo = createDemoState()
+    const v6Like = { ...demo, version: 6, settings: demo.companySettings.jiurun }
+    localStorage.setItem(LEGACY_STORAGE_KEY_V6, JSON.stringify(v6Like))
+
+    const { result } = renderHook(() => useAuditStore())
+    expect(result.current.state.version).toBe(7)
+    expect(result.current.state.companySettings.jiurun.auditYear).toBe(2026)
+    expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
+  })
+
+  it('migrates v1 key to v7 on load', () => {
     const demo = createDemoState()
     localStorage.setItem('qms-annual-internal-audit-v1', JSON.stringify({
       version: 1,
-      settings: { ...demo.settings, auditYear: 2024 },
+      settings: { ...demo.companySettings.jiurun, auditYear: 2024 },
       departments: demo.companies.jiurun.departments,
       planRows: demo.companies.jiurun.planRows,
       audits: demo.companies.jiurun.audits,
@@ -82,7 +99,7 @@ describe('localStorage load parity', () => {
     }))
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.version).toBe(6)
+    expect(result.current.state.version).toBe(7)
     expect(result.current.state.settings.auditYear).toBe(2024)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
     expect(localStorage.getItem(STORAGE_KEY)).toBeTruthy()
@@ -98,7 +115,7 @@ describe('localStorage load parity', () => {
   })
 
   it('refuses a newer storage version without overwriting it', () => {
-    const newer = { ...createDemoState(), version: 7 }
+    const newer = { ...createDemoState(), version: 8 }
     const raw = JSON.stringify(newer)
     localStorage.setItem(STORAGE_KEY, raw)
 
@@ -147,6 +164,15 @@ describe('year datasets', () => {
     act(() => result.current.switchAuditYear(2026))
     expect(result.current.state.company.audits).toHaveLength(originalCount)
   })
+
+  it('only archives the active company when switching year', () => {
+    const { result } = renderHook(() => useAuditStore())
+    const otherBefore = result.current.state.companies.zhenglongxing.audits.length
+    const prepBefore = result.current.state.externalAuditPrep.items[0].jiurunDone
+    act(() => result.current.switchAuditYear(2027))
+    expect(result.current.state.companies.zhenglongxing.audits).toHaveLength(otherBefore)
+    expect(result.current.state.externalAuditPrep.items[0].jiurunDone).toBe(prepBefore)
+  })
 })
 
 describe('audit event records', () => {
@@ -159,22 +185,27 @@ describe('audit event records', () => {
     }))
     const id = result.current.state.company.observations.at(-1)!.id
     act(() => result.current.switchAuditYear(2027))
-    const priorNcr = result.current.state.yearArchives['2026'].companies.jiurun.ncrs.find((item) => item.status !== '結案')!
-    act(() => result.current.carryForwardNCR(priorNcr.id, priorNcr.qpCode, priorNcr.departmentId))
+    const jiurun2026 = result.current.state.yearArchives['2026']?.companies.jiurun
+    expect(jiurun2026).toBeDefined()
+    const priorNcr = jiurun2026!.ncrs.find((item) => item.status !== '結案')
+    expect(priorNcr).toBeDefined()
+    act(() => result.current.carryForwardNCR(priorNcr!.id, priorNcr!.qpCode, priorNcr!.departmentId))
     expect(result.current.state.company.audits.flatMap((audit) => audit.items).some((item) => item.sourceNcrId === priorNcr.id)).toBe(true)
     act(() => result.current.addObservationFollowUp(id, '2027-01-10', '第一次追蹤'))
     act(() => result.current.carryForwardObservation(id, 'QP-28', 'dept-qa'))
     act(() => result.current.carryForwardObservation(id, 'QP-28', 'dept-qa'))
-    const prior = result.current.state.yearArchives['2026'].companies.jiurun.observations.find((item) => item.id === id)!
+    const prior = result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)
+    expect(prior).toBeDefined()
+    if (!prior) throw new Error('missing prior observation')
     expect(prior.followUps).toHaveLength(1)
     expect(prior.carryForwards).toHaveLength(1)
     expect(prior.carryForwards?.[0].year).toBe(2027)
     expect(result.current.state.company.audits.flatMap((audit) => audit.items).filter((item) => item.carriedFromId === id)).toHaveLength(1)
     act(() => result.current.updateObservation(id, { status: 'closed' }))
-    expect(result.current.state.yearArchives['2026'].companies.jiurun.observations.find((item) => item.id === id)?.status).toBe('open')
+    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.status).toBe('open')
     act(() => result.current.updateObservation(id, { status: 'closed', closedAt: '2027-02-01', closeEvidence: 'CAPA-102' }))
-    expect(result.current.state.yearArchives['2026'].companies.jiurun.observations.find((item) => item.id === id)?.status).toBe('closed')
-    const revisions = result.current.state.yearArchives['2026'].companies.jiurun.observations.find((item) => item.id === id)?.revisions
+    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.status).toBe('closed')
+    const revisions = result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.revisions
     expect(revisions).toHaveLength(1)
     expect(revisions?.[0].before.status).toBe('open')
     expect(revisions?.[0].after.closeEvidence).toBe('CAPA-102')

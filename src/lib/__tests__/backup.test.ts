@@ -12,18 +12,19 @@ describe('backup round-trip', () => {
   it('serializes envelope and restores full state', () => {
     const demo = createDemoState()
     const restored = backupRoundTrip(demo)
-    expect(restored.version).toBe(6)
+    expect(restored.version).toBe(7)
     expect(restored.people).toEqual(demo.people)
     expect(restored.companies.jiurun.audits.length).toBe(demo.companies.jiurun.audits.length)
     expect(restored.externalAuditPrep).toBeDefined()
-    expect(restored.settings.auditYear).toBe(demo.settings.auditYear)
+    expect(restored.companySettings.jiurun.auditYear).toBe(demo.companySettings.jiurun.auditYear)
+    expect(restored.companyRelationships.length).toBeGreaterThan(0)
   })
 
   it('accepts legacy plain AppState JSON without envelope', () => {
     const demo = createDemoState()
-    const legacy = JSON.stringify(demo)
+    const legacy = JSON.stringify({ ...demo, version: 6, settings: demo.companySettings.jiurun })
     const restored = parseBackupJson(legacy)
-    expect(restored.version).toBe(6)
+    expect(restored.version).toBe(7)
     expect(restored.companies.zhenglongxing.planRows.length).toBeGreaterThan(0)
   })
 
@@ -31,7 +32,7 @@ describe('backup round-trip', () => {
     const demo = createDemoState()
     const legacy = {
       version: 1,
-      settings: { ...demo.settings, auditYear: 2024 },
+      settings: { ...demo.companySettings.jiurun, auditYear: 2024 },
       departments: demo.companies.jiurun.departments,
       planRows: demo.companies.jiurun.planRows,
       audits: demo.companies.jiurun.audits,
@@ -39,8 +40,8 @@ describe('backup round-trip', () => {
       observations: demo.companies.jiurun.observations,
     }
     const restored = parseBackupJson(JSON.stringify(legacy))
-    expect(restored.version).toBe(6)
-    expect(restored.settings.auditYear).toBe(2024)
+    expect(restored.version).toBe(7)
+    expect(restored.companySettings.jiurun.auditYear).toBe(2024)
     expect(restored.companies.jiurun.audits.length).toBe(demo.companies.jiurun.audits.length)
   })
 
@@ -57,7 +58,7 @@ describe('backup round-trip', () => {
   })
 
   it('rejects a structurally valid backup from a newer version', () => {
-    const newer = { ...createDemoState(), version: 7 }
+    const newer = { ...createDemoState(), version: 8 }
     expect(() => parseBackupJson(JSON.stringify(newer))).toThrow('拒絕降版還原')
   })
 })
