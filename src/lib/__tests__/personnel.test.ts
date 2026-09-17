@@ -77,7 +77,13 @@ describe('personnel qualification validation', () => {
   })
 
   it('treats scope sentinel as matching any procedure, department, and confirmed standard', () => {
-    const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
+    const team = {
+      leadAuditorPersonId: 'p1',
+      auditorPersonIds: [],
+      escortPersonIds: [],
+      impartialityConfirmed: true,
+      impartialityNote: '職責分離已確認',
+    }
     const allScopes = {
       ...person,
       qualifications: [qualification({
