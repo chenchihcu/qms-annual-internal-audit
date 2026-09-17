@@ -1,0 +1,23 @@
+---
+description: Web 資訊三層 — 導覽摘要、工作面表、明細只開一筆
+globs: src/components/**/*.tsx,src/lib/workflowStatus.ts
+alwaysApply: false
+---
+
+# UI 資訊三層
+
+集合資料（QP、觀察、查檢項）禁止一層攤平。
+
+1. **導覽／狀態**：`已存檔 a/b`、`準備清單 x/y`、≤3 條阻擋。高度不隨 N 成長。
+2. **工作面**：sticky 表、篩選 chips、批次按鈕。手機可 `overflow-x-auto`。
+3. **明細**：點列展開證據／追蹤／編輯表單；開案列保留「轉 NCR」等主要操作。
+
+```tsx
+// BAD — 導覽逐筆
+gaps.push({ message: `${qp} 尚未存檔` })
+
+// GOOD — 導覽摘要
+gaps.push({ message: `固有風險已存檔 ${saved}/${total}` })
+```
+
+N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。
