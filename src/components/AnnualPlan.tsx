@@ -5,7 +5,7 @@ import { autoArrangePlan, cycleMonthStatus } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
 import { getPdcaOverview } from '../lib/workflowStatus'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
-import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
+import { MONTH_STATUS_LEGEND } from '../types'
 import type { MonthStatus } from '../types'
 import { leadAuditorCandidates } from '../lib/personnel'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
@@ -26,7 +26,7 @@ function statusShort(status: MonthStatus): string {
 }
 
 export function AnnualPlan({ store }: { store: AuditStore }) {
-  const { state, replacePlanRows, updatePlanRow, setPlanMonthStatus, updateDepartment, updateSettings, switchAuditYear } =
+  const { state, replacePlanRows, updatePlanRow, setPlanMonthStatus, updateSettings, switchAuditYear } =
     store
   const { settings, company, people, annualPersonnelAssignments, yearArchives } = state
   const [previewRows, setPreviewRows] = useState<typeof company.planRows | null>(null)
@@ -218,51 +218,6 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
               ))}
             </tbody>
           </table>
-        </div>
-      </Card>
-
-      <Card className="no-print">
-        <h3 className="mb-4 text-lg font-semibold">利害關係人設定</h3>
-        <div className="space-y-4">
-          {company.departments.map((dept) => (
-            <div key={dept.id} className="rounded-lg border border-slate-200 p-4">
-              <p className="mb-2 font-medium">{dept.name} · 負責人：{dept.owner}</p>
-              <div className="mb-3 grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="發生度 O（1–5）"
-                  type="number"
-                  value={dept.riskOccurrence}
-                  onChange={(value) => updateDepartment(dept.id, { riskOccurrence: Math.min(5, Math.max(1, Number(value) || 1)) })}
-                />
-                <Input
-                  label="嚴重度 S（1–5）"
-                  type="number"
-                  value={dept.riskSeverity}
-                  onChange={(value) => updateDepartment(dept.id, { riskSeverity: Math.min(5, Math.max(1, Number(value) || 1)) })}
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {STAKEHOLDER_TAGS.map((tag) => {
-                  const active = dept.stakeholders.includes(tag)
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`rounded-full border px-3 py-1 text-xs ${active ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-500'}`}
-                      onClick={() => {
-                        const stakeholders = active
-                          ? dept.stakeholders.filter((s) => s !== tag)
-                          : [...dept.stakeholders, tag]
-                        updateDepartment(dept.id, { stakeholders })
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
         </div>
       </Card>
     </div>
