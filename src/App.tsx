@@ -90,7 +90,7 @@ function App() {
 
       <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur no-print">
-        <div className="px-4 py-3 sm:px-6 lg:px-8">
+        <div className="px-4 py-3 sm:px-6 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <button type="button" className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-bold text-blue-800 lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽">選單</button>
@@ -129,7 +129,7 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6">
         {store.storageWarning && (
           <div role="alert" className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <strong className="block">資料保護模式</strong>
