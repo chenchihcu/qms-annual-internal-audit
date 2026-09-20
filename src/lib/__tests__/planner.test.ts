@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
+  annualAuditFrequencyForLevel,
   autoArrangePlan,
   calculateDepartmentPriority,
   cycleMonthStatus,
+  describeArrangementImpact,
+  osBandToScale,
+  scaleToOsBand,
   STAKEHOLDER_WEIGHTS,
 } from '../planner'
 import type { DepartmentProfile } from '../../types'
@@ -18,6 +22,53 @@ const baseDept = (overrides: Partial<DepartmentProfile> = {}): DepartmentProfile
   riskOccurrence: 3,
   riskSeverity: 4,
   ...overrides,
+})
+
+describe('scaleToOsBand / osBandToScale', () => {
+  it('maps stored scale to nearest band for display', () => {
+    expect(scaleToOsBand(1)).toBe('low')
+    expect(scaleToOsBand(2)).toBe('low')
+    expect(scaleToOsBand(3)).toBe('mid')
+    expect(scaleToOsBand(4)).toBe('high')
+    expect(scaleToOsBand(5)).toBe('high')
+  })
+
+  it('writes canonical 1/3/5 when user picks a band', () => {
+    expect(osBandToScale('low')).toBe(1)
+    expect(osBandToScale('mid')).toBe(3)
+    expect(osBandToScale('high')).toBe(5)
+  })
+})
+
+describe('describeArrangementImpact', () => {
+  it('explains sort, frequency, and timing for high customer-facing departments', () => {
+    const impact = describeArrangementImpact(
+      baseDept({
+        stakeholders: ['客戶', '法規/認證'],
+        riskOccurrence: 5,
+        riskSeverity: 5,
+      }),
+      '高',
+    )
+    expect(impact.summary).toMatch(/本部門 QP · 優先 \d+ · 年約 3 次 · 偏早/)
+    expect(impact.sortLine).toMatch(/QP 排序：優先分數/)
+    expect(impact.frequencyLine).toMatch(/年次數：約 3 次/)
+    expect(impact.timingLine).toMatch(/偏計畫窗口前半/)
+  })
+
+  it('uses balanced timing for low-risk departments without customer/reg tags', () => {
+    const impact = describeArrangementImpact(
+      baseDept({
+        stakeholders: ['員工'],
+        riskOccurrence: 1,
+        riskSeverity: 1,
+      }),
+      '低',
+    )
+    expect(annualAuditFrequencyForLevel('低')).toBe(1)
+    expect(impact.summary).toMatch(/年約 1 次 · 均衡/)
+    expect(impact.timingLine).toMatch(/均衡分散/)
+  })
 })
 
 describe('calculateDepartmentPriority', () => {

@@ -97,7 +97,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
   {
     id: 'stakeholders',
     label: '利害關係人',
-    purpose: '標定各部門利害關係人與部門風險（O×S），作為自動編排排序／頻率的輸入。',
+    purpose: '標定各部門利害關係人與部門風險（低／中／高，系統換算 O×S），作為自動編排排序／頻率的輸入。',
     entry: '程序來源已備',
     exit: '每個部門至少一個利害關係人標籤',
     outputs: 'departments[].stakeholders／riskOccurrence／riskSeverity（不直接改月格）',
@@ -107,7 +107,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
   {
     id: 'risk',
     label: '方案風險與優先順序',
-    purpose: '評估全部 QP 的七因素優先順序，並可套用至月格。',
+    purpose: '以件數／三檔事實評估全部 QP 優先順序（系統加權 0–100），並可套用至月格。',
     entry: '部門利害關係人已標註',
     exit: '各 QP 固有風險已存檔（其餘因素可暫定）',
     outputs: 'procedureRisks、QR-02-01 Excel',
@@ -206,7 +206,7 @@ export function getTabWorkflow(tab: TabId): TabWorkflow | undefined {
 export const PROCEDURE_LIFECYCLE_STEPS: Array<{ step: string; tab: TabId; note: string }> = [
   { step: '01', tab: 'standard', note: '確認適用標準與證書依據。' },
   { step: '02', tab: 'procedure', note: '本頁完成版本與紀錄位置。' },
-  { step: '03', tab: 'stakeholders', note: '標定部門利害關係人與 O×S。' },
+  { step: '03', tab: 'stakeholders', note: '標定部門利害關係人與 O／S 三檔事實。' },
   { step: '04', tab: 'risk', note: '評估 QP 優先順序。' },
   { step: '05', tab: 'plan', note: '依風險安排稽核月份。' },
   { step: '06', tab: 'personnel', note: '確認稽核團隊資格與任命。' },

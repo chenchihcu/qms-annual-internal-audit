@@ -1,7 +1,7 @@
 import { EXTERNAL_AUDIT_PREP_SEED } from './externalAuditPrep'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
-import { calculateProcedurePriority } from './risk'
+import { calculateProcedurePriority, inherentScaleFromSeed } from './risk'
 import { formatQualificationScopeSummary, PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
 import type {
   AppState,
@@ -219,11 +219,14 @@ export function buildSuggestionsSheet(co: CompanyData): SpreadsheetSheet {
 }
 
 export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
+  const legend = [
+    '對照：NCR 0/1/2/3/≥4件→1–5；客訴／變更 無／中／高→1/3/5；距上次 ＜6/6–11/12–17/18–23/≥24月→1–5；固有 低／中／高→1/3/5；空白暫估3',
+  ]
   const header = ['QP', '部門', '固有風險', '上次內稽NCR', '上次第三方NCR', '未結NCR', '客戶抱怨', '重大變更', '距上次稽核', '優先分數', '等級', '暫定', '證據']
   const rows = co.planRows.map((plan) => {
     const saved = co.procedureRisks?.find((item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId)
     const values = {
-      inherentRisk: saved?.inherentRisk ?? (plan.riskLevel === '高' ? 5 : plan.riskLevel === '中' ? 3 : 1),
+      inherentRisk: saved?.inherentRisk ?? inherentScaleFromSeed(plan.riskLevel),
       previousInternalNcrCount: saved?.previousInternalNcrCount,
       previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
       overdueOpenNcrCount: saved?.overdueOpenNcrCount,
@@ -248,7 +251,7 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
       saved?.evidenceReference ?? '',
     ]
   })
-  return createSheet([['方案風險與優先順序 QR-02-01'], [], header, ...rows])
+  return createSheet([['方案風險與優先順序 QR-02-01'], legend, [], header, ...rows])
 }
 
 export function buildPersonnelSheet(state: AppState, companyId: CompanyId): SpreadsheetSheet {

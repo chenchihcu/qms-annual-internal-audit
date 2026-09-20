@@ -6,7 +6,46 @@ import {
   getProceduresRaw,
   isSeedFinalized,
 } from '../data/checklistLoader'
-import { calculateProcedurePriority, calculateRiskLevel } from './risk'
+import { calculateProcedurePriority, calculateRiskLevel, clampRiskValue } from './risk'
+
+export type OsBand = 'low' | 'mid' | 'high'
+
+export const OS_BAND_SCALE: Record<OsBand, number> = {
+  low: 1,
+  mid: 3,
+  high: 5,
+}
+
+export const OS_BAND_LABELS: Record<OsBand, string> = {
+  low: '低',
+  mid: '中',
+  high: '高',
+}
+
+export const OS_BAND_ORDER: OsBand[] = ['low', 'mid', 'high']
+
+export const OCCURRENCE_BAND_GUIDE: Record<OsBand, string> = {
+  low: '近兩年幾乎未發生',
+  mid: '約每年一次',
+  high: '一年多次或持續發生',
+}
+
+export const SEVERITY_BAND_GUIDE: Record<OsBand, string> = {
+  low: '內部可吸收、無外部衝擊',
+  mid: '需矯正、影響部門績效',
+  high: '客訴、認證觀察或法規不合格',
+}
+
+export function scaleToOsBand(scale: number): OsBand {
+  const s = clampRiskValue(scale)
+  if (s <= 2) return 'low'
+  if (s <= 3) return 'mid'
+  return 'high'
+}
+
+export function osBandToScale(band: OsBand): number {
+  return OS_BAND_SCALE[band]
+}
 
 export const STAKEHOLDER_WEIGHTS: Record<string, number> = {
   客戶: 10,
@@ -73,9 +112,65 @@ export function calculateDepartmentPriority(dept: DepartmentProfile): number {
   return stakeholderScore * 2 + index
 }
 
+/** 部門風險等級 → 年度計畫窗口內建議稽核次數（不含跨年未結案加成） */
+export function annualAuditFrequencyForLevel(level: RiskLevel): number {
+  if (level === '高') return 3
+  if (level === '中') return 2
+  return 1
+}
+
+export const ARRANGEMENT_IMPACT_RULES = {
+  scope: '此部門底下各 QP 在年度計畫的「順序」與「月格次數／早晚」。',
+  trigger: '僅在方案風險或年度計畫頁按「預覽自動編排」時套用。',
+  excludes: 'QR-02-01 已存檔的 QP 改以方案風險為準；已手動覆寫（manualOverride）的月格不會被改寫。',
+  columnNote: '本欄為各部門在「尚未存 QR-02-01」時的估算；實際以自動編排結果為準。',
+} as const
+
+/** 利害關係人工作流與紙本／標準對照（本頁無獨立 QR 匯出） */
+export const STAKEHOLDER_WORKFLOW_REFERENCES = {
+  procedures: [
+    { code: 'QP-28', name: '內部稽核管理程序', note: '年度計畫擬定、稽核頻率與月格編排' },
+    { code: 'QP-02', name: '風險與機會管理程序', note: 'QR-02-01 方案風險（與本頁部門 O×S 分軌）' },
+  ],
+  clauses: [
+    { standard: 'ISO 9001', clause: '4.2', label: '了解相關方需求與期望（利害關係人標籤）' },
+    { standard: 'ISO 9001', clause: '9.2', label: '內部稽核方案規劃（計畫順序／頻率）' },
+  ],
+  forms: [
+    { code: '—', name: '本頁工作流輸入', role: '部門利害關係人與 O／S 三檔事實', storage: 'departments[]／備份 JSON' },
+    { code: 'QR-28-01', name: '年度稽核計畫表', role: '編排產出（月格）', tab: 'plan' as const },
+    { code: 'QR-02-01', name: '風險與機會監控評估表', role: 'QP 方案風險（優先於本頁估算）', tab: 'risk' as const },
+  ],
+} as const
+
+export interface ArrangementImpact {
+  summary: string
+  sortLine: string
+  frequencyLine: string
+  timingLine: string
+}
+
+export function describeArrangementImpact(
+  dept: DepartmentProfile,
+  level: RiskLevel,
+): ArrangementImpact {
+  const priority = calculateDepartmentPriority(dept)
+  const freq = annualAuditFrequencyForLevel(level)
+  const hasCustomerReg = dept.stakeholders.some((s) => s === '客戶' || s === '法規/認證')
+  const preferEarly = level === '高' || hasCustomerReg
+
+  const sortLine = `QP 排序：優先分數 ${priority}（高者先排進月格）`
+  const frequencyLine = `年次數：約 ${freq} 次（依部門風險「${level}」；高 3／中 2／低 1）`
+  const timingLine = preferEarly
+    ? `月格時點：偏計畫窗口前半${hasCustomerReg ? '（含客戶／法規標籤）' : '（高風險）'}`
+    : '月格時點：窗口內均衡分散'
+  const summary = `本部門 QP · 優先 ${priority} · 年約 ${freq} 次 · ${preferEarly ? '偏早' : '均衡'}`
+
+  return { summary, sortLine, frequencyLine, timingLine }
+}
+
 function frequencyForRisk(level: RiskLevel, carryBoost: number): number {
-  const base = level === '高' ? 3 : level === '中' ? 2 : 1
-  return Math.min(4, base + (carryBoost > 0 ? 1 : 0))
+  return Math.min(4, annualAuditFrequencyForLevel(level) + (carryBoost > 0 ? 1 : 0))
 }
 
 function distributeMonths(

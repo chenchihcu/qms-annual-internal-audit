@@ -6,6 +6,21 @@ import {
   clampRiskValue,
   calculateProcedurePriority,
   buildEffectiveProcedureRisks,
+  countToScale,
+  scaleToCountLabel,
+  cycleCountScale,
+  bandToScale,
+  scaleToBandLabel,
+  monthsToScale,
+  scaleToMonthsLabel,
+  inherentScaleFromSeed,
+  scaleToInherentLabel,
+  cycleInherentScale,
+  formatFactorLabel,
+  cycleFactorScale,
+  factorWeightedPoints,
+  suggestOverdueScaleFromOpenCount,
+  suggestMonthsScaleFromAudits,
 } from '../risk'
 import type { CompanyData } from '../../types'
 
@@ -43,6 +58,78 @@ describe('calculateProcedurePriority', () => {
     const baseline = { inherentRisk: 3, previousInternalNcrCount: 1, previousThirdPartyNcrCount: 1, overdueOpenNcrCount: 1, customerComplaintLevel: 1, changeImpact: 1, monthsSinceLastAudit: 1 }
     const increasedExternal = calculateProcedurePriority({ ...baseline, previousThirdPartyNcrCount: 5 })
     expect(increasedExternal.score).toBeGreaterThan(calculateProcedurePriority(baseline).score)
+  })
+})
+
+describe('risk factor label mappings', () => {
+  it('maps NCR counts to scale and labels', () => {
+    expect(countToScale(0)).toBe(1)
+    expect(countToScale(1)).toBe(2)
+    expect(countToScale(2)).toBe(3)
+    expect(countToScale(3)).toBe(4)
+    expect(countToScale(4)).toBe(5)
+    expect(countToScale(99)).toBe(5)
+    expect(scaleToCountLabel(undefined)).toBe('—')
+    expect(scaleToCountLabel(1)).toBe('0件')
+    expect(scaleToCountLabel(5)).toBe('≥4件')
+  })
+
+  it('cycles count scale through blank for optional fields', () => {
+    expect(cycleCountScale(undefined, false)).toBe(1)
+    expect(cycleCountScale(5, false)).toBeUndefined()
+    expect(cycleCountScale(5, true)).toBe(1)
+  })
+
+  it('maps three-band and months scales', () => {
+    expect(bandToScale('low')).toBe(1)
+    expect(bandToScale('mid')).toBe(3)
+    expect(bandToScale('high')).toBe(5)
+    expect(scaleToBandLabel(1)).toBe('無')
+    expect(scaleToBandLabel(3)).toBe('中')
+    expect(scaleToBandLabel(5)).toBe('高')
+    expect(monthsToScale(0)).toBe(1)
+    expect(monthsToScale(11)).toBe(2)
+    expect(monthsToScale(24)).toBe(5)
+    expect(scaleToMonthsLabel(4)).toBe('18–23月')
+  })
+
+  it('maps inherent seed and legacy display bands', () => {
+    expect(inherentScaleFromSeed('高')).toBe(5)
+    expect(inherentScaleFromSeed('中')).toBe(3)
+    expect(inherentScaleFromSeed('低')).toBe(1)
+    expect(scaleToInherentLabel(2)).toBe('低')
+    expect(scaleToInherentLabel(3)).toBe('中')
+    expect(scaleToInherentLabel(4)).toBe('高')
+    expect(cycleInherentScale(5)).toBe(1)
+  })
+
+  it('formatFactorLabel routes by field kind', () => {
+    expect(formatFactorLabel('previousInternalNcrCount', 3)).toBe('2件')
+    expect(formatFactorLabel('customerComplaintLevel', 1)).toBe('無')
+    expect(formatFactorLabel('inherentRisk', 5)).toBe('高')
+  })
+
+  it('cycleFactorScale uses field kind', () => {
+    expect(cycleFactorScale('customerComplaintLevel', undefined, false)).toBe(1)
+    expect(cycleFactorScale('customerComplaintLevel', 5, false)).toBeUndefined()
+    expect(cycleFactorScale('inherentRisk', 3, true)).toBe(5)
+  })
+
+  it('factorWeightedPoints uses provisional 3 when blank', () => {
+    expect(factorWeightedPoints('previousInternalNcrCount', undefined)).toBe(12)
+    expect(factorWeightedPoints('previousInternalNcrCount', 5)).toBe(20)
+  })
+
+  it('suggests overdue and months without auto-persisting zero', () => {
+    expect(suggestOverdueScaleFromOpenCount(0)).toBeUndefined()
+    expect(suggestOverdueScaleFromOpenCount(2)).toBe(3)
+    expect(suggestMonthsScaleFromAudits([], 'QP-01', 'd1', '2026-06-01')).toBeUndefined()
+    expect(suggestMonthsScaleFromAudits(
+      [{ qpCode: 'QP-01', departmentId: 'd1', auditDate: '2025-06-01' }],
+      'QP-01',
+      'd1',
+      '2026-06-01',
+    )).toBe(3)
   })
 })
 
@@ -101,6 +188,6 @@ describe('buildEffectiveProcedureRisks', () => {
   it('falls back to plan risk level when no saved record exists', () => {
     const risks = buildEffectiveProcedureRisks(baseCompany)
     expect(risks[1].inherentRisk).toBe(1)
-    expect(risks[1].overdueOpenNcrCount).toBe(2)
+    expect(risks[1].overdueOpenNcrCount).toBeUndefined()
   })
 })

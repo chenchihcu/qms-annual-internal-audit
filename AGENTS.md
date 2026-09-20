@@ -62,16 +62,16 @@
 - [ ] 改儀表板程序列：跑 `dashboardAttention.test`、`Dashboard.test`（可直 render `Dashboard` + `createDemoState`，不必全 App）
 - [ ] `buildAuditFocusOverview`：seed finalized 時回傳 focusLegend 全列，單測勿假設傳入 1 列 `planRows` 即輸出 1 列；用 `qpCode + department` 找列
 - [ ] 變更缺口粒度或風險版面：跑 `workflowStatus.test`（`gaps.length === 1` + `/\d+\/\d+/`）、`RiskAssessment.test`、`App.smoke`
-- [ ] 利害關係人頁：桌面表（`lg:block`）＋手機可展開卡（`lg:hidden`）；jsdom 兩套同時在 DOM，測試限域 `#stakeholders-form` 或 `[data-stakeholder-dept]`，勿用裸 `getByText` 部門名
+- [ ] 利害關係人頁：資訊三層—導覽（三步+進度+資料流）→ `StakeholderRulesPanel`（`details open` 規則）→ 工作表；表內編排影響只顯示 `describeArrangementImpact().summary`（細節 title／可展開）；桌面表（`lg:block`）＋手機可展開卡（`lg:hidden`）；jsdom 兩套同時在 DOM，測試限域 `#stakeholders-form` 或 `[data-stakeholder-dept]`，勿用裸 `getByText` 部門名
 
 ## 利害關係人（部門輸入）
 
 - [ ] 部門 `stakeholders`／`riskOccurrence`／`riskSeverity` 只在 `stakeholders` tab 編輯；[`AnnualPlan`](src/components/AnnualPlan.tsx) 不呼叫 `updateDepartment`
-- [ ] 部門優先分數＝`calculateDepartmentPriority`（`STAKEHOLDER_WEIGHTS×2 + O×S`），餵 [`autoArrangePlan`](src/lib/planner.ts)；與 QR-02-01 `procedureRisks` 七因素分軌，UI 須註明非方案風險
+- [ ] 部門優先分數＝`calculateDepartmentPriority`（`STAKEHOLDER_WEIGHTS×2 + O×S`），餵 [`autoArrangePlan`](src/lib/planner.ts)；與 QR-02-01 `procedureRisks` 七因素分軌，UI 須註明非方案風險；「編排影響」文案 SSOT 在 `describeArrangementImpact`／`ARRANGEMENT_IMPACT_RULES`
 - [ ] `stakeholdersReady`：每部門 `stakeholders.length >= 1`；`getPdcaOverview` P 缺口 `tab: 'stakeholders'` 插在程序與風險之間
 - [ ] 改部門輸入不呼叫 `replacePlanRows`；只影響下次「預覽自動編排」；已有 `manualOverride` 月格保留
-- [ ] O／S 用 1–5 `radiogroup`，勿 `type="number"`；勿重用 RiskAssessment `ScaleFive`（綁因素 % 權重）
-- [ ] 無 QR 紙本的工作流頁（例：利害關係人）不加 `formExport` 工作表；備份 JSON 已含 `departments`
+- [ ] O／S 用三檔低／中／高 `radiogroup`（系統寫入 1／3／5），勿 `type="number"`；勿重用 RiskAssessment `ScaleFive`（綁因素 % 權重）；量表 SSOT 在 `planner.ts` `OCCURRENCE_BAND_GUIDE`／`SEVERITY_BAND_GUIDE`
+- [ ] 無 QR 紙本的工作流頁（例：利害關係人）不加 `formExport` 工作表；備份 JSON 已含 `departments`；程序／章節／表單對照 SSOT 在 `STAKEHOLDER_WORKFLOW_REFERENCES`
 
 ## 人員資格與任命（personnel tab）
 
@@ -121,7 +121,7 @@
 
 - [ ] 預設 stability fixes only；使用者明確要求工作流閉環時可改 product，仍須跑 release gate
 - [ ] 緊急 zip：排除 `node_modules`、`.git`、`dist`；附 SHA256
-- [ ] README 測試數與 `npm test` 實際數量一致（目前 125）
+- [ ] README 測試數與 `npm test` 實際數量一致（目前 133）
 - [ ] 規則三處（skill references、`AGENTS.md`、`.cursor/rules/*.mdc`）同任務交付；`git show --name-only` 須含 mdc，勿漏追蹤
 - [ ] 功能 commit 排除 `artifacts/`、`.netlify/`、deploy/smoke/verify 腳本、release zip；只 stage 任務相關路徑
 - [ ] commit 環境無 `user.email` 時：用 `GIT_AUTHOR_*`／`GIT_COMMITTER_*` 環境變數，禁止 `git config`

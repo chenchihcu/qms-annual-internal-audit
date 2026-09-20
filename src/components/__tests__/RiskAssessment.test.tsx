@@ -25,7 +25,7 @@ describe('RiskAssessment matrix layout', () => {
     fireEvent.click(complaintBtn)
 
     await waitFor(() => {
-      expect(complaintBtn.textContent).toBe('1')
+      expect(complaintBtn.textContent).toBe('無')
     })
   })
 

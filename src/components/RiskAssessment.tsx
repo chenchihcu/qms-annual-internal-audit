@@ -6,30 +6,30 @@ import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import {
   buildEffectiveProcedureRisks,
   calculateProcedurePriority,
+  cycleFactorScale,
+  formatFactorBreakdown,
+  formatFactorLabel,
+  inherentScaleFromSeed,
   PROCEDURE_RISK_WEIGHTS,
+  suggestMonthsScaleFromAudits,
+  suggestOverdueScaleFromOpenCount,
   type ProcedurePriorityInput,
 } from '../lib/risk'
-import type { PlanRow } from '../types'
+import type { PlanRow, ProcedureRiskRecord } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
 
 type RiskFactorField = keyof ProcedurePriorityInput
 type RiskFilter = 'all' | 'unsaved' | 'provisional'
 
-const FACTOR_COLUMNS: Array<{ field: RiskFactorField; label: string; required?: boolean }> = [
-  { field: 'inherentRisk', label: '固有', required: true },
-  { field: 'previousInternalNcrCount', label: '內稽' },
-  { field: 'previousThirdPartyNcrCount', label: '三方' },
-  { field: 'overdueOpenNcrCount', label: '逾期' },
-  { field: 'customerComplaintLevel', label: '客訴' },
-  { field: 'changeImpact', label: '變更' },
-  { field: 'monthsSinceLastAudit', label: '距上次' },
+const FACTOR_COLUMNS: Array<{ field: RiskFactorField; label: string; required?: boolean; hint: string }> = [
+  { field: 'inherentRisk', label: '固有', required: true, hint: '低／中／高（程序種子）' },
+  { field: 'previousInternalNcrCount', label: '內稽', hint: '0件～≥4件' },
+  { field: 'previousThirdPartyNcrCount', label: '三方', hint: '0件～≥4件' },
+  { field: 'overdueOpenNcrCount', label: '逾期', hint: '0件～≥4件' },
+  { field: 'customerComplaintLevel', label: '客訴', hint: '無／中／高' },
+  { field: 'changeImpact', label: '變更', hint: '無／中／高' },
+  { field: 'monthsSinceLastAudit', label: '距上次', hint: '＜6月～≥24月' },
 ]
-
-function cycleFactorValue(current: number | undefined, required: boolean): number | undefined {
-  if (current == null || Number.isNaN(current)) return 1
-  if (current >= 5) return required ? 1 : undefined
-  return current + 1
-}
 
 function isRowPersisted(
   saved: { inherentRisk: number } | undefined,
@@ -44,6 +44,8 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
   const [filter, setFilter] = useState<RiskFilter>('all')
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
+  const referenceDate = `${settings.auditYear}-06-01`
+
   const rows = useMemo(() => company.planRows.map((plan) => {
     const saved = company.procedureRisks?.find(
       (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId,
@@ -51,19 +53,24 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     const openNcr = company.ncrs.filter(
       (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId && item.status !== '結案',
     ).length
+    const seedInherent = inherentScaleFromSeed(plan.riskLevel)
     const values: ProcedurePriorityInput = {
-      inherentRisk: saved?.inherentRisk ?? (plan.riskLevel === '高' ? 5 : plan.riskLevel === '中' ? 3 : 1),
+      inherentRisk: saved?.inherentRisk ?? seedInherent,
       previousInternalNcrCount: saved?.previousInternalNcrCount,
       previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
-      overdueOpenNcrCount: saved?.overdueOpenNcrCount ?? (openNcr ? Math.min(5, openNcr + 1) : undefined),
+      overdueOpenNcrCount: saved?.overdueOpenNcrCount,
       customerComplaintLevel: saved?.customerComplaintLevel,
       changeImpact: saved?.changeImpact,
       monthsSinceLastAudit: saved?.monthsSinceLastAudit,
     }
     const persisted = isRowPersisted(saved)
     const result = calculateProcedurePriority(values)
-    return { plan, saved, values, result, persisted }
-  }).sort((a, b) => b.result.score - a.result.score), [company])
+    const suggestions = {
+      overdue: suggestOverdueScaleFromOpenCount(openNcr),
+      months: suggestMonthsScaleFromAudits(company.audits, plan.qpCode, plan.departmentId, referenceDate),
+    }
+    return { plan, saved, values, result, persisted, seedInherent, openNcr, suggestions }
+  }).sort((a, b) => b.result.score - a.result.score), [company, referenceDate])
 
   const savedCount = rows.filter((row) => row.persisted).length
   const totalCount = rows.length
@@ -99,6 +106,15 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     }, { leadAuditor: settings.leadAuditor }))
   }
 
+  const applySuggestions = (qpCode: string, departmentId: string, suggestions: { overdue?: number; months?: number }) => {
+    const patch: Partial<ProcedureRiskRecord> = {}
+    if (suggestions.overdue != null) patch.overdueOpenNcrCount = suggestions.overdue
+    if (suggestions.months != null) patch.monthsSinceLastAudit = suggestions.months
+    if (Object.keys(patch).length > 0) {
+      updateProcedureRisk(qpCode, departmentId, patch)
+    }
+  }
+
   const filterButtons: Array<{ id: RiskFilter; label: string }> = [
     { id: 'all', label: '全部' },
     { id: 'unsaved', label: '未存檔' },
@@ -116,7 +132,8 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
           <div>
             <h2 className="mb-2 text-lg font-semibold">風險指標評估（QR-02-01）</h2>
             <p className="text-sm text-slate-600">
-              矩陣評估全部 QP 供年度稽核排序。待確認欄位以中位數暫估並標示「暫定」；點格子循環 1–5，空白顯示 —。
+              優先分數 0–100＝七因素加權（各欄選<strong>事實</strong>，系統換算 1–5 再計分，不是直接打分）。
+              空白欄暫估為中位數並標「暫定」；點格子循環選項，空白顯示 —。
             </p>
           </div>
           <div className="flex flex-wrap gap-2 no-print">
@@ -172,14 +189,12 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
           </div>
         </div>
 
-        <div className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-4 text-xs text-slate-600 sm:grid-cols-3">
-          <span>程序固有風險 {PROCEDURE_RISK_WEIGHTS.inherentRisk}%</span>
-          <span>上次內稽 NCR {PROCEDURE_RISK_WEIGHTS.previousInternalNcrCount}%</span>
-          <span>上次第三方稽核 NCR {PROCEDURE_RISK_WEIGHTS.previousThirdPartyNcrCount}%</span>
-          <span>逾期／未結 NCR {PROCEDURE_RISK_WEIGHTS.overdueOpenNcrCount}%</span>
-          <span>客戶抱怨 {PROCEDURE_RISK_WEIGHTS.customerComplaintLevel}%</span>
-          <span>重大變更 {PROCEDURE_RISK_WEIGHTS.changeImpact}%</span>
-          <span>距上次稽核 {PROCEDURE_RISK_WEIGHTS.monthsSinceLastAudit}%</span>
+        <div className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-4 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+          {FACTOR_COLUMNS.map(({ field, label, hint }) => (
+            <span key={field}>
+              <strong>{label}</strong> {hint} → 加權 {PROCEDURE_RISK_WEIGHTS[field]}%
+            </span>
+          ))}
         </div>
 
         {visibleRows.length === 0 ? (
@@ -199,13 +214,15 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map(({ plan, saved, values, result, persisted }) => {
+                {visibleRows.map(({ plan, saved, result, persisted, seedInherent, openNcr, suggestions }) => {
                   const statusLabel = !persisted
                     ? '未存檔'
                     : result.provisional
                       ? `暫定 ${7 - result.missingFactors.length}/7`
                       : '已確認'
                   const expanded = expandedRowId === plan.id
+                  const breakdownFields = FACTOR_COLUMNS.map(({ field }) => field)
+                  const hasSuggestions = suggestions.overdue != null || suggestions.months != null
                   return (
                     <Fragment key={plan.id}>
                       <tr
@@ -216,23 +233,24 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                         <td className="border p-2 font-medium whitespace-nowrap">{plan.qpCode}</td>
                         <td className="border p-2 whitespace-nowrap">{plan.department}</td>
                         {FACTOR_COLUMNS.map(({ field, label, required }) => {
-                          const raw = field === 'inherentRisk'
-                            ? (saved?.inherentRisk ?? values.inherentRisk)
-                            : saved?.[field]
-                          const display = raw == null || Number.isNaN(raw) ? '—' : String(raw)
+                          const raw = field === 'inherentRisk' ? saved?.inherentRisk : saved?.[field]
+                          const cycleBase = field === 'inherentRisk' ? (raw ?? seedInherent) : raw
+                          const displayValue = field === 'inherentRisk' ? (raw ?? seedInherent) : raw
+                          const display = formatFactorLabel(field, displayValue)
+                          const showBlank = raw == null && field !== 'inherentRisk'
                           return (
                             <td key={field} className="border p-0.5 text-center">
                               <button
                                 type="button"
-                                className="no-print h-8 w-8 rounded border border-slate-200 text-xs font-medium hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                                className="no-print min-h-8 min-w-[2.75rem] rounded border border-slate-200 px-0.5 text-[10px] font-medium leading-tight hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:text-xs"
                                 aria-label={`${plan.qpCode} ${plan.department} ${label}`}
                                 onClick={(event) => {
                                   event.stopPropagation()
-                                  const next = cycleFactorValue(raw, Boolean(required))
+                                  const next = cycleFactorScale(field, cycleBase, Boolean(required))
                                   updateProcedureRisk(plan.qpCode, plan.departmentId, { [field]: next })
                                 }}
                               >
-                                {display}
+                                {showBlank ? '—' : display}
                               </button>
                               <span className="print-only">{display}</span>
                             </td>
@@ -256,6 +274,34 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                         <tr className="bg-slate-50/80">
                           <td colSpan={FACTOR_COLUMNS.length + 4} className="border p-3">
                             <p className="mb-1 text-xs font-medium text-slate-600">{plan.process}</p>
+                            <p className="mb-2 text-xs text-slate-600">
+                              加權拆帳：
+                              {breakdownFields.map((field, index) => {
+                                const breakdownScale = saved?.[field] ?? (field === 'inherentRisk' ? seedInherent : undefined)
+                                return (
+                                  <span key={field}>
+                                    {index > 0 ? ' · ' : ' '}
+                                    {formatFactorBreakdown(field, breakdownScale)}
+                                  </span>
+                                )
+                              })}
+                            </p>
+                            {hasSuggestions && (
+                              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-amber-900">
+                                <span>
+                                  台帳建議：
+                                  {suggestions.overdue != null && ` 逾期 ${formatFactorLabel('overdueOpenNcrCount', suggestions.overdue)}（未結 ${openNcr} 件）`}
+                                  {suggestions.months != null && ` 距上次 ${formatFactorLabel('monthsSinceLastAudit', suggestions.months)}`}
+                                </span>
+                                <Button
+                                  variant="secondary"
+                                  className="!px-2 !py-0.5 text-xs"
+                                  onClick={() => applySuggestions(plan.qpCode, plan.departmentId, suggestions)}
+                                >
+                                  採用建議
+                                </Button>
+                              </div>
+                            )}
                             <Input
                               label="證據／來源"
                               value={saved?.evidenceReference ?? ''}
