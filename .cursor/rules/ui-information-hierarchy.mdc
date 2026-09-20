@@ -8,8 +8,8 @@ alwaysApply: false
 
 集合資料（QP、觀察、查檢項）禁止一層攤平。
 
-1. **導覽／狀態**：`已存檔 a/b`、`準備清單 x/y`、≤3 條阻擋。高度不隨 N 成長。
-2. **工作面**：sticky 表、篩選 chips、批次按鈕。寬表用外層 `overflow-x-auto` + `min-w-[…]`；手機與 1280 桌面皆可能出現**表內**橫向捲軸，勿用 `overflow-x: hidden` 硬切頁面。
+1. **導覽／狀態**：Guide 單列 purpose + 缺口（`a/b`、`待追蹤 n 件`、≤3 條阻擋）；**無** PDCA chip／完成 chip。高度不隨 N 成長。
+2. **工作面**：sticky 表、篩選 chips、批次按鈕。寬表用 `ScrollRegion` + `min-w-[…]`；手機與 1280 桌面皆可能出現**表內**橫向捲軸，勿用 `overflow-x: hidden` 硬切頁面。
 3. **明細**：點列展開證據／追蹤／編輯表單；開案列保留「轉 NCR」等主要操作。
 
 ```tsx
@@ -20,8 +20,24 @@ gaps.push({ message: `${qp} 尚未存檔` })
 gaps.push({ message: `固有風險已存檔 ${saved}/${total}` })
 ```
 
-N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。
+N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 **單表 + `ScrollRegion`**，禁止桌面表＋`lg:hidden` 手機 `<article>` 雙 DOM。
 
-儀表板總覽：KPI 下禁止 QR-28-01 全表 + 得分全列並排；改單一「程序風險與得分」+ chip 預設需關注，完整明細導向年度計畫。
+殼層：頂欄只顯示範圍／年度／公司；頁名只在側欄與頁內 H2。進度 `a/b` 只在 Guide，頁內勿重複。
 
-人員資格編輯：QP／標準／單位用緊湊 checkbox 群（`max-h-36` 內捲），禁止逗號手打；依角色顯隱明細欄，勿一次攤 20+ 輸入框。
+利害關係人 WorkflowGuide 缺口用 `利害關係人已標註 a/b`；`StakeholderRulesPanel` 預設收合，勿 `open`。工作表單表 + `data-stakeholder-dept` 掛列。
+
+儀表板總覽：PDCA 四卡只顯示就緒／n 項；KPI 一列四張（總分、待追蹤合計、稽核事件、外稽準備）；「程序風險與得分」chip 預設需關注，完整明細導向年度計畫。D 卡導向 `schedule`；C 待追蹤導向 `followups`（紙本表仍側欄直達）。
+
+稽核日程（`schedule`）：Guide 摘要；工作面單表 + chips；點列進 `#tab=audit&audit=`。`score == null` 顯示「未計分」。
+
+待改善追蹤（`followups`）：`followupQueue` 合併未結 NCR／open 觀察／open 建議；Guide `待追蹤 n 件`；跨年橫幅只連結觀察頁帶入。
+
+外稽當日行程（`onsite`）：單表 + `ScrollRegion`；外稽日期只讀、連回準備頁；`ready: true` 不列入年度結案閘門。
+
+人員資格編輯：QP／標準／單位用緊湊 checkbox 群（`max-h-36` 內捲）；免責 `<details>`；名單單表 + `ScrollRegion`。
+
+空狀態：[`EmptyState.tsx`](src/components/ui/EmptyState.tsx)，句型「目前沒有{物件}」。
+
+畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
+
+圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 16 頁，不渲染 PDCA 分組標題；PDCA 四字只留儀表板四卡。

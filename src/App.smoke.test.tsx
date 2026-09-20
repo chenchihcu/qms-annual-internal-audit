@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from './App'
 
 const TAB_LABELS = [
@@ -7,15 +7,27 @@ const TAB_LABELS = [
   '標準',
   '程序',
   '利害關係人',
-  '方案風險與優先順序',
+  '方案風險',
+  '人員合格名單',
   '年度稽核計畫',
-  '稽核員能力與任命',
-  '稽核執行與證據',
-  '不符合與矯正措施',
-  '觀察事項與追蹤',
-  '改善機會與建議',
-  '外部稽核前準備與序位',
+  '稽核日程',
+  '查檢表',
+  '觀察事項',
+  '不符合',
+  '第三方建議',
+  '待改善追蹤',
+  '外稽準備',
+  '外稽當日行程',
   '系統設定',
+]
+
+const SIDEBAR_GROUP_LABELS = [
+  '總覽',
+  'P · 方案規劃',
+  'D · 稽核執行',
+  'C · 結果與改善',
+  'A · 結案與改進',
+  '系統管理',
 ]
 
 describe('App tab smoke', () => {
@@ -23,7 +35,7 @@ describe('App tab smoke', () => {
     window.location.hash = ''
   })
 
-  it('renders all thirteen tabs without crashing', () => {
+  it('renders all sixteen tabs without crashing', () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
@@ -33,9 +45,21 @@ describe('App tab smoke', () => {
     }
   })
 
+  it('lists sixteen tabs without PDCA group headings', () => {
+    render(<App />)
+    const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
+    for (const heading of SIDEBAR_GROUP_LABELS) {
+      expect(within(nav).queryByText(heading)).toBeNull()
+    }
+    for (const label of TAB_LABELS) {
+      expect(within(nav).getByRole('button', { name: label })).toBeTruthy()
+    }
+  })
+
   it('switches company without crashing', () => {
     render(<App />)
-    const zlx = screen.getByRole('button', { name: /正隆興精密/ })
+    const companySwitch = screen.getByRole('group', { name: '切換公司' })
+    const zlx = within(companySwitch).getByRole('button', { name: '正隆興精密' })
     fireEvent.click(zlx)
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
@@ -43,8 +67,8 @@ describe('App tab smoke', () => {
   it('shows workflow guide and dashboard drill-down controls', () => {
     render(<App />)
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /不符合 NCR/i }))
-    expect(screen.getByRole('button', { name: '不符合與矯正措施' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /待追蹤/i }))
+    expect(screen.getByRole('button', { name: '待改善追蹤' })).toBeTruthy()
   })
 
   it('asks before clearing all data and keeps data when cancelled', async () => {
@@ -63,23 +87,22 @@ describe('App tab smoke', () => {
 
   it('asks before switching audit year and keeps year when cancelled', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('稽核年度')).toBeTruthy()
+      expect(screen.getByLabelText('內稽年度')).toBeTruthy()
     })
-    const yearInput = screen.getByLabelText('稽核年度') as HTMLInputElement
+    const yearInput = screen.getByLabelText('內稽年度') as HTMLInputElement
     expect(yearInput.value).toBe('2026')
     fireEvent.change(yearInput, { target: { value: '2027' } })
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('切換至 2027 年')
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect((screen.getByLabelText('稽核年度') as HTMLInputElement).value).toBe('2026')
+    expect((screen.getByLabelText('內稽年度') as HTMLInputElement).value).toBe('2026')
   })
 
   it('asks before converting observation to NCR', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '觀察事項與追蹤' }))
+    fireEvent.click(screen.getByRole('button', { name: '觀察事項' }))
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '轉為 NCR' }).length).toBeGreaterThan(0)
     })
@@ -93,7 +116,7 @@ describe('App tab smoke', () => {
 
   it('links start audit button to visible block reasons for planning events', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '稽核執行與證據' }))
+    fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
       expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
     })
@@ -114,7 +137,7 @@ describe('App tab smoke', () => {
 
   it('asks before deleting custom checklist item and keeps item when cancelled', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '稽核執行與證據' }))
+    fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
       expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
     })
@@ -133,5 +156,41 @@ describe('App tab smoke', () => {
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(screen.getAllByRole('button', { name: /刪除/ }).length).toBeGreaterThan(0)
+  })
+
+  it('exposes skip link to main content', () => {
+    render(<App />)
+    const skip = screen.getByRole('link', { name: '跳至主要內容' })
+    expect(skip.getAttribute('href')).toBe('#main')
+    expect(document.getElementById('main')).toBeTruthy()
+  })
+
+  it('hides start audit button for non-planning events', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+    })
+    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
+    const activeOption = Array.from(select.options).find((option) => option.text.includes('2026-03-15') || option.text.match(/\d{4}-\d{2}-\d{2}/))
+    expect(activeOption).toBeTruthy()
+    fireEvent.change(select, { target: { value: activeOption!.value } })
+    expect(screen.queryByRole('button', { name: '開始稽核' })).toBeNull()
+  })
+
+  it('asks before switching external prep year', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '外稽準備' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('外稽準備表年度')).toBeTruthy()
+    })
+    const yearInput = screen.getByLabelText('外稽準備表年度') as HTMLInputElement
+    expect(yearInput.value).toBe('2026')
+    fireEvent.change(yearInput, { target: { value: '2027' } })
+    const dialog = await screen.findByRole('alertdialog')
+    expect(dialog.textContent).toContain('切換外稽準備至 2027 年')
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect((screen.getByLabelText('外稽準備表年度') as HTMLInputElement).value).toBe('2026')
   })
 })

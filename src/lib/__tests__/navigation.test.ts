@@ -6,10 +6,12 @@ describe('workflow navigation/form mapping', () => {
     const entries = ALL_TABS.filter((entry) => entry.id !== 'dashboard')
     const formIds = entries.map((entry) => entry.formId)
 
-    expect(entries).toHaveLength(12)
+    expect(entries).toHaveLength(15)
     expect(formIds.every((id): id is string => Boolean(id))).toBe(true)
     expect(new Set(formIds).size).toBe(entries.length)
-    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(13)
+    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(16)
+    expect(ALL_TABS.every((entry) => Boolean(entry.icon))).toBe(true)
+    expect(TAB_GROUPS.every((group) => Boolean(group.icon))).toBe(true)
   })
 
   it('keeps the dashboard as the overview entry without a workflow form', () => {
@@ -30,14 +32,17 @@ describe('workflow navigation/form mapping', () => {
       '標準',
       '程序',
       '利害關係人',
-      '方案風險與優先順序',
+      '方案風險',
+      '人員合格名單',
       '年度稽核計畫',
-      '稽核員能力與任命',
-      '稽核執行與證據',
-      '不符合與矯正措施',
-      '觀察事項與追蹤',
-      '改善機會與建議',
-      '外部稽核前準備與序位',
+      '稽核日程',
+      '查檢表',
+      '觀察事項',
+      '不符合',
+      '第三方建議',
+      '待改善追蹤',
+      '外稽準備',
+      '外稽當日行程',
       '系統設定',
     ])
   })
@@ -55,14 +60,24 @@ describe('workflow navigation/form mapping', () => {
   })
 
   it('defines workflow metadata for every tab in PDCA order', () => {
-    expect(TAB_WORKFLOW).toHaveLength(13)
+    expect(TAB_WORKFLOW).toHaveLength(16)
+    expect(TAB_WORKFLOW.map((entry) => entry.id)).toEqual(ALL_TABS.map((entry) => entry.id))
     expect(getTabWorkflow('procedure')?.nextTab).toBe('stakeholders')
     expect(getTabWorkflow('stakeholders')?.nextTab).toBe('risk')
     expect(getTabWorkflow('risk')?.prevTab).toBe('stakeholders')
-    expect(getTabWorkflow('risk')?.nextTab).toBe('plan')
-    expect(getTabWorkflow('plan')?.prevTab).toBe('risk')
-    expect(getTabWorkflow('personnel')?.nextTab).toBe('audit')
-    expect(getTabWorkflow('suggestions')?.nextTab).toBe('prep')
+    expect(getTabWorkflow('risk')?.nextTab).toBe('personnel')
+    expect(getTabWorkflow('personnel')?.prevTab).toBe('risk')
+    expect(getTabWorkflow('personnel')?.nextTab).toBe('plan')
+    expect(getTabWorkflow('plan')?.prevTab).toBe('personnel')
+    expect(getTabWorkflow('plan')?.nextTab).toBe('schedule')
+    expect(getTabWorkflow('schedule')?.nextTab).toBe('audit')
+    expect(getTabWorkflow('audit')?.nextTab).toBe('observations')
+    expect(getTabWorkflow('observations')?.nextTab).toBe('ncr')
+    expect(getTabWorkflow('ncr')?.nextTab).toBe('suggestions')
+    expect(getTabWorkflow('suggestions')?.nextTab).toBe('followups')
+    expect(getTabWorkflow('followups')?.nextTab).toBe('prep')
+    expect(getTabWorkflow('prep')?.nextTab).toBe('onsite')
+    expect(getTabWorkflow('onsite')?.nextTab).toBe('system-settings')
     expect(getTabWorkflow('system-settings')?.nextTab).toBe('dashboard')
   })
 })

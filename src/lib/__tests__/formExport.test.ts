@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createDemoState } from '../../data/demoData'
-import { buildExportWorkbookSmoke, buildAnnualPlanSheet, buildNcrSheet, buildAllFormsWorkbook, buildRiskSheet } from '../formExport'
+import { buildExportWorkbookSmoke, buildAnnualPlanSheet, buildNcrSheet, buildAllFormsWorkbook, buildOnsiteSheet, buildRiskSheet } from '../formExport'
 import { sheetToCsv, writeWorkbook } from '../simpleXlsx'
 
 describe('form export smoke', () => {
@@ -54,6 +54,26 @@ describe('form export smoke', () => {
     expect(workbook.SheetNames).toContain('QR-02-01')
     expect(workbook.SheetNames).toContain('適用標準')
     expect(workbook.SheetNames).toContain('人員合格名單')
+    expect(workbook.SheetNames).toContain('外稽當日行程')
+  })
+
+  it('builds onsite schedule sheet', () => {
+    const state = createDemoState()
+    state.externalAuditPrep.onsiteSlots = [{
+      id: 'slot-1',
+      date: '2026-11-01',
+      startTime: '09:00',
+      endTime: '12:00',
+      site: 'both',
+      qpCodes: ['QP-01'],
+      productModels: ['型號 A'],
+      escortPersonIds: [],
+      note: '開場',
+    }]
+    const text = sheetToCsv(buildOnsiteSheet(state))
+    expect(text).toContain('外部稽核當日行程')
+    expect(text).toContain('2026-11-01')
+    expect(text).toContain('型號 A')
   })
 
   it('keeps worksheet names unique for repeated audit events', () => {

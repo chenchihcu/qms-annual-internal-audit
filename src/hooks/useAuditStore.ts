@@ -951,6 +951,38 @@ export function useAuditStore() {
     setState((s) => switchPrepYearState(s, year))
   }, [])
 
+  const addOnsiteSlot = useCallback((slot: import('../types').OnsiteAuditSlot) => {
+    setState((s) => ({
+      ...s,
+      externalAuditPrep: {
+        ...s.externalAuditPrep,
+        onsiteSlots: [...(s.externalAuditPrep.onsiteSlots ?? []), slot],
+      },
+    }))
+  }, [])
+
+  const updateOnsiteSlot = useCallback((id: string, patch: Partial<import('../types').OnsiteAuditSlot>) => {
+    setState((s) => ({
+      ...s,
+      externalAuditPrep: {
+        ...s.externalAuditPrep,
+        onsiteSlots: (s.externalAuditPrep.onsiteSlots ?? []).map((slot) =>
+          slot.id === id ? { ...slot, ...patch } : slot,
+        ),
+      },
+    }))
+  }, [])
+
+  const removeOnsiteSlot = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      externalAuditPrep: {
+        ...s.externalAuditPrep,
+        onsiteSlots: (s.externalAuditPrep.onsiteSlots ?? []).filter((slot) => slot.id !== id),
+      },
+    }))
+  }, [])
+
   const carryForwardObservation = useCallback(
     (obsId: string, qpCode: string, departmentId: string) => {
       setState((s) => {
@@ -1271,6 +1303,9 @@ export function useAuditStore() {
     updateExternalPrepSequence,
     updateExternalPrepRelationship,
     switchPrepYear,
+    addOnsiteSlot,
+    updateOnsiteSlot,
+    removeOnsiteSlot,
     carryForwardObservation,
     carryForwardNCR,
     carryForwardSuggestion,

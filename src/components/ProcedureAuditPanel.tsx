@@ -5,8 +5,10 @@ import { buildAppHash } from '../lib/navigation'
 import { scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
 import type { Judgment } from '../types'
+import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -14,9 +16,10 @@ interface ProcedureAuditPanelProps {
   store: AuditStore
   auditKey?: string
   onAuditKeyChange?: (auditId: string) => void
+  onBackToSchedule?: () => void
 }
 
-export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: ProcedureAuditPanelProps) {
+export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange, onBackToSchedule }: ProcedureAuditPanelProps) {
   const {
     state,
     getOrCreateAudit,
@@ -36,7 +39,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
     () =>
       company.audits.map((item, index) => ({
         value: item.id,
-        label: `${item.qpCode} ${getProcedureTitle(item.qpCode, item.department)} · ${item.department} · ${item.auditDate || item.plannedDate || `事件 ${index + 1}`}`,
+        label: `${item.qpCode} · ${item.department} · ${item.auditDate || item.plannedDate || `事件 ${index + 1}`}`,
       })),
     [company.audits, getProcedureTitle],
   )
@@ -60,7 +63,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
     ?? (() => { const [qpCode, departmentId] = newPlanKey.split('|'); return qpCode && departmentId ? getOrCreateAudit(qpCode, departmentId) : null })()
 
   if (!audit) {
-    return <p className="text-slate-500">請先於年度稽核計畫建立程序稽核項目</p>
+    return <p className="text-slate-500">請先於稽核日程選擇事件</p>
   }
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
@@ -105,7 +108,12 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
     <div className="space-y-6 print-area qr-form">
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 no-print">
-          <h2 className="text-lg font-semibold">內部稽核查檢表（QR-28-02）</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            {onBackToSchedule && (
+              <Button variant="ghost" icon="chevronLeft" onClick={onBackToSchedule}>返回日程</Button>
+            )}
+            <h2 className="text-sm font-semibold">查檢表</h2>
+          </div>
           <div className="flex flex-wrap items-end gap-2">
             <Select
               label=""
@@ -114,21 +122,28 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
               onChange={selectAudit}
               options={auditOptions}
             />
-            <Button variant="secondary" onClick={() => exportAuditExcel(state, state.activeCompanyId, audit)}>
-              匯出 Excel
-            </Button>
-            <Button variant="ghost" onClick={() => exportAuditHtml(state, state.activeCompanyId, audit)}>
-              匯出 HTML
-            </Button>
-            <Button variant="ghost" onClick={() => exportAllAuditsExcel(state, state.activeCompanyId)}>
-              全部 Excel
-            </Button>
+            <Select
+              label=""
+              ariaLabel="匯出查檢表"
+              value=""
+              onChange={(value) => {
+                if (value === 'excel') exportAuditExcel(state, state.activeCompanyId, audit)
+                if (value === 'html') exportAuditHtml(state, state.activeCompanyId, audit)
+                if (value === 'all') exportAllAuditsExcel(state, state.activeCompanyId)
+              }}
+              options={[
+                { value: '', label: '匯出…' },
+                { value: 'excel', label: '本表 Excel' },
+                { value: 'html', label: '本表 HTML' },
+                { value: 'all', label: '全部 Excel' },
+              ]}
+            />
           </div>
         </div>
 
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3 no-print">
           <div className="min-w-64 flex-1"><Select label="新增單次稽核事件" value={newPlanKey} onChange={setNewPlanKey} options={company.planRows.map((row) => ({ value: `${row.qpCode}|${row.departmentId}`, label: `${row.qpCode} · ${row.department} · ${row.process}` }))} /></div>
-          <Button variant="secondary" onClick={() => { const [qpCode, departmentId] = newPlanKey.split('|'); if (qpCode && departmentId) selectAudit(createAuditEvent(qpCode, departmentId)) }}>建立獨立事件</Button>
+          <Button variant="ghost" onClick={() => { const [qpCode, departmentId] = newPlanKey.split('|'); if (qpCode && departmentId) selectAudit(createAuditEvent(qpCode, departmentId)) }}>建立獨立事件</Button>
         </div>
 
         <div className="print-only qr-form-header mb-4 text-center">
@@ -137,17 +152,7 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
           <p className="text-sm">{audit.qpCode} {getProcedureTitle(audit.qpCode, audit.department)} · {audit.auditCategory}</p>
         </div>
 
-        <div className="mb-6 grid gap-3 lg:hidden print:hidden">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><span className="block text-xs font-bold text-slate-500">被稽核部門</span>{audit.department}</div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><span className="block text-xs font-bold text-slate-500">稽核流程（QP）</span>{audit.qpCode} {audit.process}</div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm"><span className="block text-xs font-bold text-slate-500">對應文件</span>{audit.documents}</div>
-          <Input label="通知日期" type="date" value={audit.notifyDate} onChange={(v) => handleHeaderChange('notifyDate', v)} disabled={!planning} />
-          <Input label="實施日期" type="date" value={audit.auditDate} onChange={(v) => handleHeaderChange('auditDate', v)} disabled={!planning} />
-          <Input label="被稽核部門主管" value={audit.departmentManager} onChange={(v) => handleHeaderChange('departmentManager', v)} disabled={!planning} />
-          <Input label="既有姓名／待配對" value={audit.auditors} onChange={(v) => handleHeaderChange('auditors', v)} disabled={!planning} />
-        </div>
-
-        <div className="mb-6 hidden overflow-x-auto lg:block print:block">
+        <ScrollRegion ariaLabel="稽核表頭 QR-28-02" className="mb-6 print:block">
         <table className="qr-header-table w-full min-w-[640px] border-collapse text-sm">
           <tbody>
             <tr>
@@ -186,25 +191,26 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
             </tr>
           </tbody>
         </table>
-        </div>
+        </ScrollRegion>
 
         <section className="mb-6 rounded-xl border border-slate-200 bg-slate-50 p-4 no-print">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div><h3 className="font-semibold">稽核團隊與開始前資格檢查</h3><p className="text-xs text-slate-500">依此次公司、QP、受稽單位與實際日期檢查；陪稽人員不列入獨立判定團隊。</p></div>
             <div className="flex items-center gap-2">
               <Badge label={audit.status ?? '規劃中'} />
-              <span title={!canStart ? startBlockReasons : undefined}>
-                <Button
-                  disabled={!canStart}
-                  aria-describedby={!canStart ? 'audit-start-gaps' : undefined}
-                  onClick={() => {
-                    const result = startAudit(audit.id)
-                    if (!result.canStart) window.alert(`無法開始稽核：\n${result.errors.join('\n')}`)
-                  }}
-                >
-                  開始稽核
-                </Button>
-              </span>
+              {planning && (
+                <span title={!canStart ? startBlockReasons : undefined}>
+                  <Button
+                    disabled={!canStart}
+                    aria-describedby={!canStart ? 'audit-start-gaps' : undefined}
+                    onClick={() => {
+                      startAudit(audit.id)
+                    }}
+                  >
+                    開始稽核
+                  </Button>
+                </span>
+              )}
             </div>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -276,20 +282,20 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
           {reported && (
             <div className="mt-4 flex flex-wrap gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
               <span className="font-medium text-green-900">已回報 — 後續處理：</span>
-              <a className="font-medium text-blue-700 underline" href={buildAppHash('ncr')}>不符合與矯正措施</a>
-              <a className="font-medium text-blue-700 underline" href={buildAppHash('observations')}>觀察事項與追蹤</a>
+              <a className="font-medium text-blue-700 underline" href={buildAppHash('ncr')}>不符合</a>
+              <a className="font-medium text-blue-700 underline" href={buildAppHash('observations')}>觀察事項</a>
             </div>
           )}
         </section>
 
         <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm">程序得分：<span className="text-lg font-bold text-blue-700">{score.score == null ? '—' : `${score.score}%`}</span>{score.breakdown.pending > 0 && <span className="ml-2 text-xs text-amber-700">暫時計分 · 待判定 {score.breakdown.pending} 項</span>}</p>
-          <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)} disabled={reported}>
+          <p className="text-sm">程序得分：<span className="text-sm font-bold text-blue-700">{score.score == null ? '—' : `${score.score}%`}</span>{score.breakdown.pending > 0 && <span className="ml-2 text-xs text-amber-700">暫時計分 · 待判定 {score.breakdown.pending} 項</span>}</p>
+          <Button variant="secondary" icon={ACTION_ICONS.add} className="no-print" onClick={() => addChecklistItem(audit.id)} disabled={reported}>
             新增稽核項目
           </Button>
         </div>
 
-        <div className="overflow-x-auto print:block">
+        <ScrollRegion ariaLabel="程序查檢表 QR-28-02">
           <table className="qr-checklist w-full border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
@@ -382,20 +388,23 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange }: Proce
                       <span className="print-only">{item.description}</span>
                     </td>
                     <td className="border p-2 align-top no-print">
-                      {!reported && (item.origin === 'custom' || item.origin === 'carryforward') && <button
-                        type="button"
-                        className="text-xs text-red-600 hover:underline"
-                        onClick={() => setPendingDeleteItemId(item.id)}
-                      >
-                        刪除
-                      </button>}
+                      {!reported && (item.origin === 'custom' || item.origin === 'carryforward') && (
+                        <Button
+                          variant="ghost"
+                          icon={ACTION_ICONS.delete}
+                          className="min-h-10 px-2 text-xs text-red-600"
+                          onClick={() => setPendingDeleteItemId(item.id)}
+                        >
+                          刪除
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       </Card>
     </div>
   )

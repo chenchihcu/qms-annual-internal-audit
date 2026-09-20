@@ -46,6 +46,9 @@ describe('workflowStatus', () => {
     state.companies.jiurun.departments[0].stakeholders = []
     expect(stakeholdersReady(state, 'jiurun')).toBe(false)
     expect(canProceedToNextTab(state, 'stakeholders')).toBe(false)
+    const status = getTabWorkflowStatus(state, 'stakeholders')
+    expect(status.gaps).toHaveLength(1)
+    expect(status.gaps[0].message).toMatch(/利害關係人已標註 \d+\/\d+/)
     const overview = getPdcaOverview(state, 'jiurun')
     expect(overview.plan.gaps.some((gap) => gap.tab === 'stakeholders')).toBe(true)
   })
@@ -71,6 +74,21 @@ describe('workflowStatus', () => {
     expect(overview.check).toBeDefined()
     expect(overview.act).toBeDefined()
     expect(typeof overview.annualCloseReady).toBe('boolean')
+  })
+
+  it('merges check gaps into a single followups summary', () => {
+    const state = createDemoState()
+    const overview = getPdcaOverview(state)
+    const followupGaps = overview.check.gaps.filter((gap) => gap.tab === 'followups')
+    expect(followupGaps.length).toBeLessThanOrEqual(1)
+    if (followupGaps.length === 1) {
+      expect(followupGaps[0].message).toMatch(/待追蹤 \d+ 件/)
+    }
+    const status = getTabWorkflowStatus(state, 'followups')
+    expect(status.gaps.length).toBeLessThanOrEqual(1)
+    if (status.advisories.length > 0) {
+      expect(status.advisories[0].message).toMatch(/待追蹤 \d+ 件/)
+    }
   })
 
   it('detects standard readiness with evidence', () => {

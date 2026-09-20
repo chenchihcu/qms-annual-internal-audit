@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportSuggestionsExcel } from '../lib/formExport'
-import type { SuggestionStatus } from '../types'
+import type { SuggestionStatus, ThirdPartySuggestion } from '../types'
+import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { EmptyState } from './ui/EmptyState'
 
 export function Suggestions({ store }: { store: AuditStore }) {
   const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
@@ -33,9 +36,47 @@ export function Suggestions({ store }: { store: AuditStore }) {
 
   const prior = allSuggestions.filter((s) => s.year < currentYear)
   const current = allSuggestions.filter((s) => s.year >= currentYear)
+  const listedSuggestions = [...prior, ...current]
 
   const planRowsForProcedure = (qp: string) =>
     company.planRows.filter((row) => row.qpCode === qp)
+
+  const procedureOptions = useMemo(() => {
+    const seen = new Set<string>()
+    return company.planRows.reduce<{ value: string; label: string }[]>((options, row) => {
+      if (seen.has(row.qpCode)) return options
+      seen.add(row.qpCode)
+      options.push({ value: row.qpCode, label: `${row.qpCode} · ${row.process}` })
+      return options
+    }, [])
+  }, [company.planRows])
+
+  const renderCarryActions = (sug: ThirdPartySuggestion) => {
+    const rows = planRowsForProcedure(sug.procedure)
+    const deptId = carryDept[sug.id] ?? sug.departmentId ?? rows[0]?.departmentId ?? ''
+    if (sug.status !== 'open' || sug.carriedToYear || rows.length === 0) {
+      return sug.carriedToYear ? <span className="text-xs text-blue-600">已帶入 {sug.carriedToYear}</span> : null
+    }
+    return (
+      <div className="flex flex-col gap-2">
+        {rows.length > 1 && (
+          <Select
+            label="帶入部門"
+            value={deptId}
+            onChange={(value) => setCarryDept({ ...carryDept, [sug.id]: value })}
+            options={rows.map((row) => ({ value: row.departmentId, label: row.department }))}
+          />
+        )}
+        <Button
+          variant="secondary"
+          disabled={!deptId}
+          onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
+        >
+          帶入 {currentYear} 年
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -47,14 +88,11 @@ export function Suggestions({ store }: { store: AuditStore }) {
         />
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="mb-2 text-lg font-semibold">第三方稽核建議事項一覽表</h2>
-            <p className="text-sm text-slate-500">
-              對應紙本建議追蹤表：程序、問題、進度、負責單位；可帶入新年度查檢表。
-            </p>
+            <h2 className="mb-2 text-sm font-semibold">第三方建議</h2>
           </div>
           <div className="flex flex-wrap gap-2 no-print">
-            <Button onClick={() => setShowForm((v) => !v)}>{showForm ? '收起登錄' : '登錄建議'}</Button>
-            <Button variant="secondary" onClick={() => exportSuggestionsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+            <Button icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((v) => !v)}>{showForm ? '收起登錄' : '登錄建議'}</Button>
+            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportSuggestionsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
           </div>
         </div>
 
@@ -69,7 +107,7 @@ export function Suggestions({ store }: { store: AuditStore }) {
                   const rows = planRowsForProcedure(value)
                   setForm({ ...form, procedure: value, departmentId: rows[0]?.departmentId ?? '' })
                 }}
-                options={company.planRows.map((row) => ({ value: row.qpCode, label: `${row.qpCode} · ${row.process}` }))}
+                options={procedureOptions}
               />
               <Select
                 label="責任單位"
@@ -106,85 +144,58 @@ export function Suggestions({ store }: { store: AuditStore }) {
         )}
 
         {allSuggestions.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">尚無建議事項，請點「登錄建議」新增。</p>
+          <EmptyState message="目前沒有建議事項。" />
         ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-left">
-                <th className="border p-2">年度</th>
-                <th className="border p-2">程序</th>
-                <th className="border p-2">問題描述</th>
-                <th className="border p-2">進度</th>
-                <th className="border p-2">負責單位</th>
-                <th className="border p-2">狀態</th>
-                <th className="border p-2 no-print">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...prior, ...current].map((sug) => {
-                const rows = planRowsForProcedure(sug.procedure)
-                const deptId = carryDept[sug.id] ?? sug.departmentId ?? rows[0]?.departmentId ?? ''
-                return (
-                <tr key={sug.id} className={sug.status === 'open' ? 'bg-amber-50/30' : ''}>
-                  <td className="border p-2">{sug.year}</td>
-                  <td className="border p-2 font-medium">{sug.procedure}</td>
-                  <td className="border p-2">{sug.issue}</td>
-                  <td className="border p-2">
-                    <textarea
-                      className="w-full min-w-[160px] rounded border border-slate-200 px-2 py-1 no-print"
-                      rows={2}
-                      aria-label={`${sug.year} ${sug.procedure} 建議進度`}
-                      value={sug.progress}
-                      onChange={(e) => updateSuggestion(sug.id, { progress: e.target.value })}
-                    />
-                    <span className="print-only">{sug.progress}</span>
-                  </td>
-                  <td className="border p-2">{sug.responsibleUnit}</td>
-                  <td className="border p-2">
-                    <div className="no-print">
-                      <Select
-                        ariaLabel={`${sug.year} ${sug.procedure} 建議狀態`}
-                        value={sug.status}
-                        onChange={(v) => updateSuggestion(sug.id, { status: v as SuggestionStatus })}
-                        options={[
-                          { value: 'open', label: '待追蹤' },
-                          { value: 'closed', label: '已結案' },
-                        ]}
-                      />
-                    </div>
-                    <span className="print-only"><Badge label={statusLabel[sug.status]} /></span>
-                  </td>
-                  <td className="border p-2 no-print">
-                    {sug.status === 'open' && !sug.carriedToYear && rows.length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        {rows.length > 1 && (
-                          <Select
-                            label="帶入部門"
-                            value={deptId}
-                            onChange={(value) => setCarryDept({ ...carryDept, [sug.id]: value })}
-                            options={rows.map((row) => ({ value: row.departmentId, label: row.department }))}
-                          />
-                        )}
-                        <Button
-                          variant="secondary"
-                          disabled={!deptId}
-                          onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
-                        >
-                          帶入 {currentYear} 年
-                        </Button>
-                      </div>
-                    )}
-                    {sug.carriedToYear && (
-                      <span className="text-xs text-blue-600">已帶入 {sug.carriedToYear}</span>
-                    )}
-                  </td>
+          <ScrollRegion ariaLabel="第三方稽核建議事項一覽表">
+            <table className="w-full min-w-[760px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">年度</th>
+                  <th className="border p-2">程序</th>
+                  <th className="border p-2">問題描述</th>
+                  <th className="border p-2">進度</th>
+                  <th className="border p-2">負責單位</th>
+                  <th className="border p-2">狀態</th>
+                  <th className="border p-2 no-print">操作</th>
                 </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {listedSuggestions.map((sug) => (
+                  <tr key={sug.id} data-suggestion-id={sug.id} className={sug.status === 'open' ? 'bg-amber-50/30' : ''}>
+                    <td className="border p-2">{sug.year}</td>
+                    <td className="border p-2 font-medium">{sug.procedure}</td>
+                    <td className="border p-2">{sug.issue}</td>
+                    <td className="border p-2">
+                      <textarea
+                        className="w-full min-w-[160px] rounded border border-slate-200 px-2 py-1 no-print"
+                        rows={2}
+                        aria-label={`${sug.year} ${sug.procedure} 建議進度`}
+                        value={sug.progress}
+                        onChange={(e) => updateSuggestion(sug.id, { progress: e.target.value })}
+                      />
+                      <span className="print-only">{sug.progress}</span>
+                    </td>
+                    <td className="border p-2">{sug.responsibleUnit}</td>
+                    <td className="border p-2">
+                      <div className="no-print">
+                        <Select
+                          ariaLabel={`${sug.year} ${sug.procedure} 建議狀態`}
+                          value={sug.status}
+                          onChange={(v) => updateSuggestion(sug.id, { status: v as SuggestionStatus })}
+                          options={[
+                            { value: 'open', label: '待追蹤' },
+                            { value: 'closed', label: '已結案' },
+                          ]}
+                        />
+                      </div>
+                      <span className="print-only"><Badge label={statusLabel[sug.status]} /></span>
+                    </td>
+                    <td className="border p-2 no-print">{renderCarryActions(sug)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollRegion>
         )}
       </Card>
     </div>

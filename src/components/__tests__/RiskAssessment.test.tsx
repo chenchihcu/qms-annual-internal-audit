@@ -9,10 +9,10 @@ describe('RiskAssessment matrix layout', () => {
 
   it('shows matrix table and persists factor on cell click', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '方案風險與優先順序' }))
+    fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
 
     await waitFor(() => {
-      expect(screen.getByText('風險指標評估（QR-02-01）')).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
     })
 
     const matrix = document.querySelector('[data-risk-matrix]')
@@ -31,7 +31,7 @@ describe('RiskAssessment matrix layout', () => {
 
   it('workflow guide shows summary gap not per-row list', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '方案風險與優先順序' }))
+    fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
 
     await waitFor(() => {
       expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()

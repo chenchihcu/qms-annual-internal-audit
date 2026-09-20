@@ -160,16 +160,26 @@ function buildAudit(
 }
 
 function createDemoPeople(): Person[] {
-  return ['王大明', '王稽核', '李稽核', '陳稽核'].map((name, index) => ({
+  const configs = [
+    { name: '王大明', employeeNumber: 'JR-001', companyId: 'jiurun' as const, departmentId: 'dept-admin' },
+    { name: '王稽核', employeeNumber: 'JR-QA-01', companyId: 'jiurun' as const, departmentId: 'dept-qa' },
+    { name: '李稽核', employeeNumber: 'JR-PR-01', companyId: 'jiurun' as const, departmentId: 'dept-prod' },
+    { name: '陳稽核', employeeNumber: 'ZLX-001', companyId: 'zhenglongxing' as const, departmentId: 'dept-admin' },
+  ]
+  return configs.map((item, index) => ({
     id: `person-demo-${index + 1}`,
-    name,
-    employeeNumber: '',
+    name: item.name,
+    employeeNumber: item.employeeNumber,
     type: 'internal' as const,
-    affiliations: [],
+    affiliations: [{
+      id: `aff-demo-${index + 1}`,
+      companyId: item.companyId,
+      departmentId: item.departmentId,
+    }],
     qualifications: [],
     appointments: [],
     active: true,
-    notes: '既有示範姓名，資格與所屬單位待確認',
+    notes: '既有示範姓名，資格與任命待確認',
   }))
 }
 

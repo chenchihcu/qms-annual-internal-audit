@@ -1,12 +1,51 @@
 @import "tailwindcss";
 
+@theme {
+  --color-page: var(--theme-page);
+  --color-surface: var(--theme-surface);
+  --color-ink: var(--theme-ink);
+  --color-muted: var(--theme-muted);
+  --color-line: var(--theme-line);
+  --color-brand: var(--theme-brand);
+  --color-focus: var(--theme-focus);
+}
+
+:root {
+  --theme-page: #f8fafc;
+  --theme-surface: #ffffff;
+  --theme-ink: #0f172a;
+  --theme-muted: #64748b;
+  --theme-line: #e2e8f0;
+  --theme-brand: #1d4ed8;
+  --theme-focus: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --theme-page: #0f172a;
+    --theme-surface: #1e293b;
+    --theme-ink: #f1f5f9;
+    --theme-muted: #94a3b8;
+    --theme-line: #334155;
+    --theme-brand: #3b82f6;
+    --theme-focus: #60a5fa;
+  }
+}
+
 @layer base {
+  /* Screen type scale: body/titles 14px (text-sm); captions 12px (text-xs). html stays 16px for rem. */
   html {
-    font-family: Inter, "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    font-family: system-ui, "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    font-size: 16px;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-page text-ink text-sm antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply text-sm font-semibold;
   }
 
   button, input, select, textarea {
@@ -14,7 +53,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #2563eb;
+    outline: 2px solid var(--theme-focus);
     outline-offset: 2px;
   }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { AnnualPersonnelAssignment, Person, PersonnelRole, QualificationRecord, RoleAppointment, ValidityMode } from '../types'
 import { COMPANY_LABELS } from '../types'
@@ -13,7 +13,11 @@ import {
 } from '../lib/personnel'
 import { downloadBlob, safeFilename } from '../lib/download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook } from '../lib/simpleXlsx'
+import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { EmptyState } from './ui/EmptyState'
 
 const ROLES = Object.keys(PERSONNEL_ROLE_LABELS) as PersonnelRole[]
 
@@ -150,6 +154,9 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const [scopeFilter, setScopeFilter] = useState('')
   const [editing, setEditing] = useState<FormState | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [pendingCancel, setPendingCancel] = useState(false)
+  const [pendingDeactivate, setPendingDeactivate] = useState<Person | null>(null)
+  const editCardRef = useRef<HTMLDivElement>(null)
   const today = new Date().toISOString().slice(0, 10)
 
   const standardOptions = useMemo(
@@ -178,6 +185,12 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
+
+  useEffect(() => {
+    if (editing && editCardRef.current) {
+      editCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [editing?.id])
 
   const rows = useMemo(() => state.people.filter((person) => {
     const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
@@ -257,7 +270,16 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   }
 
   const cancel = () => {
-    if (dirty && !window.confirm('尚有未儲存變更，確定取消？')) return
+    if (dirty) {
+      setPendingCancel(true)
+      return
+    }
+    setEditing(null)
+    setDirty(false)
+  }
+
+  const confirmCancel = () => {
+    setPendingCancel(false)
     setEditing(null)
     setDirty(false)
   }
@@ -387,6 +409,17 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const showAuditorValidity = editing && isAuditorRole(editing.role)
   const showAppointmentDocs = editing && (isAuditorRole(editing.role) || isManagementRepRole(editing.role))
 
+  const filterFields = (
+    <>
+      <Input label="搜尋姓名／編號／機構" value={search} onChange={setSearch} />
+      <Select label="角色" value={roleFilter} onChange={(v) => setRoleFilter(v as typeof roleFilter)} options={[{ value: 'all', label: '全部角色' }, ...ROLES.map((role) => ({ value: role, label: PERSONNEL_ROLE_LABELS[role] }))]} />
+      <Select label="資格狀態" value={statusFilter} onChange={setStatusFilter} options={['all', '有效', '待確認', '未生效', '已逾期', '已暫停', '已終止', '已停用'].map((value) => ({ value, label: value === 'all' ? '全部狀態' : value }))} />
+      <Select label="所屬公司" value={companyFilter} onChange={setCompanyFilter} options={[{ value: 'all', label: '全部公司' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
+      <Select label="責任單位" value={departmentFilter} onChange={setDepartmentFilter} options={[{ value: 'all', label: '全部責任單位' }, ...state.company.departments.map((department) => ({ value: department.id, label: department.name }))]} />
+      <Input label="可稽核程序／範圍" value={scopeFilter} onChange={setScopeFilter} />
+    </>
+  )
+
   return (
     <div className="space-y-6 print-area qr-form">
       <div className="print-only qr-form-header mb-4 text-center">
@@ -395,20 +428,27 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       </div>
       <Card>
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><h2 className="text-lg font-semibold">人員合格名單</h2><p className="text-sm text-slate-500">{state.settings.auditYear} 年 · 資格、任命與陪稽安排共用同一人員主檔</p></div>
-          <div className="flex flex-wrap gap-2 no-print"><Button onClick={() => { setEditing(blankForm()); setDirty(false) }}>新增人員</Button><Button variant="secondary" onClick={exportExcel}>匯出名單</Button></div>
+          <div><h2 className="text-sm font-semibold">人員合格名單</h2></div>
+          <div className="flex flex-wrap gap-2 no-print"><Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false) }}>新增人員</Button><Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button></div>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 no-print">
-          <Input label="搜尋姓名／編號／機構" value={search} onChange={setSearch} />
-          <Select label="角色" value={roleFilter} onChange={(v) => setRoleFilter(v as typeof roleFilter)} options={[{ value: 'all', label: '全部角色' }, ...ROLES.map((role) => ({ value: role, label: PERSONNEL_ROLE_LABELS[role] }))]} />
-          <Select label="資格狀態" value={statusFilter} onChange={setStatusFilter} options={['all', '有效', '待確認', '未生效', '已逾期', '已暫停', '已終止', '已停用'].map((value) => ({ value, label: value === 'all' ? '全部狀態' : value }))} />
-          <Select label="所屬公司" value={companyFilter} onChange={setCompanyFilter} options={[{ value: 'all', label: '全部公司' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
-          <Select label="責任單位" value={departmentFilter} onChange={setDepartmentFilter} options={[{ value: 'all', label: '全部責任單位' }, ...state.company.departments.map((department) => ({ value: department.id, label: department.name }))]} />
-          <Input label="可稽核程序／範圍" value={scopeFilter} onChange={setScopeFilter} />
+        <details className="mt-5 lg:hidden no-print">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">篩選條件</summary>
+          <div className="mt-3 grid gap-3">{filterFields}</div>
+        </details>
+        <div className="mt-5 hidden gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-3 no-print">
+          {filterFields}
         </div>
+        <details className="mt-4 no-print">
+          <summary className="cursor-pointer text-xs text-slate-500">使用說明</summary>
+          <p className="mt-2 text-xs text-slate-500">
+            系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。空白範圍不算「全部」，開始稽核時仍須符合當次 QP 與單位。
+          </p>
+        </details>
       </Card>
 
-      {editing && <Card className="border-blue-200">
+      {editing && (
+      <div ref={editCardRef}>
+      <Card className="border-blue-200">
         <h3 className="mb-4 font-semibold">{editing.id ? '編輯人員與資格' : '新增人員與資格'}</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input label="姓名 *" value={editing.name} onChange={(v) => patchForm({ name: v })} />
@@ -465,17 +505,97 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
             </>
           )}
         </div>
-        <p className="mt-3 text-xs text-slate-500">系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。空白範圍不算「全部」，開始稽核時仍須符合當次 QP 與單位。</p>
         <div className="mt-5 flex gap-2"><Button onClick={save} disabled={!editing.name.trim()}>儲存</Button><Button variant="secondary" onClick={cancel}>取消</Button></div>
-      </Card>}
+      </Card>
+      </div>)}
 
       <Card>
-        <div className="space-y-3 lg:hidden">
-          {rows.map((person) => <article key={person.id} className="rounded-lg border border-slate-200 p-4"><div className="flex justify-between gap-3"><div><h3 className="font-semibold">{person.name}</h3><p className="text-xs text-slate-500">{person.employeeNumber || '無編號'}</p></div><Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} /></div><p className="mt-2 text-sm">{personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '角色待確認'}</p><div className="mt-3 flex gap-2 no-print"><Button variant="secondary" onClick={() => openEdit(person)}>編輯</Button>{person.active && <Button variant="ghost" onClick={() => window.confirm(`停用 ${person.name}？歷史事件仍會保留快照。`) && deactivatePerson(person.id)}>停用</Button>}</div></article>)}
-        </div>
-        <div className="hidden overflow-x-auto lg:block"><table className="w-full border-collapse text-sm"><thead><tr className="bg-slate-50 text-left"><th className="border p-2">姓名／編號</th><th className="border p-2">公司或機構</th><th className="border p-2">責任單位</th><th className="border p-2">角色</th><th className="border p-2">狀態</th><th className="border p-2">適用範圍</th><th className="border p-2">有效日期</th><th className="border p-2 no-print">操作</th></tr></thead><tbody>{rows.map((person) => { const affiliation = person.affiliations[0]; const qualification = currentQualification(person, undefined, today); return <tr key={person.id}><td className="border p-2 font-medium">{person.name}<span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span></td><td className="border p-2">{affiliation?.companyId ? COMPANY_LABELS[affiliation.companyId] : affiliation?.externalOrganization || '待確認'}</td><td className="border p-2">{state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}</td><td className="border p-2">{personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '待確認'}</td><td className="border p-2"><Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} /></td><td className="border p-2 text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td><td className="border p-2 text-xs">{qualification ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}` : '—'}</td><td className="border p-2 no-print"><div className="flex gap-1"><Button variant="ghost" onClick={() => openEdit(person)}>編輯</Button>{person.active && <Button variant="ghost" onClick={() => window.confirm(`停用 ${person.name}？`) && deactivatePerson(person.id)}>停用</Button>}</div></td></tr> })}</tbody></table></div>
-        {rows.length === 0 && <p className="py-8 text-center text-sm text-slate-500">沒有符合條件的人員</p>}
+        {rows.length === 0 ? (
+          <EmptyState message="目前沒有人員。" />
+        ) : (
+          <ScrollRegion ariaLabel="人員合格名單工作表">
+            <table className="w-full min-w-[960px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">姓名／編號</th>
+                  <th className="border p-2">公司或機構</th>
+                  <th className="border p-2">責任單位</th>
+                  <th className="border p-2">角色</th>
+                  <th className="border p-2">狀態</th>
+                  <th className="border p-2">適用範圍</th>
+                  <th className="border p-2">有效日期</th>
+                  <th className="border p-2 no-print">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((person) => {
+                  const affiliation = person.affiliations[0]
+                  const qualification = currentQualification(person, undefined, today)
+                  return (
+                    <tr key={person.id}>
+                      <td className="border p-2 font-medium">
+                        {person.name}
+                        <span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span>
+                      </td>
+                      <td className="border p-2">
+                        {affiliation?.companyId ? COMPANY_LABELS[affiliation.companyId] : affiliation?.externalOrganization || '待確認'}
+                      </td>
+                      <td className="border p-2">
+                        {state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}
+                      </td>
+                      <td className="border p-2">
+                        {personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '待確認'}
+                      </td>
+                      <td className="border p-2">
+                        <Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} />
+                      </td>
+                      <td className="border p-2 text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td>
+                      <td className="border p-2 text-xs">
+                        {qualification
+                          ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}`
+                          : '—'}
+                      </td>
+                      <td className="border p-2 no-print">
+                        <div className="flex gap-1">
+                          <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => openEdit(person)}>編輯</Button>
+                          {person.active && (
+                            <Button variant="ghost" icon="minusCircle" onClick={() => setPendingDeactivate(person)}>停用</Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </ScrollRegion>
+        )}
       </Card>
+      {pendingCancel && (
+        <ConfirmDialog
+          open
+          title="放棄未儲存變更？"
+          description="尚有未儲存變更，確定取消編輯？"
+          confirmLabel="放棄變更"
+          variant="danger"
+          onConfirm={confirmCancel}
+          onCancel={() => setPendingCancel(false)}
+        />
+      )}
+      {pendingDeactivate && (
+        <ConfirmDialog
+          open
+          title={`停用 ${pendingDeactivate.name}？`}
+          description="停用後歷史稽核事件仍保留人員快照，但此人不再出現於可指派清單。"
+          confirmLabel="停用"
+          variant="danger"
+          onConfirm={() => {
+            deactivatePerson(pendingDeactivate.id)
+            setPendingDeactivate(null)
+          }}
+          onCancel={() => setPendingDeactivate(null)}
+        />
+      )}
     </div>
   )
 }

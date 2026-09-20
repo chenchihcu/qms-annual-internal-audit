@@ -1,0 +1,214 @@
+import { useMemo, useState } from 'react'
+import type { AuditStore } from '../hooks/useAuditStore'
+import { exportOnsiteExcel } from '../lib/formExport'
+import { buildAppHash } from '../lib/navigation'
+import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
+import type { OnsiteAuditSlot, OnsiteSite } from '../types'
+import { COMPANY_LABELS } from '../types'
+import { ACTION_ICONS } from '../lib/uiIcons'
+import { Button, Card, Input, Select } from './ui/Badge'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { EmptyState } from './ui/EmptyState'
+
+const UNIQUE_QP_CODES = [...new Set(PROCEDURE_PLAN_TEMPLATE.map((entry) => entry.qpCode))].sort()
+
+const SITE_OPTIONS: { value: OnsiteSite; label: string }[] = [
+  { value: 'jiurun', label: COMPANY_LABELS.jiurun },
+  { value: 'zhenglongxing', label: COMPANY_LABELS.zhenglongxing },
+  { value: 'both', label: '兩公司合併' },
+]
+
+function blankSlot(): OnsiteAuditSlot {
+  return {
+    id: `onsite-${Date.now()}`,
+    date: '',
+    startTime: '',
+    endTime: '',
+    site: 'both',
+    departmentId: '',
+    qpCodes: [],
+    productModels: [],
+    escortPersonIds: [],
+    note: '',
+  }
+}
+
+export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
+  const { state, addOnsiteSlot, updateOnsiteSlot, removeOnsiteSlot } = store
+  const { externalAuditPrep, people } = state
+  const slots = externalAuditPrep.onsiteSlots ?? []
+  const [draft, setDraft] = useState<OnsiteAuditSlot | null>(null)
+
+  const escorts = useMemo(
+    () => people.filter((person) => person.active),
+    [people],
+  )
+
+  const departmentOptions = useMemo(() => {
+    const ids = new Set<string>()
+    return Object.values(state.companies).flatMap((company) =>
+      company.departments
+        .filter((dept) => {
+          if (ids.has(dept.id)) return false
+          ids.add(dept.id)
+          return true
+        })
+        .map((dept) => ({ value: dept.id, label: dept.name })),
+    )
+  }, [state.companies])
+
+  const startEdit = (slot?: OnsiteAuditSlot) => {
+    const next = slot ? { ...slot } : blankSlot()
+    setDraft(next)
+  }
+
+  const saveDraft = () => {
+    if (!draft || !draft.date.trim()) return
+    if (slots.some((slot) => slot.id === draft.id)) {
+      updateOnsiteSlot(draft.id, draft)
+    } else {
+      addOnsiteSlot(draft)
+    }
+    setDraft(null)
+  }
+
+  const siteLabel = (site: OnsiteSite) => SITE_OPTIONS.find((item) => item.value === site)?.label ?? site
+
+  return (
+    <div className="space-y-6 print-area qr-form">
+      <Card>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">外稽當日行程</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              外部稽核預定：{externalAuditPrep.externalAuditDate || '未設定'}
+              <a className="ml-2 font-medium text-blue-700 underline" href={buildAppHash('prep')}>外稽準備</a>
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 no-print">
+            <Button icon={ACTION_ICONS.add} onClick={() => startEdit()}>新增時段</Button>
+            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportOnsiteExcel(state)}>匯出 Excel</Button>
+          </div>
+        </div>
+
+        {draft && (
+          <Card className="mb-4 border-blue-200 no-print">
+            <h3 className="mb-3 font-semibold">{slots.some((slot) => slot.id === draft.id) ? '編輯時段' : '新增時段'}</h3>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Input label="日期 *" type="date" value={draft.date} onChange={(value) => setDraft({ ...draft, date: value })} />
+              <Input label="開始時間" type="time" value={draft.startTime} onChange={(value) => setDraft({ ...draft, startTime: value })} />
+              <Input label="結束時間" type="time" value={draft.endTime} onChange={(value) => setDraft({ ...draft, endTime: value })} />
+              <Select
+                label="廠區"
+                value={draft.site}
+                onChange={(value) => setDraft({ ...draft, site: value as OnsiteSite })}
+                options={SITE_OPTIONS}
+              />
+              <Select
+                label="受稽單位"
+                value={draft.departmentId ?? ''}
+                onChange={(value) => setDraft({ ...draft, departmentId: value || undefined })}
+                options={[{ value: '', label: '待確認' }, ...departmentOptions]}
+              />
+              <Input
+                label="受稽產品／型號（逗號分隔）"
+                value={draft.productModels.join('、')}
+                onChange={(value) => setDraft({
+                  ...draft,
+                  productModels: value.split(/[,，、]/).map((item) => item.trim()).filter(Boolean),
+                })}
+              />
+              <Input label="備註" value={draft.note} onChange={(value) => setDraft({ ...draft, note: value })} />
+            </div>
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-medium text-slate-700">涵蓋程序（QP）</p>
+              <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                {UNIQUE_QP_CODES.map((qpCode) => (
+                  <label key={qpCode} className="flex min-h-8 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={draft.qpCodes.includes(qpCode)}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...draft.qpCodes, qpCode]
+                          : draft.qpCodes.filter((code) => code !== qpCode)
+                        setDraft({ ...draft, qpCodes: next })
+                      }}
+                    />
+                    {qpCode}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="mb-2 text-sm font-medium text-slate-700">陪同人員</p>
+              <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
+                {escorts.map((person) => (
+                  <label key={person.id} className="flex min-h-8 items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={draft.escortPersonIds.includes(person.id)}
+                      onChange={(event) => {
+                        const next = event.target.checked
+                          ? [...draft.escortPersonIds, person.id]
+                          : draft.escortPersonIds.filter((id) => id !== person.id)
+                        setDraft({ ...draft, escortPersonIds: next })
+                      }}
+                    />
+                    {person.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2">
+              <Button onClick={saveDraft} disabled={!draft.date.trim()}>儲存</Button>
+              <Button variant="secondary" onClick={() => setDraft(null)}>取消</Button>
+            </div>
+          </Card>
+        )}
+
+        {slots.length === 0 ? (
+          <EmptyState message="目前沒有外稽當日時段。" />
+        ) : (
+          <ScrollRegion ariaLabel="外稽當日行程表">
+            <table className="w-full min-w-[900px] border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">日期</th>
+                  <th className="border p-2">時段</th>
+                  <th className="border p-2">廠區</th>
+                  <th className="border p-2">QP</th>
+                  <th className="border p-2">產品／型號</th>
+                  <th className="border p-2">陪同</th>
+                  <th className="border p-2">備註</th>
+                  <th className="border p-2 no-print">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slots.map((slot) => (
+                  <tr key={slot.id}>
+                    <td className="border p-2">{slot.date}</td>
+                    <td className="border p-2 text-xs">{slot.startTime}{slot.endTime ? `–${slot.endTime}` : ''}</td>
+                    <td className="border p-2 text-xs">{siteLabel(slot.site)}</td>
+                    <td className="border p-2 text-xs">{slot.qpCodes.join('、') || '—'}</td>
+                    <td className="border p-2 text-xs">{slot.productModels.join('、') || '—'}</td>
+                    <td className="border p-2 text-xs">
+                      {slot.escortPersonIds.map((id) => people.find((person) => person.id === id)?.name ?? id).join('、') || '—'}
+                    </td>
+                    <td className="border p-2 text-xs">{slot.note || '—'}</td>
+                    <td className="border p-2 no-print">
+                      <div className="flex gap-1">
+                        <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => startEdit(slot)}>編輯</Button>
+                        <Button variant="ghost" icon={ACTION_ICONS.delete} className="text-red-600" onClick={() => removeOnsiteSlot(slot.id)}>刪除</Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollRegion>
+        )}
+      </Card>
+    </div>
+  )
+}

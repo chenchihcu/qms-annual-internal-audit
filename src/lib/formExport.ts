@@ -330,6 +330,52 @@ export function buildObservationsSheet(co: CompanyData): SpreadsheetSheet {
   return createSheet([['觀察事項紀錄台帳'], [], header, ...rows])
 }
 
+/** 外稽當日行程（雙公司共用） */
+export function buildOnsiteSheet(state: AppState): SpreadsheetSheet {
+  const header = ['日期', '開始', '結束', '廠區', '受稽單位', 'QP', '產品／型號', '陪同人員', '備註']
+  const deptName = (departmentId?: string) => {
+    if (!departmentId) return ''
+    for (const company of Object.values(state.companies)) {
+      const dept = company.departments.find((item) => item.id === departmentId)
+      if (dept) return dept.name
+    }
+    return departmentId
+  }
+  const escortNames = (ids: string[]) => ids
+    .map((id) => state.people.find((person) => person.id === id)?.name ?? id)
+    .join('、')
+  const siteLabel = (site: string) => {
+    if (site === 'both') return '兩公司合併'
+    if (site === 'jiurun') return '九潤精密'
+    if (site === 'zhenglongxing') return '正隆興精密'
+    return site
+  }
+  const rows = (state.externalAuditPrep.onsiteSlots ?? []).map((slot) => [
+    slot.date,
+    slot.startTime,
+    slot.endTime,
+    siteLabel(slot.site),
+    deptName(slot.departmentId),
+    slot.qpCodes.join('、'),
+    slot.productModels.join('、'),
+    escortNames(slot.escortPersonIds),
+    slot.note,
+  ])
+  return createSheet([
+    ['外部稽核當日行程'],
+    [`年度：${state.externalAuditPrep.year}`, `外稽日期：${state.externalAuditPrep.externalAuditDate ?? ''}`],
+    [],
+    header,
+    ...rows,
+  ])
+}
+
+export function exportOnsiteExcel(state: AppState): void {
+  const wb = createWorkbook()
+  appendSheet(wb, buildOnsiteSheet(state), sheetName('外稽當日行程'))
+  writeWorkbook(wb, safeFilename(['外稽當日行程', String(state.externalAuditPrep.year)]) + '.xlsx')
+}
+
 /** 稽核前準備（optional sheet） */
 export function buildPrepSheet(state: AppState): SpreadsheetSheet {
   const header = ['項次', '稽核前準備事項', '負責人', '九潤', '正隆興', '合併', '完成', '備註']
@@ -384,6 +430,7 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
   appendSheet(wb, buildPrepSheet(state), sheetName('稽核前準備'))
+  appendSheet(wb, buildOnsiteSheet(state), sheetName('外稽當日行程'))
   return wb
 }
 

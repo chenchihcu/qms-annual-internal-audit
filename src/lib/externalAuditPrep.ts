@@ -59,6 +59,7 @@ export function createDefaultPrepState(year: number): ExternalAuditPrepState {
       completed: false,
       remark: '',
     })),
+    onsiteSlots: [],
   }
 }
 
@@ -77,6 +78,7 @@ export function migratePrepState(
     managementReviewComplete: normalizeSequenceFlag(old.managementReviewComplete),
     relationshipChecks: old.relationshipChecks ?? {},
     items: old.items ?? createDefaultPrepState(year).items,
+    onsiteSlots: old.onsiteSlots ?? [],
   }
 }
 

@@ -1,11 +1,13 @@
-import { Component, Suspense, lazy, useEffect, useState, type ReactNode } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuditStore } from './hooks/useAuditStore'
 import type { CompanyId, TabId } from './types'
 import { COMPANY_LABELS } from './types'
+import { AuditYearSwitcher } from './components/AuditYearSwitcher'
 import { Dashboard } from './components/Dashboard'
 import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
-import { ALL_TABS, TAB_GROUPS, parseAppHash, syncHash } from './lib/navigation'
+import { ALL_TABS, parseAppHash, syncHash } from './lib/navigation'
+import { Icon } from './components/ui/Icon'
 
 const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
 const ProcedureAuditPanel = lazy(() => import('./components/ProcedureAuditPanel').then((module) => ({ default: module.ProcedureAuditPanel })))
@@ -17,6 +19,9 @@ const RiskAssessment = lazy(() => import('./components/RiskAssessment').then((mo
 const StakeholdersPage = lazy(() => import('./components/StakeholdersPage').then((module) => ({ default: module.StakeholdersPage })))
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then((module) => ({ default: module.SettingsPanel })))
 const PersonnelPage = lazy(() => import('./components/PersonnelPage').then((module) => ({ default: module.PersonnelPage })))
+const AuditSchedulePage = lazy(() => import('./components/AuditSchedulePage').then((module) => ({ default: module.AuditSchedulePage })))
+const FollowupsPage = lazy(() => import('./components/FollowupsPage').then((module) => ({ default: module.FollowupsPage })))
+const OnsiteSchedulePage = lazy(() => import('./components/OnsiteSchedulePage').then((module) => ({ default: module.OnsiteSchedulePage })))
 
 class TabErrorBoundary extends Component<
   { children: ReactNode; tabLabel: string },
@@ -32,7 +37,7 @@ class TabErrorBoundary extends Component<
     if (this.state.error) {
       return (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-          <h2 className="text-lg font-semibold text-red-800">{this.props.tabLabel} 無法顯示</h2>
+          <h2 className="text-sm font-semibold text-red-800">{this.props.tabLabel} 無法顯示</h2>
           <p className="mt-2 text-sm text-red-700">{this.state.error.message}</p>
           <button
             type="button"
@@ -53,13 +58,17 @@ function App() {
   const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
   const { tab, auditKey } = hashState
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarNavRef = useRef<HTMLElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const { settings, activeCompanyId, company, externalAuditPrep } = store.state
-  const headerScope = tab === 'prep'
+  const headerScope = tab === 'prep' || tab === 'onsite'
     ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
     : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
   const setTab = (next: TabId, nextAuditKey?: string) => {
-    setHashState({ tab: next, auditKey: nextAuditKey })
-    syncHash(next, nextAuditKey)
+    const auditKeyForTab = next === 'audit' ? nextAuditKey : undefined
+    setHashState({ tab: next, auditKey: auditKeyForTab })
+    syncHash(next, auditKeyForTab)
     setMobileMenuOpen(false)
   }
   useEffect(() => {
@@ -67,48 +76,94 @@ function App() {
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
+  useEffect(() => {
+    const activeEntry = ALL_TABS.find((item) => item.id === tab)
+    document.title = activeEntry
+      ? `${activeEntry.label} · QMS 年度內部稽核`
+      : 'QMS 年度內部稽核系統'
+    mainRef.current?.focus({ preventScroll: true })
+  }, [tab])
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+        menuButtonRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    const firstNav = sidebarNavRef.current?.querySelector('button') as HTMLButtonElement | null
+    firstNav?.focus()
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileMenuOpen])
   const activeEntry = ALL_TABS.find((item) => item.id === tab)
-  const activeLabel = activeEntry?.label ?? '稽核總覽'
   const renderSidebar = () => (
     <div className="flex h-full flex-col">
       <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
-        <span className="block text-xs font-medium text-blue-100">首頁</span>
-        <span className="mt-1 block text-lg font-bold">QMS 年度內部稽核</span>
+        <span className="flex items-center gap-1.5 text-xs font-medium text-blue-100">
+          <Icon name="home" className="text-blue-200" />
+          首頁
+        </span>
+        <span className="mt-1 block text-sm font-bold">QMS 年度內部稽核</span>
         <span className="mt-1 block text-xs leading-snug text-blue-100">{headerScope}</span>
       </button>
-      <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
-        {TAB_GROUPS.map((group) => <div key={group.label} className="mb-4"><p className="px-3 pb-1 text-xs font-bold tracking-wide text-slate-400">{group.label}</p>{group.tabs.map((item) => <button key={item.id} type="button" onClick={() => setTab(item.id)} className={`mb-1 min-h-11 w-full whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`} aria-current={tab === item.id ? 'page' : undefined} aria-controls={item.formId}>{item.label}</button>)}</div>)}
+      <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
+        {ALL_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            aria-current={tab === item.id ? 'page' : undefined}
+            aria-controls={item.formId}
+          >
+            <Icon name={item.icon} className="mt-0.5" />
+            <span>{item.label}</span>
+          </button>
+        ))}
       </nav>
-      <p className="border-t border-slate-100 p-4 text-xs text-slate-400">資料儲存於本機 · v7</p>
+      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v7</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 lg:flex">
-      <aside className="hidden w-56 shrink-0 border-r border-slate-200 bg-white no-print lg:block">{renderSidebar()}</aside>
-      <aside className={`fixed inset-y-0 left-0 z-40 w-56 border-r border-slate-200 bg-white transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
-      {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => setMobileMenuOpen(false)} />}
+    <div className="min-h-screen bg-page lg:flex">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg"
+      >
+        跳至主要內容
+      </a>
+      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface no-print lg:block">{renderSidebar()}</aside>
+      <aside id="mobile-sidebar" className={`fixed inset-y-0 left-0 z-40 w-56 border-r border-line bg-surface transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
+      {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
 
       <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur no-print">
+      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur no-print">
         <div className="px-4 py-3 sm:px-6 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <button type="button" className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-bold text-blue-800 lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽">選單</button>
-              <button type="button" onClick={() => setTab('dashboard')} className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm font-bold text-blue-800 lg:hidden" aria-label="回到首頁">首頁</button>
+              <button ref={menuButtonRef} type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽" aria-expanded={mobileMenuOpen} aria-controls="mobile-sidebar">
+                <Icon name="menu" />
+                選單
+              </button>
+              <button type="button" onClick={() => setTab('dashboard')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" aria-label="回到首頁">
+                <Icon name="home" />
+                首頁
+              </button>
               <div className="min-h-11 px-2 text-left">
-                <span className="block truncate text-lg font-bold text-slate-900">{activeLabel}</span>
-                <span className="block truncate text-xs text-slate-500">{headerScope}</span>
+                <span className="block truncate text-sm font-medium text-ink">{headerScope}</span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex rounded-lg border border-slate-300 p-0.5" role="group" aria-label="切換公司">
+              <AuditYearSwitcher store={store} compact />
+              <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="切換公司">
                 {(Object.keys(COMPANY_LABELS) as CompanyId[]).map((id) => (
                   <button
                     key={id}
                     type="button"
                     onClick={() => store.switchCompany(id)}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    className={`min-h-11 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                       activeCompanyId === id
                         ? 'bg-blue-700 text-white'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -120,9 +175,10 @@ function App() {
               </div>
               <button
                 type="button"
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-50"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-slate-50"
                 onClick={() => window.print()}
               >
+                <Icon name="printer" />
                 列印目前頁面
               </button>
             </div>
@@ -130,14 +186,17 @@ function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6">
+      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6 outline-none">
         {store.storageWarning && (
-          <div role="alert" className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-            <strong className="block">資料保護模式</strong>
-            <span>{store.storageWarning}</span>
+          <div role="alert" className="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <Icon name="warning" className="mt-0.5 text-amber-700" />
+            <div>
+              <strong className="block">資料保護模式</strong>
+              <span>{store.storageWarning}</span>
+            </div>
           </div>
         )}
-        <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">正在載入頁面…</div>}>
+        <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
         <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="top" />
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
@@ -146,29 +205,49 @@ function App() {
                 <AnnualPlan store={store} />
               </TabErrorBoundary>
             )}
+            {tab === 'schedule' && (
+              <TabErrorBoundary tabLabel="稽核日程">
+                <AuditSchedulePage store={store} onOpenAudit={(id) => setTab('audit', id)} />
+              </TabErrorBoundary>
+            )}
             {tab === 'audit' && (
-              <TabErrorBoundary tabLabel="稽核執行與證據">
-                <ProcedureAuditPanel store={store} auditKey={auditKey} onAuditKeyChange={(id) => setTab('audit', id)} />
+              <TabErrorBoundary tabLabel="查檢表">
+                <ProcedureAuditPanel
+                  store={store}
+                  auditKey={auditKey}
+                  onAuditKeyChange={(id) => setTab('audit', id)}
+                  onBackToSchedule={() => setTab('schedule')}
+                />
+              </TabErrorBoundary>
+            )}
+            {tab === 'followups' && (
+              <TabErrorBoundary tabLabel="待改善追蹤">
+                <FollowupsPage store={store} onNavigate={(next) => setTab(next)} />
               </TabErrorBoundary>
             )}
             {tab === 'ncr' && (
-              <TabErrorBoundary tabLabel="不符合與矯正措施">
+              <TabErrorBoundary tabLabel="不符合">
                 <NCRList store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'observations' && (
-              <TabErrorBoundary tabLabel="觀察事項與追蹤">
+              <TabErrorBoundary tabLabel="觀察事項">
                 <Observations store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'suggestions' && (
-              <TabErrorBoundary tabLabel="改善機會與建議">
+              <TabErrorBoundary tabLabel="第三方建議">
                 <Suggestions store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'prep' && (
-              <TabErrorBoundary tabLabel="外部稽核前準備與序位">
+              <TabErrorBoundary tabLabel="外稽準備">
                 <PreAuditPrep store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'onsite' && (
+              <TabErrorBoundary tabLabel="外稽當日行程">
+                <OnsiteSchedulePage store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'stakeholders' && (
@@ -177,12 +256,12 @@ function App() {
               </TabErrorBoundary>
             )}
             {tab === 'risk' && (
-              <TabErrorBoundary tabLabel="方案風險與優先順序">
+              <TabErrorBoundary tabLabel="方案風險">
                 <RiskAssessment store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'personnel' && (
-              <TabErrorBoundary tabLabel="稽核員能力與任命">
+              <TabErrorBoundary tabLabel="人員合格名單">
                 <PersonnelPage store={store} />
               </TabErrorBoundary>
             )}
@@ -204,15 +283,19 @@ function App() {
           </ProcessForm>
         ) : (
           <TabErrorBoundary tabLabel="稽核總覽">
-            <Dashboard state={store.state} onNavigate={setTab} />
+            <Dashboard
+              state={store.state}
+              onNavigate={setTab}
+              onSwitchCompany={(id) => store.switchCompany(id)}
+            />
           </TabErrorBoundary>
         )}
         <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="bottom" />
         </Suspense>
       </main>
 
-      <footer className="border-t border-slate-200 py-4 text-center text-xs text-slate-400 no-print">
-        ISO 9001 / AS9100D 內部稽核 · 對應 QR-28-01/02/03/04/05 · 資料儲存於本機
+      <footer className="border-t border-line py-4 text-center text-xs text-muted no-print">
+        ISO 9001 / AS9100D 內部稽核
       </footer>
       </div>
     </div>

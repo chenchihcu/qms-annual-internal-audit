@@ -194,6 +194,11 @@ describe('migratePrepState', () => {
     expect(migratedMixed.internalAuditComplete).toBe(false)
     expect(migratedMixed.managementReviewComplete).toBe(false)
   })
+
+  it('defaults onsiteSlots to empty array when missing', () => {
+    const migrated = migratePrepState({ year: 2026 })
+    expect(migrated.onsiteSlots).toEqual([])
+  })
 })
 
 describe('itemHasCallout', () => {

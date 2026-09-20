@@ -36,12 +36,12 @@ describe('Dashboard attention list', () => {
       expect(screen.getByRole('group', { name: '程序清單篩選' })).toBeTruthy()
     })
 
-    const defaultRows = screen.getAllByRole('button', { name: /前往 QP-/ })
+    const defaultRows = screen.getAllByRole('button', { name: /^QP-/ })
     expect(defaultRows.length).toBeGreaterThan(0)
     expect(defaultRows.length).toBeLessThan(29)
 
     fireEvent.click(screen.getByRole('button', { name: '全部' }))
-    const allRows = screen.getAllByRole('button', { name: /前往 QP-/ })
+    const allRows = screen.getAllByRole('button', { name: /^QP-/ })
     expect(allRows.length).toBeGreaterThan(defaultRows.length)
   })
 
@@ -53,7 +53,7 @@ describe('Dashboard attention list', () => {
     })
 
     fireEvent.click(screen.getByRole('button', { name: '全部' }))
-    expect(screen.getByRole('button', { name: /前往 QP-06 · 管理部/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /QP-06 · 管理部/ })).toBeTruthy()
   })
 
   it('navigates via row click handler for scored demo row', async () => {
@@ -69,10 +69,10 @@ describe('Dashboard attention list', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /前往 QP-16 · 品保部/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: /QP-16 · 品保部/ })).toBeTruthy()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /前往 QP-16 · 品保部/ }))
+    fireEvent.click(screen.getByRole('button', { name: /QP-16 · 品保部/ }))
     expect(tab).toBe('audit')
   })
 
@@ -86,7 +86,7 @@ describe('Dashboard attention list', () => {
     fireEvent.click(screen.getByRole('button', { name: '全部' }))
 
     const unscoredButtons = screen
-      .getAllByRole('button', { name: /前往 QP-/ })
+      .getAllByRole('button', { name: /^QP-/ })
       .filter((button) => within(button).queryByText('未計分'))
 
     expect(unscoredButtons.length).toBeGreaterThan(0)

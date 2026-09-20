@@ -1,4 +1,7 @@
 import { forwardRef, type ReactNode } from 'react'
+import type { IconName } from '../../lib/uiIcons'
+import { badgeIconFor } from '../../lib/uiIcons'
+import { Icon } from './Icon'
 
 const colors: Record<string, string> = {
   高: 'bg-red-100 text-red-800 border-red-200',
@@ -11,12 +14,25 @@ const colors: Record<string, string> = {
   不符: 'bg-red-100 text-red-800',
   觀察: 'bg-amber-100 text-amber-800',
   不適用: 'bg-slate-100 text-slate-600',
+  規劃中: 'bg-slate-100 text-slate-700 border-slate-200',
+  執行中: 'bg-blue-100 text-blue-800 border-blue-200',
+  已回報: 'bg-green-100 text-green-800 border-green-200',
+  NCR: 'bg-red-100 text-red-800 border-red-200',
+  建議: 'bg-violet-100 text-violet-800 border-violet-200',
+  待追蹤: 'bg-amber-100 text-amber-800 border-amber-200',
+  已結案: 'bg-green-100 text-green-800 border-green-200',
+  '已轉 NCR': 'bg-red-100 text-red-800 border-red-200',
+  系統稽核: 'bg-slate-100 text-slate-700 border-slate-200',
+  製程稽核: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  型態稽核: 'bg-purple-100 text-purple-800 border-purple-200',
 }
 
 export function Badge({ label, className = '' }: { label: string; className?: string }) {
   const color = colors[label] ?? 'bg-slate-100 text-slate-700'
+  const icon = badgeIconFor(label)
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${color} ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${color} ${className}`}>
+      {icon && <Icon name={icon} size="sm" />}
       {label}
     </span>
   )
@@ -24,7 +40,7 @@ export function Badge({ label, className = '' }: { label: string; className?: st
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
+    <div className={`rounded-xl border border-line bg-surface p-5 shadow-sm ${className}`}>
       {children}
     </div>
   )
@@ -37,6 +53,7 @@ export const Button = forwardRef<HTMLButtonElement, {
   className?: string
   type?: 'button' | 'submit'
   disabled?: boolean
+  icon?: IconName
   'aria-describedby'?: string
 }>(({
   children,
@@ -45,11 +62,12 @@ export const Button = forwardRef<HTMLButtonElement, {
   className = '',
   type = 'button',
   disabled,
+  icon,
   'aria-describedby': ariaDescribedBy,
 }, ref) => {
   const variants = {
     primary: 'bg-blue-700 text-white hover:bg-blue-800',
-    secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
+    secondary: 'bg-surface text-slate-700 border border-line hover:bg-slate-50',
     danger: 'bg-red-600 text-white hover:bg-red-700',
     ghost: 'text-slate-600 hover:bg-slate-100',
   }
@@ -60,8 +78,9 @@ export const Button = forwardRef<HTMLButtonElement, {
       disabled={disabled}
       aria-describedby={ariaDescribedBy}
       onClick={onClick}
-      className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 ${variants[variant]} ${className}`}
     >
+      {icon && <Icon name={icon} />}
       {children}
     </button>
   )
@@ -97,7 +116,7 @@ export function Input({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
-        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
+        className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
       />
     </label>
   )
@@ -126,7 +145,7 @@ export function Select({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
-        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
+        className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

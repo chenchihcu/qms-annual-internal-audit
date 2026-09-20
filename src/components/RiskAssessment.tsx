@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportRiskExcel } from '../lib/formExport'
-import { autoArrangePlan } from '../lib/planner'
+import { autoArrangePlan, MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import {
   buildEffectiveProcedureRisks,
@@ -16,7 +16,11 @@ import {
   type ProcedurePriorityInput,
 } from '../lib/risk'
 import type { PlanRow, ProcedureRiskRecord } from '../types'
+import { ACTION_ICONS, RISK_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input } from './ui/Badge'
+import { Icon } from './ui/Icon'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { EmptyState } from './ui/EmptyState'
 
 type RiskFactorField = keyof ProcedurePriorityInput
 type RiskFilter = 'all' | 'unsaved' | 'provisional'
@@ -71,9 +75,6 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     }
     return { plan, saved, values, result, persisted, seedInherent, openNcr, suggestions }
   }).sort((a, b) => b.result.score - a.result.score), [company, referenceDate])
-
-  const savedCount = rows.filter((row) => row.persisted).length
-  const totalCount = rows.length
 
   const visibleRows = useMemo(() => rows.filter((row) => {
     if (filter === 'unsaved') return !row.persisted
@@ -130,16 +131,12 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
       <Card>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="mb-2 text-lg font-semibold">風險指標評估（QR-02-01）</h2>
-            <p className="text-sm text-slate-600">
-              優先分數 0–100＝七因素加權（各欄選<strong>事實</strong>，系統換算 1–5 再計分，不是直接打分）。
-              空白欄暫估為中位數並標「暫定」；點格子循環選項，空白顯示 —。
-            </p>
+            <h2 className="mb-2 text-sm font-semibold">方案風險</h2>
           </div>
           <div className="flex flex-wrap gap-2 no-print">
-            <Button variant="secondary" onClick={persistDisplayedRisks}>採用目前評估並全部存檔</Button>
-            <Button onClick={previewPlan}>預覽套用至年度計畫</Button>
-            <Button variant="secondary" onClick={() => exportRiskExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+            <Button variant="secondary" icon="save" onClick={persistDisplayedRisks}>採用目前評估並全部存檔</Button>
+            <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽套用至年度計畫</Button>
+            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportRiskExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
           </div>
         </div>
 
@@ -148,10 +145,10 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-blue-950">年度計畫套用預覽</h3>
-                <p className="text-sm text-blue-800">依方案風險優先順序重排月格；手動覆寫的計畫列會保留。</p>
+                <p className="text-sm text-blue-800">依方案風險優先順序重排月格；{MANUAL_OVERRIDE_PLAN_NOTE}</p>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => { persistDisplayedRisks(); replacePlanRows(previewRows); setPreviewRows(null) }}>確認套用</Button>
+                <Button icon="check" onClick={() => { persistDisplayedRisks(); replacePlanRows(previewRows); setPreviewRows(null) }}>確認套用</Button>
                 <Button variant="secondary" onClick={() => setPreviewRows(null)}>取消</Button>
               </div>
             </div>
@@ -166,48 +163,47 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
           </div>
         )}
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 no-print">
-          <p className="text-sm font-medium text-slate-700">
-            固有風險已存檔 <span className="text-blue-800">{savedCount}/{totalCount}</span>
-          </p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="風險清單篩選">
+        <div className="mb-4 flex flex-wrap justify-end gap-2 no-print" role="group" aria-label="風險清單篩選">
             {filterButtons.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
                 aria-pressed={filter === id}
-                className={`rounded-full border px-3 py-1 text-sm font-medium transition ${
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
                   filter === id
                     ? 'border-blue-700 bg-blue-700 text-white'
                     : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
                 }`}
                 onClick={() => setFilter(id)}
               >
+                <Icon name={RISK_FILTER_ICONS[label]} size="sm" />
                 {label}
               </button>
             ))}
-          </div>
         </div>
 
-        <div className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-4 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
-          {FACTOR_COLUMNS.map(({ field, label, hint }) => (
-            <span key={field}>
-              <strong>{label}</strong> {hint} → 加權 {PROCEDURE_RISK_WEIGHTS[field]}%
-            </span>
-          ))}
-        </div>
+        <details className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 no-print">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">計分說明</summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {FACTOR_COLUMNS.map(({ field, label, hint }) => (
+              <span key={field}>
+                <strong>{label}</strong> {hint} → 加權 {PROCEDURE_RISK_WEIGHTS[field]}%
+              </span>
+            ))}
+          </div>
+        </details>
 
         {visibleRows.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">目前篩選條件沒有程序列</p>
+          <EmptyState message="目前沒有程序列。" />
         ) : (
-          <div className="overflow-x-auto">
+          <ScrollRegion ariaLabel="方案風險矩陣 QR-02-01">
             <table className="qr-risk-matrix w-full min-w-[960px] border-collapse text-sm" data-risk-matrix>
               <thead className="sticky top-0 z-10 bg-slate-50">
                 <tr className="text-left">
                   <th className="border p-2">QP</th>
                   <th className="border p-2">部門</th>
-                  {FACTOR_COLUMNS.map(({ label }) => (
-                    <th key={label} className="border p-1 text-center text-xs">{label}</th>
+                  {FACTOR_COLUMNS.map(({ label, hint }) => (
+                    <th key={label} className="border p-1 text-center text-xs" title={hint}>{label}</th>
                   ))}
                   <th className="border p-2 text-center">分</th>
                   <th className="border p-2">狀態</th>
@@ -242,7 +238,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                             <td key={field} className="border p-0.5 text-center">
                               <button
                                 type="button"
-                                className="no-print min-h-8 min-w-[2.75rem] rounded border border-slate-200 px-0.5 text-[10px] font-medium leading-tight hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:text-xs"
+                                className="no-print min-h-10 min-w-10 rounded border border-slate-200 px-0.5 text-xs font-medium leading-tight hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
                                 aria-label={`${plan.qpCode} ${plan.department} ${label}`}
                                 onClick={(event) => {
                                   event.stopPropagation()
@@ -316,7 +312,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
       </Card>
     </div>

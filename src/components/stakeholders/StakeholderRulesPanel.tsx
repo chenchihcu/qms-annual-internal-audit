@@ -8,12 +8,12 @@ import {
   STAKEHOLDER_WEIGHTS,
   STAKEHOLDER_WORKFLOW_REFERENCES,
 } from '../../lib/planner'
-import { buildAppHash } from '../../lib/navigation'
+import { buildAppHash, tabLabel } from '../../lib/navigation'
 import { STAKEHOLDER_TAGS } from '../../types'
 
 export function StakeholderRulesPanel() {
   return (
-    <details open className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
+    <details className="mt-4 rounded-lg border border-slate-200 bg-slate-50">
       <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
         評分規則與編排影響
       </summary>
@@ -101,7 +101,7 @@ export function StakeholderRulesPanel() {
                       <>
                         {' · '}
                         <a className="font-medium text-blue-700 underline" href={buildAppHash(row.tab)}>
-                          前往工作頁
+                          {tabLabel(row.tab)}
                         </a>
                       </>
                     )}

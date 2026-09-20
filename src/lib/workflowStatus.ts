@@ -1,4 +1,5 @@
 import { countPrepProgress, evaluatePrepSequence } from './externalAuditPrep'
+import { countOpenFollowups } from './followupQueue'
 import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
 import type { AppState, CompanyId, TabId } from '../types'
@@ -132,26 +133,24 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '程序來源三欄未齊全', tab: 'procedure' })
   if (!stakeholdersReady(state, companyId)) planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'stakeholders' })
   if (!riskPersistedForAllRows(state, companyId)) planGaps.push({ message: '方案風險尚未全部存檔', tab: 'risk' })
-  if (!planScheduled(state, companyId)) planGaps.push({ message: '年度計畫月格或窗口未排定', tab: 'plan' })
   if (!leadAuditorAppointed(state, companyId)) planGaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
+  if (!planScheduled(state, companyId)) planGaps.push({ message: '年度計畫月格或窗口未排定', tab: 'plan' })
 
   const doGaps: WorkflowGap[] = []
   const started = co.audits.filter((a) => a.status === '執行中' || a.status === '已回報')
   const planning = co.audits.filter((a) => !a.status || a.status === '規劃中')
   const reported = co.audits.filter((a) => a.status === '已回報')
-  if (started.length === 0) doGaps.push({ message: '尚無已開始的稽核事件', tab: 'audit' })
+  if (started.length === 0) doGaps.push({ message: '尚無已開始的稽核事件', tab: 'schedule' })
   const inProgress = co.audits.filter((a) => a.status === '執行中')
   if (inProgress.length > 0) {
-    doGaps.push({ message: `${inProgress.length} 件執行中待回報`, tab: 'audit' })
+    doGaps.push({ message: `${inProgress.length} 件執行中待回報`, tab: 'schedule' })
   }
 
   const checkGaps: WorkflowGap[] = []
-  const openNcr = co.ncrs.filter((n) => n.status !== '結案').length
-  const openObs = co.observations.filter((o) => o.status === 'open').length
-  const openSug = co.suggestions.filter((s) => s.status === 'open').length
-  if (openNcr > 0) checkGaps.push({ message: `未結案 NCR ${openNcr} 件`, tab: 'ncr' })
-  if (openObs > 0) checkGaps.push({ message: `待追蹤觀察 ${openObs} 件`, tab: 'observations' })
-  if (openSug > 0) checkGaps.push({ message: `待追蹤建議 ${openSug} 件`, tab: 'suggestions' })
+  const openFollowups = countOpenFollowups(co)
+  if (openFollowups > 0) {
+    checkGaps.push({ message: `待追蹤 ${openFollowups} 件`, tab: 'followups' })
+  }
 
   const actGaps: WorkflowGap[] = []
   const prepProgress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
@@ -170,13 +169,13 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
 
   const annualCloseGaps: WorkflowGap[] = []
   if (planGaps.length > 0) annualCloseGaps.push(...planGaps)
-  if (started.length === 0) annualCloseGaps.push({ message: '年度內部稽核尚未開始', tab: 'audit' })
+  if (started.length === 0) annualCloseGaps.push({ message: '年度內部稽核尚未開始', tab: 'schedule' })
   if (planning.length > 0 && co.planRows.some((r) => r.months.some(Boolean))) {
-    annualCloseGaps.push({ message: `${planning.length} 件計畫事件尚未開始`, tab: 'audit' })
+    annualCloseGaps.push({ message: `${planning.length} 件計畫事件尚未開始`, tab: 'schedule' })
   }
-  if (inProgress.length > 0) annualCloseGaps.push({ message: `${inProgress.length} 件尚未完成回報`, tab: 'audit' })
-  if (openNcr > 0 || openObs > 0) {
-    annualCloseGaps.push({ message: '尚有未結 NCR 或觀察事項', tab: 'ncr' })
+  if (inProgress.length > 0) annualCloseGaps.push({ message: `${inProgress.length} 件尚未完成回報`, tab: 'schedule' })
+  if (openFollowups > 0) {
+    annualCloseGaps.push({ message: '尚有未結改善追蹤項目', tab: 'followups' })
   }
   if (!prepComplete(state)) annualCloseGaps.push({ message: '外部稽核前準備未完成', tab: 'prep' })
 
@@ -200,13 +199,16 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
     case 'plan':
     case 'personnel':
       return 'P'
+    case 'schedule':
     case 'audit':
       return 'D'
+    case 'followups':
     case 'ncr':
     case 'observations':
     case 'suggestions':
       return 'C'
     case 'prep':
+    case 'onsite':
       return 'A'
     case 'system-settings':
       return 'system'
@@ -257,14 +259,15 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = gaps.length === 0
       break
 
-    case 'stakeholders':
-      for (const dept of co.departments) {
-        if (dept.stakeholders.length < 1) {
-          gaps.push({ message: `${dept.name}尚未標註利害關係人` })
-        }
+    case 'stakeholders': {
+      const total = co.departments.length
+      const tagged = co.departments.filter((d) => d.stakeholders.length >= 1).length
+      if (tagged < total) {
+        gaps.push({ message: `利害關係人已標註 ${tagged}/${total}` })
       }
-      ready = gaps.length === 0
+      ready = tagged === total
       break
+    }
 
     case 'risk': {
       const total = co.planRows.length
@@ -299,12 +302,27 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = gaps.length === 0
       break
 
+    case 'schedule': {
+      if (co.audits.length === 0) {
+        gaps.push({ message: '尚無可排程的稽核事件' })
+      }
+      ready = gaps.length === 0
+      break
+    }
+
     case 'audit':
       if (!auditStarted(state, companyId)) {
         gaps.push({ message: '至少須有一筆稽核事件已開始（執行中或已回報）' })
       }
       ready = gaps.length === 0
       break
+
+    case 'followups': {
+      ready = true
+      const pending = countOpenFollowups(co)
+      if (pending > 0) advisories.push({ message: `待追蹤 ${pending} 件` })
+      break
+    }
 
     case 'ncr':
     case 'observations':
@@ -316,6 +334,13 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       if (tab === 'ncr' && openNcr > 0) advisories.push({ message: `尚有 ${openNcr} 件未結案 NCR` })
       if (tab === 'observations' && openObs > 0) advisories.push({ message: `尚有 ${openObs} 件待追蹤觀察` })
       if (tab === 'suggestions' && openSug > 0) advisories.push({ message: `尚有 ${openSug} 件待追蹤建議` })
+      break
+
+    case 'onsite':
+      ready = true
+      if ((state.externalAuditPrep.onsiteSlots?.length ?? 0) === 0) {
+        advisories.push({ message: '尚未排定外稽當日時段' })
+      }
       break
 
     case 'prep': {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { CompanyRelationship, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
 import { COMPANY_LABELS, relationshipCheckKey } from '../types'
@@ -13,8 +14,11 @@ import {
   relationshipsForPrepItem,
 } from '../lib/externalAuditPrep'
 import { exportPrepExcel } from '../lib/formExport'
-import { buildAppHash } from '../lib/navigation'
+import { buildAppHash, tabLabel } from '../lib/navigation'
+import { ACTION_ICONS } from '../lib/uiIcons'
 import { Button, Card } from './ui/Badge'
+import { ConfirmDialog } from './ui/ConfirmDialog'
+import { ScrollRegion } from './ui/ScrollRegion'
 import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
 
 const SCOPE_LABELS: Record<PrepScopeMode, string> = {
@@ -49,10 +53,14 @@ function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 
 function ScopeCells({
   mode,
   item,
+  prepItemNo,
+  itemTitle,
   onUpdate,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
+  prepItemNo: number
+  itemTitle: string
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
 }) {
   if (mode === 'both_separate') {
@@ -64,10 +72,11 @@ function ScopeCells({
               type="checkbox"
               className="no-print h-4 w-4"
               checked={item.jiurunDone}
+              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.jiurun} 已完成`}
               onChange={(e) => onUpdate({ jiurunDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.jiurunDone ? '■' : '□'}</span>
-            <span className="text-[10px] text-slate-400 no-print">◎</span>
+            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
           </label>
         </td>
         <td className="border p-2 text-center align-top">
@@ -76,10 +85,11 @@ function ScopeCells({
               type="checkbox"
               className="no-print h-4 w-4"
               checked={item.zhenglongxingDone}
+              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.zhenglongxing} 已完成`}
               onChange={(e) => onUpdate({ zhenglongxingDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.zhenglongxingDone ? '■' : '□'}</span>
-            <span className="text-[10px] text-slate-400 no-print">◎</span>
+            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
           </label>
         </td>
       </>
@@ -94,6 +104,7 @@ function ScopeCells({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.mergedDone}
+            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 合併共用證據已完成`}
             onChange={(e) => onUpdate({ mergedDone: e.target.checked })}
           />
           <span className="print-only text-xs">{item.mergedDone ? '■' : '□'}</span>
@@ -117,11 +128,15 @@ function ScopeCells({
 function DoneCell({
   mode,
   item,
+  prepItemNo,
+  itemTitle,
   done,
   onUpdate,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
+  prepItemNo: number
+  itemTitle: string
   done: boolean
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
 }) {
@@ -133,6 +148,7 @@ function DoneCell({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.completed}
+            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 依稽核廠區範圍已完成`}
             onChange={(e) => onUpdate({ completed: e.target.checked })}
           />
           <span className="print-only text-xs">{item.completed ? '■' : '□'}</span>
@@ -147,6 +163,8 @@ function DoneCell({
         className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
           done ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-400'
         }`}
+        role="status"
+        aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${done ? '已完成' : '未完成'}`}
         title={done ? '已完成' : '未完成'}
       >
         {done ? '✓' : '—'}
@@ -196,7 +214,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     updateExternalPrepRelationship,
     switchPrepYear,
   } = store
-  const { settings, externalAuditPrep, companies, companyRelationships, activeCompanyId } = state
+  const { settings, externalAuditPrep, companies, companyRelationships } = state
   const prepContext = {
     prep: externalAuditPrep,
     companies,
@@ -209,27 +227,82 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
   const seed = EXTERNAL_AUDIT_PREP_SEED
   const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
   const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
+  const [prepYearDraft, setPrepYearDraft] = useState<string | null>(null)
+  const [pendingPrepYear, setPendingPrepYear] = useState<number | null>(null)
+  const prepYearInput = prepYearDraft ?? String(externalAuditPrep.year)
+
+  const handlePrepYearDraftChange = (value: string) => {
+    setPrepYearDraft(value)
+    const year = Number(value)
+    if (!Number.isInteger(year) || value.length !== 4 || year < 2000 || year > 2200) return
+    if (year === externalAuditPrep.year) {
+      setPrepYearDraft(null)
+      setPendingPrepYear(null)
+      return
+    }
+    setPendingPrepYear(year)
+  }
+
+  const confirmPrepYearSwitch = () => {
+    if (pendingPrepYear == null) return
+    switchPrepYear(pendingPrepYear)
+    setPendingPrepYear(null)
+    setPrepYearDraft(null)
+  }
+
+  const cancelPrepYearSwitch = () => {
+    setPendingPrepYear(null)
+    setPrepYearDraft(null)
+  }
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <Card>
-        <h2 className="mb-3 text-lg font-semibold">外部稽核團隊與本年度陪稽安排</h2>
-        <div className="grid gap-4 sm:grid-cols-2"><div><h3 className="text-sm font-semibold text-slate-700">第三方稽核團隊</h3>{externalTeam.length ? <ul className="mt-2 space-y-1 text-sm">{externalTeam.map((person) => <li key={person.id}>{person.name} · {personRoles(person, settings.auditYear, state.annualPersonnelAssignments).filter((role) => role.startsWith('third_party')).map((role) => PERSONNEL_ROLE_LABELS[role]).join('、')}</li>)}</ul> : <p className="mt-2 text-sm text-amber-800">尚未於人員合格名單確認第三方團隊 — <a className="font-medium text-blue-700 underline" href={buildAppHash('personnel')}>前往人員合格名單</a></p>}</div><div><h3 className="text-sm font-semibold text-slate-700">受稽方陪同／協調人員</h3>{escorts.length ? <ul className="mt-2 space-y-1 text-sm">{escorts.map((person) => <li key={person.id}>{person.name}</li>)}</ul> : <p className="mt-2 text-sm text-amber-800">尚未安排本年度陪稽人員 — <a className="font-medium text-blue-700 underline" href={buildAppHash('personnel')}>前往人員合格名單</a></p>}</div></div>
-      </Card>
+      <details className="rounded-lg border border-slate-200 bg-white no-print">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">外部稽核團隊與陪稽安排</summary>
+        <div className="border-t border-slate-100 px-4 pb-4">
+        <div className="grid gap-4 sm:grid-cols-2 pt-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">第三方稽核團隊</h3>
+            {externalTeam.length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {externalTeam.map((person) => (
+                  <li key={person.id}>
+                    {person.name} · {personRoles(person, settings.auditYear, state.annualPersonnelAssignments).filter((role) => role.startsWith('third_party')).map((role) => PERSONNEL_ROLE_LABELS[role]).join('、')}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-amber-800">尚未確認第三方團隊</p>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">受稽方陪同／協調人員</h3>
+            {escorts.length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {escorts.map((person) => <li key={person.id}>{person.name}</li>)}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-amber-800">尚未安排本年度陪稽人員</p>
+            )}
+          </div>
+        </div>
+        {(externalTeam.length === 0 || escorts.length === 0) && (
+          <p className="mt-3 text-sm text-amber-800">
+            請至
+            <a className="mx-1 font-medium text-blue-700 underline" href={buildAppHash('personnel')}>{tabLabel('personnel')}</a>
+            確認團隊與陪稽安排
+          </p>
+        )}
+        </div>
+      </details>
       <Card>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold">{seed.title}</h2>
+            <h2 className="text-sm font-semibold">外稽準備</h2>
             <p className="mt-1 text-sm text-slate-500">
-              {seed.companies.join(' | ')} · 雙公司合併取證（一張證書）
+              {externalAuditPrep.year} 年 · 外稽 {externalAuditPrep.externalAuditDate || '未設定'}
             </p>
-            <p className="text-sm text-amber-800">
-              本頁為雙公司共用準備表，不隨頂部公司切換過濾；目前台帳：{COMPANY_LABELS[activeCompanyId]}。
-            </p>
-            <p className="text-sm text-slate-500">
-              外稽準備年度 {externalAuditPrep.year} · 外部稽核預定：{externalAuditPrep.externalAuditDate || '未設定'} · 完成 {done}/{total}
-            </p>
-            <p className="mt-1 text-xs text-slate-400">資料來源：{seed.source}</p>
+            <p className="mt-1 text-xs text-slate-400 print-only">{seed.title} · {seed.source}</p>
           </div>
           <div className="flex flex-col items-end gap-2 no-print">
             <label className="text-xs text-slate-600">
@@ -237,11 +310,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               <input
                 type="number"
                 className="ml-2 w-20 rounded border border-slate-300 px-2 py-1 text-sm"
-                value={externalAuditPrep.year}
-                onChange={(e) => {
-                  const year = Number(e.target.value)
-                  if (Number.isInteger(year) && year >= 2000 && year <= 2200) switchPrepYear(year)
-                }}
+                value={prepYearInput}
+                aria-label="外稽準備表年度"
+                onChange={(e) => handlePrepYearDraftChange(e.target.value)}
               />
             </label>
             <label className="text-xs text-slate-600">
@@ -253,7 +324,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 onChange={(e) => updateExternalPrepSequence({ externalAuditDate: e.target.value })}
               />
             </label>
-            <Button variant="secondary" onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
+            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
             <div className="h-3 w-32 rounded-full bg-slate-100">
               <div
                 className="h-3 rounded-full bg-green-500 transition-all"
@@ -271,7 +342,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
         {/* 序位橫幅 */}
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位（內稽→管審→外稽；兩家公司同一順序）</p>
+          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位</p>
           <div className="space-y-3 text-sm">
             <div>
               <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
@@ -301,9 +372,6 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </div>
             <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
               <span className="font-medium">3. 外部稽核</span>
-              <span className="ml-2 text-slate-500">
-                {externalAuditPrep.externalAuditDate || '（日期未設定）'}
-              </span>
             </div>
           </div>
         </div>
@@ -327,17 +395,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         )}
 
         {/* 範圍圖例 */}
-        <div className="mb-4 flex flex-wrap gap-3 text-xs text-slate-600">
-          <span>
-            <strong>◎◎</strong> 兩公司各自準備
-          </span>
-          <span>
-            <strong>合併</strong> 共用證據
-          </span>
-          <span>
-            <strong>稽核廠區範圍</strong> 依現場稽核範圍
-          </span>
-        </div>
+        <p className="mb-4 text-xs text-slate-500 no-print">
+          ◎◎ 兩公司各自準備 · 合併 共用證據 · 稽核廠區範圍 依現場
+        </p>
 
         <div className="print-only qr-form-header mb-4 text-center">
           <h1 className="text-xl font-bold">{seed.companies.join(' / ')}</h1>
@@ -346,7 +406,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        <ScrollRegion ariaLabel="外部稽核前準備清單">
           <table className="qr-checklist w-full min-w-[900px] border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
@@ -384,7 +444,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                         relationships={companyRelationships}
                         onToggle={updateExternalPrepRelationship}
                       />
-                      <span className="mt-1 inline-block text-[10px] text-slate-400">
+                      <span className="mt-1 inline-block text-xs text-slate-400">
                         {SCOPE_LABELS[mode]}
                       </span>
                     </td>
@@ -392,11 +452,15 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                     <ScopeCells
                       mode={mode}
                       item={itemState}
+                      prepItemNo={template.no}
+                      itemTitle={template.title}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <DoneCell
                       mode={mode}
                       item={itemState}
+                      prepItemNo={template.no}
+                      itemTitle={template.title}
                       done={done}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
@@ -420,28 +484,38 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
 
         {/* 序位規則摘要 */}
-        <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <p className="mb-2 text-xs font-semibold text-slate-600">稽核要點</p>
-          <ul className="list-inside list-disc space-y-1 text-xs text-slate-600">
+        <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-slate-600">稽核要點</summary>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.sequenceRules.map((rule) => (
               <li key={rule}>{rule}</li>
             ))}
           </ul>
-        </div>
+        </details>
 
         {/* 頁尾 otherNotes */}
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <p className="mb-2 text-xs font-semibold text-slate-600">其他注意事項</p>
-          <ul className="list-inside list-disc space-y-1 text-xs text-slate-600">
+        <details className="mt-4 border-t border-slate-200 pt-4">
+          <summary className="cursor-pointer text-xs font-semibold text-slate-600">其他注意事項</summary>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.otherNotes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
-        </div>
+        </details>
       </Card>
+      {pendingPrepYear != null && (
+        <ConfirmDialog
+          open
+          title={`切換外稽準備至 ${pendingPrepYear} 年？`}
+          description={`外稽準備表為雙公司共用；切換後將載入 ${pendingPrepYear} 年準備進度，不會改動各公司年度台帳（目前台帳年度 ${settings.auditYear}）。`}
+          confirmLabel="確認切換"
+          onConfirm={confirmPrepYearSwitch}
+          onCancel={cancelPrepYearSwitch}
+        />
+      )}
     </div>
   )
 }

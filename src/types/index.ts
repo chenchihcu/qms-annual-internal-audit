@@ -329,6 +329,22 @@ export interface ExternalAuditPrepItemState {
   remark: string
 }
 
+/** 外稽當日行程時段（與準備表同年、雙公司共用） */
+export type OnsiteSite = CompanyId | 'both'
+
+export interface OnsiteAuditSlot {
+  id: string
+  date: string
+  startTime: string
+  endTime: string
+  site: OnsiteSite
+  departmentId?: string
+  qpCodes: string[]
+  productModels: string[]
+  escortPersonIds: string[]
+  note: string
+}
+
 export interface ExternalAuditPrepState {
   year: number
   externalAuditDate?: string
@@ -336,6 +352,7 @@ export interface ExternalAuditPrepState {
   managementReviewComplete: boolean
   relationshipChecks: Record<string, boolean>
   items: ExternalAuditPrepItemState[]
+  onsiteSlots: OnsiteAuditSlot[]
 }
 
 export interface CompanyData {
@@ -401,11 +418,14 @@ export function otherCompanyId(companyId: CompanyId): CompanyId {
 export type TabId =
   | 'dashboard'
   | 'plan'
+  | 'schedule'
   | 'audit'
+  | 'followups'
   | 'ncr'
   | 'observations'
   | 'suggestions'
   | 'prep'
+  | 'onsite'
   | 'risk'
   | 'stakeholders'
   | 'personnel'
