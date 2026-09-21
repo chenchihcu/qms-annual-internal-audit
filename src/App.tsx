@@ -104,8 +104,7 @@ function App() {
           <Icon name="home" className="text-blue-200" />
           首頁
         </span>
-        <span className="mt-1 block text-sm font-bold">QMS 年度內部稽核</span>
-        <span className="mt-1 block text-xs leading-snug text-blue-100">{headerScope}</span>
+        <span className="mt-1 block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
       </button>
       <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
         {ALL_TABS.map((item) => (
@@ -286,7 +285,6 @@ function App() {
             <Dashboard
               state={store.state}
               onNavigate={setTab}
-              onSwitchCompany={(id) => store.switchCompany(id)}
             />
           </TabErrorBoundary>
         )}

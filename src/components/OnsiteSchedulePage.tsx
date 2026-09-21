@@ -7,8 +7,11 @@ import type { OnsiteAuditSlot, OnsiteSite } from '../types'
 import { COMPANY_LABELS } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Button, Card, Input, Select } from './ui/Badge'
-import { ScrollRegion } from './ui/ScrollRegion'
+import { CheckboxList } from './ui/CheckboxList'
 import { EmptyState } from './ui/EmptyState'
+import { PageToolbar } from './ui/PageToolbar'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { TagInput } from './ui/TagInput'
 
 const UNIQUE_QP_CODES = [...new Set(PROCEDURE_PLAN_TEMPLATE.map((entry) => entry.qpCode))].sort()
 
@@ -39,9 +42,14 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
   const slots = externalAuditPrep.onsiteSlots ?? []
   const [draft, setDraft] = useState<OnsiteAuditSlot | null>(null)
 
-  const escorts = useMemo(
-    () => people.filter((person) => person.active),
+  const escortOptions = useMemo(
+    () => people.filter((person) => person.active).map((person) => ({ value: person.id, label: person.name })),
     [people],
+  )
+
+  const qpOptions = useMemo(
+    () => UNIQUE_QP_CODES.map((qpCode) => ({ value: qpCode, label: qpCode })),
+    [],
   )
 
   const departmentOptions = useMemo(() => {
@@ -77,22 +85,24 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
   return (
     <div className="space-y-6 print-area qr-form">
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">外稽當日行程</h2>
-            <p className="mt-1 text-sm text-slate-500">
+        <PageToolbar
+          title="外稽當日行程"
+          meta={(
+            <>
               外部稽核預定：{externalAuditPrep.externalAuditDate || '未設定'}
               <a className="ml-2 font-medium text-blue-700 underline" href={buildAppHash('prep')}>外稽準備</a>
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 no-print">
-            <Button icon={ACTION_ICONS.add} onClick={() => startEdit()}>新增時段</Button>
-            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportOnsiteExcel(state)}>匯出 Excel</Button>
-          </div>
-        </div>
+            </>
+          )}
+          actions={(
+            <>
+              <Button icon={ACTION_ICONS.add} onClick={() => startEdit()}>新增時段</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportOnsiteExcel(state)}>匯出 Excel</Button>
+            </>
+          )}
+        />
 
         {draft && (
-          <Card className="mb-4 border-blue-200 no-print">
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 no-print">
             <h3 className="mb-3 font-semibold">{slots.some((slot) => slot.id === draft.id) ? '編輯時段' : '新增時段'}</h3>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <Input label="日期 *" type="date" value={draft.date} onChange={(value) => setDraft({ ...draft, date: value })} />
@@ -110,61 +120,32 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
                 onChange={(value) => setDraft({ ...draft, departmentId: value || undefined })}
                 options={[{ value: '', label: '待確認' }, ...departmentOptions]}
               />
-              <Input
-                label="受稽產品／型號（逗號分隔）"
-                value={draft.productModels.join('、')}
-                onChange={(value) => setDraft({
-                  ...draft,
-                  productModels: value.split(/[,，、]/).map((item) => item.trim()).filter(Boolean),
-                })}
-              />
               <Input label="備註" value={draft.note} onChange={(value) => setDraft({ ...draft, note: value })} />
             </div>
-            <div className="mt-4">
-              <p className="mb-2 text-sm font-medium text-slate-700">涵蓋程序（QP）</p>
-              <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
-                {UNIQUE_QP_CODES.map((qpCode) => (
-                  <label key={qpCode} className="flex min-h-8 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={draft.qpCodes.includes(qpCode)}
-                      onChange={(event) => {
-                        const next = event.target.checked
-                          ? [...draft.qpCodes, qpCode]
-                          : draft.qpCodes.filter((code) => code !== qpCode)
-                        setDraft({ ...draft, qpCodes: next })
-                      }}
-                    />
-                    {qpCode}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="mb-2 text-sm font-medium text-slate-700">陪同人員</p>
-              <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
-                {escorts.map((person) => (
-                  <label key={person.id} className="flex min-h-8 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={draft.escortPersonIds.includes(person.id)}
-                      onChange={(event) => {
-                        const next = event.target.checked
-                          ? [...draft.escortPersonIds, person.id]
-                          : draft.escortPersonIds.filter((id) => id !== person.id)
-                        setDraft({ ...draft, escortPersonIds: next })
-                      }}
-                    />
-                    {person.name}
-                  </label>
-                ))}
-              </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <TagInput
+                label="受稽產品／型號"
+                value={draft.productModels}
+                onChange={(productModels) => setDraft({ ...draft, productModels })}
+              />
+              <CheckboxList
+                label="涵蓋程序（QP）"
+                options={qpOptions}
+                selected={draft.qpCodes}
+                onChange={(qpCodes) => setDraft({ ...draft, qpCodes })}
+              />
+              <CheckboxList
+                label="陪同人員"
+                options={escortOptions}
+                selected={draft.escortPersonIds}
+                onChange={(escortPersonIds) => setDraft({ ...draft, escortPersonIds })}
+              />
             </div>
             <div className="mt-4 flex gap-2">
               <Button onClick={saveDraft} disabled={!draft.date.trim()}>儲存</Button>
               <Button variant="secondary" onClick={() => setDraft(null)}>取消</Button>
             </div>
-          </Card>
+          </div>
         )}
 
         {slots.length === 0 ? (

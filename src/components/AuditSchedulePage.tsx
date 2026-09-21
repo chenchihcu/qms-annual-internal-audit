@@ -10,9 +10,10 @@ import {
 import type { CategoryFilter, ScheduleFilter } from '../lib/auditSchedule'
 import { CATEGORY_FILTER_ICONS, SCHEDULE_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge, Card } from './ui/Badge'
-import { Icon } from './ui/Icon'
-import { ScrollRegion } from './ui/ScrollRegion'
 import { EmptyState } from './ui/EmptyState'
+import { FilterChips } from './ui/FilterChips'
+import { PageToolbar } from './ui/PageToolbar'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 interface AuditSchedulePageProps {
   store: AuditStore
@@ -38,59 +39,37 @@ export function AuditSchedulePage({ store, onOpenAudit }: AuditSchedulePageProps
     [rows, scheduleFilter, categoryFilter],
   )
 
-  const inProgressCount = rows.filter((row) => row.status === '執行中').length
-  const planningCount = rows.filter((row) => row.status === '規劃中' || !row.status).length
-  const reportedCount = rows.filter((row) => row.status === '已回報').length
+  const scheduleFilterOptions = (Object.keys(SCHEDULE_FILTER_LABELS) as ScheduleFilter[]).map((filter) => ({
+    id: filter,
+    label: SCHEDULE_FILTER_LABELS[filter],
+    icon: SCHEDULE_FILTER_ICONS[SCHEDULE_FILTER_LABELS[filter]],
+  }))
+
+  const categoryFilterOptions = (Object.keys(CATEGORY_FILTER_LABELS) as CategoryFilter[]).map((filter) => ({
+    id: filter,
+    label: CATEGORY_FILTER_LABELS[filter],
+    icon: CATEGORY_FILTER_ICONS[CATEGORY_FILTER_LABELS[filter]],
+  }))
 
   return (
     <div className="space-y-6">
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">稽核日程</h2>
-          </div>
-          <p className="text-sm text-slate-600" role="status">
-            執行中 {inProgressCount} · 規劃中 {planningCount} · 已回報 {reportedCount}
-          </p>
-        </div>
+        <PageToolbar title="稽核日程" />
 
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="日程篩選">
-          {(Object.keys(SCHEDULE_FILTER_LABELS) as ScheduleFilter[]).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              aria-pressed={scheduleFilter === filter}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                scheduleFilter === filter
-                  ? 'border-blue-700 bg-blue-700 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
-              }`}
-              onClick={() => setScheduleFilter(filter)}
-            >
-              <Icon name={SCHEDULE_FILTER_ICONS[SCHEDULE_FILTER_LABELS[filter]]} size="sm" />
-              {SCHEDULE_FILTER_LABELS[filter]}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          options={scheduleFilterOptions}
+          value={scheduleFilter}
+          onChange={setScheduleFilter}
+          ariaLabel="日程篩選"
+        />
 
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="稽核類型篩選">
-          {(Object.keys(CATEGORY_FILTER_LABELS) as CategoryFilter[]).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              aria-pressed={categoryFilter === filter}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                categoryFilter === filter
-                  ? 'border-slate-700 bg-slate-700 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
-              }`}
-              onClick={() => setCategoryFilter(filter)}
-            >
-              <Icon name={CATEGORY_FILTER_ICONS[CATEGORY_FILTER_LABELS[filter]]} size="sm" />
-              {CATEGORY_FILTER_LABELS[filter]}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          options={categoryFilterOptions}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+          ariaLabel="稽核類型篩選"
+          tone="slate"
+        />
 
         {visibleRows.length === 0 ? (
           <EmptyState message="目前沒有稽核事件。" />

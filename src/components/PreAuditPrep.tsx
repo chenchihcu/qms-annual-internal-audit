@@ -6,8 +6,6 @@ import type { PrepScopeMode } from '../lib/externalAuditPrep'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
   countPrepProgress,
-  evaluatePrepSequence,
-  formatPrepYearMismatch,
   getPrepTemplate,
   isItemDone,
   itemHasCallout,
@@ -16,7 +14,9 @@ import {
 import { exportPrepExcel } from '../lib/formExport'
 import { buildAppHash, tabLabel } from '../lib/navigation'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Card } from './ui/Badge'
+import { Button, Card, Input } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
+import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
@@ -214,16 +214,8 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     updateExternalPrepRelationship,
     switchPrepYear,
   } = store
-  const { settings, externalAuditPrep, companies, companyRelationships } = state
-  const prepContext = {
-    prep: externalAuditPrep,
-    companies,
-    companySettings: state.companySettings,
-    yearArchives: state.yearArchives,
-  }
+  const { settings, externalAuditPrep, companyRelationships } = state
   const { done, total } = countPrepProgress(externalAuditPrep, companyRelationships)
-  const warnings = evaluatePrepSequence(prepContext)
-  const yearMismatch = formatPrepYearMismatch(externalAuditPrep.year, state.companySettings)
   const seed = EXTERNAL_AUDIT_PREP_SEED
   const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
   const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
@@ -296,49 +288,37 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         </div>
       </details>
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-sm font-semibold">外稽準備</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {externalAuditPrep.year} 年 · 外稽 {externalAuditPrep.externalAuditDate || '未設定'}
-            </p>
-            <p className="mt-1 text-xs text-slate-400 print-only">{seed.title} · {seed.source}</p>
-          </div>
-          <div className="flex flex-col items-end gap-2 no-print">
-            <label className="text-xs text-slate-600">
-              準備表年度
-              <input
-                type="number"
-                className="ml-2 w-20 rounded border border-slate-300 px-2 py-1 text-sm"
-                value={prepYearInput}
-                aria-label="外稽準備表年度"
-                onChange={(e) => handlePrepYearDraftChange(e.target.value)}
-              />
-            </label>
-            <label className="text-xs text-slate-600">
-              外部稽核日期
-              <input
-                type="date"
-                className="ml-2 rounded border border-slate-300 px-2 py-1 text-sm"
-                value={externalAuditPrep.externalAuditDate ?? ''}
-                onChange={(e) => updateExternalPrepSequence({ externalAuditDate: e.target.value })}
-              />
-            </label>
-            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-            <div className="h-3 w-32 rounded-full bg-slate-100">
-              <div
-                className="h-3 rounded-full bg-green-500 transition-all"
-                style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-              />
-            </div>
-          </div>
-        </div>
+        <PageToolbar
+          title="外稽準備"
+          meta={`${externalAuditPrep.year} 年 · 外稽 ${externalAuditPrep.externalAuditDate || '未設定'}`}
+          actions={(
+            <>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
+              <div className="h-3 w-32 rounded-full bg-slate-100" title={`準備清單 ${done}/${total}`}>
+                <div
+                  className="h-3 rounded-full bg-green-500 transition-all"
+                  style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+                />
+              </div>
+            </>
+          )}
+        />
 
-        {yearMismatch && (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            ⚠ {yearMismatch}
-          </div>
-        )}
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 no-print">
+          <Input
+            label="準備表年度"
+            type="number"
+            value={prepYearInput}
+            onChange={(value) => handlePrepYearDraftChange(value)}
+            ariaLabel="外稽準備表年度"
+          />
+          <Input
+            label="外部稽核日期"
+            type="date"
+            value={externalAuditPrep.externalAuditDate ?? ''}
+            onChange={(value) => updateExternalPrepSequence({ externalAuditDate: value })}
+          />
+        </div>
 
         {/* 序位橫幅 */}
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -376,35 +356,17 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           </div>
         </div>
 
-        {/* 警告 */}
-        {warnings.messages.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {warnings.messages.map((msg) => (
-              <div
-                key={msg}
-                className={`rounded-lg border px-4 py-3 text-sm ${
-                  warnings.sequenceWarning
-                    ? 'border-red-300 bg-red-50 text-red-900'
-                    : 'border-amber-300 bg-amber-50 text-amber-900'
-                }`}
-              >
-                ⚠ {msg}
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* 範圍圖例 */}
         <p className="mb-4 text-xs text-slate-500 no-print">
           ◎◎ 兩公司各自準備 · 合併 共用證據 · 稽核廠區範圍 依現場
         </p>
 
-        <div className="print-only qr-form-header mb-4 text-center">
-          <h1 className="text-xl font-bold">{seed.companies.join(' / ')}</h1>
-          <p>
-            {seed.title} · {externalAuditPrep.year} 年
-          </p>
-        </div>
+        <PrintDocHeader
+          companyName={seed.companies.join(' / ')}
+          auditYear={externalAuditPrep.year}
+          formTitle={seed.title}
+          subtitle={seed.source}
+        />
 
         <ScrollRegion ariaLabel="外部稽核前準備清單">
           <table className="qr-checklist w-full min-w-[900px] border-collapse text-sm">

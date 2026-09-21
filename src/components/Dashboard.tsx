@@ -9,18 +9,21 @@ import {
 } from '../lib/dashboardAttention'
 import { calculateAnnualScore } from '../lib/scoring'
 import { buildAppHash, TAB_GROUPS } from '../lib/navigation'
-import { prepYearMismatchCompanies, relationshipsForPrepItem } from '../lib/externalAuditPrep'
+import { relationshipsForPrepItem } from '../lib/externalAuditPrep'
 import { getPdcaOverview } from '../lib/workflowStatus'
-import type { AppState, CompanyId, TabId } from '../types'
+import type { AppState, TabId } from '../types'
 import { COMPANY_LABELS, companySettingsFor, otherCompanyId } from '../types'
 import { ATTENTION_FILTER_ICONS, DASHBOARD_KPI_ICONS, PDCA_SECTION_ICONS } from '../lib/uiIcons'
-import { Badge, Card } from './ui/Badge'
+import { Badge, Button, Card } from './ui/Badge'
+import { EmptyState } from './ui/EmptyState'
+import { FilterChips } from './ui/FilterChips'
 import { Icon } from './ui/Icon'
+import { PageToolbar } from './ui/PageToolbar'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 interface DashboardProps {
   state: AppState & { company: AppState['companies'][keyof AppState['companies']] }
   onNavigate?: (tab: TabId, auditKey?: string) => void
-  onSwitchCompany?: (companyId: CompanyId) => void
 }
 
 const PDCA_SECTION_KEYS = ['plan', 'do', 'check', 'act'] as const
@@ -32,7 +35,7 @@ const PDCA_DEFAULT_TABS: Record<(typeof PDCA_SECTION_KEYS)[number], TabId> = {
 }
 const PDCA_GROUP_LABELS = TAB_GROUPS.slice(1, 5).map((group) => group.label)
 
-export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps) {
+export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company } = state
   const settings = companySettingsFor(state)
   const [attentionFilter, setAttentionFilter] = useState<AttentionFilter>('needsAttention')
@@ -50,7 +53,6 @@ export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps
   const otherPdca = getPdcaOverview(state, otherId)
   const otherSettings = companySettingsFor(state, otherId)
   const customerGate = relationshipsForPrepItem(15, state.companyRelationships)[0]
-  const prepYearMismatch = prepYearMismatchCompanies(state.externalAuditPrep.year, state.companySettings).length > 0
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -58,6 +60,12 @@ export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps
   const inProgress = company.audits.filter((a) => a.status === '執行中').length
   const reported = company.audits.filter((a) => a.status === '已回報').length
   const notStarted = company.audits.filter((a) => !a.status || a.status === '規劃中').length
+
+  const attentionFilterOptions = ATTENTION_FILTERS.map((filter) => ({
+    id: filter,
+    label: getAttentionFilterLabel(filter),
+    icon: ATTENTION_FILTER_ICONS[getAttentionFilterLabel(filter)],
+  }))
 
   const go = (tab: TabId, auditKey?: string) => {
     if (onNavigate) onNavigate(tab, auditKey)
@@ -107,19 +115,6 @@ export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps
             )
           })}
         </div>
-        {!pdca.annualCloseReady && pdca.annualCloseGaps.length > 0 && (
-          <ul className="mt-4 space-y-1 text-xs text-amber-900">
-            {pdca.annualCloseGaps.slice(0, 5).map((gap) => (
-              <li key={gap.message}>
-                {gap.tab ? (
-                  <button type="button" className="text-left underline hover:text-amber-950" onClick={() => go(gap.tab!)}>
-                    {gap.message}
-                  </button>
-                ) : gap.message}
-              </li>
-            ))}
-          </ul>
-        )}
         {pdca.annualCloseReady && (
           <p className="mt-3 text-sm text-green-800">
             可在年度計畫切換新年；待追蹤項目請至
@@ -136,29 +131,14 @@ export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps
       </Card>
 
       <Card className="border-slate-200 bg-slate-50/60">
-        <button
-          type="button"
-          className="w-full text-left"
-          onClick={() => onSwitchCompany?.(otherId)}
-          disabled={!onSwitchCompany}
-        >
-          <h3 className="text-sm font-semibold text-slate-800">另一家台帳摘要 · {COMPANY_LABELS[otherId]}</h3>
-          <p className="mt-1 text-xs text-slate-600">
-            內稽 {otherSettings.auditYear} 年 · {otherPdca.annualCloseReady ? '年度可結案' : `${otherPdca.annualCloseGaps.length} 項年度缺口`}
-          </p>
-          {state.activeCompanyId === 'zhenglongxing' && customerGate && (
-            <p className="mt-2 text-xs text-rose-800">客戶關係：{customerGate.label}</p>
-          )}
-          <p className="mt-2 text-xs text-blue-700 underline-offset-2 hover:underline">點擊切換至 {COMPANY_LABELS[otherId]}</p>
-        </button>
-        {prepYearMismatch && (
-          <p className="mt-2 text-xs text-amber-800">
-            外稽準備年度（{state.externalAuditPrep.year}）與內稽年度不一致 —
-            <button type="button" className="ml-1 font-medium text-blue-700 underline" onClick={() => go('prep')}>
-              外稽準備
-            </button>
-          </p>
+        <h3 className="text-sm font-semibold text-slate-800">另一家台帳摘要 · {COMPANY_LABELS[otherId]}</h3>
+        <p className="mt-1 text-xs text-slate-600">
+          內稽 {otherSettings.auditYear} 年 · {otherPdca.annualCloseReady ? '年度可結案' : `${otherPdca.annualCloseGaps.length} 項年度缺口`}
+        </p>
+        {state.activeCompanyId === 'zhenglongxing' && customerGate && (
+          <p className="mt-2 text-xs text-rose-800">客戶關係：{customerGate.label}</p>
         )}
+        <p className="mt-2 text-xs text-slate-500">請使用頂欄切換公司查看 {COMPANY_LABELS[otherId]} 台帳。</p>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -219,104 +199,87 @@ export function Dashboard({ state, onNavigate, onSwitchCompany }: DashboardProps
       </div>
 
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">程序風險與得分</h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <button type="button" className="font-medium text-blue-700 underline" onClick={() => go('plan')}>
-              完整計畫
-            </button>
-            <span className="text-slate-300">·</span>
-            <button type="button" className="font-medium text-blue-700 underline" onClick={() => go('schedule')}>
-              稽核日程
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="程序清單篩選">
-          {ATTENTION_FILTERS.map((filter) => {
-            const active = attentionFilter === filter
-            return (
-              <button
-                key={filter}
-                type="button"
-                aria-pressed={active}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                  active
-                    ? 'border-blue-700 bg-blue-700 text-white'
-                    : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-800'
-                }`}
-                onClick={() => setAttentionFilter(filter)}
-              >
-                <Icon name={ATTENTION_FILTER_ICONS[getAttentionFilterLabel(filter)]} size="sm" />
-                {getAttentionFilterLabel(filter)}
+        <PageToolbar
+          title="程序風險與得分"
+          actions={(
+            <>
+              <button type="button" className="text-sm font-medium text-blue-700 underline" onClick={() => go('plan')}>
+                完整計畫
               </button>
-            )
-          })}
-        </div>
+              <span className="text-slate-300">·</span>
+              <button type="button" className="text-sm font-medium text-blue-700 underline" onClick={() => go('schedule')}>
+                稽核日程
+              </button>
+            </>
+          )}
+        />
+
+        <FilterChips
+          options={attentionFilterOptions}
+          value={attentionFilter}
+          onChange={setAttentionFilter}
+          ariaLabel="程序清單篩選"
+        />
 
         {visibleAttentionRows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
-            {attentionFilter === 'needsAttention' ? (
-              <>
-                目前無需關注項目。
-                <button
-                  type="button"
-                  className="ml-1 font-medium text-blue-700 underline"
-                  onClick={() => setAttentionFilter('all')}
-                >
-                  查看全部程序
-                </button>
-              </>
-            ) : (
-              '目前篩選沒有程序列。'
-            )}
-          </div>
+          <EmptyState
+            message={attentionFilter === 'needsAttention' ? '目前無需關注項目。' : '目前篩選沒有程序列。'}
+            action={attentionFilter === 'needsAttention' ? (
+              <Button variant="ghost" onClick={() => setAttentionFilter('all')}>查看全部程序</Button>
+            ) : undefined}
+          />
         ) : (
-          <div className="space-y-2">
-            {visibleAttentionRows.map((row) => (
-              <button
-                key={`${row.sheet}-${row.qpCode}-${row.department}`}
-                type="button"
-                className="flex w-full flex-col gap-2 rounded-lg border border-slate-100 px-3 py-2 text-left transition hover:border-blue-200 hover:bg-slate-50 sm:flex-row sm:items-center"
-                onClick={() => navigateToRow(row.auditId)}
-                aria-label={`${row.qpCode} · ${row.department}`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-blue-800 underline-offset-2 hover:underline">
-                      {row.qpCode} · {row.department}
-                    </span>
-                    <Badge label={row.riskLevel} />
-                    {row.auditCategory !== '系統稽核' && (
-                      <Badge label={row.auditCategory} className="border-slate-200 bg-slate-50 text-slate-700" />
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {row.status}
-                    {row.totalItems > 0 ? ` · ${row.judgedCount}/${row.totalItems}` : ''}
-                  </p>
-                </div>
-
-                <div className="flex w-full items-center gap-3 sm:w-auto sm:min-w-[10rem] sm:justify-end">
-                  {row.score == null ? (
-                    <span className="text-sm font-medium text-slate-500">未計分</span>
-                  ) : (
-                    <>
-                      <div className="hidden h-2 w-24 rounded-full bg-slate-100 sm:block">
-                        <div
-                          className={`h-2 rounded-full ${row.score >= 80 ? 'bg-green-500' : row.score >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
-                          style={{ width: `${Math.min(row.score, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold text-slate-800">{row.score}%</span>
-                    </>
-                  )}
-                </div>
-              </button>
-            ))}
-          </div>
+          <ScrollRegion ariaLabel="程序風險與得分工作表">
+            <table className="w-full min-w-[760px] border-collapse text-sm" aria-label="程序風險與得分工作表">
+              <thead>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">程序</th>
+                  <th className="border p-2">風險</th>
+                  <th className="border p-2">類型</th>
+                  <th className="border p-2">狀態</th>
+                  <th className="border p-2">得分</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleAttentionRows.map((row) => (
+                  <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="hover:bg-slate-50">
+                    <td className="border p-2">
+                      <button
+                        type="button"
+                        className="font-medium text-blue-800 underline-offset-2 hover:underline"
+                        onClick={() => navigateToRow(row.auditId)}
+                      >
+                        {row.qpCode} · {row.department}
+                      </button>
+                    </td>
+                    <td className="border p-2"><Badge label={row.riskLevel} /></td>
+                    <td className="border p-2 text-xs">
+                      {row.auditCategory !== '系統稽核' ? row.auditCategory : '—'}
+                    </td>
+                    <td className="border p-2 text-xs">
+                      {row.status}
+                      {row.totalItems > 0 ? ` · ${row.judgedCount}/${row.totalItems}` : ''}
+                    </td>
+                    <td className="border p-2">
+                      {row.score == null ? (
+                        <span className="text-sm font-medium text-slate-500">未計分</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="hidden h-2 w-16 rounded-full bg-slate-100 sm:block">
+                            <div
+                              className={`h-2 rounded-full ${row.score >= 80 ? 'bg-green-500' : row.score >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              style={{ width: `${Math.min(row.score, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-semibold text-slate-800">{row.score}%</span>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollRegion>
         )}
       </Card>
     </div>

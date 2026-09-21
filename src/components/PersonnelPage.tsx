@@ -11,13 +11,15 @@ import {
   personRoles,
   qualificationState,
 } from '../lib/personnel'
-import { downloadBlob, safeFilename } from '../lib/download'
-import { appendSheet, createSheet, createWorkbook, writeWorkbook } from '../lib/simpleXlsx'
+import { exportPersonnelExcel } from '../lib/formExport'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { CheckboxList } from './ui/CheckboxList'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import { ScrollRegion } from './ui/ScrollRegion'
 import { EmptyState } from './ui/EmptyState'
+import { PageToolbar } from './ui/PageToolbar'
+import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const ROLES = Object.keys(PERSONNEL_ROLE_LABELS) as PersonnelRole[]
 
@@ -111,35 +113,19 @@ function ScopeCheckboxGroup({
   onChange: (next: string[]) => void
 }) {
   const isAll = value.includes(QUALIFICATION_SCOPE_ALL)
-  const toggleItem = (itemValue: string, checked: boolean) => {
-    if (checked) onChange([...value.filter((v) => v !== QUALIFICATION_SCOPE_ALL), itemValue])
-    else onChange(value.filter((v) => v !== itemValue))
-  }
+  const selected = isAll ? [] : value
   return (
-    <div className="block sm:col-span-2 lg:col-span-3">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
-      <label className="flex min-h-8 items-center gap-2 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-sm">
-        <input
-          type="checkbox"
-          checked={isAll}
-          onChange={(event) => onChange(event.target.checked ? [QUALIFICATION_SCOPE_ALL] : [])}
-        />
-        {allLabel}
-      </label>
-      <div className="mt-2 grid max-h-36 gap-1 overflow-y-auto rounded border border-slate-200 p-2 sm:grid-cols-2 lg:grid-cols-3">
-        {options.map((option) => (
-          <label key={option.value} className="flex items-start gap-2 text-xs leading-snug">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              disabled={isAll}
-              checked={!isAll && value.includes(option.value)}
-              onChange={(event) => toggleItem(option.value, event.target.checked)}
-            />
-            <span>{option.label}</span>
-          </label>
-        ))}
-      </div>
+    <div className="sm:col-span-2 lg:col-span-3">
+      <CheckboxList
+        label={label}
+        allLabel={allLabel}
+        allSelected={isAll}
+        onToggleAll={(checked) => onChange(checked ? [QUALIFICATION_SCOPE_ALL] : [])}
+        options={options}
+        selected={selected}
+        disabled={isAll}
+        onChange={(next) => onChange(next)}
+      />
     </div>
   )
 }
@@ -386,20 +372,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   }
 
   const exportExcel = () => {
-    const data = rows.map((person) => ({
-      姓名: person.name, 編號: person.employeeNumber, 類型: person.type === 'internal' ? '內部' : '外部',
-      公司或機構: person.affiliations.map((a) => a.companyId ? COMPANY_LABELS[a.companyId] : a.externalOrganization).filter(Boolean).join('、'),
-      責任單位: person.affiliations.map((a) => a.departmentId).filter(Boolean).join('、'),
-      角色: personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、'),
-      狀態: primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments),
-      適用範圍: person.qualifications.map((q) => formatQualificationScopeSummary(q)).join('；'),
-      有效日期: person.qualifications.map((q) => `${q.effectiveFrom || '待確認'}～${q.validityMode === 'no_expiry' ? '正式依據未訂期限' : q.effectiveTo || '待確認'}`).join('；'),
-    }))
-    const headers = ['姓名', '編號', '類型', '公司或機構', '責任單位', '角色', '狀態', '適用範圍', '有效日期'] as const
-    const book = createWorkbook()
-    appendSheet(book, createSheet([headers as unknown as string[], ...data.map((item) => headers.map((header) => item[header]))]), '人員合格名單')
-    const buffer = writeWorkbook(book)
-    downloadBlob(new Blob([buffer.buffer as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), safeFilename([`人員合格名單_${state.settings.auditYear}.xlsx`]))
+    exportPersonnelExcel(state, state.activeCompanyId)
   }
 
   const showExternalOrg = editing?.type === 'external'
@@ -422,22 +395,25 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <div className="print-only qr-form-header mb-4 text-center">
-        <h1 className="text-xl font-bold">人員合格名單</h1>
-        <p className="text-sm">{state.settings.auditYear} 年 · {state.company.name}</p>
-      </div>
+      <PrintDocHeader
+        companyName={state.company.name}
+        auditYear={state.settings.auditYear}
+        formTitle="人員合格名單"
+      />
       <Card>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><h2 className="text-sm font-semibold">人員合格名單</h2></div>
-          <div className="flex flex-wrap gap-2 no-print"><Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false) }}>新增人員</Button><Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button></div>
-        </div>
-        <details className="mt-5 lg:hidden no-print">
+        <PageToolbar
+          title="人員合格名單"
+          actions={(
+            <>
+              <Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false) }}>新增人員</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
+            </>
+          )}
+        />
+        <details className="mt-2 no-print">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">篩選條件</summary>
-          <div className="mt-3 grid gap-3">{filterFields}</div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filterFields}</div>
         </details>
-        <div className="mt-5 hidden gap-3 sm:grid-cols-2 lg:grid lg:grid-cols-3 no-print">
-          {filterFields}
-        </div>
         <details className="mt-4 no-print">
           <summary className="cursor-pointer text-xs text-slate-500">使用說明</summary>
           <p className="mt-2 text-xs text-slate-500">

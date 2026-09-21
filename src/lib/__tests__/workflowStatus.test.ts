@@ -86,8 +86,14 @@ describe('workflowStatus', () => {
     }
     const status = getTabWorkflowStatus(state, 'followups')
     expect(status.gaps.length).toBeLessThanOrEqual(1)
-    if (status.advisories.length > 0) {
-      expect(status.advisories[0].message).toMatch(/待追蹤 \d+ 件/)
+    const pendingAdvisory = status.advisories.find((item) => /待追蹤 \d+ 件/.test(item.message))
+    if (pendingAdvisory) {
+      expect(pendingAdvisory.message).toMatch(/待追蹤 \d+ 件/)
+    }
+    const carryAdvisory = status.advisories.find((item) => item.message.includes('跨年待帶入'))
+    if (carryAdvisory) {
+      expect(carryAdvisory.message).toMatch(/跨年待帶入 \d+ 件，至觀察事項帶入/)
+      expect(carryAdvisory.tab).toBe('observations')
     }
   })
 

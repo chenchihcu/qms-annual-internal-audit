@@ -30,7 +30,11 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 稽核日程（`schedule`）：Guide 摘要；工作面單表 + chips；點列進 `#tab=audit&audit=`。`score == null` 顯示「未計分」。
 
-待改善追蹤（`followups`）：`followupQueue` 合併未結 NCR／open 觀察／open 建議；Guide `待追蹤 n 件`；跨年橫幅只連結觀察頁帶入。
+待改善追蹤（`followups`）：`followupQueue` 合併未結 NCR／open 觀察／open 建議；Guide `待追蹤 n 件` + advisory「跨年待帶入 n 件，至觀察事項帶入」；觀察頁跨年帶入卡為唯一批次操作入口。
+
+觀察事項（`observations`）：`PageToolbar` + `FilterChips`（年度／來源／狀態）；清單 `ScrollRegion`；查檢未同步只當篩選結果；跨年帶入琥珀卡保留。
+
+殼層藍卡只留產品名；`headerScope` 只在頂欄。儀表板另一家台帳純摘要，不切公司。
 
 外稽當日行程（`onsite`）：單表 + `ScrollRegion`；外稽日期只讀、連回準備頁；`ready: true` 不列入年度結案閘門。
 

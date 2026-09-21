@@ -290,6 +290,15 @@ export function buildStandardSheet(profile: CompanyAuditProfile, companyName: st
   return createSheet([[`${companyName} · 適用標準與證書`], [], header, ...rows])
 }
 
+export function exportPersonnelExcel(state: AppState, companyId: CompanyId): void {
+  const wb = createWorkbook()
+  appendSheet(wb, buildPersonnelSheet(state, companyId), sheetName('人員合格名單'))
+  writeWorkbook(
+    wb,
+    safeFilename(['人員合格名單', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx',
+  )
+}
+
 export function exportRiskExcel(state: AppState, companyId: CompanyId): void {
   const co = state.companies[companyId]
   const wb = createWorkbook()

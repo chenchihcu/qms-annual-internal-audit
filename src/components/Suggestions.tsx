@@ -4,9 +4,10 @@ import { exportSuggestionsExcel } from '../lib/formExport'
 import type { SuggestionStatus, ThirdPartySuggestion } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { EmptyState } from './ui/EmptyState'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
-import { EmptyState } from './ui/EmptyState'
 
 export function Suggestions({ store }: { store: AuditStore }) {
   const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
@@ -86,62 +87,15 @@ export function Suggestions({ store }: { store: AuditStore }) {
           auditYear={currentYear}
           formTitle="第三方稽核建議事項一覽表"
         />
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="mb-2 text-sm font-semibold">第三方建議</h2>
-          </div>
-          <div className="flex flex-wrap gap-2 no-print">
-            <Button icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((v) => !v)}>{showForm ? '收起登錄' : '登錄建議'}</Button>
-            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportSuggestionsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
-          </div>
-        </div>
-
-        {showForm && (
-          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 no-print">
-            <h3 className="mb-3 font-semibold">登錄第三方建議</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Select
-                label="程序 QP"
-                value={form.procedure}
-                onChange={(value) => {
-                  const rows = planRowsForProcedure(value)
-                  setForm({ ...form, procedure: value, departmentId: rows[0]?.departmentId ?? '' })
-                }}
-                options={procedureOptions}
-              />
-              <Select
-                label="責任單位"
-                value={form.departmentId}
-                onChange={(value) => setForm({ ...form, departmentId: value })}
-                options={planRowsForProcedure(form.procedure).map((row) => ({ value: row.departmentId, label: row.department }))}
-              />
-              <Input label="問題描述" value={form.issue} onChange={(value) => setForm({ ...form, issue: value })} />
-              <Input label="負責單位（文字）" value={form.responsibleUnit} onChange={(value) => setForm({ ...form, responsibleUnit: value })} />
-              <Input label="進度" value={form.progress} onChange={(value) => setForm({ ...form, progress: value })} />
-            </div>
-            <div className="mt-3 flex gap-2">
-              <Button
-                disabled={!form.issue.trim()}
-                onClick={() => {
-                  addSuggestion({
-                    year: currentYear,
-                    procedure: form.procedure,
-                    departmentId: form.departmentId || undefined,
-                    issue: form.issue,
-                    progress: form.progress,
-                    responsibleUnit: form.responsibleUnit,
-                    status: 'open',
-                  })
-                  setForm({ procedure: form.procedure, departmentId: form.departmentId, issue: '', progress: '', responsibleUnit: '' })
-                  setShowForm(false)
-                }}
-              >
-                儲存
-              </Button>
-              <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
-            </div>
-          </div>
-        )}
+        <PageToolbar
+          title="第三方建議"
+          actions={(
+            <>
+              <Button icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((v) => !v)}>{showForm ? '收起登錄' : '登錄建議'}</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportSuggestionsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+            </>
+          )}
+        />
 
         {allSuggestions.length === 0 ? (
           <EmptyState message="目前沒有建議事項。" />
@@ -198,6 +152,53 @@ export function Suggestions({ store }: { store: AuditStore }) {
           </ScrollRegion>
         )}
       </Card>
+
+      {showForm && (
+        <Card className="border-blue-200 no-print">
+          <h3 className="mb-4 font-semibold">登錄第三方建議</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label="程序 QP"
+              value={form.procedure}
+              onChange={(value) => {
+                const rows = planRowsForProcedure(value)
+                setForm({ ...form, procedure: value, departmentId: rows[0]?.departmentId ?? '' })
+              }}
+              options={procedureOptions}
+            />
+            <Select
+              label="責任單位"
+              value={form.departmentId}
+              onChange={(value) => setForm({ ...form, departmentId: value })}
+              options={planRowsForProcedure(form.procedure).map((row) => ({ value: row.departmentId, label: row.department }))}
+            />
+            <Input label="問題描述" value={form.issue} onChange={(value) => setForm({ ...form, issue: value })} />
+            <Input label="負責單位（文字）" value={form.responsibleUnit} onChange={(value) => setForm({ ...form, responsibleUnit: value })} />
+            <Input label="進度" value={form.progress} onChange={(value) => setForm({ ...form, progress: value })} />
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button
+              disabled={!form.issue.trim()}
+              onClick={() => {
+                addSuggestion({
+                  year: currentYear,
+                  procedure: form.procedure,
+                  departmentId: form.departmentId || undefined,
+                  issue: form.issue,
+                  progress: form.progress,
+                  responsibleUnit: form.responsibleUnit,
+                  status: 'open',
+                })
+                setForm({ procedure: form.procedure, departmentId: form.departmentId, issue: '', progress: '', responsibleUnit: '' })
+                setShowForm(false)
+              }}
+            >
+              儲存
+            </Button>
+            <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
+          </div>
+        </Card>
+      )}
     </div>
   )
 }

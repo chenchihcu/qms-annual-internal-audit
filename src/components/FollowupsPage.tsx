@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { buildAppHash } from '../lib/navigation'
 import {
-  buildCarryForwardSummary,
   buildFollowupQueue,
   filterFollowupRows,
   FOLLOWUP_FILTER_LABELS,
@@ -12,9 +10,10 @@ import type { FollowupFilter } from '../lib/followupQueue'
 import type { TabId } from '../types'
 import { FOLLOWUP_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge, Card } from './ui/Badge'
-import { Icon } from './ui/Icon'
-import { ScrollRegion } from './ui/ScrollRegion'
 import { EmptyState } from './ui/EmptyState'
+import { FilterChips } from './ui/FilterChips'
+import { PageToolbar } from './ui/PageToolbar'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 interface FollowupsPageProps {
   store: AuditStore
@@ -25,48 +24,26 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
   const { state } = store
   const { company } = state
   const rows = useMemo(() => buildFollowupQueue(company), [company])
-  const carryForward = useMemo(() => buildCarryForwardSummary(state), [state])
   const [filter, setFilter] = useState<FollowupFilter>('all')
   const visibleRows = useMemo(() => filterFollowupRows(rows, filter), [rows, filter])
 
+  const filterOptions = (Object.keys(FOLLOWUP_FILTER_LABELS) as FollowupFilter[]).map((item) => ({
+    id: item,
+    label: FOLLOWUP_FILTER_LABELS[item],
+    icon: FOLLOWUP_FILTER_ICONS[FOLLOWUP_FILTER_LABELS[item]],
+  }))
+
   return (
     <div className="space-y-6">
-      {carryForward.total > 0 && (
-        <Card className="border-amber-200 bg-amber-50/40">
-          <p className="text-sm text-amber-900">
-            跨年待帶入：觀察 {carryForward.importableObservations} 件、NCR {carryForward.importableNcrs} 件。
-            <a className="ml-2 font-medium text-blue-700 underline" href={buildAppHash('observations')}>
-              至觀察事項帶入
-            </a>
-          </p>
-        </Card>
-      )}
-
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">待改善追蹤</h2>
-          </div>
-        </div>
+        <PageToolbar title="待改善追蹤" />
 
-        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="追蹤類型篩選">
-          {(Object.keys(FOLLOWUP_FILTER_LABELS) as FollowupFilter[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={filter === item}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                filter === item
-                  ? 'border-blue-700 bg-blue-700 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
-              }`}
-              onClick={() => setFilter(item)}
-            >
-              <Icon name={FOLLOWUP_FILTER_ICONS[FOLLOWUP_FILTER_LABELS[item]]} size="sm" />
-              {FOLLOWUP_FILTER_LABELS[item]}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          options={filterOptions}
+          value={filter}
+          onChange={setFilter}
+          ariaLabel="追蹤類型篩選"
+        />
 
         {visibleRows.length === 0 ? (
           <EmptyState message="目前沒有待追蹤項目。" />

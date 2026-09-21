@@ -1,5 +1,5 @@
-import { countPrepProgress, evaluatePrepSequence } from './externalAuditPrep'
-import { countOpenFollowups } from './followupQueue'
+import { countPrepProgress, evaluatePrepSequence, formatPrepYearMismatch } from './externalAuditPrep'
+import { buildCarryForwardSummary, countOpenFollowups } from './followupQueue'
 import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
 import type { AppState, CompanyId, TabId } from '../types'
@@ -321,6 +321,13 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = true
       const pending = countOpenFollowups(co)
       if (pending > 0) advisories.push({ message: `待追蹤 ${pending} 件` })
+      const carryForward = buildCarryForwardSummary(state, companyId)
+      if (carryForward.total > 0) {
+        advisories.push({
+          message: `跨年待帶入 ${carryForward.total} 件，至觀察事項帶入`,
+          tab: 'observations',
+        })
+      }
       break
     }
 
@@ -356,6 +363,8 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       })
       if (warnings.sequenceWarning) gaps.push({ message: '管審／內稽序位異常' })
       if (warnings.ncrWarning) advisories.push({ message: warnings.messages[0] ?? '尚有未結案 NCR' })
+      const yearMismatch = formatPrepYearMismatch(state.externalAuditPrep.year, state.companySettings)
+      if (yearMismatch) advisories.push({ message: yearMismatch })
       ready = gaps.length === 0
       break
     }

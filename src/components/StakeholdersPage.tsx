@@ -17,6 +17,7 @@ import type { DepartmentProfile, StakeholderTag } from '../types'
 import { STAKEHOLDER_TAGS } from '../types'
 import { StakeholderRulesPanel } from './stakeholders/StakeholderRulesPanel'
 import { Card } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
 import { ScrollRegion } from './ui/ScrollRegion'
 
 function OsBandRadios({
@@ -219,33 +220,30 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
   return (
     <div className="space-y-6">
       <Card>
-        <h2 className="text-sm font-semibold">利害關係人</h2>
+        <PageToolbar title="利害關係人" />
         <StakeholderRulesPanel />
-      </Card>
-
-      <Card>
-        <ScrollRegion ariaLabel="部門利害關係人工作表">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
-              <th className="p-3">部門 · 負責人</th>
-              <th className="p-3">利害關係人</th>
-              <th className="p-3">發生度</th>
-              <th className="p-3">嚴重度</th>
-              <th className="p-3">風險與優先</th>
-              <th className="p-3">編排影響</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranked.map((dept) => (
-              <DepartmentRow
-                key={dept.id}
-                dept={dept}
-                onUpdate={(patch) => updateDepartment(dept.id, patch)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <ScrollRegion ariaLabel="部門利害關係人工作表" className="mt-4">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead>
+              <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                <th className="p-3">部門 · 負責人</th>
+                <th className="p-3">利害關係人</th>
+                <th className="p-3">發生度</th>
+                <th className="p-3">嚴重度</th>
+                <th className="p-3">風險與優先</th>
+                <th className="p-3">編排影響</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ranked.map((dept) => (
+                <DepartmentRow
+                  key={dept.id}
+                  dept={dept}
+                  onUpdate={(patch) => updateDepartment(dept.id, patch)}
+                />
+              ))}
+            </tbody>
+          </table>
         </ScrollRegion>
       </Card>
     </div>

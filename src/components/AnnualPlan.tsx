@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { exportAnnualPlanExcel, exportAnnualPlanHtml } from '../lib/formExport'
+import { exportAnnualPlanExcel } from '../lib/formExport'
 import { autoArrangePlan, cycleMonthStatus, MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
@@ -9,6 +9,9 @@ import type { MonthStatus } from '../types'
 import { leadAuditorCandidates } from '../lib/personnel'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
+import { PlanPreviewPanel } from './ui/PlanPreviewPanel'
+import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
@@ -38,62 +41,58 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
   return (
     <div className="space-y-6 print-area qr-form">
       <Card className="print-break">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4 no-print">
-          <div>
-            <h2 className="text-sm font-semibold">年度稽核計畫</h2>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽自動編排</Button>
-            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportAnnualPlanExcel(state, state.activeCompanyId)}>
-              匯出 Excel
-            </Button>
-            <Button variant="ghost" icon={ACTION_ICONS.exportHtml} onClick={() => exportAnnualPlanHtml(state, state.activeCompanyId)}>
-              匯出 HTML
-            </Button>
-          </div>
-        </div>
+        <PageToolbar
+          title="年度稽核計畫"
+          className="no-print"
+          actions={(
+            <>
+              <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽自動編排</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportAnnualPlanExcel(state, state.activeCompanyId)}>
+                匯出 Excel
+              </Button>
+            </>
+          )}
+        />
 
         <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 no-print">
           <Input label="計畫窗口起" type="date" value={settings.planWindowStart} onChange={(value) => updateSettings({ planWindowStart: value })} />
           <Input label="計畫窗口迄" type="date" value={settings.planWindowEnd} onChange={(value) => updateSettings({ planWindowEnd: value })} />
-          <Select
-            label="主任稽核員（人員名單）"
-            value={leadAuditorCandidates(people, settings.auditYear, annualPersonnelAssignments).find((p) => p.name === settings.leadAuditor)?.id ?? ''}
-            onChange={(personId) => {
-              const person = people.find((p) => p.id === personId)
-              if (person) updateSettings({ leadAuditor: person.name })
-            }}
-            options={[
-              { value: '', label: '自填或待指派' },
-              ...leadAuditorCandidates(people, settings.auditYear, annualPersonnelAssignments).map((p) => ({ value: p.id, label: p.name })),
-            ]}
-          />
-          <Input label="主任稽核員（紙本顯示姓名）" value={settings.leadAuditor} onChange={(value) => updateSettings({ leadAuditor: value })} />
           <Input label="年度起算日" type="date" value={settings.yearStart} onChange={(value) => updateSettings({ yearStart: value })} />
           <Input label="管理審查日期" type="date" value={settings.managementReviewDate ?? ''} onChange={(value) => updateSettings({ managementReviewDate: value })} />
         </div>
 
-        {previewRows && (
-          <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 no-print">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-blue-950">自動編排預覽</h3>
-                <p className="text-sm text-blue-800">共 {previewRows.length} 個程序；{MANUAL_OVERRIDE_PLAN_NOTE}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button icon="check" onClick={() => { replacePlanRows(previewRows); setPreviewRows(null) }}>套用預覽</Button>
-                <Button variant="secondary" onClick={() => setPreviewRows(null)}>取消</Button>
-              </div>
-            </div>
-            <div className="mt-3 max-h-48 overflow-y-auto text-xs text-blue-950">
-              {previewRows.map((row) => (
-                <div key={row.id} className="flex justify-between border-t border-blue-100 py-1">
-                  <span>{row.qpCode} · {row.department}</span>
-                  <span>{row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程'}</span>
-                </div>
-              ))}
-            </div>
+        <details className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-3 no-print">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">主任稽核員設定</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Select
+              label="主任稽核員（人員名單）"
+              value={leadAuditorCandidates(people, settings.auditYear, annualPersonnelAssignments).find((p) => p.name === settings.leadAuditor)?.id ?? ''}
+              onChange={(personId) => {
+                const person = people.find((p) => p.id === personId)
+                if (person) updateSettings({ leadAuditor: person.name })
+              }}
+              options={[
+                { value: '', label: '自填或待指派' },
+                ...leadAuditorCandidates(people, settings.auditYear, annualPersonnelAssignments).map((p) => ({ value: p.id, label: p.name })),
+              ]}
+            />
+            <Input label="主任稽核員（紙本顯示姓名）" value={settings.leadAuditor} onChange={(value) => updateSettings({ leadAuditor: value })} />
           </div>
+        </details>
+
+        {previewRows && (
+          <PlanPreviewPanel
+            title="自動編排預覽"
+            description={`共 ${previewRows.length} 個程序；${MANUAL_OVERRIDE_PLAN_NOTE}`}
+            rows={previewRows.map((row) => ({
+              id: row.id,
+              label: `${row.qpCode} · ${row.department}`,
+              schedule: row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程',
+            }))}
+            onApply={() => { replacePlanRows(previewRows); setPreviewRows(null) }}
+            onCancel={() => setPreviewRows(null)}
+            applyLabel="套用預覽"
+          />
         )}
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
@@ -103,10 +102,12 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           <span className="text-slate-400">（點擊月格循環切換狀態）</span>
         </div>
 
-        <div className="print-only qr-form-header mb-4 text-center">
-          <h1 className="text-xl font-bold">{company.name}</h1>
-          <p>{settings.auditYear} 年度內部稽核計畫 QR-28-01 · 主任稽核員：{settings.leadAuditor}</p>
-        </div>
+        <PrintDocHeader
+          companyName={company.name}
+          auditYear={settings.auditYear}
+          formTitle="年度內部稽核計畫 QR-28-01"
+          subtitle={`主任稽核員：${settings.leadAuditor}`}
+        />
 
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">
           {MONTH_STATUS_LEGEND.map((l) => (

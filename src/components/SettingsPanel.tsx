@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { backupFilename, describeBackup, parseBackupJson } from '../lib/backup'
 import { downloadBlob } from '../lib/download'
-import { exportAllAuditsExcel, exportAllFormsExcel, exportStandardExcel } from '../lib/formExport'
+import { exportAllAuditsExcel, exportAllFormsExcel, exportAnnualPlanHtml, exportAuditHtml, exportStandardExcel } from '../lib/formExport'
 import { buildAppHash, tabLabel } from '../lib/navigation'
 import { CHECKLIST_SEED, getSeedStats, isSeedFinalized, seedImportProgress } from '../data/checklistLoader'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Card, Input, Select } from './ui/Badge'
+import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
@@ -89,75 +90,22 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
           auditYear={state.settings.auditYear}
           formTitle="適用標準與證書範圍"
         />
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold">標準</h2>
-          </div>
-          <Button variant="secondary" icon={ACTION_ICONS.exportExcel} className="no-print" onClick={() => exportStandardExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
-        </div>
+        <PageToolbar
+          title="標準"
+          actions={<Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportStandardExcel(state, state.activeCompanyId)}>匯出 Excel</Button>}
+        />
         <div className="space-y-3">{state.companyAuditProfiles[state.activeCompanyId].applicableStandards.map((standard, index) => <div key={standard.name} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4"><label className="block"><span className="mb-1 block text-sm font-medium text-slate-700">標準</span><span className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{standard.name}</span></label><Input label="版本" value={standard.version} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, version: value }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} /><Select label="適用性" value={standard.confirmationStatus} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]} /><Input label="依據引用（證書／決議）" value={standard.evidenceReference} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, evidenceReference: value }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} /></div>)}</div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="證書範圍" value={state.companyAuditProfiles[state.activeCompanyId].certificateScope} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateScope: value })} /><Input label="證書／依據編號" value={state.companyAuditProfiles[state.activeCompanyId].certificateReference} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateReference: value })} /></div>
-        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
-          <details>
-            <summary className="cursor-pointer font-bold">ISO 9001／AS9100 稽核程序解讀</summary>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              <li>年度、月份與風險分數是公司政策及規劃工具；標準沒有規定所有程序固定每年一次或使用特定分數公式。</li>
-              <li>同單位任職會觸發客觀性警示，仍須依實際職責、控制措施與稽核證據判斷，不以職稱或部門自動判定符合／不符合。</li>
-              <li>系統檢查資格範圍、日期與任命引用，但正式能力準則及核准仍由公司或外部機構的受控紀錄決定。</li>
-              <li>ISO 9001 版本狀態正在轉換；確認適用版本前，請核對有效證書、合約／法規及驗證機構通知。</li>
-            </ul>
-            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-              <a className="font-bold underline" href="https://www.iso.org/standard/62085.html" target="_blank" rel="noreferrer">
-                ISO 9001:2015 官方狀態<span className="sr-only">（另開新視窗）</span>
-              </a>
-              <a className="font-bold underline" href="https://iaqg.org/wp-content/uploads/2023/04/9100-2016-Series-Clarification-Table-2024-02-12.pdf" target="_blank" rel="noreferrer">
-                IAQG 9100:2016 官方澄清<span className="sr-only">（另開新視窗）</span>
-              </a>
-            </p>
-          </details>
-        </div>
       </Card>}
 
-      {section === 'procedure' && <div className="space-y-6">
-        <Card>
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <h2 className="text-sm font-semibold">程序</h2>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Input label="稽核程序代碼" value={profile.auditProcedureCode} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })} />
-            <Input label="程序版本" value={profile.auditProcedureVersion} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })} />
-            <Input label="正式紀錄保存位置" value={profile.formalRecordLocation} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })} />
-          </div>
-        </Card>
-
-        <Card>
-          <details>
-            <summary className="mb-4 cursor-pointer text-sm font-semibold">查檢表來源與覆蓋範圍</summary>
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <span className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1 text-xs font-semibold ${checklistReady ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`} role="status">
-                {checklistReady ? '查檢表來源已封存' : seedImportProgress() ?? '查檢表來源待完成'}
-              </span>
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} className="no-print" onClick={() => exportAllAuditsExcel(state, state.activeCompanyId)}>匯出全部 QR-28-02</Button>
-            </div>
-            <div className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-3">
-              <span>資料版本：{CHECKLIST_SEED.version}</span>
-              <span>種子年度：{CHECKLIST_SEED.year}</span>
-              <span>稽核重點：{seedStats.focusRows} 列</span>
-            </div>
-            <ScrollRegion ariaLabel="查檢表來源與覆蓋範圍">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead><tr className="bg-slate-50 text-left"><th className="border p-2">正式表單</th><th className="border p-2">用途</th><th className="border p-2">目前來源數量</th><th className="border p-2">使用入口</th></tr></thead>
-                <tbody>
-                  <tr><td className="border p-2 font-medium">QR-28-01 年度稽核計畫</td><td className="border p-2">年度方案與月格排程</td><td className="border p-2">{seedStats.procedureEntries} 程序列／{seedStats.qpCoverage} 個 QP</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('plan')}>{tabLabel('plan')}</a></td></tr>
-                  <tr><td className="border p-2 font-medium">QR-28-02 程序查檢表</td><td className="border p-2">稽核執行、判定與客觀證據</td><td className="border p-2">{seedStats.systemItems} 項系統稽核</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a></td></tr>
-                  <tr><td className="border p-2 font-medium">QR-28-03 不符合</td><td className="border p-2">不符合、矯正措施與效果確認</td><td className="border p-2">由稽核判定自動產生</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('ncr')}>{tabLabel('ncr')}</a></td></tr>
-                  <tr><td className="border p-2 font-medium">QR-28-04／05</td><td className="border p-2">製程／型態稽核查檢</td><td className="border p-2">{seedStats.processItems}／{seedStats.configItems} 項</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a></td></tr>
-                </tbody>
-              </table>
-            </ScrollRegion>
-          </details>
-        </Card>
-      </div>}
+      {section === 'procedure' && <Card>
+        <PageToolbar title="程序" />
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Input label="稽核程序代碼" value={profile.auditProcedureCode} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })} />
+          <Input label="程序版本" value={profile.auditProcedureVersion} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })} />
+          <Input label="正式紀錄保存位置" value={profile.formalRecordLocation} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })} />
+        </div>
+      </Card>}
 
       {section === 'system' && <>
       <Card>
@@ -228,7 +176,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-sm font-semibold">全部表單匯出（Excel）</h2>
+        <PageToolbar title="全部表單匯出" />
         <p className="mb-4 text-sm text-slate-500">
           一次匯出目前公司全部工作表；各頁亦可單獨匯出。
         </p>
@@ -240,6 +188,62 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
             匯出正隆興全部表單
           </Button>
         </div>
+        <div className="mt-4 flex flex-wrap gap-3 border-t border-slate-100 pt-4">
+          <Button variant="ghost" icon={ACTION_ICONS.exportHtml} onClick={() => exportAnnualPlanHtml(state, state.activeCompanyId)}>
+            年度計畫 HTML
+          </Button>
+          {activeCompany.audits[0] && (
+            <Button variant="ghost" icon={ACTION_ICONS.exportHtml} onClick={() => exportAuditHtml(state, state.activeCompanyId, activeCompany.audits[0])}>
+              首筆查檢表 HTML
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <details>
+          <summary className="mb-4 cursor-pointer text-sm font-semibold">ISO 9001／AS9100 稽核程序解讀</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+            <li>年度、月份與風險分數是公司政策及規劃工具；標準沒有規定所有程序固定每年一次或使用特定分數公式。</li>
+            <li>同單位任職會觸發客觀性警示，仍須依實際職責、控制措施與稽核證據判斷，不以職稱或部門自動判定符合／不符合。</li>
+            <li>系統檢查資格範圍、日期與任命引用，但正式能力準則及核准仍由公司或外部機構的受控紀錄決定。</li>
+            <li>ISO 9001 版本狀態正在轉換；確認適用版本前，請核對有效證書、合約／法規及驗證機構通知。</li>
+          </ul>
+          <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <a className="font-bold text-blue-700 underline" href="https://www.iso.org/standard/62085.html" target="_blank" rel="noreferrer">
+              ISO 9001:2015 官方狀態<span className="sr-only">（另開新視窗）</span>
+            </a>
+            <a className="font-bold text-blue-700 underline" href="https://iaqg.org/wp-content/uploads/2023/04/9100-2016-Series-Clarification-Table-2024-02-12.pdf" target="_blank" rel="noreferrer">
+              IAQG 9100:2016 官方澄清<span className="sr-only">（另開新視窗）</span>
+            </a>
+          </p>
+        </details>
+      </Card>
+
+      <Card>
+        <details>
+          <summary className="mb-4 cursor-pointer text-sm font-semibold">查檢表來源與覆蓋範圍</summary>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <Badge label={checklistReady ? '查檢表來源已封存' : (seedImportProgress() ?? '查檢表來源待完成')} />
+            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportAllAuditsExcel(state, state.activeCompanyId)}>匯出全部 QR-28-02</Button>
+          </div>
+          <div className="mb-4 grid gap-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-700 sm:grid-cols-3">
+            <span>資料版本：{CHECKLIST_SEED.version}</span>
+            <span>種子年度：{CHECKLIST_SEED.year}</span>
+            <span>稽核重點：{seedStats.focusRows} 列</span>
+          </div>
+          <ScrollRegion ariaLabel="查檢表來源與覆蓋範圍">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead><tr className="bg-slate-50 text-left"><th className="border p-2">正式表單</th><th className="border p-2">用途</th><th className="border p-2">目前來源數量</th><th className="border p-2">使用入口</th></tr></thead>
+              <tbody>
+                <tr><td className="border p-2 font-medium">QR-28-01 年度稽核計畫</td><td className="border p-2">年度方案與月格排程</td><td className="border p-2">{seedStats.procedureEntries} 程序列／{seedStats.qpCoverage} 個 QP</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('plan')}>{tabLabel('plan')}</a></td></tr>
+                <tr><td className="border p-2 font-medium">QR-28-02 程序查檢表</td><td className="border p-2">稽核執行、判定與客觀證據</td><td className="border p-2">{seedStats.systemItems} 項系統稽核</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a></td></tr>
+                <tr><td className="border p-2 font-medium">QR-28-03 不符合</td><td className="border p-2">不符合、矯正措施與效果確認</td><td className="border p-2">由稽核判定自動產生</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('ncr')}>{tabLabel('ncr')}</a></td></tr>
+                <tr><td className="border p-2 font-medium">QR-28-04／05</td><td className="border p-2">製程／型態稽核查檢</td><td className="border p-2">{seedStats.processItems}／{seedStats.configItems} 項</td><td className="border p-2"><a className="font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a></td></tr>
+              </tbody>
+            </table>
+          </ScrollRegion>
+        </details>
       </Card>
 
       <Card>

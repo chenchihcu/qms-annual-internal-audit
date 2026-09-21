@@ -18,9 +18,12 @@ import {
 import type { PlanRow, ProcedureRiskRecord } from '../types'
 import { ACTION_ICONS, RISK_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input } from './ui/Badge'
-import { Icon } from './ui/Icon'
-import { ScrollRegion } from './ui/ScrollRegion'
 import { EmptyState } from './ui/EmptyState'
+import { FilterChips } from './ui/FilterChips'
+import { PageToolbar } from './ui/PageToolbar'
+import { PlanPreviewPanel } from './ui/PlanPreviewPanel'
+import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 type RiskFactorField = keyof ProcedurePriorityInput
 type RiskFilter = 'all' | 'unsaved' | 'provisional'
@@ -116,71 +119,53 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     }
   }
 
-  const filterButtons: Array<{ id: RiskFilter; label: string }> = [
-    { id: 'all', label: '全部' },
-    { id: 'unsaved', label: '未存檔' },
-    { id: 'provisional', label: '暫定' },
+  const filterOptions = [
+    { id: 'all' as RiskFilter, label: '全部', icon: RISK_FILTER_ICONS['全部'] },
+    { id: 'unsaved' as RiskFilter, label: '未存檔', icon: RISK_FILTER_ICONS['未存檔'] },
+    { id: 'provisional' as RiskFilter, label: '暫定', icon: RISK_FILTER_ICONS['暫定'] },
   ]
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <div className="print-only qr-form-header mb-4 text-center">
-        <h1 className="text-xl font-bold">{company.name}</h1>
-        <p className="text-sm">{settings.auditYear} 年 · 方案風險與優先順序 QR-02-01</p>
-      </div>
+      <PrintDocHeader
+        companyName={company.name}
+        auditYear={settings.auditYear}
+        formTitle="方案風險與優先順序 QR-02-01"
+      />
       <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="mb-2 text-sm font-semibold">方案風險</h2>
-          </div>
-          <div className="flex flex-wrap gap-2 no-print">
-            <Button variant="secondary" icon="save" onClick={persistDisplayedRisks}>採用目前評估並全部存檔</Button>
-            <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽套用至年度計畫</Button>
-            <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportRiskExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
-          </div>
-        </div>
+        <PageToolbar
+          title="方案風險"
+          actions={(
+            <>
+              <Button variant="secondary" icon="save" onClick={persistDisplayedRisks}>採用目前評估並全部存檔</Button>
+              <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽套用至年度計畫</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportRiskExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+            </>
+          )}
+        />
 
         {previewRows && (
-          <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 no-print">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-blue-950">年度計畫套用預覽</h3>
-                <p className="text-sm text-blue-800">依方案風險優先順序重排月格；{MANUAL_OVERRIDE_PLAN_NOTE}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button icon="check" onClick={() => { persistDisplayedRisks(); replacePlanRows(previewRows); setPreviewRows(null) }}>確認套用</Button>
-                <Button variant="secondary" onClick={() => setPreviewRows(null)}>取消</Button>
-              </div>
-            </div>
-            <div className="mt-3 max-h-48 overflow-y-auto text-xs text-blue-950">
-              {previewRows.map((row) => (
-                <div key={row.id} className="flex justify-between border-t border-blue-100 py-1">
-                  <span>{row.qpCode} · {row.department} · {row.riskLevel}</span>
-                  <span>{row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程'}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PlanPreviewPanel
+            title="年度計畫套用預覽"
+            description={`依方案風險優先順序重排月格；${MANUAL_OVERRIDE_PLAN_NOTE}`}
+            rows={previewRows.map((row) => ({
+              id: row.id,
+              label: `${row.qpCode} · ${row.department} · ${row.riskLevel}`,
+              schedule: row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程',
+            }))}
+            onApply={() => { persistDisplayedRisks(); replacePlanRows(previewRows); setPreviewRows(null) }}
+            onCancel={() => setPreviewRows(null)}
+            applyLabel="確認套用"
+          />
         )}
 
-        <div className="mb-4 flex flex-wrap justify-end gap-2 no-print" role="group" aria-label="風險清單篩選">
-            {filterButtons.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={filter === id}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
-                  filter === id
-                    ? 'border-blue-700 bg-blue-700 text-white'
-                    : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'
-                }`}
-                onClick={() => setFilter(id)}
-              >
-                <Icon name={RISK_FILTER_ICONS[label]} size="sm" />
-                {label}
-              </button>
-            ))}
-        </div>
+        <FilterChips
+          className="justify-end no-print"
+          options={filterOptions}
+          value={filter}
+          onChange={setFilter}
+          ariaLabel="風險清單篩選"
+        />
 
         <details className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 no-print">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">計分說明</summary>

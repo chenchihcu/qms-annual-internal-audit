@@ -38,10 +38,10 @@
 
 ## 版面與 shell（App.tsx）
 
-- [ ] 側欄寬度 SSOT：桌面與手機抽屜皆 `w-56`（224px）+ `shrink-0`；勿回到 `w-72` 除非重新量最長導覽標籤與藍卡副標
+- [ ] 側欄寬度 SSOT：桌面與手機抽屜皆 `w-56`（224px）+ `shrink-0`；勿回到 `w-72` 除非重新量最長導覽標籤
 - [ ] 側欄直列 `ALL_TABS` 16 頁，不渲染 `TAB_GROUPS.label`／分組圖示／組間 `mb-4`／分隔；PDCA 四字只留儀表板四卡
 - [ ] 頂欄只顯示 `headerScope`、年度、公司、列印；**不重複頁名**（頁內 H2 對齊側欄短名）
-- [ ] 藍卡 `m-3 p-3`；副標 `leading-snug` 允許換行；導覽按鈕 `whitespace-normal leading-snug`（瓶頸在藍卡副標，非 nav 字數）
+- [ ] 藍卡 `m-3 p-3` 只留產品名「QMS 年度內部稽核」；`headerScope` 只在頂欄；導覽按鈕 `whitespace-normal leading-snug`
 - [ ] header／main 大螢幕 padding 對齊 `lg:px-6`；`main` 保留 `max-w-[1600px]`（超寬螢幕縮側欄不會再加寬表單）
 - [ ] 禁止在 `html`／`body` 設 `overflow-x: hidden` 假裝消除橫向捲軸
 - [ ] 1280 桌面可用寬 ≈ `viewport − 224（側欄）− 48（main lg:px-6）− Card 內距`；年度計畫表 `min-w-[960px]` + 外層 `overflow-x-auto`（窄屏仍靠內層捲軸，非頁面級）
@@ -52,14 +52,14 @@
 - [ ] 集合資料分三層：導覽／狀態（`a/b` 或 ≤3 條）、工作面（表／篩選／批次）、明細（只開一筆）
 - [ ] `WorkflowGuide` 頂區：單列 **purpose + 缺口**（`待完成：`／`提示：`）；**無** PDCA chip／「本頁已完成／尚待完成」；底區保留上一步／下一步（緊湊 padding）
 - [ ] `WorkflowGuide` 與 `workflowStatus` 缺口禁止逐 `planRows`／查檢項展開；底部「下一步」`title` 只取 `gaps[0]`，禁止 `join` 完整清單
-- [ ] 進度 `a/b` 或 `待追蹤 n 件` **只在 Guide**；利害關係人／風險／追蹤／外稽準備頁內勿重複琥珀橫幅或標題 `完成 a/b`
+- [ ] 進度 `a/b` 或 `待追蹤 n 件` **只在 Guide**；利害關係人／風險／追蹤／外稽準備頁內勿重複琥珀橫幅或標題 `完成 a/b`；追蹤跨年待帶入改 `workflowStatus` `followups` advisory（觀察頁跨年帶入卡保留為批次操作入口）
 - [ ] `risk` tab：`getTabWorkflowStatus` 只 push `固有風險已存檔 a/b`；`ready` 仍為全部存檔；`TAB_WORKFLOW.exit` 與閘門一致（其餘因素可暫定）
-- [ ] N≥10 的 QP／觀察／查檢：預設緊湊表或單列，禁止 `space-y-4` 大卡牆；集合頁改 **單表 + `ScrollRegion`**（日程／追蹤／NCR／建議／當日行程／利害關係人／人員／查檢表頭）；禁止桌面表＋`lg:hidden` 手機 `<article>` 雙 DOM
+- [ ] N≥10 的 QP／觀察／查檢：預設緊湊表或單列，禁止 `space-y-4` 大卡牆；集合頁改 **單表 + `ScrollRegion`**（日程／追蹤／NCR／建議／觀察／當日行程／利害關係人／人員／查檢表頭）；禁止桌面表＋`lg:hidden` 手機 `<article>` 雙 DOM
 - [ ] 風險工作面：矩陣對齊 `buildRiskSheet`；`persistDisplayedRisks` 獨立成鈕，不必先套用月格；證據欄點列展開
 - [ ] 觀察台帳收合列仍保留「轉為 NCR」「編輯／結案」（`App.smoke` 與開案操作依賴）
 - [ ] 正例：儀表板缺口 `slice`、外稽 `x/y`、年度計畫月格表、儀表板需關注篩選、風險 `data-risk-matrix`
 - [ ] 反例：風險頁每 QP 一張 `<details>`、風險 tab 逐筆 gap、觀察／跨年全文卡片牆
-- [ ] 儀表板 PDCA 四卡：**只顯示就緒／n 項待處理**，不逐條印 gap；年度缺口清單保留一處（`annualCloseGaps.slice`）；KPI 一列四張（總分、待追蹤合計、稽核事件、外稽準備）
+- [ ] 儀表板 PDCA 四卡：**只顯示就緒／n 項待處理**，不逐條印 gap；年度結案缺口只在 Guide advisory；KPI 一列四張（總分、待追蹤合計、稽核事件、外稽準備）；另一家台帳改純摘要（切公司只留頂欄）
 - [ ] 儀表板程序列：單一 Card「程序風險與得分」取代「QR-28-01 全表 + 各程序得分全列」；join／篩選／排序 SSOT 在 [`dashboardAttention.ts`](src/lib/dashboardAttention.ts)（`buildProcedureAttentionRows` + `isNeedsAttention`）；刪「需關注」副標（chip 已表達）
 - [ ] 預設 chip `需關注`（OR）：高中風險、`score < 80`、狀態 `執行中`、製程／型態稽核；勿把全部 `已回報` 塞進預設；完整 27+2 列連到 `plan` tab
 - [ ] 儀表板得分列：`score == null` 只顯示「未計分」，禁止 0% 空 bar；有分數才畫短 bar + `%`

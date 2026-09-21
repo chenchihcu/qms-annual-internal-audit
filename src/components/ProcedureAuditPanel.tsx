@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { exportAllAuditsExcel, exportAuditExcel, exportAuditHtml } from '../lib/formExport'
+import { exportAllAuditsExcel, exportAuditExcel } from '../lib/formExport'
 import { buildAppHash } from '../lib/navigation'
 import { scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
@@ -8,6 +8,8 @@ import type { Judgment } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { PageToolbar } from './ui/PageToolbar'
+import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
@@ -107,50 +109,42 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange, onBackT
   return (
     <div className="space-y-6 print-area qr-form">
       <Card>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 no-print">
-          <div className="flex flex-wrap items-center gap-3">
-            {onBackToSchedule && (
-              <Button variant="ghost" icon="chevronLeft" onClick={onBackToSchedule}>返回日程</Button>
-            )}
-            <h2 className="text-sm font-semibold">查檢表</h2>
-          </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <Select
-              label=""
-              ariaLabel="目前稽核事件"
-              value={activeAuditId}
-              onChange={selectAudit}
-              options={auditOptions}
-            />
-            <Select
-              label=""
-              ariaLabel="匯出查檢表"
-              value=""
-              onChange={(value) => {
-                if (value === 'excel') exportAuditExcel(state, state.activeCompanyId, audit)
-                if (value === 'html') exportAuditHtml(state, state.activeCompanyId, audit)
-                if (value === 'all') exportAllAuditsExcel(state, state.activeCompanyId)
-              }}
-              options={[
-                { value: '', label: '匯出…' },
-                { value: 'excel', label: '本表 Excel' },
-                { value: 'html', label: '本表 HTML' },
-                { value: 'all', label: '全部 Excel' },
-              ]}
-            />
-          </div>
-        </div>
+        <PageToolbar
+          title="查檢表"
+          className="no-print"
+          actions={(
+            <>
+              {onBackToSchedule && (
+                <Button variant="ghost" icon="chevronLeft" onClick={onBackToSchedule}>返回日程</Button>
+              )}
+              <Select
+                label=""
+                ariaLabel="目前稽核事件"
+                value={activeAuditId}
+                onChange={selectAudit}
+                options={auditOptions}
+              />
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportAuditExcel(state, state.activeCompanyId, audit)}>
+                本表 Excel
+              </Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportAllAuditsExcel(state, state.activeCompanyId)}>
+                全部 Excel
+              </Button>
+            </>
+          )}
+        />
 
         <div className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border border-blue-100 bg-blue-50/50 p-3 no-print">
           <div className="min-w-64 flex-1"><Select label="新增單次稽核事件" value={newPlanKey} onChange={setNewPlanKey} options={company.planRows.map((row) => ({ value: `${row.qpCode}|${row.departmentId}`, label: `${row.qpCode} · ${row.department} · ${row.process}` }))} /></div>
           <Button variant="ghost" onClick={() => { const [qpCode, departmentId] = newPlanKey.split('|'); if (qpCode && departmentId) selectAudit(createAuditEvent(qpCode, departmentId)) }}>建立獨立事件</Button>
         </div>
 
-        <div className="print-only qr-form-header mb-4 text-center">
-          <h1 className="text-xl font-bold">{company.name}</h1>
-          <p className="text-sm">內部稽核查檢表 QR-28-02</p>
-          <p className="text-sm">{audit.qpCode} {getProcedureTitle(audit.qpCode, audit.department)} · {audit.auditCategory}</p>
-        </div>
+        <PrintDocHeader
+          companyName={company.name}
+          auditYear={settings.auditYear}
+          formTitle="內部稽核查檢表 QR-28-02"
+          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
+        />
 
         <ScrollRegion ariaLabel="稽核表頭 QR-28-02" className="mb-6 print:block">
         <table className="qr-header-table w-full min-w-[640px] border-collapse text-sm">
@@ -211,8 +205,19 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange, onBackT
                   </Button>
                 </span>
               )}
+              {audit.status === '執行中' && (
+                <Button
+                  variant="secondary"
+                  disabled={!completeCheck.ready || completingReport}
+                  onClick={() => setShowCompleteDialog(true)}
+                >
+                  完成回報
+                </Button>
+              )}
             </div>
           </div>
+          <details className="mt-4" open={planning}>
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">團隊與資格設定</summary>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Input label="計畫日期" type="date" value={audit.plannedDate ?? ''} onChange={(value) => updateAudit({ ...audit, plannedDate: value })} disabled={!planning} />
             <Input label="稽核範圍" value={audit.scope ?? ''} onChange={(value) => updateAudit({ ...audit, scope: value })} disabled={!planning} />
@@ -238,18 +243,10 @@ export function ProcedureAuditPanel({ store, auditKey, onAuditKeyChange, onBackT
             <h4 className="font-semibold text-slate-800">稽核開始時固定的來源快照</h4>
             {(audit.procedureCodeSnapshot || audit.procedureVersion || audit.formalRecordLocationSnapshot) ? <div className="mt-2 grid gap-2 text-slate-700 sm:grid-cols-3"><span><strong>程序：</strong>{[audit.procedureCodeSnapshot, audit.procedureVersion].filter(Boolean).join('／')}</span><span><strong>正式紀錄位置：</strong>{audit.formalRecordLocationSnapshot || '未留存'}</span><span><strong>適用標準：</strong>{audit.standardSnapshot?.join('、') || '未留存'}</span></div> : <p className="mt-2 text-xs text-amber-800">此事件沒有稽核開始時的來源快照；系統不補寫未被保存的歷史資料，請以正式紀錄核對。</p>}
           </div>}
-          {audit.status === '執行中' && (
-            <div className="mt-3">
-              <Button
-                variant="secondary"
-                disabled={!completeCheck.ready || completingReport}
-                onClick={() => setShowCompleteDialog(true)}
-              >
-                完成回報
-              </Button>
-              {!completeCheck.ready && <span className="ml-2 text-xs text-slate-500">{completeCheck.gaps.join('；')}</span>}
-            </div>
+          {audit.status === '執行中' && !completeCheck.ready && (
+            <p className="mt-3 text-xs text-slate-500">{completeCheck.gaps.join('；')}</p>
           )}
+          </details>
           {showCompleteDialog && (
             <ConfirmDialog
               open

@@ -36,12 +36,13 @@ describe('Dashboard attention list', () => {
       expect(screen.getByRole('group', { name: '程序清單篩選' })).toBeTruthy()
     })
 
-    const defaultRows = screen.getAllByRole('button', { name: /^QP-/ })
+    const table = screen.getByRole('table', { name: '程序風險與得分工作表' })
+    const defaultRows = within(table).getAllByRole('button')
     expect(defaultRows.length).toBeGreaterThan(0)
     expect(defaultRows.length).toBeLessThan(29)
 
     fireEvent.click(screen.getByRole('button', { name: '全部' }))
-    const allRows = screen.getAllByRole('button', { name: /^QP-/ })
+    const allRows = within(table).getAllByRole('button')
     expect(allRows.length).toBeGreaterThan(defaultRows.length)
   })
 
@@ -85,13 +86,15 @@ describe('Dashboard attention list', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '全部' }))
 
-    const unscoredButtons = screen
-      .getAllByRole('button', { name: /^QP-/ })
-      .filter((button) => within(button).queryByText('未計分'))
+    const table = screen.getByRole('table', { name: '程序風險與得分工作表' })
+    const unscoredRows = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .filter((row) => within(row).queryByText('未計分'))
 
-    expect(unscoredButtons.length).toBeGreaterThan(0)
-    for (const button of unscoredButtons) {
-      expect(button.querySelector('.rounded-full.bg-slate-100')).toBeNull()
-    }
+    expect(unscoredRows.length).toBeGreaterThan(0)
+    unscoredRows.forEach((row) => {
+      expect(row.querySelector('.bg-green-500, .bg-amber-500, .bg-red-500')).toBeNull()
+    })
   })
 })
