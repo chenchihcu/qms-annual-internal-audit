@@ -1,0 +1,30 @@
+import { describe, it, expect } from 'vitest'
+import { buildMergedCertificateCoverage, buildSharedCoverage, deriveInternalAuditComplete } from '../coverage'
+import { createDemoState } from '../../data/demoData'
+import type { CompanyData } from '../../types'
+
+describe('buildMergedCertificateCoverage', () => {
+  it('reports gaps for demo company with partial audits', () => {
+    const demo = createDemoState()
+    const report = buildMergedCertificateCoverage(
+      demo.company,
+      demo.settings.auditYear,
+      demo.settings.scoringRules,
+    )
+    expect(report.gaps.length).toBeGreaterThan(0)
+    expect(deriveInternalAuditComplete(demo.company, demo.settings.auditYear)).toBe(false)
+  })
+
+  it('reports unscheduled plan rows', () => {
+    const base = createDemoState().company
+    const company: CompanyData = {
+      ...base,
+      audits: [],
+      planRows: base.planRows.map((r, i) =>
+        i === 0 ? { ...r, months: Array(12).fill(null) } : r,
+      ),
+    }
+    const gaps = buildSharedCoverage(company, 2026)
+    expect(gaps.some((g) => g.reason === 'unscheduled')).toBe(true)
+  })
+})

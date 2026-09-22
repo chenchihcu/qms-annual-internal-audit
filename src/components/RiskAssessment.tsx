@@ -41,6 +41,9 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
         <p className="mb-4 text-sm text-muted">
           風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
         </p>
+        <p className="mb-4 rounded-md border border-line bg-page px-3 py-2 text-xs text-muted">
+          本頁為年度稽核排程用部門風險指標，不等同 QR-02-01「風險與機會監控評估表」（含氣候變遷、改善結果隔年填寫等），請於外部稽核準備第 5 項另備證據。
+        </p>
 
         <div className="overflow-x-auto">
           <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>

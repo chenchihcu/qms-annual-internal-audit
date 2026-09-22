@@ -1,38 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type {
   AppState,
   AuditSettings,
   ChecklistItem,
   CompanyData,
-  CompanyId,
   NCR,
+  NcrCompanyScope,
   Observation,
   PlanRow,
   ExternalAuditPrepItemState,
   ProcedureAudit,
   ThirdPartySuggestion,
 } from '../types'
-import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
+import { createDemoState, STORAGE_KEY } from '../data/demoData'
 import { autoArrangePlan } from '../lib/planner'
+import { carryForwardNcrIntoCompany, carryForwardObservationIntoCompany } from '../lib/carryForward'
 import { collectNCRsFromAudits, generateNCRNumber } from '../lib/ncr'
-import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
+import { collectObservationsFromAudits } from '../lib/observation'
+import {
+  createChecklistForProcedure,
+  getProcedureTitle,
+  mergeChecklistWithSeed,
+} from '../data/checklistLoader'
+import { ensurePrepItems } from '../lib/externalAuditPrep'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
 import { loadStateFromStorage, saveStateToStorage } from '../lib/storage'
 import { applyAuditYearChange } from '../lib/settingsYear'
 import { parseImportJSON } from '../lib/importSummary'
 
-function patchCompany(
-  state: AppState,
-  companyId: CompanyId,
-  patch: Partial<CompanyData>,
-): AppState {
+function patchCompanyState(state: AppState, patch: Partial<CompanyData>): AppState {
   return {
     ...state,
-    companies: {
-      ...state.companies,
-      [companyId]: { ...state.companies[companyId], ...patch },
-    },
+    company: { ...state.company, ...patch },
   }
 }
 
@@ -40,9 +40,19 @@ export interface UpdateSettingsOptions {
   resetExternalPrep?: boolean
 }
 
+function hydrateAppState(raw: AppState): AppState {
+  return {
+    ...raw,
+    externalAuditPrep: ensurePrepItems({
+      ...raw.externalAuditPrep,
+      auditedProducts: raw.externalAuditPrep?.auditedProducts ?? [],
+    }),
+  }
+}
+
 export function useAuditStore() {
   const initial = loadStateFromStorage()
-  const [state, setState] = useState<AppState>(initial.state)
+  const [state, setState] = useState<AppState>(() => hydrateAppState(initial.state))
   const [loadWarning] = useState<string | undefined>(initial.warning)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -57,8 +67,6 @@ export function useAuditStore() {
     }
   }, [state])
 
-  const activeCompany = state.companies[state.activeCompanyId]
-
   const updateSettings = useCallback(
     (patch: Partial<AuditSettings>, options?: UpdateSettingsOptions) => {
       setState((s) => {
@@ -71,15 +79,11 @@ export function useAuditStore() {
     [],
   )
 
-  const switchCompany = useCallback((companyId: CompanyId) => {
-    setState((s) => ({ ...s, activeCompanyId: companyId }))
-  }, [])
-
   const updateDepartment = useCallback(
     (id: string, patch: Partial<CompanyData['departments'][0]>) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
-        return patchCompany(s, s.activeCompanyId, {
+        const co = s.company
+        return patchCompanyState(s, {
           departments: co.departments.map((d) => (d.id === id ? { ...d, ...patch } : d)),
         })
       })
@@ -89,7 +93,7 @@ export function useAuditStore() {
 
   const regeneratePlan = useCallback(() => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.company
       const openCount =
         co.observations.filter((o) => o.status === 'open').length +
         co.suggestions.filter((sg) => sg.status === 'open').length +
@@ -102,19 +106,20 @@ export function useAuditStore() {
           planWindowStart: s.settings.planWindowStart,
           planWindowEnd: s.settings.planWindowEnd,
           managementReviewDate: s.settings.managementReviewDate,
+          externalAuditDate: s.settings.externalAuditDate,
           existingRows: co.planRows,
           openCarryForwardCount: openCount,
         },
         { leadAuditor: s.settings.leadAuditor },
       )
-      return patchCompany(s, s.activeCompanyId, { planRows })
+      return patchCompanyState(s, { planRows })
     })
   }, [])
 
   const updatePlanRow = useCallback((id: string, patch: Partial<PlanRow>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.company
+      return patchCompanyState(s, {
         planRows: co.planRows.map((r) =>
           r.id === id ? { ...r, ...patch, manualOverride: true } : r,
         ),
@@ -124,8 +129,8 @@ export function useAuditStore() {
 
   const setPlanMonthStatus = useCallback((rowId: string, monthIndex: number, status: MonthStatus) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.company
+      return patchCompanyState(s, {
         planRows: co.planRows.map((r) => {
           if (r.id !== rowId) return r
           const months = [...r.months] as MonthStatus[]
@@ -138,10 +143,15 @@ export function useAuditStore() {
 
   const getOrCreateAudit = useCallback(
     (qpCode: string, departmentId: string): ProcedureAudit => {
-      const co = activeCompany
+      const co = state.company
       const auditId = `audit-${qpCode}-${departmentId}`
       const existing = co.audits.find((a) => a.id === auditId)
-      if (existing) return existing
+      if (existing) {
+        const dept = co.departments.find((d) => d.id === departmentId)
+        const items = mergeChecklistWithSeed(existing.items, qpCode, dept?.name)
+        if (items.length === existing.items.length) return existing
+        return { ...existing, items }
+      }
 
       const dept = co.departments.find((d) => d.id === departmentId)
       const entry = PROCEDURE_PLAN_TEMPLATE.find(
@@ -179,34 +189,38 @@ export function useAuditStore() {
         items: createChecklistForProcedure(qpCode, dept.name),
       }
     },
-    [activeCompany],
+    [state.company],
   )
 
-  const persistAudit = useCallback(
-    (s: AppState, audits: ProcedureAudit[], companyId: CompanyId) => {
-      const co = s.companies[companyId]
-      const ncrs = collectNCRsFromAudits(audits, s.settings.auditYear, co.ncrs)
-      return patchCompany(s, companyId, { audits, ncrs })
+  const persistAudit = useCallback((s: AppState, audits: ProcedureAudit[]): AppState => {
+    const co = s.company
+    const ncrs = collectNCRsFromAudits(audits, s.settings.auditYear, co.ncrs)
+    const observations = collectObservationsFromAudits(
+      audits,
+      s.settings.auditYear,
+      co.observations,
+    )
+    return patchCompanyState(s, { audits, ncrs, observations })
+  }, [])
+
+  const updateAudit = useCallback(
+    (audit: ProcedureAudit) => {
+      setState((s) => {
+        const co = s.company
+        const exists = co.audits.some((a) => a.id === audit.id)
+        const audits = exists
+          ? co.audits.map((a) => (a.id === audit.id ? audit : a))
+          : [...co.audits, audit]
+        return persistAudit(s, audits)
+      })
     },
-    [],
+    [persistAudit],
   )
-
-  const updateAudit = useCallback((audit: ProcedureAudit) => {
-    setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const exists = co.audits.some((a) => a.id === audit.id)
-      const audits = exists
-        ? co.audits.map((a) => (a.id === audit.id ? audit : a))
-        : [...co.audits, audit]
-      return persistAudit(s, audits, s.activeCompanyId)
-    })
-  }, [persistAudit])
 
   const updateChecklistItem = useCallback(
     (auditId: string, itemId: string, patch: Partial<ChecklistItem>) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
-        const audits = co.audits.map((a) => {
+        const audits = s.company.audits.map((a) => {
           if (a.id !== auditId) return a
           return {
             ...a,
@@ -215,7 +229,7 @@ export function useAuditStore() {
             ),
           }
         })
-        return persistAudit(s, audits, s.activeCompanyId)
+        return persistAudit(s, audits)
       })
     },
     [persistAudit],
@@ -223,8 +237,7 @@ export function useAuditStore() {
 
   const addChecklistItem = useCallback((auditId: string) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const audits = co.audits.map((a) => {
+      const audits = s.company.audits.map((a) => {
         if (a.id !== auditId) return a
         const nextNo = a.items.length + 1
         return {
@@ -240,36 +253,42 @@ export function useAuditStore() {
               description: '',
               procedureRef: a.qpCode,
               origin: 'custom' as const,
+              certificateScope: 'shared' as const,
             },
           ],
         }
       })
-      return patchCompany(s, s.activeCompanyId, { audits })
+      return patchCompanyState(s, { audits })
     })
   }, [])
 
-  const removeChecklistItem = useCallback((auditId: string, itemId: string) => {
-    setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const audits = co.audits.map((a) => {
-        if (a.id !== auditId) return a
-        const items = a.items
-          .filter((i) => i.id !== itemId)
-          .map((item, idx) => ({ ...item, no: idx + 1 }))
-        return { ...a, items }
+  const removeChecklistItem = useCallback(
+    (auditId: string, itemId: string) => {
+      setState((s) => {
+        const audits = s.company.audits.map((a) => {
+          if (a.id !== auditId) return a
+          const items = a.items
+            .filter((i) => i.id !== itemId)
+            .map((item, idx) => ({ ...item, no: idx + 1 }))
+          return { ...a, items }
+        })
+        return persistAudit(s, audits)
       })
-      return persistAudit(s, audits, s.activeCompanyId)
-    })
-  }, [persistAudit])
+    },
+    [persistAudit],
+  )
 
-  const markChecklistItemNA = useCallback((auditId: string, itemId: string) => {
-    updateChecklistItem(auditId, itemId, { judgment: '不適用' })
-  }, [updateChecklistItem])
+  const markChecklistItemNA = useCallback(
+    (auditId: string, itemId: string) => {
+      updateChecklistItem(auditId, itemId, { judgment: '不適用' })
+    },
+    [updateChecklistItem],
+  )
 
   const updateNCR = useCallback((id: string, patch: Partial<NCR>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.company
+      return patchCompanyState(s, {
         ncrs: co.ncrs.map((n) => (n.id === id ? { ...n, ...patch } : n)),
       })
     })
@@ -281,9 +300,10 @@ export function useAuditStore() {
       departmentId: string
       description: string
       process?: string
+      companyScope: NcrCompanyScope
     }) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.company
         const dept = co.departments.find((d) => d.id === input.departmentId)
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === input.qpCode && e.departmentId === input.departmentId,
@@ -298,8 +318,9 @@ export function useAuditStore() {
           description: input.description,
           date: new Date().toISOString().slice(0, 10),
           status: '開立',
+          companyScope: input.companyScope,
         }
-        return patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] })
+        return patchCompanyState(s, { ncrs: [...co.ncrs, ncr] })
       })
     },
     [],
@@ -307,8 +328,8 @@ export function useAuditStore() {
 
   const updateObservation = useCallback((id: string, patch: Partial<Observation>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.company
+      return patchCompanyState(s, {
         observations: co.observations.map((o) => (o.id === id ? { ...o, ...patch } : o)),
       })
     })
@@ -322,7 +343,7 @@ export function useAuditStore() {
       description?: string
     }) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.company
         const dept = co.departments.find((d) => d.id === input.departmentId)
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === input.qpCode && e.departmentId === input.departmentId,
@@ -338,7 +359,7 @@ export function useAuditStore() {
           description: input.description ?? '',
           status: 'open',
         }
-        return patchCompany(s, s.activeCompanyId, {
+        return patchCompanyState(s, {
           observations: [...co.observations, obs],
         })
       })
@@ -348,8 +369,8 @@ export function useAuditStore() {
 
   const updateSuggestion = useCallback((id: string, patch: Partial<ThirdPartySuggestion>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.company
+      return patchCompanyState(s, {
         suggestions: co.suggestions.map((sg) => (sg.id === id ? { ...sg, ...patch } : sg)),
       })
     })
@@ -363,7 +384,7 @@ export function useAuditStore() {
       responsibleUnit: string
     }) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.company
         const sug: ThirdPartySuggestion = {
           id: `sug-${Date.now()}`,
           year: s.settings.auditYear,
@@ -373,7 +394,7 @@ export function useAuditStore() {
           responsibleUnit: input.responsibleUnit,
           status: 'open',
         }
-        return patchCompany(s, s.activeCompanyId, {
+        return patchCompanyState(s, {
           suggestions: [...co.suggestions, sug],
         })
       })
@@ -397,7 +418,11 @@ export function useAuditStore() {
   )
 
   const updateExternalPrepSequence = useCallback(
-    (patch: Partial<Pick<AppState['externalAuditPrep'], 'internalAuditComplete' | 'managementReviewComplete'>>) => {
+    (
+      patch: Partial<
+        Pick<AppState['externalAuditPrep'], 'managementReviewComplete' | 'auditedProducts'>
+      >,
+    ) => {
       setState((s) => ({
         ...s,
         externalAuditPrep: { ...s.externalAuditPrep, ...patch },
@@ -406,133 +431,40 @@ export function useAuditStore() {
     [],
   )
 
-  const carryForwardObservation = useCallback(
-    (obsId: string, qpCode: string, departmentId: string) => {
+  const carryForwardObservation = useCallback((obsId: string, _qpCode: string, _departmentId: string) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.company
         const obs = co.observations.find((o) => o.id === obsId)
         if (!obs || obs.carriedToYear) return s
-
-        const auditId = `audit-${qpCode}-${departmentId}`
-        let audit = co.audits.find((a) => a.id === auditId)
-        const dept = co.departments.find((d) => d.id === departmentId)
-        const entry = PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-        )
-        if (!dept || !entry) return s
-
-        if (!audit) {
-          audit = {
-            id: auditId,
-            qpCode,
-            departmentId,
-            department: dept.name,
-            process: entry.process,
-            documents: entry.documents,
-            notifyDate: '',
-            auditDate: '',
-            departmentManager: dept.owner,
-            auditors: dept.defaultAuditors,
-            auditCategory: entry.auditCategory,
-            items: createChecklistForProcedure(qpCode, dept.name),
-          }
+        try {
+          const updated = carryForwardObservationIntoCompany(co, obs, s.settings.auditYear)
+          return patchCompanyState(s, updated)
+        } catch {
+          return s
         }
-
-        const newItemId = `chk-cf-${Date.now()}`
-        const newItem: ChecklistItem = {
-          id: newItemId,
-          category: '跨年追蹤',
-          no: audit.items.length + 1,
-          content: `[${obs.year}年觀察事項] ${obs.content}`,
-          judgment: null,
-          description: obs.description,
-          sourceYear: obs.year,
-          carriedFromId: obs.id,
-          procedureRef: qpCode,
-          origin: 'carryforward',
-        }
-
-        const audits = co.audits.some((a) => a.id === audit!.id)
-          ? co.audits.map((a) =>
-              a.id === audit!.id ? { ...a, items: [...a.items, newItem] } : a,
-            )
-          : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
-
-        const observations = co.observations.map((o) =>
-          o.id === obsId
-            ? { ...o, carriedToYear: s.settings.auditYear, carriedToChecklistId: newItemId }
-            : o,
-        )
-
-        return patchCompany(s, s.activeCompanyId, { audits, observations })
       })
     },
     [],
   )
 
-  const carryForwardNCR = useCallback((ncrId: string, qpCode: string, departmentId: string) => {
+  const carryForwardNCR = useCallback((ncrId: string, _qpCode: string, _departmentId: string) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.company
       const ncr = co.ncrs.find((n) => n.id === ncrId)
       if (!ncr || ncr.status === '結案' || ncr.carriedToYear) return s
-
-      const auditId = `audit-${qpCode}-${departmentId}`
-      let audit = co.audits.find((a) => a.id === auditId)
-      const dept = co.departments.find((d) => d.id === departmentId)
-      const entry = PROCEDURE_PLAN_TEMPLATE.find(
-        (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-      ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
-      if (!dept || !entry) return s
-
-      if (!audit) {
-        audit = {
-          id: auditId,
-          qpCode,
-          departmentId,
-          department: dept.name,
-          process: entry.process,
-          documents: entry.documents,
-          notifyDate: '',
-          auditDate: '',
-          departmentManager: dept.owner,
-          auditors: dept.defaultAuditors,
-          auditCategory: entry.auditCategory,
-          items: createChecklistForProcedure(qpCode, dept.name),
-        }
+      try {
+        const updated = carryForwardNcrIntoCompany(co, ncr, s.settings.auditYear)
+        return patchCompanyState(s, updated)
+      } catch {
+        return s
       }
-
-      const newItemId = `chk-ncr-cf-${Date.now()}`
-      const year = ncr.sourceYear ?? s.settings.auditYear - 1
-      const newItem: ChecklistItem = {
-        id: newItemId,
-        category: '跨年追蹤',
-        no: audit.items.length + 1,
-        content: `[${year}年 NCR ${ncr.ncrNumber}] ${ncr.description}`,
-        judgment: null,
-        description: '前年度未結案不符合追蹤',
-        sourceYear: year,
-        procedureRef: qpCode,
-        origin: 'carryforward',
-      }
-
-      const audits = co.audits.some((a) => a.id === audit!.id)
-        ? co.audits.map((a) =>
-            a.id === audit!.id ? { ...a, items: [...a.items, newItem] } : a,
-          )
-        : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
-
-      const ncrs = co.ncrs.map((n) =>
-        n.id === ncrId ? { ...n, carriedToYear: s.settings.auditYear } : n,
-      )
-
-      return patchCompany(s, s.activeCompanyId, { audits, ncrs })
     })
   }, [])
 
   const carryForwardSuggestion = useCallback(
     (sugId: string, qpCode: string, departmentId: string) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.company
         const sug = co.suggestions.find((sg) => sg.id === sugId)
         if (!sug || sug.status === 'closed') return s
 
@@ -572,6 +504,7 @@ export function useAuditStore() {
           sourceYear: sug.year,
           procedureRef: qpCode,
           origin: 'carryforward',
+          certificateScope: 'shared' as const,
         }
 
         const audits = co.audits.some((a) => a.id === audit!.id)
@@ -584,7 +517,7 @@ export function useAuditStore() {
           sg.id === sugId ? { ...sg, carriedToYear: s.settings.auditYear } : sg,
         )
 
-        return patchCompany(s, s.activeCompanyId, { audits, suggestions })
+        return patchCompanyState(s, { audits, suggestions })
       })
     },
     [],
@@ -594,40 +527,24 @@ export function useAuditStore() {
 
   const importJSON = useCallback((json: string) => {
     const parsed = parseImportJSON(json)
-    if (parsed.version < 4) {
-      const migrated =
-        parsed.version === 1 ? migrateV1State(parsed) : migrateToV4(parsed as AppState)
-      if (migrated) {
-        setState(migrated)
-        return
-      }
-    }
-    setState(parsed)
+    setState(hydrateAppState(parsed))
   }, [])
 
   const resetToDemo = useCallback(() => setState(createDemoState()), [])
 
   const clearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem('qms-annual-internal-audit-v5')
     localStorage.removeItem('qms-annual-internal-audit-v1')
     setState(createDemoState())
   }, [])
 
-  const syncedState = useMemo(
-    () => ({
-      ...state,
-      company: activeCompany,
-    }),
-    [state, activeCompany],
-  )
-
   return {
-    state: syncedState,
+    state,
     loadWarning,
     lastSavedAt,
     saveError,
     updateSettings,
-    switchCompany,
     updateDepartment,
     regeneratePlan,
     updatePlanRow,

@@ -1,9 +1,10 @@
+import { applyCertificateScopeToItem } from '../lib/certificateScope'
 import type { ChecklistItem } from '../types'
 import seed from './checklists.seed.json'
 
 export interface SeedCategory {
   name: string
-  items: Array<{ no: number; content: string }>
+  items: Array<{ no: number; content: string; as9100Clauses?: string[] }>
 }
 
 export interface SeedProcedure {
@@ -156,7 +157,7 @@ export function createChecklistForProcedure(
   let globalNo = 1
   for (const cat of proc.categories) {
     for (const item of cat.items) {
-      items.push({
+      const base: ChecklistItem = {
         id: `chk-${qpCode}-${globalNo}-${Date.now()}`,
         category: cat.name,
         no: item.no,
@@ -164,12 +165,44 @@ export function createChecklistForProcedure(
         judgment: null,
         description: '',
         procedureRef: qpCode,
+        as9100Clauses: item.as9100Clauses,
         origin: 'seed',
-      })
+      }
+      items.push(applyCertificateScopeToItem(base, qpCode, department))
       globalNo++
     }
   }
   return items
+}
+
+/** 將種子新增題合併進既有查檢列（以 category+no 辨識） */
+export function mergeChecklistWithSeed(
+  existing: ChecklistItem[],
+  qpCode: string,
+  department?: string,
+): ChecklistItem[] {
+  const seedItems = createChecklistForProcedure(qpCode, department)
+  const key = (item: Pick<ChecklistItem, 'category' | 'no'>) => `${item.category}|${item.no}`
+  const seen = new Set(existing.map(key))
+  const merged = [...existing]
+  for (const seed of seedItems) {
+    if (seen.has(key(seed))) continue
+    merged.push(
+      applyCertificateScopeToItem(
+        {
+          ...seed,
+          id: `chk-${qpCode}-seed-${seed.no}-${seed.category}`,
+          judgment: null,
+          description: '',
+          origin: 'seed',
+        },
+        qpCode,
+        department,
+      ),
+    )
+    seen.add(key(seed))
+  }
+  return merged.sort((a, b) => a.no - b.no)
 }
 
 export function countChecklistItems(qpCode: string, department?: string): number {

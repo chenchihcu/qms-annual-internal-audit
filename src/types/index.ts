@@ -18,6 +18,10 @@ export type SuggestionStatus = 'open' | 'closed'
 
 export type CompanyId = 'jiurun' | 'zhenglongxing'
 
+export type CertificateScope = 'shared' | 'dual' | 'jiurun' | 'zhenglongxing'
+
+export type NcrCompanyScope = 'jiurun' | 'zhenglongxing' | 'both'
+
 export interface ScoringRules {
   conform: number
   nonConform: number
@@ -74,9 +78,12 @@ export interface ChecklistItem {
   judgment: Judgment | null
   description: string
   procedureRef?: string
+  as9100Clauses?: string[]
   sourceYear?: number
   carriedFromId?: string
   origin?: ChecklistItemOrigin
+  certificateScope?: CertificateScope
+  judgmentByCompany?: { jiurun: Judgment | null; zhenglongxing: Judgment | null }
 }
 
 /** QR-28-02 程序導向查檢表 */
@@ -108,6 +115,7 @@ export interface NCR {
   checklistItemId?: string
   sourceYear?: number
   carriedToYear?: number
+  companyScope?: NcrCompanyScope
 }
 
 export interface Observation {
@@ -136,10 +144,20 @@ export interface ThirdPartySuggestion {
   carriedToYear?: number
 }
 
+export type AuditedProductCompanyScope = 'jiurun' | 'zhenglongxing' | 'both'
+
+export interface AuditedProduct {
+  id: string
+  name: string
+  companyScope: AuditedProductCompanyScope
+  note?: string
+}
+
 /** 雙公司合併取證 — 外部稽核前準備狀態（依年度共用） */
 export interface ExternalAuditPrepItemState {
   id: string
   no: number
+  sub?: string
   jiurunDone: boolean
   zhenglongxingDone: boolean
   mergedDone: boolean
@@ -152,6 +170,7 @@ export interface ExternalAuditPrepState {
   internalAuditComplete: boolean
   managementReviewComplete: boolean
   items: ExternalAuditPrepItemState[]
+  auditedProducts: AuditedProduct[]
 }
 
 export interface CompanyData {
@@ -165,7 +184,15 @@ export interface CompanyData {
 }
 
 export interface AppState {
-  activeCompanyId: CompanyId
+  settings: AuditSettings
+  company: CompanyData
+  externalAuditPrep: ExternalAuditPrepState
+  version: number
+}
+
+/** v5 雙公司結構（僅供遷移） */
+export interface LegacyV5AppState {
+  activeCompanyId?: CompanyId
   settings: AuditSettings
   companies: Record<CompanyId, CompanyData>
   externalAuditPrep: ExternalAuditPrepState
@@ -183,9 +210,17 @@ export type TabId =
   | 'risk'
   | 'settings'
 
+export const DUAL_COMPANY_LABEL = '九潤精密 / 正隆興精密'
+
 export const COMPANY_LABELS: Record<CompanyId, string> = {
   jiurun: '九潤精密',
   zhenglongxing: '正隆興精密',
+}
+
+export const NCR_COMPANY_SCOPE_LABELS: Record<NcrCompanyScope, string> = {
+  jiurun: '九潤',
+  zhenglongxing: '正隆興',
+  both: '兩證',
 }
 
 export const MONTH_STATUS_LEGEND: { status: MonthStatus; label: string; color: string }[] = [

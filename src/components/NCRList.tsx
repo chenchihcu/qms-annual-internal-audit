@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { isNcrStale } from '../lib/ncr'
-import type { NCRStatus } from '../types'
+import type { NCRStatus, NcrCompanyScope } from '../types'
+import { NCR_COMPANY_SCOPE_LABELS } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
+const COMPANY_SCOPES: NcrCompanyScope[] = ['jiurun', 'zhenglongxing', 'both']
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
@@ -19,6 +21,7 @@ export function NCRList({ store }: { store: AuditStore }) {
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
     departmentId: company.planRows[0]?.departmentId ?? '',
     description: '',
+    companyScope: 'both' as NcrCompanyScope,
   })
 
   const planRowOptions = company.planRows.map((r) => ({
@@ -40,6 +43,15 @@ export function NCRList({ store }: { store: AuditStore }) {
               setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
             }}
             options={planRowOptions}
+          />
+          <Select
+            label="證書"
+            value={newNcr.companyScope}
+            onChange={(v) => setNewNcr((s) => ({ ...s, companyScope: v as NcrCompanyScope }))}
+            options={COMPANY_SCOPES.map((s) => ({
+              value: s,
+              label: NCR_COMPANY_SCOPE_LABELS[s],
+            }))}
           />
           <Input
             label="描述"
@@ -81,6 +93,7 @@ export function NCRList({ store }: { store: AuditStore }) {
               <thead>
                 <tr className="bg-page text-left text-muted">
                   <th className="border border-line p-2">NCR#</th>
+                  <th className="border border-line p-2">證書</th>
                   <th className="border border-line p-2">QP</th>
                   <th className="border border-line p-2">部門</th>
                   <th className="border border-line p-2">流程</th>
@@ -92,9 +105,25 @@ export function NCRList({ store }: { store: AuditStore }) {
               <tbody>
                 {company.ncrs.map((ncr) => {
                   const stale = isNcrStale(ncr, company.audits)
+                  const scope = ncr.companyScope ?? 'both'
                   return (
                     <tr key={ncr.id} className={stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
                       <td className="border border-line p-2 font-mono text-xs">{ncr.ncrNumber}</td>
+                      <td className="border border-line p-2">
+                        <div className="no-print">
+                          <Select
+                            value={scope}
+                            onChange={(v) =>
+                              updateNCR(ncr.id, { companyScope: v as NcrCompanyScope })
+                            }
+                            options={COMPANY_SCOPES.map((s) => ({
+                              value: s,
+                              label: NCR_COMPANY_SCOPE_LABELS[s],
+                            }))}
+                          />
+                        </div>
+                        <span className="print-only">{NCR_COMPANY_SCOPE_LABELS[scope]}</span>
+                      </td>
                       <td className="border border-line p-2">{ncr.qpCode}</td>
                       <td className="border border-line p-2">{ncr.department}</td>
                       <td className="border border-line p-2">{ncr.process}</td>

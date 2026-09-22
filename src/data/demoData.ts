@@ -1,10 +1,11 @@
-import type { AppState, CompanyData, CompanyId } from '../types'
-import { COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
+import type { AppState, CompanyData, LegacyV5AppState } from '../types'
+import { DUAL_COMPANY_LABEL, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
+import { migrateV5ToV6 } from '../lib/migrateToV6'
 
 const departments = [
   {
@@ -76,7 +77,7 @@ const settings = {
   planWindowStart: '2026-02-01',
   planWindowEnd: '2026-11-30',
   externalAuditDate: '2026-09-15',
-  managementReviewDate: '2026-12-10',
+  managementReviewDate: '2026-08-01',
   scoringRules: DEFAULT_SCORING_RULES,
 }
 
@@ -120,7 +121,7 @@ function buildAudit(
   }
 }
 
-function createCompanyData(companySuffix: string): CompanyData {
+function createCompanyData(): CompanyData {
   const planRows = autoArrangePlan(
     {
       departments,
@@ -129,27 +130,24 @@ function createCompanyData(companySuffix: string): CompanyData {
       planWindowStart: settings.planWindowStart,
       planWindowEnd: settings.planWindowEnd,
       managementReviewDate: settings.managementReviewDate,
+      externalAuditDate: settings.externalAuditDate,
       openCarryForwardCount: 2,
     },
     { leadAuditor: settings.leadAuditor },
   )
 
   const audits = [
-    buildAudit('QP-28', 'dept-qa', [
-      { no: 1, judgment: '符合' },
-    ]),
+    buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }]),
     buildAudit('QP-16', 'dept-qa', [
       { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
     ]),
-    buildAudit('QP-20', 'dept-admin', [
-      { no: 1, judgment: '符合' },
-    ]),
+    buildAudit('QP-20', 'dept-admin', [{ no: 1, judgment: '符合' }]),
   ]
 
   const ncrs = [
     {
       id: 'ncr-demo-1',
-      ncrNumber: `NCR-2026-001-${companySuffix}`,
+      ncrNumber: 'NCR-2026-001',
       qpCode: 'QP-16',
       departmentId: 'dept-qa',
       department: '品保部',
@@ -158,18 +156,19 @@ function createCompanyData(companySuffix: string): CompanyData {
       date: '2026-03-15',
       status: '矯正中' as const,
       checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
+      companyScope: 'both' as const,
     },
   ]
 
   return {
-    name: '',
+    name: DUAL_COMPANY_LABEL,
     departments,
     planRows,
     audits,
     ncrs,
     observations: [
       {
-        id: `obs-2025-1-${companySuffix}`,
+        id: 'obs-2025-1',
         year: 2025,
         qpCode: 'QP-01',
         departmentId: 'dept-admin',
@@ -180,7 +179,7 @@ function createCompanyData(companySuffix: string): CompanyData {
         status: 'open' as const,
       },
       {
-        id: `obs-2025-2-${companySuffix}`,
+        id: 'obs-2025-2',
         year: 2025,
         qpCode: 'QP-22',
         departmentId: 'dept-prod',
@@ -193,7 +192,7 @@ function createCompanyData(companySuffix: string): CompanyData {
     ],
     suggestions: [
       {
-        id: `sug-2025-1-${companySuffix}`,
+        id: 'sug-2025-1',
         year: 2025,
         procedure: 'QP-18',
         issue: '部分量測設備校正標籤資訊不完整',
@@ -202,7 +201,7 @@ function createCompanyData(companySuffix: string): CompanyData {
         status: 'open' as const,
       },
       {
-        id: `sug-2025-2-${companySuffix}`,
+        id: 'sug-2025-2',
         year: 2025,
         procedure: 'QP-09',
         issue: '合約審查紀錄缺少客戶特殊要求欄位',
@@ -215,49 +214,33 @@ function createCompanyData(companySuffix: string): CompanyData {
 }
 
 export function createDemoState(): AppState {
-  const companies = {} as Record<CompanyId, CompanyData>
-  for (const id of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
-    companies[id] = {
-      ...createCompanyData(id),
-      name: COMPANY_LABELS[id],
-    }
-  }
-
   const prep = createDefaultPrepState(settings.auditYear)
-  prep.internalAuditComplete = true
-  prep.items[0].jiurunDone = true
-  prep.items[0].zhenglongxingDone = true
 
   return {
-    activeCompanyId: 'jiurun',
     settings,
-    companies,
+    company: createCompanyData(),
     externalAuditPrep: prep,
-    version: 5,
+    version: 6,
   }
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v5'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v6'
 
-export function migrateToV4(raw: AppState): AppState {
-  if (raw.version >= 5 && raw.externalAuditPrep) return raw
-  const demo = createDemoState()
-  demo.activeCompanyId = raw.activeCompanyId
-  demo.settings = raw.settings
-  demo.companies = raw.companies
-  return demo
+export function migrateToV4(raw: LegacyV5AppState | AppState): AppState {
+  if (raw.version >= 6 && 'company' in raw && raw.company) return raw as AppState
+  return migrateV5ToV6(raw as LegacyV5AppState)
 }
 
 /** 舊版 v1 遷移（若存在） */
 export function migrateV1State(raw: unknown): AppState | null {
   if (!raw || typeof raw !== 'object') return null
   const old = raw as Record<string, unknown>
-  if (old.version === 2 && old.companies) return raw as AppState
+  if ((old.version as number) >= 6 && old.company) return raw as AppState
+  if (old.version === 2 && old.companies) return migrateV5ToV6(raw as LegacyV5AppState)
   if (!old.departments || !old.settings) return null
 
   const demo = createDemoState()
-  demo.activeCompanyId = 'jiurun'
-  const company = demo.companies.jiurun
+  const company = demo.company
   company.departments = old.departments as CompanyData['departments']
   if (old.planRows) company.planRows = old.planRows as CompanyData['planRows']
   if (old.audits) {

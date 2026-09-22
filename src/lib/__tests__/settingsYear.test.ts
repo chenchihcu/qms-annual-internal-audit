@@ -23,4 +23,28 @@ describe('applyAuditYearChange', () => {
     expect(next.externalAuditPrep.year).toBe(2027)
     expect(next.externalAuditPrep.items[0].jiurunDone).toBe(false)
   })
+
+  it('auto carry-forwards open prior-year observations on year change', () => {
+    const state = createDemoState()
+    state.company.observations.push({
+      id: 'obs-prior',
+      year: 2025,
+      qpCode: 'QP-01',
+      departmentId: 'dept-admin',
+      department: '管理部',
+      process: 'p',
+      content: '跨年觀察',
+      description: '',
+      status: 'open',
+    })
+    const next = applyAuditYearChange(state, 2027, false)
+    expect(
+      next.company.observations.find((o) => o.id === 'obs-prior')?.carriedToYear,
+    ).toBe(2027)
+    expect(
+      next.company.audits.some((a) =>
+        a.items.some((i) => i.content.includes('跨年觀察')),
+      ),
+    ).toBe(true)
+  })
 })

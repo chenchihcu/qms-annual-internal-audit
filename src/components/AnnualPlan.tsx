@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { evaluateDateSequence } from '../lib/coverage'
 import { cycleMonthStatus } from '../lib/planner'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus } from '../types'
@@ -31,6 +32,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
   const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus, updateDepartment } =
     store
   const { settings, company } = state
+  const dateWarnings = evaluateDateSequence(settings)
 
   const [yearDraft, setYearDraft] = useState(String(settings.auditYear))
   const [yearDialog, setYearDialog] = useState<{ open: boolean; newYear: number }>({
@@ -84,6 +86,17 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         }}
         onCancel={() => setRegenConfirm(false)}
       />
+
+      {dateWarnings.length > 0 && (
+        <div
+          role="alert"
+          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 no-print dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+        >
+          {dateWarnings.map((msg) => (
+            <p key={msg}>⚠ {msg}</p>
+          ))}
+        </div>
+      )}
 
       <Card>
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4 no-print">
@@ -177,8 +190,19 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
               </tr>
             </thead>
             <tbody>
-              {company.planRows.map((row) => (
-                <tr key={row.id} className={row.manualOverride ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}>
+              {company.planRows.map((row) => {
+                const unscheduled = !row.months.some(Boolean)
+                return (
+                <tr
+                  key={row.id}
+                  className={
+                    unscheduled
+                      ? 'bg-rose-50/60 dark:bg-rose-950/20'
+                      : row.manualOverride
+                        ? 'bg-amber-50/50 dark:bg-amber-950/20'
+                        : ''
+                  }
+                >
                   <td className="border border-line p-2">{row.sequence}</td>
                   <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>
                   <td className="border border-line p-2 font-medium">{row.qpCode}</td>
@@ -214,7 +238,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                     </td>
                   ))}
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

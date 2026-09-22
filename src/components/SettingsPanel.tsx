@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { getSeedStats } from '../data/checklistLoader'
-import { summarizeImportState, parseImportJSON } from '../lib/importSummary'
+import { summarizeImportState, parseImportJSON, formatImportSummary } from '../lib/importSummary'
 import { Button, Card, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 
@@ -69,7 +69,7 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
         title="確認匯入 JSON"
         description={
           pendingImport
-            ? `將覆蓋本機資料。版本 ${pendingImport.version} · ${pendingImport.auditYear} 年 · 公司：${pendingImport.companies.join('、')} · NCR ${pendingImport.ncrCount} · 觀察 ${pendingImport.observationCount} · 建議 ${pendingImport.suggestionCount}`
+            ? `將覆蓋本機資料。${formatImportSummary(pendingImport)}`
             : ''
         }
         variant="danger"
@@ -83,7 +83,7 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
       <ConfirmDialog
         open={resetConfirm}
         title="還原示範資料"
-        description="將以示範資料覆蓋目前所有公司資料。"
+        description="將以示範資料覆蓋目前內稽底稿。"
         variant="danger"
         confirmLabel="還原"
         onConfirm={() => {
@@ -188,9 +188,9 @@ export function SettingsPanel({ store }: { store: AuditStore }) {
       <Card>
         <h2 className="mb-2 text-lg font-semibold text-ink">關於</h2>
         <p className="text-sm text-muted">
-          QMS 年度內部稽核系統 v2.0 — 程序導向（QP 查檢表）、雙公司切換、
+          QMS 年度內部稽核系統 v2.0 — 程序導向（QP 查檢表）、兩張證書合併內稽、
           對應 QR-28-01/02/03/04/05 及 QR-02-01 風險矩陣。
-          目前公司：{state.company.name}
+          證書範圍：{state.company.name}
         </p>
       </Card>
     </div>

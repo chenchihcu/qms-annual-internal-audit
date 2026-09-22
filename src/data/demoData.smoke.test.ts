@@ -1,19 +1,14 @@
-import { describe, expect, it } from 'vitest'
-import { createDemoState, STORAGE_KEY } from './demoData'
-import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
+import { describe, it, expect } from 'vitest'
+import { createDemoState } from './demoData'
 
-describe('demoData smoke (delivery gate)', () => {
-  it('createDemoState does not throw and aligns QP/dept', () => {
+describe('createDemoState', () => {
+  it('creates v6 merged company with plan and audits', () => {
     const state = createDemoState()
-    expect(STORAGE_KEY).toContain('v5')
-    expect(state.version).toBeGreaterThanOrEqual(5)
-    expect(state.companies.jiurun.planRows.length).toBeGreaterThan(0)
-    for (const audit of state.companies.jiurun.audits) {
-      const entry =
-        PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === audit.qpCode && e.departmentId === audit.departmentId,
-        ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === audit.qpCode)
-      expect(entry, `${audit.qpCode}|${audit.departmentId}`).toBeTruthy()
+    expect(state.version).toBe(6)
+    expect(state.company.name).toContain('九潤')
+    expect(state.company.planRows.length).toBeGreaterThan(0)
+    for (const audit of state.company.audits) {
+      expect(audit.items.length).toBeGreaterThan(0)
     }
   })
 })

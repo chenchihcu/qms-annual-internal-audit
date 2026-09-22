@@ -1,167 +1,304 @@
 {
-  "source": "第三方主任稽核員長期觀察 — 兩家公司合併稽核取得一張證書",
+  "source": "第三方主任稽核員長期觀察 — 九潤+正隆興合併稽核行程；現場確認為兩張證書、同一組執行人員",
   "title": "外部稽核前準備事項（管理代表及相關部門確認）",
-  "certificateModel": "dual_company_single_certificate",
+  "certificateModel": "two_certificates_combined_audit",
   "companies": ["九潤精密", "正隆興精密"],
   "sequenceRules": [
     "內部稽核完成 → 再召開管理審查（有時間順序要求）。",
     "內部 NCR 盡量於外部稽核前關閉。",
     "風險評估改善結果：當年不填評估結果，隔年稽核再填。",
-    "雙公司合併取證：部分證據『合併』共用，部分『◎◎』兩公司各自準備；現場類依『稽核廠區範圍』。",
-    "客戶滿意度：兩公司分開；正隆興須調查主要客戶九潤。"
+    "兩張證書、合併稽核行程：部分證據『合併』共用，部分『◎◎』兩公司各自準備；現場類依『稽核廠區範圍』。",
+    "客戶滿意度：兩公司分開；正隆興須調查主要客戶九潤。",
+    "執行人員同一組、過程可合併受稽；法人義務文件須獨立公司名稱。合併項是一份文件同時載明兩家，不是省略抬頭。"
   ],
   "items": [
     {
+      "id": "prep-1",
       "no": 1,
       "title": "品質手冊、相關程序修訂完成並頒佈發行（首次認證）／往後年度確認法規改版",
       "owner": "品保/管理代表",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份手冊／程序發行紀錄，抬頭不可共用。",
       "notes": "往後年度稽核前，確認有無因法規而修訂內容改版。",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-08" }]
     },
     {
+      "id": "prep-2-a",
       "no": 2,
-      "title": "年度內部稽核缺失追蹤及確認完成",
+      "sub": "a",
+      "groupTitle": "年度內部稽核缺失追蹤及確認完成",
+      "title": "年度內部稽核計畫／查檢表紀錄／稽核缺失彙整",
       "owner": "品保彙整／各部門繳交",
       "scope": { "mode": "merged" },
-      "notes": "含年度內部稽核計畫/查檢表紀錄/稽核缺失。盡量內部 NCR 於外部稽核前完成，並完成 QR-28-07 內外部稽核報告書。",
-      "forms": ["QR-28-03 稽核矯正報告", "QR-28-07 內外部稽核報告書"]
+      "headerRule": "shared_dual_header",
+      "doneWhen": "內稽計畫／查檢可一份，報告封面須寫涵蓋兩張證書；表頭載明九潤＋正隆興。",
+      "notes": "含年度內部稽核計畫/查檢表紀錄/稽核缺失。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-28" }]
     },
     {
+      "id": "prep-2-b",
+      "no": 2,
+      "sub": "b",
+      "title": "QR-28-03 稽核矯正報告（兩家各自備查）",
+      "owner": "稽核員",
+      "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份矯正報告；屬某家合約的缺失須寫該公司名稱。",
+      "notes": "盡量內部 NCR 於外部稽核前完成。",
+      "forms": ["QR-28-03 稽核矯正報告"],
+      "linkedQp": [{ "qpCode": "QP-28" }],
+      "ncrGate": "open_any"
+    },
+    {
+      "id": "prep-2-c",
+      "no": 2,
+      "sub": "c",
+      "title": "QR-28-07 內外部稽核報告書（兩家各自備查）",
+      "owner": "稽核員",
+      "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份內外部稽核報告書。",
+      "notes": "",
+      "forms": ["QR-28-07 內外部稽核報告書"],
+      "linkedQp": [{ "qpCode": "QP-28" }],
+      "ncrGate": "open_any"
+    },
+    {
+      "id": "prep-3",
       "no": 3,
       "title": "各部門年度目標訂定及統計分析完成/公告",
       "owner": "品保彙整／管理代表／各責任部門",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份 QR-03-01，抬頭不可共用。",
       "notes": "品質目標統計至稽核前一個月；初次稽核至少要 3 個月統計資料（沒有統計目標達成情況會開缺失）。未達成要有因應處置。前一年目標統計完成至 12 月底；當年注意未達標指標。目標管理每月更新；當年度稽核時去年度內容要完整。開發件準時達交率＝量產前送樣批數準時達交率。",
-      "forms": ["QR-03-01 年度品質目標管制表"]
+      "forms": ["QR-03-01 年度品質目標管制表"],
+      "linkedQp": [{ "qpCode": "QP-03" }]
     },
     {
+      "id": "prep-4",
       "no": 4,
       "title": "管理審查會議召開、會議記錄完成",
       "owner": "管理代表／品保",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份管審會議紀錄，抬頭不可共用。",
       "notes": "時間順序：內部稽核需先完成，才能召開管審。需將外部稽核追蹤事項彙整陳述於會議記錄。",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-03" }]
     },
     {
+      "id": "prep-5",
       "no": 5,
       "title": "品質系統風險與機會管理表完成",
       "owner": "責任單位／品保",
       "scope": { "mode": "merged" },
-      "notes": "氣候變遷要加入風險評估。今年風險評估之改善措施評估結果不要直接填寫，隔年稽核時再填。",
-      "forms": ["QR-02-01 風險與機會監控評估表"]
+      "headerRule": "shared_dual_header",
+      "doneWhen": "風險表可一份，表頭載明九潤＋正隆興；產品／客戶風險列上標適用公司。",
+      "notes": "氣候變遷要加入風險評估。今年風險評估之改善措施評估結果不要直接填寫，隔年稽核時再填。廠區／氣候風險可合併；產品／客戶相關風險須標適用公司。",
+      "forms": ["QR-02-01 風險與機會監控評估表"],
+      "linkedQp": [{ "qpCode": "QP-02" }]
     },
     {
+      "id": "prep-6",
       "no": 6,
       "title": "品質政策/品質目標之宣導及公告",
       "owner": "品保/各主管",
       "scope": { "mode": "merged" },
+      "headerRule": "shared_dual_header",
+      "doneWhen": "宣導紀錄一份，表頭或公告須載明九潤＋正隆興。",
       "notes": "",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-03" }]
     },
     {
+      "id": "prep-7",
       "no": 7,
       "title": "管理代表任用令公告",
       "owner": "管理代表",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "任用令兩份，同一人兼任仍須分開備查。",
       "notes": "",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-01" }]
     },
     {
+      "id": "prep-8",
       "no": 8,
       "title": "品質文件 1-4 階均確認完成並歸檔",
       "owner": "品保(文管)",
       "scope": { "mode": "merged" },
-      "notes": "",
-      "forms": []
+      "headerRule": "shared_dual_header",
+      "doneWhen": "QP 可一套，封面須載明九潤＋正隆興兩家法定名稱。",
+      "notes": "程序可共用，封面須兩家法定名稱並列。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-08" }]
     },
     {
+      "id": "prep-9",
       "no": 9,
       "title": "報表、記錄等各部門確認",
       "owner": "各部門",
       "scope": { "mode": "merged" },
-      "notes": "",
-      "forms": []
+      "headerRule": "shared_dual_header",
+      "doneWhen": "共用紀錄一份，表頭載明九潤＋正隆興；法人紀錄仍須分開。",
+      "notes": "部門紀錄含法人與共用兩類，合併勾選前須確認抬頭規則。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-09" }]
     },
     {
+      "id": "prep-10",
       "no": 10,
       "title": "機器設備保養記錄/相關指導書/標示等確認/模具區整理及標示確認",
       "owner": "生產製造部",
       "scope": { "mode": "merged" },
+      "headerRule": "shared_dual_header",
+      "doneWhen": "設備／保養紀錄一份，表頭載明九潤＋正隆興。",
       "notes": "",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-04" }]
     },
     {
+      "id": "prep-11",
       "no": 11,
       "title": "各區域之標示區隔（進料/退貨/不合格品…等）",
       "owner": "全廠區",
       "scope": { "mode": "merged" },
+      "headerRule": "shared_dual_header",
+      "doneWhen": "區域標示就緒，共用廠區一份確認紀錄，表頭載明九潤＋正隆興。",
       "notes": "",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-26" }]
     },
     {
+      "id": "prep-12",
       "no": 12,
       "title": "教育訓練記錄整理確認（能力鑑定、人員意識、三次元特定人員）",
       "owner": "各部門/人資",
       "scope": { "mode": "merged" },
+      "headerRule": "shared_dual_header",
+      "doneWhen": "訓練紀錄一份，表頭載明九潤＋正隆興。",
       "notes": "每年度都要執行人員意識教育訓練；三次元特定人員訓練紀錄要完成。含年度教育訓練計畫、QR-06-04 員工教育訓練紀錄表。",
-      "forms": ["QR-06-04 員工教育訓練紀錄表"]
+      "forms": ["QR-06-04 員工教育訓練紀錄表"],
+      "linkedQp": [{ "qpCode": "QP-06" }]
     },
     {
+      "id": "prep-14",
       "no": 14,
       "title": "新產品送樣資料整理（MOT SOP/SIP/圖面/試製工單/首件/客戶核准樣品）",
       "owner": "開發工程",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份送樣／首件資料包，抬頭不可共用。",
       "notes": "含工程變更、產品風險評估、產品型態管制。",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-11" }, { "qpCode": "QP-14" }]
     },
     {
+      "id": "prep-15",
       "no": 15,
       "title": "客戶滿意度調查統計及分析／客訴退貨異常／圖面合約",
       "owner": "業務部",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "兩公司各自滿意度／合約／圖面管制備查；正隆興須對九潤調查。",
       "notes": "滿意度調查沒執行會開缺失。客訴抱怨/退貨/內部品質異常要整理備查。客戶圖面與外來文件納入文件管制（含版次變更）。航太合約審查管理。重點：正隆興需對主要客戶（九潤精密科技）做滿意度調查；區分正隆興精密、九潤精密。",
-      "forms": ["QR-16-07 客戶滿意度調查表"]
+      "forms": ["QR-16-07 客戶滿意度調查表"],
+      "linkedQp": [
+        { "qpCode": "QP-16", "department": "業務部" },
+        { "qpCode": "QP-16", "department": "品保部" }
+      ]
     },
     {
+      "id": "prep-16",
       "no": 16,
       "title": "供應商評鑑完成／委外加工單填具完整",
       "owner": "外包/採購/開發工程",
       "scope": { "mode": "both_separate" },
-      "notes": "供應商年度評核未執行會開缺失。材質證明與採購文件核對，不符合會開缺失。",
-      "forms": []
+      "headerRule": "two_letterheads",
+      "doneWhen": "評鑑表與材質證明各兩份抬頭，可同一天評。",
+      "notes": "供應商年度評核未執行會開缺失。材質證明與採購文件核對，不符合會開缺失。同一天評、同一供應商，評鑑表仍須兩份抬頭。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-17" }, { "qpCode": "QP-18" }]
     },
     {
+      "id": "prep-17",
       "no": 17,
       "title": "庫房/樣品之整理標示/記錄",
       "owner": "倉儲",
       "scope": { "mode": "site_scope" },
+      "headerRule": "site_trace",
+      "doneWhen": "當日受稽廠區庫房就緒，製令／實物可追溯到哪張證書。",
       "notes": "依稽核廠區範圍。",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-24" }]
     },
     {
+      "id": "prep-18-a",
       "no": 18,
-      "title": "現場區域整齊清潔整理／製令與產品對應／刀具／不合格品",
+      "sub": "a",
+      "groupTitle": "現場區域整齊清潔整理／製令與產品對應／刀具／不合格品",
+      "title": "現場區域整齊清潔、製令與產品對應、刀具與不合格品管理",
       "owner": "生產製造",
       "scope": { "mode": "site_scope" },
-      "notes": "製令單與產品放置在一起；不同產品類別區隔不混儲；機台前規範/作業指導書/首件確認表定位。切削油檢驗紀錄注意稽核前一個月。",
-      "forms": []
+      "headerRule": "site_trace",
+      "doneWhen": "當日受稽廠區現場就緒，製令與實物對應、可追溯到哪張證書。",
+      "notes": "製令單與產品放置在一起；不同產品類別區隔不混儲；機台前規範/作業指導書/首件確認表定位。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QR-28-04", "department": "生產製造部" }]
     },
     {
+      "id": "prep-18-b",
+      "no": 18,
+      "sub": "b",
+      "title": "切削油檢驗紀錄（稽核前一個月）",
+      "owner": "生產製造",
+      "scope": { "mode": "merged" },
+      "headerRule": "shared_dual_header",
+      "doneWhen": "切削油檢驗紀錄備齊，表頭載明九潤＋正隆興。",
+      "notes": "注意稽核前一個月的紀錄。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-04" }]
+    },
+    {
+      "id": "prep-19",
       "no": 19,
       "title": "量規儀器校驗／異常矯正／檢驗記錄備查",
       "owner": "品保",
       "scope": { "mode": "merged" },
-      "notes": "年度校正項目別勿漏校。出貨/進料檢驗紀錄、ECOA 報告採兩公司分開確認（可在備註勾選）。",
-      "forms": []
+      "headerRule": "shared_dual_header",
+      "doneWhen": "校驗帳一份，表頭載明九潤＋正隆興；客訴／放行勿與項 21 混訂。",
+      "notes": "年度校正項目別勿漏校；客戶抱怨及異常矯正措施處理完成；品保各項檢驗記錄備查。校驗帳可合併；進料／出貨檢驗放行見項 21 分開備查。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-05" }]
     },
     {
+      "id": "prep-20",
       "no": 20,
       "title": "技術知識一覽表更新（檢驗規範、工程圖面版本）",
       "owner": "業務/開發工程",
       "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份技術知識一覽表，抬頭不可共用。",
       "notes": "客戶有更新需登錄，需定期與客戶確認索取。",
-      "forms": []
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-10" }]
+    },
+    {
+      "id": "prep-21",
+      "no": 21,
+      "title": "出貨檢驗紀錄、進料檢驗紀錄、ECOA 報告",
+      "owner": "品保",
+      "scope": { "mode": "both_separate" },
+      "headerRule": "two_letterheads",
+      "doneWhen": "九潤、正隆興各一份進料／出貨／ECOA，抬頭不可共用。",
+      "notes": "兩張證書分開備查；與 PDF 準備表一致。",
+      "forms": [],
+      "linkedQp": [{ "qpCode": "QP-19" }, { "qpCode": "QP-25" }]
     }
   ],
   "otherNotes": [

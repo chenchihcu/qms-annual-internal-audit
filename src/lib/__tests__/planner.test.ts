@@ -3,6 +3,7 @@ import {
   autoArrangePlan,
   calculateDepartmentPriority,
   cycleMonthStatus,
+  getWindowMonths,
   STAKEHOLDER_WEIGHTS,
 } from '../planner'
 import type { DepartmentProfile } from '../../types'
@@ -133,5 +134,17 @@ describe('autoArrangePlan', () => {
       .map((v, i) => (v ? i + 1 : null))
       .filter((m): m is number => m !== null)
     expect(scheduled.every((m) => m <= 11)).toBe(true)
+  })
+
+  it('uses earlier of management review and external audit for window end', () => {
+    const months = getWindowMonths(
+      2026,
+      '2026-01-01',
+      '2026-12-31',
+      '2026-12-10',
+      '2026-09-15',
+    )
+    expect(months.every((m) => m <= 8)).toBe(true)
+    expect(months.length).toBeGreaterThan(0)
   })
 })

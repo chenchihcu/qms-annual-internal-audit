@@ -23,6 +23,7 @@ export interface PlannerInput {
   planWindowStart: string
   planWindowEnd: string
   managementReviewDate?: string
+  externalAuditDate?: string
   existingRows?: PlanRow[]
   openCarryForwardCount?: number
 }
@@ -38,21 +39,28 @@ function parseMonth(dateStr: string, year: number): number | null {
   return d.getFullYear() === year ? d.getMonth() + 1 : d.getMonth() + 1
 }
 
-function getWindowMonths(
+export function getWindowMonths(
   year: number,
   start: string,
   end: string,
   mgmtReview?: string,
+  externalAudit?: string,
 ): number[] {
   const startMonth = parseMonth(start, year) ?? 1
   const endMonth = parseMonth(end, year) ?? 12
   let bufferEnd = endMonth
 
+  const cutoffMonths: number[] = []
   if (mgmtReview) {
     const reviewMonth = parseMonth(mgmtReview, year)
-    if (reviewMonth && reviewMonth > 1) {
-      bufferEnd = Math.min(bufferEnd, reviewMonth - 1)
-    }
+    if (reviewMonth && reviewMonth > 1) cutoffMonths.push(reviewMonth - 1)
+  }
+  if (externalAudit) {
+    const extMonth = parseMonth(externalAudit, year)
+    if (extMonth && extMonth > 1) cutoffMonths.push(extMonth - 1)
+  }
+  if (cutoffMonths.length > 0) {
+    bufferEnd = Math.min(bufferEnd, ...cutoffMonths)
   }
 
   const months: number[] = []
@@ -129,6 +137,7 @@ export function autoArrangePlan(
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
     existingRows,
     openCarryForwardCount = 0,
   } = input
@@ -139,6 +148,7 @@ export function autoArrangePlan(
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
   )
 
   const monthLoad = new Array(12).fill(0)

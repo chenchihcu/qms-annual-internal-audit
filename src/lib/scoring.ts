@@ -1,7 +1,7 @@
-import type { ChecklistItem, ProcedureAudit, ScoringRules } from '../types'
+import type { ChecklistItem, CompanyId, Judgment, ProcedureAudit, ScoringRules } from '../types'
 import { DEFAULT_SCORING_RULES } from '../types'
 
-export type ScoreStatus = 'scored' | 'unevaluated' | 'not_applicable'
+export type ScoreStatus = 'scored' | 'incomplete' | 'unevaluated' | 'not_applicable'
 
 export interface ScoreResult {
   score: number | null
@@ -17,15 +17,70 @@ export interface ScoreResult {
   }
 }
 
+function isJudgmentPending(judgment: Judgment | null | undefined, description: string): boolean {
+  if (!judgment) return true
+  if (judgment === '不適用' && !description?.trim()) return true
+  return false
+}
+
+/** 未判定，或不適用但未填說明 */
+export function isChecklistItemPending(item: ChecklistItem): boolean {
+  const scope = item.certificateScope ?? 'shared'
+  if (scope === 'dual') {
+    const byCo = item.judgmentByCompany ?? { jiurun: null, zhenglongxing: null }
+    return (
+      isJudgmentPending(byCo.jiurun, item.description) ||
+      isJudgmentPending(byCo.zhenglongxing, item.description)
+    )
+  }
+  return isJudgmentPending(item.judgment, item.description)
+}
+
+function applyJudgmentToBreakdown(
+  judgment: Judgment,
+  breakdown: ScoreResult['breakdown'],
+  rules: ScoringRules,
+): { numerator: number; applicable: number; judged: number } {
+  let numerator = 0
+  let applicable = 0
+  const judged = 1
+  switch (judgment) {
+    case '不適用':
+      breakdown.notApplicable++
+      break
+    case '符合':
+      breakdown.conform++
+      applicable++
+      numerator += rules.conform
+      break
+    case '不符':
+      breakdown.nonConform++
+      applicable++
+      numerator += rules.nonConform
+      break
+    case '觀察':
+      breakdown.observation++
+      applicable++
+      numerator += rules.observation
+      break
+  }
+  return { numerator, applicable, judged }
+}
+
 function resolveScoreStatus(
   applicable: number,
   pending: number,
   notApplicable: number,
   totalItems: number,
+  judgedCount: number,
 ): ScoreStatus {
+  if (totalItems === 0) return 'unevaluated'
+  if (pending > 0) {
+    if (applicable > 0 || judgedCount > 0) return 'incomplete'
+    return 'unevaluated'
+  }
   if (applicable > 0) return 'scored'
-  if (totalItems > 0 && notApplicable === totalItems) return 'not_applicable'
-  if (pending > 0 || totalItems === 0) return 'unevaluated'
+  if (notApplicable === totalItems) return 'not_applicable'
   return 'unevaluated'
 }
 
@@ -43,31 +98,41 @@ export function scoreChecklistItems(
 
   let numerator = 0
   let applicable = 0
+  let judgedCount = 0
+  let scoringUnits = 0
 
   for (const item of items) {
-    if (!item.judgment) {
-      breakdown.pending++
+    const scope = item.certificateScope ?? 'shared'
+    if (scope === 'dual' && item.judgmentByCompany) {
+      if (item.judgmentByCompany.jiurun) judgedCount++
+      if (item.judgmentByCompany.zhenglongxing) judgedCount++
+    } else if (item.judgment) {
+      judgedCount++
+    }
+
+    if (isChecklistItemPending(item)) {
+      breakdown.pending += scope === 'dual' ? 2 : 1
+      scoringUnits += scope === 'dual' ? 2 : 1
       continue
     }
-    switch (item.judgment) {
-      case '不適用':
-        breakdown.notApplicable++
-        break
-      case '符合':
-        breakdown.conform++
-        applicable++
-        numerator += rules.conform
-        break
-      case '不符':
-        breakdown.nonConform++
-        applicable++
-        numerator += rules.nonConform
-        break
-      case '觀察':
-        breakdown.observation++
-        applicable++
-        numerator += rules.observation
-        break
+
+    if (scope === 'dual' && item.judgmentByCompany) {
+      for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
+        const j = item.judgmentByCompany[side]
+        if (!j) continue
+        scoringUnits++
+        const r = applyJudgmentToBreakdown(j, breakdown, rules)
+        numerator += r.numerator
+        applicable += r.applicable
+      }
+      continue
+    }
+
+    if (item.judgment) {
+      scoringUnits++
+      const r = applyJudgmentToBreakdown(item.judgment, breakdown, rules)
+      numerator += r.numerator
+      applicable += r.applicable
     }
   }
 
@@ -75,7 +140,8 @@ export function scoreChecklistItems(
     applicable,
     breakdown.pending,
     breakdown.notApplicable,
-    items.length,
+    scoringUnits || items.length,
+    judgedCount,
   )
   const score =
     status === 'scored' ? Math.round((numerator / applicable) * 1000) / 10 : null
@@ -83,7 +149,7 @@ export function scoreChecklistItems(
   return {
     score,
     status,
-    totalItems: items.length,
+    totalItems: scoringUnits || items.length,
     applicableItems: applicable,
     breakdown,
   }
@@ -99,11 +165,46 @@ export function scoreProcedureAudit(
 export function formatScoreDisplay(result: ScoreResult): string {
   if (result.status === 'scored' && result.score !== null) return `${result.score}%`
   if (result.status === 'not_applicable') return '不適用'
+  if (result.status === 'incomplete') return '未完成'
   return '未評'
 }
 
+export function isAuditComplete(audit: ProcedureAudit, rules?: ScoringRules): boolean {
+  const result = scoreProcedureAudit(audit, rules)
+  return result.status === 'scored' || result.status === 'not_applicable'
+}
+
 export function hasAnyJudgment(audits: ProcedureAudit[]): boolean {
-  return audits.some((a) => a.items.some((i) => i.judgment !== null && i.judgment !== undefined))
+  return audits.some((a) =>
+    a.items.some((i) => {
+      if (i.certificateScope === 'dual' && i.judgmentByCompany) {
+        return i.judgmentByCompany.jiurun != null || i.judgmentByCompany.zhenglongxing != null
+      }
+      return i.judgment !== null && i.judgment !== undefined
+    }),
+  )
+}
+
+export function countNonConformJudgments(item: ChecklistItem): number {
+  const scope = item.certificateScope ?? 'shared'
+  if (scope === 'dual' && item.judgmentByCompany) {
+    let n = 0
+    if (item.judgmentByCompany.jiurun === '不符') n++
+    if (item.judgmentByCompany.zhenglongxing === '不符') n++
+    return n
+  }
+  return item.judgment === '不符' ? 1 : 0
+}
+
+export function countObservationJudgments(item: ChecklistItem): number {
+  const scope = item.certificateScope ?? 'shared'
+  if (scope === 'dual' && item.judgmentByCompany) {
+    let n = 0
+    if (item.judgmentByCompany.jiurun === '觀察') n++
+    if (item.judgmentByCompany.zhenglongxing === '觀察') n++
+    return n
+  }
+  return item.judgment === '觀察' ? 1 : 0
 }
 
 export interface AnnualScoreSummary {
@@ -139,20 +240,25 @@ export function calculateAnnualScore(
   let totalApplicable = 0
   let totalNCR = 0
   let totalObservation = 0
+  let hasIncomplete = false
 
   for (const audit of audits) {
     const result = scoreChecklistItems(audit.items, rules)
     for (const item of audit.items) {
-      if (item.judgment === '不符') totalNCR++
-      if (item.judgment === '觀察') totalObservation++
+      totalNCR += countNonConformJudgments(item)
+      totalObservation += countObservationJudgments(item)
     }
+    if (result.status === 'incomplete') hasIncomplete = true
     if (result.status === 'scored' && result.score !== null) {
       totalApplicable += result.applicableItems
       totalNumerator += (result.score / 100) * result.applicableItems
     }
   }
 
-  const overallStatus: ScoreStatus = totalApplicable > 0 ? 'scored' : 'unevaluated'
+  let overallStatus: ScoreStatus = 'unevaluated'
+  if (hasIncomplete) overallStatus = 'incomplete'
+  else if (totalApplicable > 0) overallStatus = 'scored'
+
   const overallScore =
     overallStatus === 'scored'
       ? Math.round((totalNumerator / totalApplicable) * 1000) / 10

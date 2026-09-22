@@ -71,3 +71,26 @@ describe('findChecklistItem', () => {
     expect(findChecklistItem(audits, 'x')?.id).toBe('x')
   })
 })
+
+describe('dual certificate NCR', () => {
+  it('creates separate NCR per non-conforming side', () => {
+    const itemId = 'chk-dual-1'
+    const items: ChecklistItem[] = [
+      {
+        id: itemId,
+        category: '雙證',
+        no: 4,
+        content: '雙證項',
+        judgment: null,
+        description: '',
+        certificateScope: 'dual',
+        judgmentByCompany: { jiurun: '不符', zhenglongxing: '符合' },
+      },
+    ]
+    const audits = [baseAudit(items)]
+    const ncrs = collectNCRsFromAudits(audits, 2026, [])
+    expect(ncrs).toHaveLength(1)
+    expect(ncrs[0].companyScope).toBe('jiurun')
+    expect(ncrs[0].id).toBe(`ncr-${itemId}-jiurun`)
+  })
+})

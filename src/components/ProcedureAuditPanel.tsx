@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { isSeedChecklistItem } from '../lib/checklistItem'
+import { isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
-import type { Judgment } from '../types'
+import type { CompanyId, Judgment } from '../types'
+import { COMPANY_LABELS } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PrintDocHeader } from './ui/PrintDocHeader'
@@ -63,8 +65,12 @@ export function ProcedureAuditPanel({
       : undefined
 
   useEffect(() => {
-    if (!qpCode || !departmentId || persistedAudit) return
-    updateAudit(getOrCreateAudit(qpCode, departmentId))
+    if (!qpCode || !departmentId) return
+    const audit = getOrCreateAudit(qpCode, departmentId)
+    const needsPersist =
+      !persistedAudit ||
+      audit.items.length !== (persistedAudit?.items.length ?? 0)
+    if (needsPersist) updateAudit(audit)
   }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
 
   if (!qpCode || !departmentId) {
@@ -89,9 +95,41 @@ export function ProcedureAuditPanel({
     })
   }
 
+  const isItemNonConform = (item: (typeof audit.items)[0]) => {
+    if (item.certificateScope === 'dual' && item.judgmentByCompany) {
+      return (
+        item.judgmentByCompany.jiurun === '不符' ||
+        item.judgmentByCompany.zhenglongxing === '不符'
+      )
+    }
+    return item.judgment === '不符'
+  }
+
   const handleRemove = (itemId: string, isNonConform: boolean) => {
     setDeleteTarget({ itemId, isNonConform })
   }
+
+  const renderJudgmentSelect = (
+    value: Judgment | null | undefined,
+    onChange: (j: Judgment | null) => void,
+    label?: string,
+  ) => (
+    <div className="space-y-0.5">
+      {label && <span className="text-xs text-muted no-print">{label}</span>}
+      <select
+        className={`w-full min-w-[5.5rem] rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
+        value={value ?? ''}
+        onChange={(e) => onChange((e.target.value || null) as Judgment | null)}
+        aria-label={label ?? '判定'}
+      >
+        <option value="">—</option>
+        {JUDGMENTS.map((j) => (
+          <option key={j} value={j}>{j}</option>
+        ))}
+      </select>
+      <span className="print-only">{value && <Badge label={value} />}</span>
+    </div>
+  )
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -201,9 +239,12 @@ export function ProcedureAuditPanel({
           </table>
         </div>
 
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-muted">
             程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
+            <span className="ml-3 text-xs">
+              未判定 {score.breakdown.pending}／共 {score.totalItems}
+            </span>
           </p>
           <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)}>
             新增稽核項目
@@ -218,7 +259,7 @@ export function ProcedureAuditPanel({
                 <th className="border border-line p-2 w-24">項目</th>
                 <th className="border border-line p-2 w-12">NO</th>
                 <th className="border border-line p-2">稽核內容</th>
-                <th className="border border-line p-2 w-28">判定</th>
+                <th className="border border-line p-2 min-w-[9rem]">判定</th>
                 <th className="border border-line p-2">內容說明</th>
                 <th className="border border-line p-2 w-24 no-print">操作</th>
               </tr>
@@ -227,7 +268,16 @@ export function ProcedureAuditPanel({
               {categories.map((cat) => {
                 const catItems = audit.items.filter((i) => i.category === cat)
                 return catItems.map((item, idx) => (
-                  <tr key={item.id} className={item.sourceYear ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                  <tr
+                    key={item.id}
+                    className={
+                      isChecklistItemPending(item)
+                        ? 'bg-rose-50/40 dark:bg-rose-950/20'
+                        : item.sourceYear
+                          ? 'bg-amber-50/40 dark:bg-amber-950/20'
+                          : ''
+                    }
+                  >
                     {idx === 0 && (
                       <td className="border border-line p-2 align-top font-medium" rowSpan={catItems.length}>
                         {cat}
@@ -243,26 +293,38 @@ export function ProcedureAuditPanel({
                         }
                       />
                       <span className="print-only">{item.content}</span>
+                      {item.as9100Clauses && item.as9100Clauses.length > 0 && (
+                        <span className="mt-1 block text-xs text-slate-500 no-print">
+                          AS9100 {item.as9100Clauses.join('、')}
+                        </span>
+                      )}
                       {item.sourceYear && (
                         <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">來源：{item.sourceYear} 年追蹤</span>
                       )}
                     </td>
                     <td className="border border-line p-2 align-top">
-                      <select
-                        className={`w-full rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
-                        value={item.judgment ?? ''}
-                        onChange={(e) =>
-                          updateChecklistItem(audit.id, item.id, {
-                            judgment: (e.target.value || null) as Judgment | null,
-                          })
-                        }
-                      >
-                        <option value="">—</option>
-                        {JUDGMENTS.map((j) => (
-                          <option key={j} value={j}>{j}</option>
-                        ))}
-                      </select>
-                      <span className="print-only">{item.judgment && <Badge label={item.judgment} />}</span>
+                      {item.certificateScope === 'dual' ? (
+                        <div className="flex flex-col gap-2">
+                          {(['jiurun', 'zhenglongxing'] as CompanyId[]).map((side) =>
+                            renderJudgmentSelect(
+                              item.judgmentByCompany?.[side],
+                              (j) =>
+                                updateChecklistItem(audit.id, item.id, {
+                                  judgmentByCompany: {
+                                    jiurun: item.judgmentByCompany?.jiurun ?? null,
+                                    zhenglongxing: item.judgmentByCompany?.zhenglongxing ?? null,
+                                    [side]: j,
+                                  },
+                                }),
+                              COMPANY_LABELS[side],
+                            ),
+                          )}
+                        </div>
+                      ) : (
+                        renderJudgmentSelect(item.judgment, (j) =>
+                          updateChecklistItem(audit.id, item.id, { judgment: j }),
+                        )
+                      )}
                     </td>
                     <td className="border border-line p-2 align-top">
                       {expandedDesc.has(item.id) ? (
@@ -306,7 +368,7 @@ export function ProcedureAuditPanel({
                         <button
                           type="button"
                           className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
-                          onClick={() => handleRemove(item.id, item.judgment === '不符')}
+                          onClick={() => handleRemove(item.id, isItemNonConform(item))}
                         >
                           刪除
                         </button>

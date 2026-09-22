@@ -5,43 +5,71 @@ export interface TabEntry {
   label: string
 }
 
-export interface TabGroup {
-  label: string
-  tabs: TabEntry[]
+/** 側欄分頁：依內部稽核流程順序，含未選取／選取色彩 */
+export interface NavTabEntry extends TabEntry {
+  inactiveClass: string
+  activeClass: string
 }
 
-export const TAB_GROUPS: TabGroup[] = [
+/** 設定 → 風險 → 計畫 → 程序稽核 → 發現 → 儀表板 → 外部準備 */
+export const NAV_TABS: NavTabEntry[] = [
   {
-    label: '規劃',
-    tabs: [
-      { id: 'settings', label: '設定' },
-      { id: 'risk', label: '風險評估' },
-      { id: 'plan', label: '年度計畫' },
-    ],
+    id: 'settings',
+    label: '設定',
+    inactiveClass: 'text-slate-600 dark:text-slate-400',
+    activeClass: 'bg-slate-600 text-white dark:bg-slate-500',
   },
   {
-    label: '執行',
-    tabs: [{ id: 'audit', label: '程序稽核' }],
+    id: 'risk',
+    label: '風險評估',
+    inactiveClass: 'text-blue-700 dark:text-blue-300',
+    activeClass: 'bg-blue-600 text-white dark:bg-blue-500',
   },
   {
-    label: '發現',
-    tabs: [
-      { id: 'ncr', label: '不符合' },
-      { id: 'observations', label: '觀察事項' },
-      { id: 'suggestions', label: '建議追蹤' },
-    ],
+    id: 'plan',
+    label: '年度計畫',
+    inactiveClass: 'text-indigo-700 dark:text-indigo-300',
+    activeClass: 'bg-indigo-600 text-white dark:bg-indigo-500',
   },
   {
-    label: '外部',
-    tabs: [{ id: 'prep', label: '外部稽核準備' }],
+    id: 'audit',
+    label: '程序稽核',
+    inactiveClass: 'text-emerald-700 dark:text-emerald-300',
+    activeClass: 'bg-emerald-600 text-white dark:bg-emerald-500',
   },
   {
-    label: '總覽',
-    tabs: [{ id: 'dashboard', label: '儀表板' }],
+    id: 'ncr',
+    label: '不符合',
+    inactiveClass: 'text-red-700 dark:text-red-300',
+    activeClass: 'bg-red-600 text-white dark:bg-red-500',
+  },
+  {
+    id: 'observations',
+    label: '觀察事項',
+    inactiveClass: 'text-amber-700 dark:text-amber-300',
+    activeClass: 'bg-amber-600 text-white dark:bg-amber-500',
+  },
+  {
+    id: 'suggestions',
+    label: '建議追蹤',
+    inactiveClass: 'text-orange-700 dark:text-orange-300',
+    activeClass: 'bg-orange-600 text-white dark:bg-orange-500',
+  },
+  {
+    id: 'dashboard',
+    label: '儀表板',
+    inactiveClass: 'text-violet-700 dark:text-violet-300',
+    activeClass: 'bg-violet-600 text-white dark:bg-violet-500',
+  },
+  {
+    id: 'prep',
+    label: '外部稽核準備',
+    inactiveClass: 'text-cyan-700 dark:text-cyan-300',
+    activeClass: 'bg-cyan-600 text-white dark:bg-cyan-500',
   },
 ]
 
-export const ALL_TABS: TabEntry[] = TAB_GROUPS.flatMap((g) => g.tabs)
+export const ALL_TABS: TabEntry[] = NAV_TABS
 
 const VALID_TABS = new Set<TabId>(ALL_TABS.map((t) => t.id))
 

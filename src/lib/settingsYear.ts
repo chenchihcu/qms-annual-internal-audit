@@ -1,4 +1,5 @@
-import { createDefaultPrepState } from './externalAuditPrep'
+import { autoCarryForwardCompany } from './carryForward'
+import { createDefaultPrepState, ensurePrepItems } from './externalAuditPrep'
 import type { AppState } from '../types'
 
 export function applyAuditYearChange(
@@ -11,7 +12,10 @@ export function applyAuditYearChange(
   if (newYear !== state.externalAuditPrep.year) {
     externalAuditPrep = resetExternalPrep
       ? createDefaultPrepState(newYear)
-      : { ...state.externalAuditPrep, year: newYear }
+      : ensurePrepItems({ ...state.externalAuditPrep, year: newYear })
   }
-  return { ...state, settings, externalAuditPrep }
+
+  const company = autoCarryForwardCompany(state.company, newYear)
+
+  return { ...state, settings, externalAuditPrep, company }
 }
