@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { FOCUS_RING } from '../lib/focusRing'
 import type { SuggestionStatus } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 export function Suggestions({ store }: { store: AuditStore }) {
   const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
@@ -14,6 +12,7 @@ export function Suggestions({ store }: { store: AuditStore }) {
   const currentYear = settings.auditYear
 
   const [carryError, setCarryError] = useState<string | null>(null)
+  const [issueError, setIssueError] = useState<string | undefined>()
   const [newSug, setNewSug] = useState({
     procedure: company.planRows[0]?.qpCode ?? 'QP-01',
     issue: '',
@@ -69,7 +68,11 @@ export function Suggestions({ store }: { store: AuditStore }) {
           <Input
             label="問題描述"
             value={newSug.issue}
-            onChange={(v) => setNewSug((s) => ({ ...s, issue: v }))}
+            error={issueError}
+            onChange={(v) => {
+              setNewSug((s) => ({ ...s, issue: v }))
+              if (issueError && v.trim()) setIssueError(undefined)
+            }}
           />
           <Input
             label="進度"
@@ -79,10 +82,15 @@ export function Suggestions({ store }: { store: AuditStore }) {
           <div className="flex items-end">
             <Button
               onClick={() => {
-                if (!newSug.issue.trim()) return
+                if (!newSug.issue.trim()) {
+                  setIssueError('請填寫問題描述')
+                  return
+                }
+                setIssueError(undefined)
                 addSuggestion(newSug)
                 setNewSug((s) => ({ ...s, issue: '', progress: '' }))
               }}
+              disabled={!newSug.issue.trim()}
             >
               新增
             </Button>

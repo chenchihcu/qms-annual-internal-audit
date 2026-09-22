@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react'
 import type { TabId } from '../types'
-import { NAV_TABS } from '../lib/navigation'
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
+import { type NavigateOptions, NAV_TABS } from '../lib/navigation'
+import { FOCUS_RING } from '../lib/focusRing'
 
 export interface AppShellProps {
   tab: TabId
-  onNavigate: (tab: TabId) => void
+  onNavigate: (tab: TabId, options?: NavigateOptions) => void
   companyName: string
   auditYear: number
   leadAuditor: string

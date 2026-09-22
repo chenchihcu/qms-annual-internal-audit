@@ -11,7 +11,7 @@ const departments = [
   {
     id: 'dept-admin',
     name: '管理部',
-    owner: '管理部主任',
+    owner: '周瑞婷',
     auditUnit: '品保部',
     defaultAuditors: '王稽核',
     stakeholders: ['法規/認證', '經營層'] as const,
@@ -31,7 +31,7 @@ const departments = [
   {
     id: 'dept-sales',
     name: '業務部',
-    owner: '業務部經理',
+    owner: '周瑞婷',
     auditUnit: '品保部',
     defaultAuditors: '李稽核',
     stakeholders: ['客戶', '經營層'] as const,
@@ -41,7 +41,7 @@ const departments = [
   {
     id: 'dept-eng',
     name: '開發工程',
-    owner: '工程部經理',
+    owner: '劉尚榤',
     auditUnit: '品保部',
     defaultAuditors: '李稽核',
     stakeholders: ['客戶', '法規/認證'] as const,
@@ -51,7 +51,7 @@ const departments = [
   {
     id: 'dept-qa',
     name: '品保部',
-    owner: '品保部經理',
+    owner: '陳智富',
     auditUnit: '管理部',
     defaultAuditors: '王稽核',
     stakeholders: ['客戶', '法規/認證', '供應商'] as const,
@@ -61,7 +61,7 @@ const departments = [
   {
     id: 'dept-prod',
     name: '生產製造部',
-    owner: '生產部經理',
+    owner: '陳志嘉',
     auditUnit: '品保部',
     defaultAuditors: '陳稽核',
     stakeholders: ['客戶', '員工', '供應商'] as const,

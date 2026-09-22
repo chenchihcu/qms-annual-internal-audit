@@ -123,3 +123,7 @@ export function collectNCRsFromAudits(
 export function updateNCRStatus(ncrs: NCR[], id: string, status: NCRStatus): NCR[] {
   return ncrs.map((n) => (n.id === id ? { ...n, status } : n))
 }
+
+export function findNcrsForChecklistItem(ncrs: NCR[], checklistItemId: string): NCR[] {
+  return ncrs.filter((n) => n.checklistItemId === checklistItemId)
+}

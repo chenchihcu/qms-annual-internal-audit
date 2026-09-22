@@ -11,11 +11,14 @@ import { Suggestions } from './components/Suggestions'
 import { PreAuditPrep } from './components/PreAuditPrep'
 import { RiskAssessment } from './components/RiskAssessment'
 import { SettingsPanel } from './components/SettingsPanel'
-import { parseAppHash, syncHash } from './lib/navigation'
+import {
+  type NavigateOptions,
+  type ObservationSection,
+  parseAppHash,
+  syncHash,
+} from './lib/navigation'
+import { FOCUS_RING } from './lib/focusRing'
 import { getStoredTheme, toggleTheme } from './lib/theme'
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
 
 class TabErrorBoundary extends Component<
   { children: ReactNode; onReset?: () => void },
@@ -56,26 +59,46 @@ function App() {
   const initialHash = parseAppHash(window.location.hash)
   const [tab, setTab] = useState<TabId>(initialHash.tab)
   const [auditKey, setAuditKey] = useState<string | undefined>(initialHash.auditKey)
+  const [observationSection, setObservationSection] = useState<ObservationSection | undefined>(
+    initialHash.section ?? (initialHash.tab === 'observations' ? 'current' : undefined),
+  )
   const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
   const { settings, company } = store.state
 
+  const hashOptions: NavigateOptions = {
+    auditKey: tab === 'audit' ? auditKey : undefined,
+    section: tab === 'observations' ? (observationSection ?? 'current') : undefined,
+  }
+
   useEffect(() => {
-    syncHash(tab, auditKey)
-  }, [tab, auditKey])
+    syncHash(tab, hashOptions)
+  }, [tab, auditKey, observationSection])
 
   useEffect(() => {
     const onHash = () => {
       const parsed = parseAppHash(window.location.hash)
       setTab(parsed.tab)
       setAuditKey(parsed.auditKey)
+      setObservationSection(
+        parsed.section ?? (parsed.tab === 'observations' ? 'current' : undefined),
+      )
     }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const navigate = useCallback((nextTab: TabId, nextAuditKey?: string) => {
+  const navigate = useCallback((nextTab: TabId, options?: NavigateOptions) => {
     setTab(nextTab)
-    if (nextAuditKey !== undefined) setAuditKey(nextAuditKey)
+    if (nextTab === 'audit') {
+      setAuditKey(options?.auditKey)
+    } else {
+      setAuditKey(undefined)
+    }
+    if (nextTab === 'observations') {
+      setObservationSection(options?.section ?? 'current')
+    } else {
+      setObservationSection(undefined)
+    }
   }, [])
 
   const handleAuditKeyChange = useCallback((key: string) => {
@@ -116,6 +139,7 @@ function App() {
             store={store}
             selectedKey={auditKey}
             onSelectedKeyChange={handleAuditKeyChange}
+            onNavigate={navigate}
           />
         </TabErrorBoundary>
       )}
@@ -126,7 +150,11 @@ function App() {
       )}
       {tab === 'observations' && (
         <TabErrorBoundary>
-          <Observations store={store} />
+          <Observations
+            store={store}
+            section={observationSection ?? 'current'}
+            onNavigate={navigate}
+          />
         </TabErrorBoundary>
       )}
       {tab === 'suggestions' && (

@@ -16,7 +16,7 @@ import { createDemoState, STORAGE_KEY } from '../data/demoData'
 import { autoArrangePlan } from '../lib/planner'
 import { carryForwardNcrIntoCompany, carryForwardObservationIntoCompany } from '../lib/carryForward'
 import { collectNCRsFromAudits, generateNCRNumber } from '../lib/ncr'
-import { collectObservationsFromAudits } from '../lib/observation'
+import { collectObservationsFromAudits, promoteObservationToNcr as applyPromoteObservationToNcr } from '../lib/observation'
 import {
   createChecklistForProcedure,
   getProcedureTitle,
@@ -28,6 +28,7 @@ import type { MonthStatus } from '../types'
 import { loadStateFromStorage, saveStateToStorage } from '../lib/storage'
 import { applyAuditYearChange } from '../lib/settingsYear'
 import { parseImportJSON } from '../lib/importSummary'
+import { applyDepartmentOwnerChange } from '../lib/departmentOwner'
 
 function patchCompanyState(state: AppState, patch: Partial<CompanyData>): AppState {
   return {
@@ -90,6 +91,10 @@ export function useAuditStore() {
     },
     [],
   )
+
+  const updateDepartmentOwner = useCallback((departmentId: string, newOwner: string) => {
+    setState((s) => applyDepartmentOwnerChange(s, departmentId, newOwner, s.settings.scoringRules))
+  }, [])
 
   const regeneratePlan = useCallback(() => {
     setState((s) => {
@@ -335,6 +340,17 @@ export function useAuditStore() {
     })
   }, [])
 
+  const promoteObservationToNcr = useCallback((observationId: string) => {
+    setState((s) => {
+      const result = applyPromoteObservationToNcr(s.company, observationId, s.settings.auditYear)
+      if (!result) return s
+      return patchCompanyState(s, {
+        ncrs: result.ncrs,
+        observations: result.observations,
+      })
+    })
+  }, [])
+
   const addObservation = useCallback(
     (input: {
       qpCode: string
@@ -546,6 +562,7 @@ export function useAuditStore() {
     saveError,
     updateSettings,
     updateDepartment,
+    updateDepartmentOwner,
     regeneratePlan,
     updatePlanRow,
     setPlanMonthStatus,
@@ -558,6 +575,7 @@ export function useAuditStore() {
     updateNCR,
     addManualNCR,
     updateObservation,
+    promoteObservationToNcr,
     addObservation,
     updateSuggestion,
     addSuggestion,

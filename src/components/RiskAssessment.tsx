@@ -1,16 +1,18 @@
 import { useMemo } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { calculateRiskLevel, RISK_BANDS, suggestRiskBump } from '../lib/risk'
+import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
+import { calculateRiskLevel, parseRiskInputValue, RISK_BANDS, suggestRiskBump } from '../lib/risk'
+import { FOCUS_RING } from '../lib/focusRing'
 import { scoreProcedureAudit } from '../lib/scoring'
+import { DepartmentOwnerField } from './DepartmentOwnerField'
+import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { Badge, Card } from './ui/Badge'
 import { PrintDocHeader } from './ui/PrintDocHeader'
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 export function RiskAssessment({ store }: { store: AuditStore }) {
   const { state, updateDepartment } = store
   const { company, settings } = state
+  const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptStats = useMemo(() => {
     return company.departments.map((dept) => {
@@ -28,8 +30,20 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     })
   }, [company.departments, company.audits, company.ncrs, settings.scoringRules])
 
+  const handleRiskChange = (
+    deptId: string,
+    field: 'riskOccurrence' | 'riskSeverity',
+    raw: string,
+  ) => {
+    const parsed = parseRiskInputValue(raw)
+    if (parsed === null) return
+    updateDepartment(deptId, { [field]: parsed })
+  }
+
   return (
     <div className="space-y-6 print-area">
+      <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
+
       <PrintDocHeader
         companyName={company.name}
         auditYear={settings.auditYear}
@@ -44,13 +58,17 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
         <p className="mb-4 rounded-md border border-line bg-page px-3 py-2 text-xs text-muted">
           本頁為年度稽核排程用部門風險指標，不等同 QR-02-01「風險與機會監控評估表」（含氣候變遷、改善結果隔年填寫等），請於外部稽核準備第 5 項另備證據。
         </p>
+        <p className="mb-4 text-xs text-muted no-print">
+          修正負責人後請按「儲存」並確認連動；寫入後會同步年度計畫與未完成查檢表（頁首顯示已儲存）。
+        </p>
 
         <div className="overflow-x-auto">
           <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2">部門 · 負責人</th>
+                <th className="border border-line p-2">部門</th>
+                <th className="border border-line p-2">負責人</th>
                 <th className="border border-line p-2 w-24">發生度 O</th>
                 <th className="border border-line p-2 w-24">嚴重度 S</th>
                 <th className="border border-line p-2 w-20">指數</th>
@@ -66,9 +84,14 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 )
                 return (
                   <tr key={dept.id}>
+                    <td className="border border-line p-2 font-medium text-ink">{dept.name}</td>
                     <td className="border border-line p-2">
-                      <div className="font-medium text-ink">{dept.name}</div>
-                      <div className="text-xs text-muted">{dept.owner}</div>
+                      <DepartmentOwnerField
+                        departmentId={dept.id}
+                        savedOwner={dept.owner}
+                        ariaLabel={`${dept.name} 負責人`}
+                        onSaveRequest={ownerConfirm.requestChange}
+                      />
                     </td>
                     <td className="border border-line p-2">
                       <input
@@ -78,9 +101,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                         className={`w-16 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
                         value={dept.riskOccurrence}
                         onChange={(e) =>
-                          updateDepartment(dept.id, {
-                            riskOccurrence: Number(e.target.value),
-                          })
+                          handleRiskChange(dept.id, 'riskOccurrence', e.target.value)
                         }
                       />
                     </td>
@@ -92,9 +113,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                         className={`w-16 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
                         value={dept.riskSeverity}
                         onChange={(e) =>
-                          updateDepartment(dept.id, {
-                            riskSeverity: Number(e.target.value),
-                          })
+                          handleRiskChange(dept.id, 'riskSeverity', e.target.value)
                         }
                       />
                     </td>

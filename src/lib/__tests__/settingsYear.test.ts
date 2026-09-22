@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createDemoState } from '../../data/demoData'
-import { applyAuditYearChange } from '../settingsYear'
+import { applyAuditYearChange, parseAuditYear } from '../settingsYear'
 
 describe('applyAuditYearChange', () => {
   it('preserves external prep items when resetExternalPrep is false', () => {
@@ -46,5 +46,14 @@ describe('applyAuditYearChange', () => {
         a.items.some((i) => i.content.includes('跨年觀察')),
       ),
     ).toBe(true)
+  })
+})
+
+describe('parseAuditYear', () => {
+  it('accepts integer years in supported range', () => {
+    expect(parseAuditYear('2026')).toBe(2026)
+    expect(parseAuditYear('abc')).toBeNull()
+    expect(parseAuditYear('1999')).toBeNull()
+    expect(parseAuditYear('2101')).toBeNull()
   })
 })

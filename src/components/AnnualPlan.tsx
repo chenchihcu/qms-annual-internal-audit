@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
+import { DepartmentOwnerField } from './DepartmentOwnerField'
+import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { evaluateDateSequence } from '../lib/coverage'
+import { FOCUS_RING } from '../lib/focusRing'
 import { cycleMonthStatus } from '../lib/planner'
+import { parseAuditYear } from '../lib/settingsYear'
 import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
 import type { MonthStatus } from '../types'
 import { Badge, Button, Card, Input } from './ui/Badge'
@@ -9,9 +14,6 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 function statusClass(status: MonthStatus): string {
   const found = MONTH_STATUS_LEGEND.find((l) => l.status === status)
@@ -40,12 +42,26 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
     newYear: settings.auditYear,
   })
   const [regenConfirm, setRegenConfirm] = useState(false)
+  const ownerConfirm = useDepartmentOwnerConfirm(store)
+
+  const deptOwner = (departmentId: string) =>
+    company.departments.find((d) => d.id === departmentId)?.owner ?? ''
+
+  useEffect(() => {
+    setYearDraft(String(settings.auditYear))
+  }, [settings.auditYear])
 
   const requestYearChange = (raw: string) => {
     setYearDraft(raw)
-    const n = Number(raw)
-    if (!Number.isFinite(n) || n === settings.auditYear) return
+    const n = parseAuditYear(raw)
+    if (n === null || n === settings.auditYear) return
     setYearDialog({ open: true, newYear: n })
+  }
+
+  const revertInvalidYear = () => {
+    if (parseAuditYear(yearDraft) === null) {
+      setYearDraft(String(settings.auditYear))
+    }
   }
 
   const confirmYearKeepPrep = () => {
@@ -86,6 +102,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         }}
         onCancel={() => setRegenConfirm(false)}
       />
+      <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
 
       {dateWarnings.length > 0 && (
         <div
@@ -120,6 +137,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
             type="number"
             value={yearDraft}
             onChange={requestYearChange}
+            onBlur={revertInvalidYear}
           />
           <Input
             label="主任稽核員"
@@ -211,7 +229,16 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                     <div>{row.process}</div>
                     <div className="text-xs text-muted">{row.documents}</div>
                   </td>
-                  <td className="border border-line p-2">{row.owner}</td>
+                  <td className="border border-line p-2">
+                    <DepartmentOwnerField
+                      departmentId={row.departmentId}
+                      savedOwner={deptOwner(row.departmentId)}
+                      displayOwner={row.owner}
+                      ariaLabel={`${row.qpCode} 負責人`}
+                      onSaveRequest={ownerConfirm.requestChange}
+                      inputClassName="px-1 py-0.5"
+                    />
+                  </td>
                   <td className="border border-line p-2 text-xs">{row.auditCategory}</td>
                   <td className="border border-line p-2">
                     <input
@@ -249,7 +276,17 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         <div className="space-y-4">
           {company.departments.map((dept) => (
             <div key={dept.id} className="rounded-lg border border-line p-4">
-              <p className="mb-2 font-medium text-ink">{dept.name} · 負責人：{dept.owner}</p>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="font-medium text-ink">{dept.name}</span>
+                <span className="text-sm text-muted">負責人</span>
+                <DepartmentOwnerField
+                  departmentId={dept.id}
+                  savedOwner={dept.owner}
+                  ariaLabel={`${dept.name} 負責人`}
+                  onSaveRequest={ownerConfirm.requestChange}
+                  className="min-w-[12rem] flex-1"
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
                 {STAKEHOLDER_TAGS.map((tag) => {
                   const active = dept.stakeholders.includes(tag)

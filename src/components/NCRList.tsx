@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { FOCUS_RING } from '../lib/focusRing'
 import { isNcrStale } from '../lib/ncr'
+import { planRowSelectOptions } from '../lib/planRowOptions'
 import type { NCRStatus, NcrCompanyScope } from '../types'
 import { NCR_COMPANY_SCOPE_LABELS } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
@@ -9,9 +11,6 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 const COMPANY_SCOPES: NcrCompanyScope[] = ['jiurun', 'zhenglongxing', 'both']
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 export function NCRList({ store }: { store: AuditStore }) {
   const { state, updateNCR, addManualNCR } = store
@@ -23,11 +22,19 @@ export function NCRList({ store }: { store: AuditStore }) {
     description: '',
     companyScope: 'both' as NcrCompanyScope,
   })
+  const [descriptionError, setDescriptionError] = useState<string | undefined>()
 
-  const planRowOptions = company.planRows.map((r) => ({
-    value: `${r.qpCode}|${r.departmentId}`,
-    label: `${r.qpCode} · ${r.department}`,
-  }))
+  const planRowOptions = planRowSelectOptions(company.planRows)
+
+  const handleAddNcr = () => {
+    if (!newNcr.description.trim()) {
+      setDescriptionError('請填寫描述')
+      return
+    }
+    setDescriptionError(undefined)
+    addManualNCR(newNcr)
+    setNewNcr((s) => ({ ...s, description: '' }))
+  }
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -56,16 +63,14 @@ export function NCRList({ store }: { store: AuditStore }) {
           <Input
             label="描述"
             value={newNcr.description}
-            onChange={(v) => setNewNcr((s) => ({ ...s, description: v }))}
+            error={descriptionError}
+            onChange={(v) => {
+              setNewNcr((s) => ({ ...s, description: v }))
+              if (descriptionError && v.trim()) setDescriptionError(undefined)
+            }}
           />
           <div className="flex items-end">
-            <Button
-              onClick={() => {
-                if (!newNcr.description.trim()) return
-                addManualNCR(newNcr)
-                setNewNcr((s) => ({ ...s, description: '' }))
-              }}
-            >
+            <Button onClick={handleAddNcr} disabled={!newNcr.description.trim()}>
               新增 NCR
             </Button>
           </div>

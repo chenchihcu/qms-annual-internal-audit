@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
+import { FOCUS_RING } from '../../lib/focusRing'
 
 const colors: Record<string, string> = {
   高: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
@@ -15,9 +16,6 @@ const colors: Record<string, string> = {
   已結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
   '已轉 NCR': 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
 }
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
 
 export function Badge({ label, className = '' }: { label: string; className?: string }) {
   const yearMatch = /^(\d{4})年$/.exec(label)
@@ -77,24 +75,31 @@ export function Input({
   label,
   value,
   onChange,
+  onBlur,
   type = 'text',
   step,
   className = '',
   id,
   min,
   max,
+  readOnly,
+  error,
 }: {
   label?: string
   value: string | number
   onChange: (v: string) => void
+  onBlur?: () => void
   type?: string
   step?: string
   className?: string
   id?: string
   min?: number
   max?: number
+  readOnly?: boolean
+  error?: string
 }) {
   const inputId = id ?? (label ? `input-${label.replace(/\s/g, '-')}` : undefined)
+  const errorId = error ? `${inputId}-error` : undefined
   return (
     <label className={`block ${className}`} htmlFor={inputId}>
       {label && <span className="mb-1 block text-sm font-medium text-ink">{label}</span>}
@@ -105,9 +110,20 @@ export function Input({
         min={min}
         max={max}
         value={value}
+        readOnly={readOnly}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={errorId}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+        onBlur={onBlur}
+        className={`w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING} ${
+          error ? 'border-red-400 dark:border-red-600' : 'border-line'
+        }`}
       />
+      {error && (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
     </label>
   )
 }

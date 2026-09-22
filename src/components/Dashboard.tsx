@@ -1,6 +1,7 @@
 import {
   buildMergedCertificateCoverage,
   gapReasonLabel,
+  type PlanGap,
 } from '../lib/coverage'
 import {
   calculateAnnualScore,
@@ -13,6 +14,9 @@ import {
   listPrepGaps,
   summarizePrepGaps,
 } from '../lib/externalAuditPrep'
+import type { NavigateOptions } from '../lib/navigation'
+import { buildPlanRowKey } from '../lib/planRowOptions'
+import { FOCUS_RING } from '../lib/focusRing'
 import type { AppState, TabId } from '../types'
 import { Badge, Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
@@ -20,8 +24,10 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 
 interface DashboardProps {
   state: AppState
-  onNavigate: (tab: TabId) => void
+  onNavigate: (tab: TabId, options?: NavigateOptions) => void
 }
+
+const linkButtonClass = `text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${FOCUS_RING}`
 
 function KpiCard({
   title,
@@ -55,6 +61,14 @@ function KpiCard({
     )
   }
   return <Card>{inner}</Card>
+}
+
+function navigateGap(g: PlanGap, onNavigate: DashboardProps['onNavigate']) {
+  if (g.reason === 'audit_missing' || g.reason === 'audit_incomplete') {
+    onNavigate('audit', { auditKey: buildPlanRowKey(g.qpCode, g.departmentId) })
+  } else {
+    onNavigate('plan')
+  }
 }
 
 export function Dashboard({ state, onNavigate }: DashboardProps) {
@@ -93,6 +107,13 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     (d) => d.status === 'incomplete' || d.status === 'unevaluated',
   )
   const anyJudgment = hasAnyJudgment(company.audits)
+
+  const navigateToAudit = (auditId: string) => {
+    const audit = company.audits.find((a) => a.id === auditId)
+    if (audit) {
+      onNavigate('audit', { auditKey: buildPlanRowKey(audit.qpCode, audit.departmentId) })
+    }
+  }
 
   const byCategory = {
     系統稽核: company.planRows.filter((r) => r.auditCategory === '系統稽核').length,
@@ -139,13 +160,13 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           value={summary.totalObservation}
           hint="查檢表判定「觀察」"
           accent="text-amber-600 dark:text-amber-400"
-          onClick={() => onNavigate('observations')}
+          onClick={() => onNavigate('observations', { section: 'current' })}
         />
         <KpiCard
           title="跨年待追蹤"
           value={openObs}
           hint="前年度觀察 open"
-          onClick={() => onNavigate('observations')}
+          onClick={() => onNavigate('observations', { section: 'prior' })}
         />
         <KpiCard
           title="第三方建議"
@@ -214,8 +235,14 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
               <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-muted">
                 {mergedCoverage.gaps.slice(0, 12).map((g) => (
                   <li key={`${g.qpCode}-${g.departmentId}-${g.reason}`}>
-                    {g.qpCode} · {g.department} — {gapReasonLabel(g.reason)}
-                    {g.detail ? `（${g.detail}）` : ''}
+                    <button
+                      type="button"
+                      className={linkButtonClass}
+                      onClick={() => navigateGap(g, onNavigate)}
+                    >
+                      {g.qpCode} · {g.department} — {gapReasonLabel(g.reason)}
+                      {g.detail ? `（${g.detail}）` : ''}
+                    </button>
                   </li>
                 ))}
                 {mergedCoverage.gaps.length > 12 && (
@@ -237,7 +264,17 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
               <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-muted">
                 {mergedCoverage.dualPendingItems.slice(0, 12).map((d) => (
                   <li key={`${d.qpCode}-${d.no}-${d.category}`}>
-                    {d.qpCode} · {d.department} · NO {d.no} {d.category}
+                    <button
+                      type="button"
+                      className={linkButtonClass}
+                      onClick={() =>
+                        onNavigate('audit', {
+                          auditKey: buildPlanRowKey(d.qpCode, d.departmentId),
+                        })
+                      }
+                    >
+                      {d.qpCode} · {d.department} · NO {d.no} {d.category}
+                    </button>
                   </li>
                 ))}
                 {mergedCoverage.dualPendingItems.length > 12 && (
@@ -254,11 +291,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
             <ul className="space-y-1 text-xs text-muted">
               {prepGapLines.map((line) => (
                 <li key={`${line.no}-${line.text}`}>
-                  <button
-                    type="button"
-                    className="text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                    onClick={() => onNavigate('prep')}
-                  >
+                  <button type="button" className={linkButtonClass} onClick={() => onNavigate('prep')}>
                     {line.text}
                   </button>
                 </li>
@@ -267,7 +300,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                 <li>
                   <button
                     type="button"
-                    className="text-left font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    className={`text-left font-medium text-primary hover:underline ${linkButtonClass}`}
                     onClick={() => onNavigate('prep')}
                   >
                     …另有 {prepGapTotal - prepGapLines.length} 項
@@ -344,7 +377,12 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
             {summary.departmentScores
               .filter((d) => d.status === 'scored')
               .map((d) => (
-                <div key={d.auditId} className="flex items-center gap-3">
+                <button
+                  key={d.auditId}
+                  type="button"
+                  className={`flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-page no-print ${FOCUS_RING}`}
+                  onClick={() => navigateToAudit(d.auditId)}
+                >
                   <span className="w-40 shrink-0 text-sm font-medium text-ink">{d.label}</span>
                   <div className="flex-1">
                     <div
@@ -370,7 +408,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                       breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
                     })}
                   </span>
-                </div>
+                </button>
               ))}
             {incompleteDepts.length > 0 && (
               <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
@@ -378,19 +416,25 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                 <ul className="list-inside list-disc space-y-0.5">
                   {incompleteDepts.map((d) => (
                     <li key={d.auditId}>
-                      {d.label} — {formatScoreDisplay({
-                        score: d.score,
-                        status: d.status,
-                        totalItems: 0,
-                        applicableItems: d.applicableItems,
-                        breakdown: {
-                          conform: 0,
-                          nonConform: 0,
-                          observation: 0,
-                          notApplicable: 0,
-                          pending: 0,
-                        },
-                      })}
+                      <button
+                        type="button"
+                        className={`text-left hover:underline ${FOCUS_RING}`}
+                        onClick={() => navigateToAudit(d.auditId)}
+                      >
+                        {d.label} — {formatScoreDisplay({
+                          score: d.score,
+                          status: d.status,
+                          totalItems: 0,
+                          applicableItems: d.applicableItems,
+                          breakdown: {
+                            conform: 0,
+                            nonConform: 0,
+                            observation: 0,
+                            notApplicable: 0,
+                            pending: 0,
+                          },
+                        })}
+                      </button>
                     </li>
                   ))}
                 </ul>

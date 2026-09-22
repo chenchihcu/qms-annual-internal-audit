@@ -16,6 +16,15 @@ export function clampRiskValue(value: number): number {
   return Math.min(5, Math.max(1, Math.round(value)))
 }
 
+/** 解析風險分數輸入；空白或非法值回傳 null，不寫入 store */
+export function parseRiskInputValue(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  const n = Number(trimmed)
+  if (!Number.isFinite(n) || n < 1 || n > 5) return null
+  return Math.round(n)
+}
+
 export function calculateRiskIndex(occurrence: number, severity: number): number {
   const o = clampRiskValue(occurrence)
   const s = clampRiskValue(severity)

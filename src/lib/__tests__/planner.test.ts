@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   autoArrangePlan,
+  buildAuditFocusOverview,
   calculateDepartmentPriority,
   cycleMonthStatus,
   getWindowMonths,
   STAKEHOLDER_WEIGHTS,
 } from '../planner'
+import { createDemoState } from '../../data/demoData'
 import type { DepartmentProfile } from '../../types'
 import type { MonthStatus, PlanRow } from '../../types'
 
@@ -146,5 +148,41 @@ describe('autoArrangePlan', () => {
     )
     expect(months.every((m) => m <= 8)).toBe(true)
     expect(months.length).toBeGreaterThan(0)
+  })
+
+  it('prefers department owner over seed entry owner when arranging', () => {
+    const departments = [
+      baseDept({ owner: '部門主管甲' }),
+    ]
+    const rows = autoArrangePlan({
+      departments,
+      planEntries: [
+        {
+          qpCode: 'QP-15',
+          departmentId: 'd1',
+          departmentName: '品保部',
+          process: '進料',
+          documents: 'QP-15',
+          auditCategory: '系統稽核',
+          owner: '種子人名乙',
+        },
+      ],
+      auditYear: 2026,
+      planWindowStart: '2026-02-01',
+      planWindowEnd: '2026-11-30',
+    })
+    expect(rows[0].owner).toBe('部門主管甲')
+  })
+})
+
+describe('buildAuditFocusOverview', () => {
+  it('uses plan row owner instead of seed legend when available', () => {
+    const state = createDemoState()
+    const planRow = state.company.planRows.find((r) => r.qpCode === 'QP-01')
+    if (!planRow) return
+    planRow.owner = '計畫列負責人'
+    const focus = buildAuditFocusOverview(state.company.planRows)
+    const match = focus.find((f) => f.qpCode === planRow.qpCode && f.department === planRow.department)
+    expect(match?.owner).toBe('計畫列負責人')
   })
 })

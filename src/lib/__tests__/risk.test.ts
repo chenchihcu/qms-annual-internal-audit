@@ -4,6 +4,7 @@ import {
   calculateRiskIndex,
   suggestRiskBump,
   clampRiskValue,
+  parseRiskInputValue,
 } from '../risk'
 
 describe('calculateRiskLevel', () => {
@@ -44,5 +45,15 @@ describe('clampRiskValue', () => {
   it('clamps to valid range', () => {
     expect(clampRiskValue(0)).toBe(1)
     expect(clampRiskValue(6)).toBe(5)
+  })
+})
+
+describe('parseRiskInputValue', () => {
+  it('accepts integers 1-5 only', () => {
+    expect(parseRiskInputValue('3')).toBe(3)
+    expect(parseRiskInputValue('')).toBeNull()
+    expect(parseRiskInputValue('0')).toBeNull()
+    expect(parseRiskInputValue('6')).toBeNull()
+    expect(parseRiskInputValue('abc')).toBeNull()
   })
 })

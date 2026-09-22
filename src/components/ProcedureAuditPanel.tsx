@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
+import { DepartmentOwnerField } from './DepartmentOwnerField'
+import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { isSeedChecklistItem } from '../lib/checklistItem'
-import { isChecklistItemPending } from '../lib/scoring'
+import { FOCUS_RING } from '../lib/focusRing'
+import { findNcrsForChecklistItem, isNcrStale } from '../lib/ncr'
+import type { NavigateOptions } from '../lib/navigation'
+import { isAuditComplete, isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
-import type { CompanyId, Judgment } from '../types'
+import type { ChecklistItem, CompanyId, Judgment, TabId } from '../types'
 import { COMPANY_LABELS } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -11,19 +17,18 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
-
 interface ProcedureAuditPanelProps {
   store: AuditStore
   selectedKey?: string
   onSelectedKeyChange?: (key: string) => void
+  onNavigate?: (tab: TabId, options?: NavigateOptions) => void
 }
 
 export function ProcedureAuditPanel({
   store,
   selectedKey: selectedKeyProp,
   onSelectedKeyChange,
+  onNavigate,
 }: ProcedureAuditPanelProps) {
   const {
     state,
@@ -57,6 +62,7 @@ export function ProcedureAuditPanel({
     null,
   )
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
+  const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const [qpCode, departmentId] = selectedKey.split('|')
   const persistedAudit =
@@ -78,9 +84,13 @@ export function ProcedureAuditPanel({
   }
 
   const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
+  const dept = company.departments.find((d) => d.id === departmentId)
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
   const categories = [...new Set(audit.items.map((i) => i.category))]
+  const auditFrozen = isAuditComplete(audit, settings.scoringRules)
+  const managerMismatch =
+    auditFrozen && dept != null && audit.departmentManager !== dept.owner
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
@@ -109,6 +119,26 @@ export function ProcedureAuditPanel({
     setDeleteTarget({ itemId, isNonConform })
   }
 
+  const renderNcrHint = (item: ChecklistItem) => {
+    const linked = findNcrsForChecklistItem(company.ncrs, item.id)
+    if (linked.length === 0 || !onNavigate) return null
+    const stale = linked.some((n) => isNcrStale(n, company.audits))
+    const numbers = linked.map((n) => n.ncrNumber).join('、')
+    return (
+      <div className="mt-1 text-xs no-print">
+        <button
+          type="button"
+          className={`hover:underline ${FOCUS_RING} ${stale ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}
+          onClick={() => onNavigate('ncr')}
+        >
+          {stale
+            ? `建議結案 NCR（${numbers}，查檢已非不符）`
+            : `已建立 NCR ${numbers}，前往不符合`}
+        </button>
+      </div>
+    )
+  }
+
   const renderJudgmentSelect = (
     value: Judgment | null | undefined,
     onChange: (j: Judgment | null) => void,
@@ -133,6 +163,7 @@ export function ProcedureAuditPanel({
 
   return (
     <div className="space-y-6 print-area qr-form">
+      <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
       <ConfirmDialog
         open={deleteTarget !== null}
         title="刪除稽核項目"
@@ -212,12 +243,31 @@ export function ProcedureAuditPanel({
                   <label htmlFor="audit-manager">被稽核部門主管</label>
                 </td>
                 <td className="border border-line p-2">
-                  <Input
-                    id="audit-manager"
-                    value={audit.departmentManager}
-                    onChange={(v) => handleHeaderChange('departmentManager', v)}
-                    className="no-print"
-                  />
+                  {auditFrozen ? (
+                    <>
+                      <span className="no-print text-ink">{audit.departmentManager}</span>
+                      {managerMismatch && (
+                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200 no-print">
+                          已評分，本表凍結為「{audit.departmentManager}」；部門負責人已改為「{dept?.owner}」
+                        </p>
+                      )}
+                    </>
+                  ) : dept ? (
+                    <DepartmentOwnerField
+                      departmentId={departmentId}
+                      savedOwner={dept.owner}
+                      displayOwner={audit.departmentManager}
+                      ariaLabel="被稽核部門主管"
+                      onSaveRequest={ownerConfirm.requestChange}
+                    />
+                  ) : (
+                    <Input
+                      id="audit-manager"
+                      value={audit.departmentManager}
+                      onChange={(v) => handleHeaderChange('departmentManager', v)}
+                      className="no-print"
+                    />
+                  )}
                   <span className="print-only">{audit.departmentManager}</span>
                 </td>
               </tr>
@@ -319,11 +369,15 @@ export function ProcedureAuditPanel({
                               COMPANY_LABELS[side],
                             ),
                           )}
+                          {renderNcrHint(item)}
                         </div>
                       ) : (
-                        renderJudgmentSelect(item.judgment, (j) =>
-                          updateChecklistItem(audit.id, item.id, { judgment: j }),
-                        )
+                        <>
+                          {renderJudgmentSelect(item.judgment, (j) =>
+                            updateChecklistItem(audit.id, item.id, { judgment: j }),
+                          )}
+                          {renderNcrHint(item)}
+                        </>
                       )}
                     </td>
                     <td className="border border-line p-2 align-top">

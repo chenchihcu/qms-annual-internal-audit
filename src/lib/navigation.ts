@@ -77,30 +77,52 @@ export function isValidTabId(id: string): id is TabId {
   return VALID_TABS.has(id as TabId)
 }
 
+export type ObservationSection = 'current' | 'prior'
+
 export interface HashState {
   tab: TabId
   auditKey?: string
+  section?: ObservationSection
+}
+
+export interface NavigateOptions {
+  auditKey?: string
+  section?: ObservationSection
+}
+
+export function isValidObservationSection(value: string): value is ObservationSection {
+  return value === 'current' || value === 'prior'
 }
 
 export function parseAppHash(hash: string): HashState {
   const raw = hash.replace(/^#/, '')
-  if (!raw) return { tab: 'settings' }
+  if (!raw) return { tab: 'dashboard' }
   const params = new URLSearchParams(raw)
-  const tabParam = params.get('tab') ?? 'settings'
-  const tab = isValidTabId(tabParam) ? tabParam : 'settings'
-  const auditKey = params.get('audit') ?? undefined
-  return { tab, auditKey }
+  const tabParam = params.get('tab') ?? 'dashboard'
+  const tab = isValidTabId(tabParam) ? tabParam : 'dashboard'
+  const auditKey = tab === 'audit' ? (params.get('audit') ?? undefined) : undefined
+  const sectionRaw = params.get('section')
+  const section =
+    tab === 'observations' && sectionRaw && isValidObservationSection(sectionRaw)
+      ? sectionRaw
+      : undefined
+  return { tab, auditKey, section }
 }
 
-export function buildAppHash(tab: TabId, auditKey?: string): string {
+export function buildAppHash(tab: TabId, options?: NavigateOptions): string {
   const params = new URLSearchParams()
   params.set('tab', tab)
-  if (auditKey) params.set('audit', auditKey)
+  if (tab === 'audit' && options?.auditKey) {
+    params.set('audit', options.auditKey)
+  }
+  if (tab === 'observations' && options?.section) {
+    params.set('section', options.section)
+  }
   return `#${params.toString()}`
 }
 
-export function syncHash(tab: TabId, auditKey?: string) {
-  const next = buildAppHash(tab, auditKey)
+export function syncHash(tab: TabId, options?: NavigateOptions) {
+  const next = buildAppHash(tab, options)
   if (window.location.hash !== next) {
     window.history.replaceState(null, '', next)
   }
