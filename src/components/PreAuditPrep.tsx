@@ -1,26 +1,25 @@
+import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import type { CompanyId, ExternalAuditPrepItemState } from '../types'
-import { COMPANY_LABELS } from '../types'
+import type { CompanyRelationship, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
+import { COMPANY_LABELS, relationshipCheckKey } from '../types'
 import type { PrepScopeMode } from '../lib/externalAuditPrep'
-import { companyFocusLabel } from '../lib/externalAuditSchedule'
-import { canEditExternalPrep, isReadOnlyRole } from '../lib/userRole'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
-  computeInternalAuditComplete,
   countPrepProgress,
-  evaluatePrepSequence,
-  getEffectiveInternalAuditComplete,
-  getInternalAuditCompleteOverride,
-  getPrepTemplate,
+  getPrepTemplateForState,
   isItemDone,
   itemHasCallout,
+  relationshipsForPrepItem,
 } from '../lib/externalAuditPrep'
-import { Button } from './ui/Badge'
-import { Card } from './ui/Badge'
+import { exportPrepExcel } from '../lib/formExport'
+import { buildAppHash, tabLabel } from '../lib/navigation'
+import { ACTION_ICONS } from '../lib/uiIcons'
+import { Button, Card, Input } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+import { ConfirmDialog } from './ui/ConfirmDialog'
+import { ScrollRegion } from './ui/ScrollRegion'
+import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
 
 const SCOPE_LABELS: Record<PrepScopeMode, string> = {
   both_separate: '◎◎',
@@ -54,43 +53,43 @@ function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 
 function ScopeCells({
   mode,
   item,
+  prepItemNo,
+  itemTitle,
   onUpdate,
-  disabled = false,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
+  prepItemNo: number
+  itemTitle: string
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
-  disabled?: boolean
 }) {
   if (mode === 'both_separate') {
     return (
       <>
-        <td className="border border-line p-2 text-center align-top">
+        <td className="border p-2 text-center align-top">
           <label className="inline-flex flex-col items-center gap-1">
             <input
               type="checkbox"
-              aria-label="九潤精密"
-              className={`no-print h-4 w-4 ${FOCUS_RING}`}
+              className="no-print h-4 w-4"
               checked={item.jiurunDone}
-              disabled={disabled}
+              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.jiurun} 已完成`}
               onChange={(e) => onUpdate({ jiurunDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.jiurunDone ? '■' : '□'}</span>
-            <span className="text-xs text-muted no-print">九潤</span>
+            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
           </label>
         </td>
-        <td className="border border-line p-2 text-center align-top">
+        <td className="border p-2 text-center align-top">
           <label className="inline-flex flex-col items-center gap-1">
             <input
               type="checkbox"
-              aria-label="正隆興精密"
-              className={`no-print h-4 w-4 ${FOCUS_RING}`}
+              className="no-print h-4 w-4"
               checked={item.zhenglongxingDone}
-              disabled={disabled}
+              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.zhenglongxing} 已完成`}
               onChange={(e) => onUpdate({ zhenglongxingDone: e.target.checked })}
             />
             <span className="print-only text-xs">{item.zhenglongxingDone ? '■' : '□'}</span>
-            <span className="text-xs text-muted no-print">正隆興</span>
+            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
           </label>
         </td>
       </>
@@ -105,7 +104,7 @@ function ScopeCells({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.mergedDone}
-            disabled={disabled}
+            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 合併共用證據已完成`}
             onChange={(e) => onUpdate({ mergedDone: e.target.checked })}
           />
           <span className="print-only text-xs">{item.mergedDone ? '■' : '□'}</span>
@@ -129,15 +128,17 @@ function ScopeCells({
 function DoneCell({
   mode,
   item,
+  prepItemNo,
+  itemTitle,
   done,
   onUpdate,
-  disabled = false,
 }: {
   mode: PrepScopeMode
   item: ExternalAuditPrepItemState
+  prepItemNo: number
+  itemTitle: string
   done: boolean
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
-  disabled?: boolean
 }) {
   if (mode === 'site_scope') {
     return (
@@ -147,7 +148,7 @@ function DoneCell({
             type="checkbox"
             className="no-print h-4 w-4"
             checked={item.completed}
-            disabled={disabled}
+            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 依稽核廠區範圍已完成`}
             onChange={(e) => onUpdate({ completed: e.target.checked })}
           />
           <span className="print-only text-xs">{item.completed ? '■' : '□'}</span>
@@ -162,6 +163,8 @@ function DoneCell({
         className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
           done ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-400'
         }`}
+        role="status"
+        aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${done ? '已完成' : '未完成'}`}
         title={done ? '已完成' : '未完成'}
       >
         {done ? '✓' : '—'}
@@ -170,309 +173,205 @@ function DoneCell({
   )
 }
 
+function RelationshipChecks({
+  prepItemNo,
+  prep,
+  relationships,
+  onToggle,
+}: {
+  prepItemNo: number
+  prep: ExternalAuditPrepState
+  relationships: CompanyRelationship[]
+  onToggle: (key: string, checked: boolean) => void
+}) {
+  const gates = relationshipsForPrepItem(prepItemNo, relationships)
+  if (gates.length === 0) return null
+  return (
+    <div className="mt-2 space-y-1">
+      {gates.map((gate) => {
+        const key = relationshipCheckKey(gate.from, gate.to, gate.relation)
+        return (
+          <label key={gate.id} className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 no-print"
+              checked={Boolean(prep.relationshipChecks[key])}
+              onChange={(e) => onToggle(key, e.target.checked)}
+            />
+            <span>{gate.label}</span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
 export function PreAuditPrep({ store }: { store: AuditStore }) {
   const {
     state,
     updateExternalPrepItem,
     updateExternalPrepSequence,
-    resetInternalAuditCompleteOverride,
-    updateExternalAuditSchedule,
-    updateExternalScheduleEntry,
-    addExternalScheduleEntry,
+    updateExternalPrepRelationship,
+    switchPrepYear,
   } = store
-  const { settings, externalAuditPrep, externalAuditSchedule, companies } = state
-  const readOnly = isReadOnlyRole(settings.viewRole)
-  const canEdit = canEditExternalPrep(settings.viewRole)
-  const schedule = externalAuditSchedule
-  const { done, total } = countPrepProgress(externalAuditPrep)
-  const warnings = evaluatePrepSequence(externalAuditPrep, companies)
-  const internalAuditSummary = computeInternalAuditComplete(companies)
-  const effectiveInternalComplete = getEffectiveInternalAuditComplete(externalAuditPrep, companies)
-  const internalAuditOverride = getInternalAuditCompleteOverride(externalAuditPrep)
+  const { settings, externalAuditPrep, companyRelationships } = state
+  const { done, total } = countPrepProgress(externalAuditPrep, companyRelationships)
   const seed = EXTERNAL_AUDIT_PREP_SEED
+  const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
+  const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
+  const [prepYearDraft, setPrepYearDraft] = useState<string | null>(null)
+  const [pendingPrepYear, setPendingPrepYear] = useState<number | null>(null)
+  const prepYearInput = prepYearDraft ?? String(externalAuditPrep.year)
+
+  const handlePrepYearDraftChange = (value: string) => {
+    setPrepYearDraft(value)
+    const year = Number(value)
+    if (!Number.isInteger(year) || value.length !== 4 || year < 2000 || year > 2200) return
+    if (year === externalAuditPrep.year) {
+      setPrepYearDraft(null)
+      setPendingPrepYear(null)
+      return
+    }
+    setPendingPrepYear(year)
+  }
+
+  const confirmPrepYearSwitch = () => {
+    if (pendingPrepYear == null) return
+    switchPrepYear(pendingPrepYear)
+    setPendingPrepYear(null)
+    setPrepYearDraft(null)
+  }
+
+  const cancelPrepYearSwitch = () => {
+    setPendingPrepYear(null)
+    setPrepYearDraft(null)
+  }
 
   return (
     <div className="space-y-6 print-area qr-form">
-      {schedule && (
-        <Card>
-          <h2 className="mb-2 text-lg font-semibold text-ink">外稽當日行程／機種</h2>
-          <p className="mb-4 text-sm text-muted">
-            雙公司合併取證 — 供第三方稽核員當日參考；機種摘要依公司分開維護。
+      <details className="rounded-lg border border-slate-200 bg-white no-print">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">外部稽核團隊與陪稽安排</summary>
+        <div className="border-t border-slate-100 px-4 pb-4">
+        <div className="grid gap-4 sm:grid-cols-2 pt-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">第三方稽核團隊</h3>
+            {externalTeam.length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {externalTeam.map((person) => (
+                  <li key={person.id}>
+                    {person.name} · {personRoles(person, settings.auditYear, state.annualPersonnelAssignments).filter((role) => role.startsWith('third_party')).map((role) => PERSONNEL_ROLE_LABELS[role]).join('、')}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-amber-800">尚未確認第三方團隊</p>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700">受稽方陪同／協調人員</h3>
+            {escorts.length ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {escorts.map((person) => <li key={person.id}>{person.name}</li>)}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-amber-800">尚未安排本年度陪稽人員</p>
+            )}
+          </div>
+        </div>
+        {(externalTeam.length === 0 || escorts.length === 0) && (
+          <p className="mt-3 text-sm text-amber-800">
+            請至
+            <a className="mx-1 font-medium text-blue-700 underline" href={buildAppHash('personnel')}>{tabLabel('personnel')}</a>
+            確認團隊與陪稽安排
           </p>
-          <div className="mb-4 grid gap-3 sm:grid-cols-2">
-            {(Object.keys(COMPANY_LABELS) as CompanyId[]).map((id) => (
-              <label key={id} className="block text-sm">
-                <span className="mb-1 block font-medium text-ink">{COMPANY_LABELS[id]} 重點機種</span>
+        )}
+        </div>
+      </details>
+      <Card>
+        <PageToolbar
+          title="外稽準備"
+          meta={`${externalAuditPrep.year} 年 · 外稽 ${externalAuditPrep.externalAuditDate || '未設定'}`}
+          actions={(
+            <>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
+              <div className="h-3 w-32 rounded-full bg-slate-100" title={`準備清單 ${done}/${total}`}>
+                <div
+                  className="h-3 rounded-full bg-green-500 transition-all"
+                  style={{ width: `${total ? (done / total) * 100 : 0}%` }}
+                />
+              </div>
+            </>
+          )}
+        />
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 no-print">
+          <Input
+            label="準備表年度"
+            type="number"
+            value={prepYearInput}
+            onChange={(value) => handlePrepYearDraftChange(value)}
+            ariaLabel="外稽準備表年度"
+          />
+          <Input
+            label="外部稽核日期"
+            type="date"
+            value={externalAuditPrep.externalAuditDate ?? ''}
+            onChange={(value) => updateExternalPrepSequence({ externalAuditDate: value })}
+          />
+        </div>
+
+        {/* 序位橫幅 */}
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位</p>
+          <div className="space-y-3 text-sm">
+            <div>
+              <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
                 <input
-                  className={`w-full rounded border border-line bg-surface px-3 py-2 text-sm no-print ${FOCUS_RING}`}
-                  value={schedule.companyProductHighlights[id]}
-                  disabled={readOnly || !canEdit}
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={externalAuditPrep.internalAuditComplete}
                   onChange={(e) =>
-                    updateExternalAuditSchedule({
-                      companyProductHighlights: {
-                        ...schedule.companyProductHighlights,
-                        [id]: e.target.value,
-                      },
-                    })
+                    updateExternalPrepSequence({ internalAuditComplete: e.target.checked })
                   }
                 />
-                <span className="print-only">{schedule.companyProductHighlights[id]}</span>
+                <span className="font-medium text-slate-700">1. 內部稽核完成</span>
               </label>
-            ))}
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block font-medium text-ink">外稽日期</span>
-              <input
-                type="date"
-                className={`w-full max-w-xs rounded border border-line bg-surface px-3 py-2 text-sm no-print ${FOCUS_RING}`}
-                value={schedule.auditDate}
-                disabled={readOnly || !canEdit}
-                onChange={(e) => updateExternalAuditSchedule({ auditDate: e.target.value })}
-              />
-              <span className="print-only">{schedule.auditDate}</span>
-            </label>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
-              <thead>
-                <tr className="bg-page text-left text-muted">
-                  <th className="border border-line p-2 w-24">時間</th>
-                  <th className="border border-line p-2">活動</th>
-                  <th className="border border-line p-2 w-28">地點</th>
-                  <th className="border border-line p-2 w-36">機種／產品</th>
-                  <th className="border border-line p-2 w-28">公司</th>
-                  <th className="border border-line p-2 w-32">備註</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.entries.map((entry) => (
-                  <tr key={entry.id}>
-                    <td className="border border-line p-2 align-top">
-                      <div className="flex gap-1 no-print">
-                        <input
-                          type="time"
-                          className="w-full rounded border border-line px-1 py-1 text-xs"
-                          value={entry.timeStart}
-                          disabled={readOnly || !canEdit}
-                          onChange={(e) =>
-                            updateExternalScheduleEntry(entry.id, { timeStart: e.target.value })
-                          }
-                        />
-                        <input
-                          type="time"
-                          className="w-full rounded border border-line px-1 py-1 text-xs"
-                          value={entry.timeEnd}
-                          disabled={readOnly || !canEdit}
-                          onChange={(e) =>
-                            updateExternalScheduleEntry(entry.id, { timeEnd: e.target.value })
-                          }
-                        />
-                      </div>
-                      <span className="print-only">
-                        {entry.timeStart}–{entry.timeEnd}
-                      </span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
-                        value={entry.activity}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateExternalScheduleEntry(entry.id, { activity: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{entry.activity}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
-                        value={entry.location}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateExternalScheduleEntry(entry.id, { location: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{entry.location}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className="w-full rounded border border-line px-2 py-1 text-sm no-print"
-                        value={entry.productModels}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateExternalScheduleEntry(entry.id, { productModels: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{entry.productModels}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <select
-                        className="w-full rounded border border-line px-1 py-1 text-xs no-print"
-                        value={entry.companyFocus}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateExternalScheduleEntry(entry.id, {
-                            companyFocus: e.target.value as CompanyId | 'both',
-                          })
-                        }
-                      >
-                        <option value="both">雙公司</option>
-                        <option value="jiurun">{COMPANY_LABELS.jiurun}</option>
-                        <option value="zhenglongxing">{COMPANY_LABELS.zhenglongxing}</option>
-                      </select>
-                      <span className="print-only">{companyFocusLabel(entry.companyFocus)}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className="w-full rounded border border-line px-2 py-1 text-xs no-print"
-                        value={entry.remark}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateExternalScheduleEntry(entry.id, { remark: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{entry.remark}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {canEdit && !readOnly && (
-            <Button variant="secondary" className="mt-3" onClick={() => addExternalScheduleEntry()}>
-              新增行程列
-            </Button>
-          )}
-        </Card>
-      )}
-
-      <Card>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">{seed.title}</h2>
-            <p className="mt-1 text-sm text-muted">
-              {seed.companies.join(' | ')} · 雙公司合併取證（一張證書）
-            </p>
-            <p className="text-sm text-muted">
-              外部稽核預定：{settings.externalAuditDate || '未設定'} · 完成 {done}/{total}
-            </p>
-            <p className="mt-1 text-xs text-muted">資料來源：{seed.source}</p>
-          </div>
-          <div
-            className="h-3 w-32 rounded-full bg-page"
-            role="progressbar"
-            aria-valuenow={done}
-            aria-valuemin={0}
-            aria-valuemax={total}
-            aria-label="外部稽核準備完成度"
-          >
-            <div
-              className="h-3 rounded-full bg-green-500 transition-all"
-              style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
-
-        <p className="mb-4 text-sm font-semibold text-ink">稽核序位（須依序完成）</p>
-        <div className="mb-2 text-xs text-muted">
-          內部稽核完成度（自動）：
-          {internalAuditSummary.details.map((d) => (
-            <span key={d.companyId} className="ml-2">
-              {d.companyName} {d.completedCount}/{d.plannedCount}
-            </span>
-          ))}
-          {internalAuditSummary.complete ? ' · 兩公司程序皆已足夠完成' : ' · 尚有未完成程序'}
-        </div>
-        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-            <label className="flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
-              <input
-                type="checkbox"
-                className={`h-4 w-4 ${FOCUS_RING}`}
-                checked={effectiveInternalComplete}
-                disabled={readOnly || !canEdit}
-                onChange={(e) =>
-                  updateExternalPrepSequence({
-                    internalAuditCompleteOverride: e.target.checked,
-                  })
-                }
-              />
-              <span className="font-medium">1. 內部稽核完成</span>
-              {internalAuditOverride === undefined && (
-                <span className="text-xs text-muted">（自動）</span>
-              )}
-            </label>
-            {internalAuditOverride !== undefined && canEdit && !readOnly && (
-              <Button
-                variant="secondary"
-                className="text-xs"
-                onClick={() => resetInternalAuditCompleteOverride()}
-              >
-                重設為自動判定
-              </Button>
-            )}
-            <span className="text-muted">→</span>
-            <label className="flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2">
-              <input
-                type="checkbox"
-                className={`h-4 w-4 ${FOCUS_RING}`}
-                checked={externalAuditPrep.managementReviewComplete}
-                disabled={readOnly || !canEdit}
-                onChange={(e) =>
-                  updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
-                }
-              />
-              <span className="font-medium">2. 管理審查完成</span>
-            </label>
-            <span className="text-muted">→</span>
-            <div className="rounded-md border border-line bg-surface px-3 py-2">
-              <span className="font-medium text-ink">3. 外部稽核</span>
-              <span className="ml-2 text-muted">
-                {settings.externalAuditDate || '（日期未設定）'}
-              </span>
             </div>
-        </div>
-
-        {/* 警告 */}
-        {warnings.messages.length > 0 && (
-          <div className="mb-4 space-y-2">
-            {warnings.messages.map((msg) => (
-              <div
-                key={msg}
-                className={`rounded-lg border px-4 py-3 text-sm ${
-                  warnings.sequenceWarning
-                    ? 'border-red-300 bg-red-50 text-red-900'
-                    : 'border-amber-300 bg-amber-50 text-amber-900'
-                }`}
-              >
-                ⚠ {msg}
-              </div>
-            ))}
+            <div>
+              <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={externalAuditPrep.managementReviewComplete}
+                  onChange={(e) =>
+                    updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
+                  }
+                />
+                <span className="font-medium text-slate-700">2. 管理審查完成</span>
+              </label>
+            </div>
+            <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
+              <span className="font-medium">3. 外部稽核</span>
+            </div>
           </div>
-        )}
+        </div>
 
         {/* 範圍圖例 */}
-        <div className="mb-4 flex flex-wrap gap-3 text-xs text-muted">
-          <span>
-            <strong>◎◎</strong> 兩公司各自準備
-          </span>
-          <span>
-            <strong>合併</strong> 共用證據
-          </span>
-          <span>
-            <strong>稽核廠區範圍</strong> 依現場稽核範圍
-          </span>
-        </div>
+        <p className="mb-4 text-xs text-slate-500 no-print">
+          ◎◎ 兩公司各自準備 · 合併 共用證據 · 稽核廠區範圍 依現場
+        </p>
 
         <PrintDocHeader
           companyName={seed.companies.join(' / ')}
-          auditYear={settings.auditYear}
+          auditYear={externalAuditPrep.year}
           formTitle={seed.title}
+          subtitle={seed.source}
         />
 
-        <div className="overflow-x-auto">
-          <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+        <ScrollRegion ariaLabel="外部稽核前準備清單">
           <table className="qr-checklist w-full min-w-[900px] border-collapse text-sm">
             <thead>
-              <tr className="bg-page text-left text-muted">
+              <tr className="bg-slate-50 text-left">
                 <th className="border p-2 w-12">項次</th>
                 <th className="border p-2">稽核前準備事項</th>
                 <th className="border p-2 w-28">負責人</th>
@@ -484,10 +383,10 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </thead>
             <tbody>
               {externalAuditPrep.items.map((itemState) => {
-                const template = getPrepTemplate(itemState.no)
+                const template = getPrepTemplateForState(itemState)
                 if (!template) return null
                 const mode = template.scope.mode
-                const done = isItemDone(template, itemState)
+                const done = isItemDone(template, itemState, externalAuditPrep, companyRelationships)
                 const callout = itemHasCallout(template.no)
                 const formsText = template.forms.length ? template.forms.join('、') : ''
                 const remarkDisplay = [formsText, itemState.remark].filter(Boolean).join(' · ')
@@ -501,7 +400,13 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                         <p className="mt-1 text-xs text-slate-500">{template.notes}</p>
                       )}
                       {callout && <CalloutBadge type={callout} />}
-                      <span className="mt-1 inline-block text-xs text-muted">
+                      <RelationshipChecks
+                        prepItemNo={template.no}
+                        prep={externalAuditPrep}
+                        relationships={companyRelationships}
+                        onToggle={updateExternalPrepRelationship}
+                      />
+                      <span className="mt-1 inline-block text-xs text-slate-400">
                         {SCOPE_LABELS[mode]}
                       </span>
                     </td>
@@ -509,14 +414,16 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                     <ScopeCells
                       mode={mode}
                       item={itemState}
-                      disabled={readOnly || !canEdit}
+                      prepItemNo={template.no}
+                      itemTitle={template.title}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <DoneCell
                       mode={mode}
                       item={itemState}
+                      prepItemNo={template.no}
+                      itemTitle={template.title}
                       done={done}
-                      disabled={readOnly || !canEdit}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <td className="border p-2 align-top">
@@ -525,9 +432,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       )}
                       <input
                         className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
+                        aria-label={`第 ${template.no} 項備註／表單`}
                         placeholder="備註"
                         value={itemState.remark}
-                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateExternalPrepItem(itemState.id, { remark: e.target.value })
                         }
@@ -539,26 +446,38 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
 
-        <div className="mt-4 border-t border-line pt-4">
-          <p className="mb-2 text-xs font-semibold text-muted">稽核要點</p>
-          <ul className="list-inside list-disc space-y-1 text-xs text-muted">
+        {/* 序位規則摘要 */}
+        <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-slate-600">稽核要點</summary>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.sequenceRules.map((rule) => (
               <li key={rule}>{rule}</li>
             ))}
           </ul>
-        </div>
+        </details>
 
-        <div className="mt-4 border-t border-line pt-4">
-          <p className="mb-2 text-xs font-semibold text-muted">其他注意事項</p>
-          <ul className="list-inside list-disc space-y-1 text-xs text-muted">
+        {/* 頁尾 otherNotes */}
+        <details className="mt-4 border-t border-slate-200 pt-4">
+          <summary className="cursor-pointer text-xs font-semibold text-slate-600">其他注意事項</summary>
+          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.otherNotes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
-        </div>
+        </details>
       </Card>
+      {pendingPrepYear != null && (
+        <ConfirmDialog
+          open
+          title={`切換外稽準備至 ${pendingPrepYear} 年？`}
+          description={`外稽準備表為雙公司共用；切換後將載入 ${pendingPrepYear} 年準備進度，不會改動各公司年度台帳（目前台帳年度 ${settings.auditYear}）。`}
+          confirmLabel="確認切換"
+          onConfirm={confirmPrepYearSwitch}
+          onCancel={cancelPrepYearSwitch}
+        />
+      )}
     </div>
   )
 }

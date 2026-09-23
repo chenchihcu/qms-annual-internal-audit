@@ -36,7 +36,7 @@ function parseStoredState(raw: string): AppState {
   if ((parsed.version ?? 0) < 7 && shouldRefreshToCurrentDemo(parsed)) {
     const fresh = createDemoState()
     fresh.activeCompanyId = parsed.activeCompanyId ?? 'jiurun'
-    return fresh
+    return migrateState({ ...fresh, version: 6 })
   }
 
   const upToV7 = (parsed.version ?? 0) >= 7 ? parsed : migrateToV7(parsed)
@@ -74,12 +74,12 @@ export function loadStateFromStorage(): LoadStateResult {
       }
     }
     return {
-      state: createDemoState(),
+      state: migrateState(createDemoState()),
       warning:
         '本機資料無法讀取，已載入示範資料。損壞的備份已保留於瀏覽器 localStorage（corrupt-backup 鍵）。',
     }
   }
-  return { state: createDemoState() }
+  return { state: migrateState(createDemoState()) }
 }
 
 export function saveStateToStorage(state: AppState): SaveStateResult {

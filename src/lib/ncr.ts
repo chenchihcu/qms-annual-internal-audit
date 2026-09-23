@@ -1,12 +1,24 @@
-import type { ChecklistItem, NCR, NCRStatus, Observation, ProcedureAudit } from '../types'
+import {
+  defaultNcrCompanyScopeForItem,
+  ncrCompanyScopeForDualSide,
+} from './certificateScope'
+import type { ChecklistItem, CompanyId, NCR, NCRStatus, Observation, ProcedureAudit } from '../types'
 
-export const EMPTY_NCR_CLOSEOUT = {
+export interface NcrCloseGateResult {
+  ok: boolean
+  missing: string[]
+}
+
+const EMPTY_NCR_CLOSEOUT = {
   rootCause: '',
   correctiveAction: '',
   verificationEvidence: '',
-} as const
+}
 
-/** 舊版 localStorage 可能缺少結案欄位，補預設空字串避免渲染錯誤 */
+export function normalizeNCRList(ncrs: Array<Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>>): NCR[] {
+  return ncrs.map(normalizeNCR)
+}
+
 export function normalizeNCR(ncr: Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>): NCR {
   return {
     ...EMPTY_NCR_CLOSEOUT,
@@ -24,15 +36,6 @@ export function normalizeNCR(ncr: Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>):
   }
 }
 
-export function normalizeNCRList(ncrs: Array<Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>>): NCR[] {
-  return ncrs.map(normalizeNCR)
-}
-
-export interface NcrCloseGateResult {
-  ok: boolean
-  missing: string[]
-}
-
 export function generateNCRNumber(year: number, index: number): string {
   return `NCR-${year}-${String(index).padStart(3, '0')}`
 }
@@ -48,11 +51,70 @@ export function findChecklistItem(
   return undefined
 }
 
+function isNonConformForNcr(item: ChecklistItem, ncr: NCR): boolean {
+  const scope = item.certificateScope ?? 'shared'
+  const ncrScope = ncr.companyScope ?? 'both'
+  if (scope === 'dual' && item.judgmentByCompany) {
+    if (ncrScope === 'jiurun') return item.judgmentByCompany.jiurun === '不符'
+    if (ncrScope === 'zhenglongxing') return item.judgmentByCompany.zhenglongxing === '不符'
+    return false
+  }
+  if (ncrScope === 'jiurun' || ncrScope === 'zhenglongxing') {
+    return item.judgment === '不符' && (item.certificateScope ?? 'shared') === ncrScope
+  }
+  return item.judgment === '不符'
+}
+
+/** 未結案且來源年早於目標年（缺 sourceYear 不算前年度） */
+export function isPriorOpenNcr(ncr: NCR, targetYear: number): boolean {
+  if (ncr.status === '結案') return false
+  if (ncr.sourceYear == null) return false
+  return ncr.sourceYear < targetYear
+}
+
 /** NCR linked to a checklist item that is no longer 不符 */
 export function isNcrStale(ncr: NCR, audits: ProcedureAudit[]): boolean {
   if (!ncr.checklistItemId) return false
   const item = findChecklistItem(audits, ncr.checklistItemId)
-  return !item || item.judgment !== '不符'
+  if (!item) return true
+  return !isNonConformForNcr(item, ncr)
+}
+
+function ncrIdForItem(item: ChecklistItem, side?: CompanyId): string {
+  if (item.certificateScope === 'dual' && side) {
+    return `ncr-${item.id}-${side}`
+  }
+  return `ncr-${item.id}`
+}
+
+function buildNcrFromItem(
+  audit: ProcedureAudit,
+  item: ChecklistItem,
+  year: number,
+  index: number,
+  companyScope: NCR['companyScope'],
+  checklistItemId: string,
+  id: string,
+): NCR {
+  return {
+    ...EMPTY_NCR_CLOSEOUT,
+    id,
+    ncrNumber: generateNCRNumber(year, index),
+    qpCode: audit.qpCode,
+    departmentId: audit.departmentId,
+    department: audit.department,
+    process: audit.process,
+    description: item.description || item.content,
+    date: audit.auditDate || new Date().toISOString().slice(0, 10),
+    status: '開立',
+    checklistItemId,
+    companyScope,
+    sourceYear: year,
+    sourceAuditId: audit.id,
+    requirementSnapshot: item.content,
+    evidenceSnapshot: item.evidenceReference ?? item.description,
+    findingSnapshot: item.description || item.content,
+  }
 }
 
 export function collectNCRsFromAudits(
@@ -60,32 +122,42 @@ export function collectNCRsFromAudits(
   year: number,
   existingNcrs: NCR[] = [],
 ): NCR[] {
-  const existingByItemId = new Map(
-    existingNcrs.filter((n) => n.checklistItemId).map((n) => [n.checklistItemId!, n]),
-  )
-
+  const existingById = new Map(existingNcrs.map((n) => [n.id, n]))
   const result: NCR[] = [...existingNcrs]
   let nextIndex = existingNcrs.length + 1
 
   for (const audit of audits) {
     for (const item of audit.items) {
-      if (item.judgment !== '不符') continue
-      if (existingByItemId.has(item.id)) continue
+      const scope = item.certificateScope ?? 'shared'
 
-      const ncr = normalizeNCR({
-        id: `ncr-${item.id}`,
-        ncrNumber: generateNCRNumber(year, nextIndex),
-        qpCode: audit.qpCode,
-        departmentId: audit.departmentId,
-        department: audit.department,
-        process: audit.process,
-        description: item.description || item.content,
-        date: audit.auditDate || new Date().toISOString().slice(0, 10),
-        status: '開立',
-        checklistItemId: item.id,
-      })
+      if (scope === 'dual' && item.judgmentByCompany) {
+        for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
+          if (item.judgmentByCompany[side] !== '不符') continue
+          const id = ncrIdForItem(item, side)
+          if (existingById.has(id)) continue
+          const ncr = buildNcrFromItem(
+            audit,
+            item,
+            year,
+            nextIndex,
+            ncrCompanyScopeForDualSide(side),
+            item.id,
+            id,
+          )
+          result.push(ncr)
+          existingById.set(id, ncr)
+          nextIndex++
+        }
+        continue
+      }
+
+      if (item.judgment !== '不符') continue
+      const id = ncrIdForItem(item)
+      if (existingById.has(id)) continue
+      const companyScope = defaultNcrCompanyScopeForItem(item)
+      const ncr = buildNcrFromItem(audit, item, year, nextIndex, companyScope, item.id, id)
       result.push(ncr)
-      existingByItemId.set(item.id, ncr)
+      existingById.set(id, ncr)
       nextIndex++
     }
   }
@@ -97,6 +169,45 @@ export function updateNCRStatus(ncrs: NCR[], id: string, status: NCRStatus): NCR
   return ncrs.map((n) => (n.id === id ? { ...n, status } : n))
 }
 
+export function findNcrsForChecklistItem(ncrs: NCR[], checklistItemId: string): NCR[] {
+  return ncrs.filter((n) => n.checklistItemId === checklistItemId)
+}
+
+export function syncNCRDescriptions(
+  ncrs: NCR[],
+  audits: ProcedureAudit[],
+): NCR[] {
+  const itemMap = new Map<string, ChecklistItem>()
+  for (const audit of audits) {
+    for (const item of audit.items) {
+      itemMap.set(item.id, item)
+    }
+  }
+
+  return ncrs.map((ncr) => {
+    if (!ncr.checklistItemId) return ncr
+    const item = itemMap.get(ncr.checklistItemId)
+    if (!item || !isNonConformForNcr(item, ncr)) return ncr
+    const finding = item.description || item.content
+    const evidence = item.evidenceReference ?? item.description
+    return {
+      ...ncr,
+      description: finding,
+      requirementSnapshot: ncr.requirementSnapshot ?? item.content,
+      evidenceSnapshot: ncr.evidenceSnapshot ?? evidence,
+      findingSnapshot: ncr.findingSnapshot ?? finding,
+    }
+  })
+}
+
+export function isNcrOpen(ncr: NCR): boolean {
+  return ncr.status === '開立' || ncr.status === '矯正中'
+}
+
+export function isNcrClosed(ncr: NCR): boolean {
+  return ncr.status === '結案'
+}
+
 export function findNcrForObservation(ncrs: NCR[], observation: Observation): NCR | undefined {
   if (observation.ncrId) {
     const linked = ncrs.find((n) => n.id === observation.ncrId)
@@ -105,7 +216,6 @@ export function findNcrForObservation(ncrs: NCR[], observation: Observation): NC
   return ncrs.find((n) => n.observationId === observation.id)
 }
 
-/** 查檢表判定「觀察」時手動轉 NCR（不重複） */
 export function ensureNcrFromChecklistObservation(
   audit: ProcedureAudit,
   itemId: string,
@@ -143,7 +253,6 @@ export function findNcrForChecklistItem(ncrs: NCR[], itemId: string): NCR | unde
   return ncrs.find((n) => n.checklistItemId === itemId)
 }
 
-/** 觀察事項設為「已轉 NCR」時建立 NCR（不重複） */
 export function ensureNcrFromObservation(
   observation: Observation,
   existingNcrs: NCR[],
@@ -174,14 +283,6 @@ export function ensureNcrFromObservation(
   })
 
   return { ncrs: [...existingNcrs, ncr], ncrId: ncr.id }
-}
-
-export function isNcrOpen(ncr: NCR): boolean {
-  return ncr.status === '開立' || ncr.status === '矯正中'
-}
-
-export function isNcrClosed(ncr: NCR): boolean {
-  return ncr.status === '結案'
 }
 
 const CLOSE_REQUIRED_LABELS: Array<{ key: keyof NCR; label: string }> = [

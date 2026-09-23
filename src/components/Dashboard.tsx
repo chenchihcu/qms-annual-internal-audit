@@ -1,19 +1,34 @@
 import {
+  buildMergedCertificateCoverage,
+  gapReasonLabel,
+  type PlanGap,
+} from '../lib/coverage'
+import {
   calculateAnnualScore,
   formatScoreDisplay,
   hasAnyJudgment,
 } from '../lib/scoring'
-import { buildDashboardRiskTiles } from '../lib/dashboardTiles'
-import { buildTodayWork } from '../lib/todayWork'
-import type { AppState, TabId } from '../types'
-import { Card } from './ui/Badge'
+import { buildAuditFocusOverview } from '../lib/planner'
+import {
+  countPrepProgress,
+  listPrepGaps,
+  summarizePrepGaps,
+} from '../lib/externalAuditPrep'
+import type { NavigateOptions } from '../lib/navigation'
+import { buildPlanRowKey } from '../lib/planRowOptions'
+import { FOCUS_RING } from '../lib/focusRing'
+import type { AuditStore } from '../hooks/useAuditStore'
+import type { TabId } from '../types'
+import { Badge, Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 
 interface DashboardProps {
-  state: AppState & { company: AppState['companies'][keyof AppState['companies']] }
-  onNavigate: (tab: TabId, auditKey?: string, ncrId?: string) => void
+  state: AuditStore['state']
+  onNavigate: (tab: TabId, options?: NavigateOptions) => void
 }
+
+const linkButtonClass = `text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${FOCUS_RING}`
 
 function KpiCard({
   title,
@@ -49,43 +64,33 @@ function KpiCard({
   return <Card>{inner}</Card>
 }
 
-function DualNavKpiCard({
-  title,
-  segments,
-  hint,
-  onNavigate,
-}: {
-  title: string
-  segments: { label: string; value: number; tab: TabId; accent?: string }[]
-  hint?: string
-  onNavigate: (tab: TabId) => void
-}) {
-  return (
-    <Card className="p-5">
-      <p className="text-sm text-muted">{title}</p>
-      <div className="mt-2 flex divide-x divide-line rounded-lg border border-line">
-        {segments.map((seg) => (
-          <button
-            key={seg.tab}
-            type="button"
-            onClick={() => onNavigate(seg.tab)}
-            className="flex flex-1 flex-col items-center px-3 py-2 transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          >
-            <span className={`text-2xl font-bold ${seg.accent ?? 'text-primary'}`}>{seg.value}</span>
-            <span className="mt-1 text-xs text-muted">{seg.label}</span>
-          </button>
-        ))}
-      </div>
-      {hint && <p className="mt-2 text-xs text-muted">{hint}</p>}
-    </Card>
-  )
+function navigateGap(g: PlanGap, onNavigate: DashboardProps['onNavigate']) {
+  if (g.reason === 'audit_missing' || g.reason === 'audit_incomplete') {
+    onNavigate('audit', { auditKey: buildPlanRowKey(g.qpCode, g.departmentId) })
+  } else {
+    onNavigate('plan')
+  }
 }
 
 export function Dashboard({ state, onNavigate }: DashboardProps) {
-  const { company, settings } = state
-  const summary = calculateAnnualScore(company.audits, settings.scoringRules, company.planRows)
-  const riskGroups = buildDashboardRiskTiles(company, settings.scoringRules)
-  const todayWork = buildTodayWork(company, settings.auditYear)
+  const { company, settings, externalAuditPrep } = state
+  const summary = calculateAnnualScore(company.audits, settings.scoringRules)
+  const prepProgress = countPrepProgress(externalAuditPrep, state.companyRelationships)
+  const prepContext = { company, rules: settings.scoringRules }
+  const prepGaps = listPrepGaps(externalAuditPrep, prepContext)
+  const prepGapLines = summarizePrepGaps(externalAuditPrep, prepContext, 5)
+  const prepGapTotal =
+    prepGaps.separateHalfDone.length +
+    prepGaps.separateOpen.length +
+    prepGaps.mergedOpen.length +
+    prepGaps.siteOpen.length +
+    prepGaps.qpBlocked.length
+  const mergedCoverage = buildMergedCertificateCoverage(
+    company,
+    settings.auditYear,
+    settings.scoringRules,
+  )
+  const focusRows = buildAuditFocusOverview(company.planRows)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -94,7 +99,17 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     0,
   )
   const scoredDepts = summary.departmentScores.filter((d) => d.status === 'scored')
+  const incompleteDepts = summary.departmentScores.filter(
+    (d) => d.status === 'incomplete' || d.status === 'unevaluated',
+  )
   const anyJudgment = hasAnyJudgment(company.audits)
+
+  const navigateToAudit = (auditId: string) => {
+    const audit = company.audits.find((a) => a.id === auditId)
+    if (audit) {
+      onNavigate('audit', { auditKey: buildPlanRowKey(audit.qpCode, audit.departmentId) })
+    }
+  }
 
   const byCategory = {
     系統稽核: company.planRows.filter((r) => r.auditCategory === '系統稽核').length,
@@ -110,24 +125,10 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
   })
 
-  const progressPercent =
-    summary.scheduledProcedures > 0
-      ? Math.round((summary.scoredProcedures / summary.scheduledProcedures) * 1000) / 10
+  const overallPercent =
+    summary.overallStatus === 'scored' && summary.overallScore !== null
+      ? summary.overallScore
       : 0
-
-  const annualScoreHint =
-    summary.allScheduledScored && summary.overallStatus === 'scored'
-      ? '全部已評程序加權'
-      : summary.scoredProcedures > 0
-        ? `已評 ${summary.scoredProcedures} / ${summary.scheduledProcedures} 程序 · 尚有未評`
-        : summary.scheduledProcedures > 0
-          ? `計畫 ${summary.scheduledProcedures} 程序 · 尚無已評`
-          : '尚無排程程序'
-
-  const handleTileClick = (auditKey: string) => {
-    if (!auditKey) return
-    onNavigate('audit', auditKey)
-  }
 
   return (
     <div className="space-y-6 print-area">
@@ -137,95 +138,37 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         formTitle="年度稽核儀表板"
       />
 
-      {(todayWork.procedures.length > 0 || todayWork.openNcrs.length > 0) && (
-        <Card className="no-print">
-          <h2 className="mb-1 text-lg font-semibold text-ink">今日工作</h2>
-          <p className="mb-4 text-sm text-muted">
-            {todayWork.month > 0
-              ? `${todayWork.month} 月待辦 · ${company.name}`
-              : `稽核年度非今年，僅列出未結案 NCR · ${company.name}`}
-          </p>
-          <div className="space-y-4">
-            {todayWork.procedures.length > 0 && (
-              <section>
-                <h3 className="mb-2 text-sm font-medium text-ink">待完成程序稽核</h3>
-                <ul className="divide-y divide-line rounded-lg border border-line">
-                  {todayWork.procedures.map((item) => (
-                    <li key={item.auditKey}>
-                      <button
-                        type="button"
-                        onClick={() => onNavigate('audit', item.auditKey)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <span className="font-medium text-ink">
-                          {item.qpCode} · {item.department}
-                        </span>
-                        <span className="shrink-0 text-sm text-muted">
-                          {item.status ?? '待辦'}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-            {todayWork.openNcrs.length > 0 && (
-              <section>
-                <h3 className="mb-2 text-sm font-medium text-ink">未結案不符合（NCR）</h3>
-                <ul className="divide-y divide-line rounded-lg border border-line">
-                  {todayWork.openNcrs.map((ncr) => (
-                    <li key={ncr.id}>
-                      <button
-                        type="button"
-                        onClick={() => onNavigate('ncr', undefined, ncr.id)}
-                        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-page focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <span className="font-medium text-ink">
-                          {ncr.ncrNumber} · {ncr.qpCode}
-                        </span>
-                        {ncr.dueDate && (
-                          <span className="shrink-0 text-sm text-muted">期限 {ncr.dueDate}</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-        </Card>
-      )}
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
-          title={`年度總分 · ${company.name}`}
+          title="年度總分"
           value={overallDisplay}
-          hint={annualScoreHint}
+          hint={summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序'}
         />
         <KpiCard
-          title="不符合（NCR）"
-          value={company.ncrs.length}
-          hint={`未結案 ${openNCR} 件`}
+          title="未結案 NCR"
+          value={openNCR}
+          hint={`全部 ${company.ncrs.length} 件`}
           accent="text-red-600 dark:text-red-400"
           onClick={() => onNavigate('ncr')}
         />
-        <DualNavKpiCard
-          title="觀察／第三方建議"
-          hint={`待追蹤 ${openObs + openSug} 件 · 點選分別前往觀察事項或建議追蹤`}
-          onNavigate={onNavigate}
-          segments={[
-            {
-              label: '觀察事項',
-              value: summary.totalObservation + openObs,
-              tab: 'observations',
-              accent: 'text-amber-600 dark:text-amber-400',
-            },
-            {
-              label: '第三方建議',
-              value: openSug,
-              tab: 'suggestions',
-            },
-          ]}
+        <KpiCard
+          title="本年查檢觀察"
+          value={summary.totalObservation}
+          hint="查檢表判定「觀察」"
+          accent="text-amber-600 dark:text-amber-400"
+          onClick={() => onNavigate('observations', { section: 'current' })}
+        />
+        <KpiCard
+          title="跨年待追蹤"
+          value={openObs}
+          hint="前年度觀察 open"
+          onClick={() => onNavigate('observations', { section: 'prior' })}
+        />
+        <KpiCard
+          title="第三方建議"
+          value={openSug}
+          hint="待追蹤建議"
+          onClick={() => onNavigate('suggestions')}
         />
         <KpiCard
           title="計畫稽核次數"
@@ -233,78 +176,190 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           hint={`系統 ${byCategory.系統稽核} · 製程 ${byCategory.製程稽核} · 型態 ${byCategory.型態稽核}`}
           onClick={() => onNavigate('plan')}
         />
+        <KpiCard
+          title="外部稽核準備（兩證）"
+          value={`${prepProgress.done}/${prepProgress.total}`}
+          hint={
+            prepGaps.separateHalfDone.length > 0
+              ? `${prepGaps.separateHalfDone.length} 項只勾一家`
+              : prepGapTotal > 0
+                ? `尚有 ${prepGapTotal} 項待備`
+                : '抬頭規則已齊'
+          }
+          accent={
+            prepGaps.separateHalfDone.length > 0
+              ? 'text-amber-600 dark:text-amber-400'
+              : prepGapTotal > 0
+                ? 'text-amber-600 dark:text-amber-400'
+                : 'text-green-700 dark:text-green-400'
+          }
+          onClick={() => onNavigate('prep')}
+        />
       </div>
 
-      {summary.scheduledProcedures > 0 && (
+      <Card className="no-print">
+        <h2 className="mb-3 text-lg font-semibold text-ink">兩張證書缺口（合併檢視）</h2>
+        <p className="mb-3 text-sm text-muted">
+          內部稽核完成：
+          <span
+            className={
+              mergedCoverage.allInternalAuditComplete
+                ? 'font-semibold text-green-700'
+                : 'font-semibold text-red-600'
+            }
+          >
+            {mergedCoverage.allInternalAuditComplete ? '是' : '否'}
+          </span>
+          · 未結 NCR 合計 {mergedCoverage.totalOpenNcr}
+          {mergedCoverage.totalOpenNcr > 0 && (
+            <span className="ml-1">
+              （九潤 {mergedCoverage.openNcrByScope.jiurun} · 正隆興{' '}
+              {mergedCoverage.openNcrByScope.zhenglongxing} · 兩證{' '}
+              {mergedCoverage.openNcrByScope.both}）
+            </span>
+          )}
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-lg border border-line p-3">
+            <p className="mb-2 font-medium text-ink">
+              共用計畫／查檢
+              <span className="ml-2 text-xs text-muted">缺口 {mergedCoverage.gaps.length}</span>
+            </p>
+            {mergedCoverage.gaps.length === 0 ? (
+              <p className="text-sm text-green-700">計畫與查檢已覆蓋</p>
+            ) : (
+              <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-muted">
+                {mergedCoverage.gaps.slice(0, 12).map((g) => (
+                  <li key={`${g.qpCode}-${g.departmentId}-${g.reason}`}>
+                    <button
+                      type="button"
+                      className={linkButtonClass}
+                      onClick={() => navigateGap(g, onNavigate)}
+                    >
+                      {g.qpCode} · {g.department} — {gapReasonLabel(g.reason)}
+                      {g.detail ? `（${g.detail}）` : ''}
+                    </button>
+                  </li>
+                ))}
+                {mergedCoverage.gaps.length > 12 && (
+                  <li>…另有 {mergedCoverage.gaps.length - 12} 項</li>
+                )}
+              </ul>
+            )}
+          </div>
+          <div className="rounded-lg border border-line p-3">
+            <p className="mb-2 font-medium text-ink">
+              ◎◎ 雙證查檢項
+              <span className="ml-2 text-xs text-muted">
+                未判定 {mergedCoverage.dualPendingItems.length}
+              </span>
+            </p>
+            {mergedCoverage.dualPendingItems.length === 0 ? (
+              <p className="text-sm text-green-700">雙證項已判定</p>
+            ) : (
+              <ul className="max-h-40 space-y-1 overflow-y-auto text-xs text-muted">
+                {mergedCoverage.dualPendingItems.slice(0, 12).map((d) => (
+                  <li key={`${d.qpCode}-${d.no}-${d.category}`}>
+                    <button
+                      type="button"
+                      className={linkButtonClass}
+                      onClick={() =>
+                        onNavigate('audit', {
+                          auditKey: buildPlanRowKey(d.qpCode, d.departmentId),
+                        })
+                      }
+                    >
+                      {d.qpCode} · {d.department} · NO {d.no} {d.category}
+                    </button>
+                  </li>
+                ))}
+                {mergedCoverage.dualPendingItems.length > 12 && (
+                  <li>…另有 {mergedCoverage.dualPendingItems.length - 12} 項</li>
+                )}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {prepGapTotal > 0 && (
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="mb-2 text-sm font-medium text-ink">外稽準備抬頭漏口（年度共用）</p>
+            <ul className="space-y-1 text-xs text-muted">
+              {prepGapLines.map((line) => (
+                <li key={`${line.no}-${line.text}`}>
+                  <button type="button" className={linkButtonClass} onClick={() => onNavigate('prep')}>
+                    {line.text}
+                  </button>
+                </li>
+              ))}
+              {prepGapTotal > prepGapLines.length && (
+                <li>
+                  <button
+                    type="button"
+                    className={`text-left font-medium text-primary hover:underline ${linkButtonClass}`}
+                    onClick={() => onNavigate('prep')}
+                  >
+                    …另有 {prepGapTotal - prepGapLines.length} 項
+                  </button>
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      {summary.overallStatus === 'scored' && (
         <Card className="no-print">
-          <p className="text-sm text-muted">
-            程序評分進度（{summary.scoredProcedures} / {summary.scheduledProcedures}）
-          </p>
+          <p className="text-sm text-muted">年度總分進度</p>
           <div
             className="mt-2 h-2 rounded-full bg-page"
             role="progressbar"
-            aria-valuenow={progressPercent}
+            aria-valuenow={overallPercent}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="程序評分進度"
+            aria-label="年度總分"
           >
             <div
               className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(progressPercent, 100)}%` }}
+              style={{ width: `${Math.min(overallPercent, 100)}%` }}
             />
           </div>
         </Card>
       )}
 
       <Card>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg font-semibold text-ink">稽核重點與得分（QR-28-01）</h2>
-          <p className="text-xs text-muted">
-            綠 ≥80% · 琥珀 ≥60% · 紅 &lt;60% · 未評分 —
-          </p>
-        </div>
-
-        {riskGroups.length === 0 ? (
+        <h2 className="mb-4 text-lg font-semibold text-ink">稽核重點標示（QR-28-01 概覽）</h2>
+        {focusRows.length === 0 ? (
           <EmptyState message="尚無計畫列，請至「年度計畫」建立或自動編排。" />
         ) : (
-          <div className="space-y-6">
-            {riskGroups.map((group) => (
-              <section key={group.riskLevel}>
-                <h3 className="mb-3 text-sm font-semibold text-ink">
-                  {group.riskLevel === '高' ? '高風險' : group.riskLevel === '中' ? '中風險' : '低風險'}
-                  {' · '}
-                  {group.tiles.length}
-                </h3>
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {group.tiles.map((tile) => (
-                    <button
-                      key={`${tile.qpCode}-${tile.departmentId}`}
-                      type="button"
-                      onClick={() => handleTileClick(tile.auditKey)}
-                      className="rounded-xl border border-line bg-surface p-4 text-left shadow-sm transition hover:border-primary hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 no-print"
-                      aria-label={`${tile.qpCode} ${tile.department}，得分 ${tile.scoreLabel}，前往程序稽核`}
-                    >
-                      <p className="font-semibold text-ink">{tile.qpCode}</p>
-                      <p className="mt-1 text-xs text-muted">{tile.department}</p>
-                      <p className={`mt-3 text-2xl font-bold ${tile.scoreClass}`}>{tile.scoreLabel}</p>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-2 hidden print:block">
-                  <table className="w-full border-collapse text-sm">
-                    <tbody>
-                      {group.tiles.map((tile) => (
-                        <tr key={`print-${tile.qpCode}-${tile.departmentId}`} className="border-b border-line">
-                          <td className="p-1">{tile.qpCode}</td>
-                          <td className="p-1">{tile.department}</td>
-                          <td className="p-1">{tile.scoreLabel}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            ))}
+          <div className="overflow-x-auto">
+            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line bg-page text-left text-muted">
+                  <th className="p-2">Sheet</th>
+                  <th className="p-2">風險等級</th>
+                  <th className="p-2">稽核程序</th>
+                  <th className="p-2">被稽核單位</th>
+                  <th className="p-2">負責人</th>
+                  <th className="p-2 text-center">查檢項數</th>
+                  <th className="p-2">稽核類型</th>
+                </tr>
+              </thead>
+              <tbody>
+                {focusRows.map((row) => (
+                  <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-line">
+                    <td className="p-2 text-muted">{row.sheet}</td>
+                    <td className="p-2"><Badge label={row.riskLevel} /></td>
+                    <td className="p-2 font-medium text-ink">{row.qpCode}</td>
+                    <td className="p-2">{row.department}</td>
+                    <td className="p-2">{row.owner}</td>
+                    <td className="p-2 text-center">{row.itemCount}</td>
+                    <td className="p-2 text-muted">{row.auditCategory}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
@@ -318,7 +373,12 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
             {summary.departmentScores
               .filter((d) => d.status === 'scored')
               .map((d) => (
-                <div key={d.auditId} className="flex items-center gap-3">
+                <button
+                  key={d.auditId}
+                  type="button"
+                  className={`flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-page no-print ${FOCUS_RING}`}
+                  onClick={() => navigateToAudit(d.auditId)}
+                >
                   <span className="w-40 shrink-0 text-sm font-medium text-ink">{d.label}</span>
                   <div className="flex-1">
                     <div
@@ -344,12 +404,37 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                       breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
                     })}
                   </span>
-                </div>
+                </button>
               ))}
-            {summary.departmentScores.filter((d) => d.status !== 'scored').length > 0 && (
-              <p className="text-xs text-muted">
-                另有 {summary.departmentScores.filter((d) => d.status !== 'scored').length} 個程序尚未評分（未評或不適用）。
-              </p>
+            {incompleteDepts.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                <p className="mb-1 font-semibold">未完成程序（{incompleteDepts.length}）</p>
+                <ul className="list-inside list-disc space-y-0.5">
+                  {incompleteDepts.map((d) => (
+                    <li key={d.auditId}>
+                      <button
+                        type="button"
+                        className={`text-left hover:underline ${FOCUS_RING}`}
+                        onClick={() => navigateToAudit(d.auditId)}
+                      >
+                        {d.label} — {formatScoreDisplay({
+                          score: d.score,
+                          status: d.status,
+                          totalItems: 0,
+                          applicableItems: d.applicableItems,
+                          breakdown: {
+                            conform: 0,
+                            nonConform: 0,
+                            observation: 0,
+                            notApplicable: 0,
+                            pending: 0,
+                          },
+                        })}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}

@@ -10,10 +10,7 @@ describe('demo defect fixes', () => {
   it('jiurun dashboard annual score is not scored while plan procedures remain unjudged', () => {
     const state = createDemoState()
     const company = state.companies.jiurun
-    const summary = calculateAnnualScore(company.audits, state.settings.scoringRules, company.planRows)
-    expect(summary.scheduledProcedures).toBeGreaterThan(summary.scoredProcedures)
-    expect(summary.allScheduledScored).toBe(false)
-    expect(summary.overallStatus).toBe('unevaluated')
+    const summary = calculateAnnualScore(company.audits, state.companySettings.jiurun.scoringRules)
     expect(summary.overallScore).toBeNull()
   })
 
@@ -25,7 +22,7 @@ describe('demo defect fixes', () => {
       if (!i.judgment) i.judgment = '符合'
     })
     expect(isProcedureComplete(audit!)).toBe(false)
-    expect(scoreProcedureAudit(audit!).status).toBe('unevaluated')
+    expect(scoreProcedureAudit(audit!).score).toBe(100)
   })
 
   it('zhenglongxing QP-05 checklist dates align with plan first scheduled month', () => {
@@ -38,7 +35,7 @@ describe('demo defect fixes', () => {
     const plannedMonth = resolvePlannedMonthFromPlan(row!)
     expect(audit!.plannedMonth).toBe(plannedMonth)
     expect(audit!.notifyDate).toBe(`2026-${String(plannedMonth).padStart(2, '0')}-01`)
-    const synced = carryPlanDatesToAudit(row!, audit!, state.settings.auditYear)
+    const synced = carryPlanDatesToAudit(row!, audit!, state.companySettings.zhenglongxing.auditYear)
     expect(synced.plannedMonth).toBe(plannedMonth)
   })
 

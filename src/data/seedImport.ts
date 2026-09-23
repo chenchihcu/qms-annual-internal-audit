@@ -14,7 +14,7 @@ export interface RawSeedProcedure {
   procedureCode: string
   procedureName: string
   supervisor: string
-  items: Array<{ no: number; category: string; content: string }>
+  items: Array<{ no: number; category: string; content: string; as9100Clauses?: string[] }>
 }
 
 export function rawProcedureToSeed(proc: RawSeedProcedure): SeedProcedure & {
@@ -22,10 +22,10 @@ export function rawProcedureToSeed(proc: RawSeedProcedure): SeedProcedure & {
   department?: string
   supervisor?: string
 } {
-  const catMap = new Map<string, Array<{ no: number; content: string }>>()
+  const catMap = new Map<string, Array<{ no: number; content: string; as9100Clauses?: string[] }>>()
   for (const item of proc.items) {
     const list = catMap.get(item.category) ?? []
-    list.push({ no: item.no, content: item.content })
+    list.push({ no: item.no, content: item.content, as9100Clauses: item.as9100Clauses })
     catMap.set(item.category, list)
   }
   const categories: SeedCategory[] = [...catMap.entries()].map(([name, items]) => ({

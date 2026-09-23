@@ -1,27 +1,36 @@
 import { createDefaultPrepState } from './externalAuditPrep'
-import { createDefaultExternalAuditSchedule } from './externalAuditSchedule'
 import type { AppState } from '../types'
+import { companySettingsFor } from '../types'
+
+export const MIN_AUDIT_YEAR = 2000
+export const MAX_AUDIT_YEAR = 2100
+
+export function parseAuditYear(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  const n = Number(trimmed)
+  if (!Number.isInteger(n) || n < MIN_AUDIT_YEAR || n > MAX_AUDIT_YEAR) return null
+  return n
+}
 
 export function applyAuditYearChange(
   state: AppState,
+  companyId: AppState['activeCompanyId'],
   newYear: number,
   resetExternalPrep: boolean,
 ): AppState {
-  const settings = { ...state.settings, auditYear: newYear }
+  const current = companySettingsFor(state, companyId)
+  const nextSettings = { ...current, auditYear: newYear }
   let externalAuditPrep = state.externalAuditPrep
-  let externalAuditSchedule = state.externalAuditSchedule
-  if (newYear !== state.externalAuditPrep.year) {
-    externalAuditPrep = resetExternalPrep
-      ? createDefaultPrepState(newYear)
-      : { ...state.externalAuditPrep, year: newYear }
-    if (resetExternalPrep || !externalAuditSchedule || externalAuditSchedule.year !== newYear) {
-      externalAuditSchedule = createDefaultExternalAuditSchedule(
-        newYear,
-        settings.externalAuditDate ?? `${newYear}-09-15`,
-      )
-    } else {
-      externalAuditSchedule = { ...externalAuditSchedule, year: newYear }
-    }
+  if (resetExternalPrep && newYear !== state.externalAuditPrep.year) {
+    externalAuditPrep = createDefaultPrepState(newYear)
   }
-  return { ...state, settings, externalAuditPrep, externalAuditSchedule }
+  return {
+    ...state,
+    companySettings: {
+      ...state.companySettings,
+      [companyId]: nextSettings,
+    },
+    externalAuditPrep,
+  }
 }

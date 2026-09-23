@@ -1,4 +1,4 @@
-import type { ChecklistItem } from '../types'
+import type { ChecklistItem, SharedChecklistQuestion } from '../types'
 import seed from './checklists.seed.json'
 
 export interface SeedCategory {
@@ -130,12 +130,27 @@ export function getProcedureTitle(qpCode: string, department?: string): string {
   return resolveProcedureSeed(qpCode, department)?.title ?? qpCode
 }
 
+export function getSeedChecklistQuestions(
+  qpCode: string,
+  department?: string,
+): SharedChecklistQuestion[] {
+  const proc = resolveProcedureSeed(qpCode, department)
+  return proc?.categories.flatMap((category) =>
+    category.items.map((item) => ({
+      category: category.name,
+      no: item.no,
+      content: item.content,
+    })),
+  ) ?? []
+}
+
 export function createChecklistForProcedure(
   qpCode: string,
   department?: string,
+  sharedQuestions?: SharedChecklistQuestion[],
 ): ChecklistItem[] {
-  const proc = resolveProcedureSeed(qpCode, department)
-  if (!proc || proc.categories.length === 0) {
+  const questions = sharedQuestions ?? getSeedChecklistQuestions(qpCode, department)
+  if (questions.length === 0) {
     const progress = seedImportProgress()
     return [
       {
@@ -153,22 +168,17 @@ export function createChecklistForProcedure(
   }
 
   const items: ChecklistItem[] = []
-  let globalNo = 1
-  for (const cat of proc.categories) {
-    for (const item of cat.items) {
+  questions.forEach((question, index) => {
       items.push({
-        id: `chk-${qpCode}-${globalNo}-${Date.now()}`,
-        category: cat.name,
-        no: item.no,
-        content: item.content,
+        id: `chk-${qpCode}-${index + 1}-${Date.now()}`,
+        category: question.category,
+        no: question.no,
+        content: question.content,
         judgment: null,
         description: '',
         procedureRef: qpCode,
-        origin: 'seed',
       })
-      globalNo++
-    }
-  }
+  })
   return items
 }
 

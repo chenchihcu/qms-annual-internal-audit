@@ -12,19 +12,20 @@ describe('buildQr2801PrintHeaderMeta', () => {
         ...state.companies[companyId],
         keyCustomerName: companyId === 'jiurun' ? '九潤精密' : state.companies[companyId].keyCustomerName,
       }
-      const meta = buildQr2801PrintHeaderMeta(state.settings, company)
+      const settings = state.companySettings[companyId]
+      const meta = buildQr2801PrintHeaderMeta(settings, company)
       expect(meta.subtitle).toContain('主任稽核員')
       expect(meta.detailLines.some((line) => line.includes('主要客戶'))).toBe(true)
       expect(meta.detailLines.some((line) => line.includes('計畫窗口'))).toBe(true)
-      expect(meta.detailLines.some((line) => line.includes(state.settings.planWindowStart))).toBe(true)
-      expect(meta.detailLines.some((line) => line.includes(state.settings.planWindowEnd))).toBe(true)
+      expect(meta.detailLines.some((line) => line.includes(settings.planWindowStart))).toBe(true)
+      expect(meta.detailLines.some((line) => line.includes(settings.planWindowEnd))).toBe(true)
     }
   })
 
   it('adds filter line when stakeholder filter is active', () => {
     const state = createDemoState()
     const company = { ...state.companies.jiurun, keyCustomerName: '九潤精密' }
-    const meta = buildQr2801PrintHeaderMeta(state.settings, company, {
+    const meta = buildQr2801PrintHeaderMeta(state.companySettings.jiurun, company, {
       tag: '客戶',
       visible: 5,
       total: 31,
@@ -49,7 +50,7 @@ describe('buildQr2802PrintHeaderMeta', () => {
           .map((_, i) => (i <= 1 ? ('擬定' as const) : null)),
       },
       audit,
-      state.settings.auditYear,
+      state.companySettings.jiurun.auditYear,
       2,
     )
     const meta = buildQr2802PrintHeaderMeta(carried, company, getProcedureTitle)

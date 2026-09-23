@@ -1,50 +1,34 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { carryPlanDatesToAudit } from '../lib/auditDates'
-import {
-  buildFormExportFilename,
-  exportChecklistExcel,
-  exportChecklistPdf,
-} from '../lib/formExport'
-import { buildQr2802PrintHeaderMeta } from '../lib/printForm'
-import { countPendingItems, isProcedureComplete } from '../lib/auditComplete'
-import { countMissingEvidenceItems } from '../lib/checklistEvidence'
+import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
+import { DepartmentOwnerField } from './DepartmentOwnerField'
+import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { isSeedChecklistItem } from '../lib/checklistItem'
-import { checkAuditImpartiality } from '../lib/impartiality'
-import { findNcrForChecklistItem } from '../lib/ncr'
+import { FOCUS_RING } from '../lib/focusRing'
+import { findNcrsForChecklistItem, isNcrStale } from '../lib/ncr'
+import type { NavigateOptions } from '../lib/navigation'
+import { isAuditComplete, isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
-import type { Judgment } from '../types'
+import type { ChecklistItem, CompanyId, Judgment, TabId } from '../types'
+import { COMPANY_LABELS } from '../types'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import { FormExportButtons } from './ui/FormExportButtons'
-import { FormPrintButton } from './ui/FormPrintButton'
-import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import { PrintDocHeader } from './ui/PrintDocHeader'
-import { AttachmentField } from './ui/AttachmentField'
-import {
-  canEditChecklist,
-  canMarkAuditNotified,
-  isReadOnlyRole,
-} from '../lib/userRole'
-import { normalizeAttachments } from '../lib/attachments'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
-
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
 interface ProcedureAuditPanelProps {
   store: AuditStore
   selectedKey?: string
-  selectedPlanMonth?: number
   onSelectedKeyChange?: (key: string) => void
+  onNavigate?: (tab: TabId, options?: NavigateOptions) => void
 }
 
 export function ProcedureAuditPanel({
   store,
   selectedKey: selectedKeyProp,
-  selectedPlanMonth,
   onSelectedKeyChange,
+  onNavigate,
 }: ProcedureAuditPanelProps) {
   const {
     state,
@@ -54,9 +38,6 @@ export function ProcedureAuditPanel({
     addChecklistItem,
     removeChecklistItem,
     markChecklistItemNA,
-    setRemainingUnjudgedToConform,
-    markAuditAsNotified,
-    convertChecklistObservationToNcr,
     getProcedureTitle,
   } = store
 
@@ -81,6 +62,7 @@ export function ProcedureAuditPanel({
     null,
   )
   const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set())
+  const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const [qpCode, departmentId] = selectedKey.split('|')
   const persistedAudit =
@@ -88,72 +70,24 @@ export function ProcedureAuditPanel({
       ? company.audits.find((a) => a.qpCode === qpCode && a.departmentId === departmentId)
       : undefined
 
-  const planRow = company.planRows.find(
-    (row) => row.qpCode === qpCode && row.departmentId === departmentId,
-  )
-
-  const audit =
-    qpCode && departmentId ? persistedAudit ?? getOrCreateAudit(qpCode, departmentId) : null
-
-  const exportFilenameBase = buildFormExportFilename(company.name, 'QR-28-02')
-  const exportContext = useMemo(
-    () =>
-      audit
-        ? {
-            settings,
-            company,
-            audit,
-            getProcedureTitle,
-          }
-        : null,
-    [settings, company, audit, getProcedureTitle],
-  )
-
   useEffect(() => {
     if (!qpCode || !departmentId) return
-    if (!persistedAudit) {
-      updateAudit(getOrCreateAudit(qpCode, departmentId))
-      return
-    }
-    if (!planRow) return
-    const carried = carryPlanDatesToAudit(
-      planRow,
-      persistedAudit,
-      settings.auditYear,
-      selectedPlanMonth,
-    )
-    if (
-      carried.notifyDate !== persistedAudit.notifyDate ||
-      carried.auditDate !== persistedAudit.auditDate ||
-      carried.plannedMonth !== persistedAudit.plannedMonth
-    ) {
-      updateAudit(carried)
-    }
-  }, [
-    qpCode,
-    departmentId,
-    persistedAudit,
-    planRow,
-    settings.auditYear,
-    selectedPlanMonth,
-    getOrCreateAudit,
-    updateAudit,
-  ])
+    const audit = getOrCreateAudit(qpCode, departmentId)
+    if (audit !== persistedAudit) updateAudit(audit)
+  }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
 
-  if (!qpCode || !departmentId || !audit || !exportContext) {
+  if (!qpCode || !departmentId) {
     return <p className="text-muted">請先於年度計畫建立程序稽核項目</p>
   }
 
+  const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
+  const dept = company.departments.find((d) => d.id === departmentId)
+
   const score = scoreProcedureAudit(audit, settings.scoringRules)
-  const complete = isProcedureComplete(audit)
-  const pendingCount = countPendingItems(audit.items)
-  const missingEvidenceCount = countMissingEvidenceItems(audit.items)
   const categories = [...new Set(audit.items.map((i) => i.category))]
-  const impartialityWarning = checkAuditImpartiality(audit, company.departments)
-  const readOnly = isReadOnlyRole(settings.viewRole)
-  const canEdit = canEditChecklist(settings.viewRole)
-  const canNotify = canMarkAuditNotified(settings.viewRole)
-  const printHeaderMeta = buildQr2802PrintHeaderMeta(audit, company, getProcedureTitle)
+  const auditFrozen = isAuditComplete(audit, settings.scoringRules)
+  const managerMismatch =
+    auditFrozen && dept != null && audit.departmentManager !== dept.owner
 
   const handleHeaderChange = (field: string, value: string) => {
     updateAudit({ ...audit, [field]: value })
@@ -168,12 +102,65 @@ export function ProcedureAuditPanel({
     })
   }
 
+  const isItemNonConform = (item: (typeof audit.items)[0]) => {
+    if (item.certificateScope === 'dual' && item.judgmentByCompany) {
+      return (
+        item.judgmentByCompany.jiurun === '不符' ||
+        item.judgmentByCompany.zhenglongxing === '不符'
+      )
+    }
+    return item.judgment === '不符'
+  }
+
   const handleRemove = (itemId: string, isNonConform: boolean) => {
     setDeleteTarget({ itemId, isNonConform })
   }
 
+  const renderNcrHint = (item: ChecklistItem) => {
+    const linked = findNcrsForChecklistItem(company.ncrs, item.id)
+    if (linked.length === 0 || !onNavigate) return null
+    const stale = linked.some((n) => isNcrStale(n, company.audits))
+    const numbers = linked.map((n) => n.ncrNumber).join('、')
+    return (
+      <div className="mt-1 text-xs no-print">
+        <button
+          type="button"
+          className={`hover:underline ${FOCUS_RING} ${stale ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}
+          onClick={() => onNavigate('ncr')}
+        >
+          {stale
+            ? `建議結案 NCR（${numbers}，查檢已非不符）`
+            : `已建立 NCR ${numbers}，前往不符合`}
+        </button>
+      </div>
+    )
+  }
+
+  const renderJudgmentSelect = (
+    value: Judgment | null | undefined,
+    onChange: (j: Judgment | null) => void,
+    label?: string,
+  ) => (
+    <div className="space-y-0.5">
+      {label && <span className="text-xs text-muted no-print">{label}</span>}
+      <select
+        className={`w-full min-w-[5.5rem] rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
+        value={value ?? ''}
+        onChange={(e) => onChange((e.target.value || null) as Judgment | null)}
+        aria-label={label ?? '判定'}
+      >
+        <option value="">—</option>
+        {JUDGMENTS.map((j) => (
+          <option key={j} value={j}>{j}</option>
+        ))}
+      </select>
+      <span className="print-only">{value && <Badge label={value} />}</span>
+    </div>
+  )
+
   return (
     <div className="space-y-6 print-area qr-form">
+      <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
       <ConfirmDialog
         open={deleteTarget !== null}
         title="刪除稽核項目"
@@ -194,31 +181,19 @@ export function ProcedureAuditPanel({
       <Card>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4 no-print">
           <h2 className="text-lg font-semibold text-ink">內部稽核查檢表（QR-28-02）</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <Select
-              label="查檢表"
-              value={selectedKey}
-              onChange={setSelectedKey}
-              options={auditOptions}
-            />
-            <FormExportButtons
-              formId="QR-28-02"
-              filenameBase={exportFilenameBase}
-              onExportExcel={() => exportChecklistExcel(exportContext)}
-              onExportPdf={() => exportChecklistPdf(exportContext)}
-            />
-            <FormPrintButton />
-          </div>
+          <Select
+            label="查檢表"
+            value={selectedKey}
+            onChange={setSelectedKey}
+            options={auditOptions}
+          />
         </div>
-
-        <ImpartialityBanner warning={impartialityWarning} />
 
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="內部稽核查檢表 QR-28-02"
-          subtitle={printHeaderMeta.subtitle}
-          detailLines={printHeaderMeta.detailLines}
+          subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
         />
 
         <div className="overflow-x-auto">
@@ -237,27 +212,14 @@ export function ProcedureAuditPanel({
                   <label htmlFor="audit-notify-date">通知日期</label>
                 </td>
                 <td className="border border-line p-2">
-                  <div className="flex flex-wrap items-center gap-2 no-print">
-                    <Input
-                      id="audit-notify-date"
-                      type="date"
-                      value={audit.notifyDate}
-                      onChange={(v) => handleHeaderChange('notifyDate', v)}
-                    />
-                    {!audit.notifySent && canNotify ? (
-                      <Button variant="secondary" onClick={() => markAuditAsNotified(audit.id)}>
-                        標記已通知
-                      </Button>
-                    ) : (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-950 dark:text-green-200">
-                        已通知
-                      </span>
-                    )}
-                  </div>
-                  <span className="print-only">
-                    {audit.notifyDate}
-                    {audit.notifySent ? '（已通知）' : ''}
-                  </span>
+                  <Input
+                    type="date"
+                    value={audit.notifyDate}
+                    onChange={(v) => handleHeaderChange('notifyDate', v)}
+                    className="no-print"
+                    ariaLabel="通知日期"
+                  />
+                  <span className="print-only">{audit.notifyDate}</span>
                 </td>
               </tr>
               <tr>
@@ -266,11 +228,11 @@ export function ProcedureAuditPanel({
                 </td>
                 <td className="border border-line p-2">
                   <Input
-                    id="audit-date"
                     type="date"
                     value={audit.auditDate}
                     onChange={(v) => handleHeaderChange('auditDate', v)}
                     className="no-print"
+                    ariaLabel="實施日期"
                   />
                   <span className="print-only">{audit.auditDate}</span>
                 </td>
@@ -278,12 +240,31 @@ export function ProcedureAuditPanel({
                   <label htmlFor="audit-manager">被稽核部門主管</label>
                 </td>
                 <td className="border border-line p-2">
-                  <Input
-                    id="audit-manager"
-                    value={audit.departmentManager}
-                    onChange={(v) => handleHeaderChange('departmentManager', v)}
-                    className="no-print"
-                  />
+                  {auditFrozen ? (
+                    <>
+                      <span className="no-print text-ink">{audit.departmentManager}</span>
+                      {managerMismatch && (
+                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200 no-print">
+                          已評分，本表凍結為「{audit.departmentManager}」；部門負責人已改為「{dept?.owner}」
+                        </p>
+                      )}
+                    </>
+                  ) : dept ? (
+                    <DepartmentOwnerField
+                      departmentId={departmentId}
+                      savedOwner={dept.owner}
+                      displayOwner={audit.departmentManager}
+                      ariaLabel="被稽核部門主管"
+                      onSaveRequest={ownerConfirm.requestChange}
+                    />
+                  ) : (
+                    <Input
+                      value={audit.departmentManager}
+                      onChange={(v) => handleHeaderChange('departmentManager', v)}
+                      className="no-print"
+                      ariaLabel="被稽核部門主管"
+                    />
+                  )}
                   <span className="print-only">{audit.departmentManager}</span>
                 </td>
               </tr>
@@ -293,10 +274,10 @@ export function ProcedureAuditPanel({
                 </td>
                 <td className="border border-line p-2" colSpan={3}>
                   <Input
-                    id="audit-auditors"
                     value={audit.auditors}
                     onChange={(v) => handleHeaderChange('auditors', v)}
                     className="no-print"
+                    ariaLabel="稽核人員"
                   />
                   <span className="print-only">{audit.auditors}</span>
                 </td>
@@ -305,43 +286,16 @@ export function ProcedureAuditPanel({
           </table>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <p className="text-muted">
-              程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
-            </p>
-            <span
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                complete
-                  ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
-                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
-              }`}
-            >
-              {complete
-                ? '查檢已完成'
-                : pendingCount > 0
-                  ? `查檢未完成（尚餘 ${pendingCount} 項未判定）`
-                  : `查檢未完成（尚餘 ${missingEvidenceCount} 項缺客觀證據）`}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-muted">
+            程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
+            <span className="ml-3 text-xs">
+              未判定 {score.breakdown.pending}／共 {score.totalItems}
             </span>
-            {audit.plannedMonth && (
-              <span className="text-xs text-muted">計畫月份：{audit.plannedMonth} 月</span>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2 no-print">
-            {pendingCount > 0 && canEdit && !readOnly && (
-              <Button
-                variant="secondary"
-                onClick={() => setRemainingUnjudgedToConform(audit.id)}
-              >
-                其餘未判定改符合
-              </Button>
-            )}
-            {canEdit && !readOnly && (
-              <Button variant="secondary" onClick={() => addChecklistItem(audit.id)}>
-                新增稽核項目
-              </Button>
-            )}
-          </div>
+          </p>
+          <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)}>
+            新增稽核項目
+          </Button>
         </div>
 
         <div className="overflow-x-auto">
@@ -352,10 +306,7 @@ export function ProcedureAuditPanel({
                 <th className="border border-line p-2 w-24">項目</th>
                 <th className="border border-line p-2 w-12">NO</th>
                 <th className="border border-line p-2">稽核內容</th>
-                <th className="border border-line p-2 w-28">判定</th>
-                <th className="border border-line p-2 w-24">抽樣</th>
-                <th className="border border-line p-2 w-32">客觀證據</th>
-                <th className="border border-line p-2 w-24">AS9100</th>
+                <th className="border border-line p-2 min-w-[9rem]">判定</th>
                 <th className="border border-line p-2">內容說明</th>
                 <th className="border border-line p-2 w-24 no-print">操作</th>
               </tr>
@@ -364,98 +315,67 @@ export function ProcedureAuditPanel({
               {categories.map((cat) => {
                 const catItems = audit.items.filter((i) => i.category === cat)
                 return catItems.map((item, idx) => (
-                  <tr key={item.id} className={item.sourceYear ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                  <tr
+                    key={item.id}
+                    className={
+                      isChecklistItemPending(item)
+                        ? 'bg-rose-50/40 dark:bg-rose-950/20'
+                        : item.sourceYear
+                          ? 'bg-amber-50/40 dark:bg-amber-950/20'
+                          : ''
+                    }
+                  >
                     {idx === 0 && (
                       <td className="border border-line p-2 align-top font-medium" rowSpan={catItems.length}>
                         {cat}
                       </td>
                     )}
                     <td className="border border-line p-2 align-top text-center">{item.no}</td>
-                    <td className="audit-content-cell border border-line p-2 align-top">
-                      <textarea
-                        className={`w-full min-h-[4.5rem] resize-y rounded border border-line bg-surface px-2 py-1 text-sm leading-relaxed no-print ${FOCUS_RING}`}
-                        rows={Math.min(6, Math.max(2, Math.ceil(item.content.length / 40)))}
+                    <td className="border border-line p-2 align-top">
+                      <input
+                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         value={item.content}
-                        disabled={readOnly || !canEdit}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { content: e.target.value })
                         }
                       />
-                      <span className="print-only whitespace-pre-wrap">{item.content}</span>
+                      <span className="print-only">{item.content}</span>
+                      {item.as9100Clause && (
+                        <span className="mt-1 block text-xs text-slate-500 no-print">
+                          AS9100 {item.as9100Clause}
+                        </span>
+                      )}
                       {item.sourceYear && (
                         <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">來源：{item.sourceYear} 年追蹤</span>
                       )}
                     </td>
                     <td className="border border-line p-2 align-top">
-                      <select
-                        className={`w-full rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
-                        value={item.judgment ?? ''}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateChecklistItem(audit.id, item.id, {
-                            judgment: (e.target.value || null) as Judgment | null,
-                          })
-                        }
-                      >
-                        <option value="">—</option>
-                        {JUDGMENTS.map((j) => (
-                          <option key={j} value={j}>{j}</option>
-                        ))}
-                      </select>
-                      <span className="print-only">{item.judgment && <Badge label={item.judgment} />}</span>
-                      {item.judgment === '觀察' && (
-                        <div className="mt-1 no-print">
-                          {findNcrForChecklistItem(company.ncrs, item.id) ? (
-                            <span className="text-xs text-primary">已轉 NCR</span>
-                          ) : (
-                            <button
-                              type="button"
-                              className={`text-xs text-primary hover:underline ${FOCUS_RING}`}
-                              onClick={() => convertChecklistObservationToNcr(audit.id, item.id)}
-                            >
-                              轉成 NCR
-                            </button>
+                      {item.certificateScope === 'dual' ? (
+                        <div className="flex flex-col gap-2">
+                          {(['jiurun', 'zhenglongxing'] as CompanyId[]).map((side) =>
+                            renderJudgmentSelect(
+                              item.judgmentByCompany?.[side],
+                              (j) =>
+                                updateChecklistItem(audit.id, item.id, {
+                                  judgmentByCompany: {
+                                    jiurun: item.judgmentByCompany?.jiurun ?? null,
+                                    zhenglongxing: item.judgmentByCompany?.zhenglongxing ?? null,
+                                    [side]: j,
+                                  },
+                                }),
+                              COMPANY_LABELS[side],
+                            ),
                           )}
+                          {renderNcrHint(item)}
                         </div>
+                      ) : (
+                        <>
+                          {renderJudgmentSelect(item.judgment, (j) =>
+                            updateChecklistItem(audit.id, item.id, { judgment: j }),
+                          )}
+                          {renderNcrHint(item)}
+                        </>
                       )}
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                        placeholder="例：3 件"
-                        value={item.sampleSize ?? ''}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateChecklistItem(audit.id, item.id, { sampleSize: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{item.sampleSize}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                        placeholder="例：QR-05-01"
-                        value={item.objectiveEvidence ?? ''}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateChecklistItem(audit.id, item.id, {
-                            objectiveEvidence: e.target.value,
-                          })
-                        }
-                      />
-                      <span className="print-only">{item.objectiveEvidence}</span>
-                    </td>
-                    <td className="border border-line p-2 align-top">
-                      <input
-                        className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                        placeholder="例：7.1.5"
-                        value={item.as9100Clause ?? ''}
-                        disabled={readOnly || !canEdit}
-                        onChange={(e) =>
-                          updateChecklistItem(audit.id, item.id, { as9100Clause: e.target.value })
-                        }
-                      />
-                      <span className="print-only">{item.as9100Clause}</span>
                     </td>
                     <td className="border border-line p-2 align-top">
                       {expandedDesc.has(item.id) ? (
@@ -463,7 +383,6 @@ export function ProcedureAuditPanel({
                           className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                           rows={2}
                           value={item.description}
-                          disabled={readOnly || !canEdit}
                           onChange={(e) =>
                             updateChecklistItem(audit.id, item.id, { description: e.target.value })
                           }
@@ -473,19 +392,11 @@ export function ProcedureAuditPanel({
                           className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                           placeholder="說明（點展開多行）"
                           value={item.description}
-                          disabled={readOnly || !canEdit}
                           onChange={(e) =>
                             updateChecklistItem(audit.id, item.id, { description: e.target.value })
                           }
                         />
                       )}
-                      <AttachmentField
-                        attachments={normalizeAttachments(item.attachments)}
-                        disabled={readOnly || !canEdit}
-                        onChange={(attachments) =>
-                          updateChecklistItem(audit.id, item.id, { attachments })
-                        }
-                      />
                       <button
                         type="button"
                         className={`mt-1 text-xs text-primary no-print hover:underline ${FOCUS_RING}`}
@@ -496,24 +407,22 @@ export function ProcedureAuditPanel({
                       <span className="print-only">{item.description}</span>
                     </td>
                     <td className="border border-line p-2 align-top no-print">
-                      {canEdit && !readOnly && (
-                        isSeedChecklistItem(item) ? (
-                          <button
-                            type="button"
-                            className={`text-xs text-muted hover:underline ${FOCUS_RING}`}
-                            onClick={() => markChecklistItemNA(audit.id, item.id)}
-                          >
-                            標不適用
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
-                            onClick={() => handleRemove(item.id, item.judgment === '不符')}
-                          >
-                            刪除
-                          </button>
-                        )
+                      {isSeedChecklistItem(item) ? (
+                        <button
+                          type="button"
+                          className={`text-xs text-muted hover:underline ${FOCUS_RING}`}
+                          onClick={() => markChecklistItemNA(audit.id, item.id)}
+                        >
+                          標不適用
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
+                          onClick={() => handleRemove(item.id, isItemNonConform(item))}
+                        >
+                          刪除
+                        </button>
                       )}
                     </td>
                   </tr>

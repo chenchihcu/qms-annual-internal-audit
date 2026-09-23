@@ -1,4 +1,4 @@
-import type { DepartmentProfile, MonthStatus, PlanRow, RiskLevel } from '../types'
+import type { DepartmentProfile, MonthStatus, PlanRow, ProcedureRiskRecord, RiskLevel } from '../types'
 import type { ProcedurePlanEntry } from '../data/procedurePlan'
 import {
   countChecklistItems,
@@ -6,7 +6,46 @@ import {
   getProceduresRaw,
   isSeedFinalized,
 } from '../data/checklistLoader'
-import { calculateRiskLevel } from './risk'
+import { calculateProcedurePriority, calculateRiskLevel, clampRiskValue } from './risk'
+
+export type OsBand = 'low' | 'mid' | 'high'
+
+export const OS_BAND_SCALE: Record<OsBand, number> = {
+  low: 1,
+  mid: 3,
+  high: 5,
+}
+
+export const OS_BAND_LABELS: Record<OsBand, string> = {
+  low: '低',
+  mid: '中',
+  high: '高',
+}
+
+export const OS_BAND_ORDER: OsBand[] = ['low', 'mid', 'high']
+
+export const OCCURRENCE_BAND_GUIDE: Record<OsBand, string> = {
+  low: '近兩年幾乎未發生',
+  mid: '約每年一次',
+  high: '一年多次或持續發生',
+}
+
+export const SEVERITY_BAND_GUIDE: Record<OsBand, string> = {
+  low: '內部可吸收、無外部衝擊',
+  mid: '需矯正、影響部門績效',
+  high: '客訴、認證觀察或法規不合格',
+}
+
+export function scaleToOsBand(scale: number): OsBand {
+  const s = clampRiskValue(scale)
+  if (s <= 2) return 'low'
+  if (s <= 3) return 'mid'
+  return 'high'
+}
+
+export function osBandToScale(band: OsBand): number {
+  return OS_BAND_SCALE[band]
+}
 
 export const STAKEHOLDER_WEIGHTS: Record<string, number> = {
   客戶: 10,
@@ -23,8 +62,10 @@ export interface PlannerInput {
   planWindowStart: string
   planWindowEnd: string
   managementReviewDate?: string
+  externalAuditDate?: string
   existingRows?: PlanRow[]
   openCarryForwardCount?: number
+  procedureRisks?: ProcedureRiskRecord[]
 }
 
 export interface PlannerOptions {
@@ -35,24 +76,32 @@ function parseMonth(dateStr: string, year: number): number | null {
   if (!dateStr) return null
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return null
-  return d.getFullYear() === year ? d.getMonth() + 1 : d.getMonth() + 1
+  if (d.getFullYear() !== year) return null
+  return d.getMonth() + 1
 }
 
-function getWindowMonths(
+export function getWindowMonths(
   year: number,
   start: string,
   end: string,
   mgmtReview?: string,
+  externalAudit?: string,
 ): number[] {
   const startMonth = parseMonth(start, year) ?? 1
   const endMonth = parseMonth(end, year) ?? 12
   let bufferEnd = endMonth
 
+  const cutoffMonths: number[] = []
   if (mgmtReview) {
     const reviewMonth = parseMonth(mgmtReview, year)
-    if (reviewMonth && reviewMonth > 1) {
-      bufferEnd = Math.min(bufferEnd, reviewMonth - 1)
-    }
+    if (reviewMonth && reviewMonth > 1) cutoffMonths.push(reviewMonth - 1)
+  }
+  if (externalAudit) {
+    const extMonth = parseMonth(externalAudit, year)
+    if (extMonth && extMonth > 1) cutoffMonths.push(extMonth - 1)
+  }
+  if (cutoffMonths.length > 0) {
+    bufferEnd = Math.min(bufferEnd, ...cutoffMonths)
   }
 
   const months: number[] = []
@@ -72,9 +121,68 @@ export function calculateDepartmentPriority(dept: DepartmentProfile): number {
   return stakeholderScore * 2 + index
 }
 
+/** 部門風險等級 → 年度計畫窗口內建議稽核次數（不含跨年未結案加成） */
+export function annualAuditFrequencyForLevel(level: RiskLevel): number {
+  if (level === '高') return 3
+  if (level === '中') return 2
+  return 1
+}
+
+/** Shown beside auto-arrange preview / apply actions that rewrite plan months. */
+export const MANUAL_OVERRIDE_PLAN_NOTE = '手動覆寫的計畫列會保留。'
+
+export const ARRANGEMENT_IMPACT_RULES = {
+  scope: '此部門底下各 QP 在年度計畫的「順序」與「月格次數／早晚」。',
+  trigger: '僅在方案風險或年度計畫頁按「預覽自動編排」時套用。',
+  excludes: 'QR-02-01 已存檔的 QP 改以方案風險為準；已手動覆寫的月格不會被改寫。',
+  columnNote: '本欄為各部門在「尚未存 QR-02-01」時的估算；實際以自動編排結果為準。',
+} as const
+
+/** 利害關係人工作流與紙本／標準對照（本頁無獨立 QR 匯出） */
+export const STAKEHOLDER_WORKFLOW_REFERENCES = {
+  procedures: [
+    { code: 'QP-28', name: '內部稽核管理程序', note: '年度計畫擬定、稽核頻率與月格編排' },
+    { code: 'QP-02', name: '風險與機會管理程序', note: 'QR-02-01 方案風險（與本頁部門 O×S 分軌）' },
+  ],
+  clauses: [
+    { standard: 'ISO 9001', clause: '4.2', label: '了解相關方需求與期望（利害關係人標籤）' },
+    { standard: 'ISO 9001', clause: '9.2', label: '內部稽核方案規劃（計畫順序／頻率）' },
+  ],
+  forms: [
+    { code: '—', name: '本頁工作流輸入', role: '部門利害關係人與 O／S 三檔事實', storage: '備份 JSON' },
+    { code: 'QR-28-01', name: '年度稽核計畫表', role: '編排產出（月格）', tab: 'plan' as const },
+    { code: 'QR-02-01', name: '風險與機會監控評估表', role: 'QP 方案風險（優先於本頁估算）', tab: 'risk' as const },
+  ],
+} as const
+
+export interface ArrangementImpact {
+  summary: string
+  sortLine: string
+  frequencyLine: string
+  timingLine: string
+}
+
+export function describeArrangementImpact(
+  dept: DepartmentProfile,
+  level: RiskLevel,
+): ArrangementImpact {
+  const priority = calculateDepartmentPriority(dept)
+  const freq = annualAuditFrequencyForLevel(level)
+  const hasCustomerReg = dept.stakeholders.some((s) => s === '客戶' || s === '法規/認證')
+  const preferEarly = level === '高' || hasCustomerReg
+
+  const sortLine = `QP 排序：優先分數 ${priority}（高者先排進月格）`
+  const frequencyLine = `年次數：約 ${freq} 次（依部門風險「${level}」；高 3／中 2／低 1）`
+  const timingLine = preferEarly
+    ? `月格時點：偏計畫窗口前半${hasCustomerReg ? '（含客戶／法規標籤）' : '（高風險）'}`
+    : '月格時點：窗口內均衡分散'
+  const summary = `本部門 QP · 優先 ${priority} · 年約 ${freq} 次 · ${preferEarly ? '偏早' : '均衡'}`
+
+  return { summary, sortLine, frequencyLine, timingLine }
+}
+
 function frequencyForRisk(level: RiskLevel, carryBoost: number): number {
-  const base = level === '高' ? 3 : level === '中' ? 2 : 1
-  return Math.min(4, base + (carryBoost > 0 ? 1 : 0))
+  return Math.min(4, annualAuditFrequencyForLevel(level) + (carryBoost > 0 ? 1 : 0))
 }
 
 function distributeMonths(
@@ -115,7 +223,7 @@ function distributeMonths(
 }
 
 function emptyMonths(): MonthStatus[] {
-  return Array.from({ length: 12 }, () => null as MonthStatus)
+  return Array.from({ length: 12 }, () => null) as MonthStatus[]
 }
 
 export function autoArrangePlan(
@@ -129,16 +237,62 @@ export function autoArrangePlan(
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
     existingRows,
     openCarryForwardCount = 0,
+    procedureRisks = [],
   } = input
 
   const deptMap = new Map(departments.map((d) => [d.id, d]))
+  const riskMap = new Map(
+    procedureRisks.map((r) => [`${r.qpCode}|${r.departmentId}`, r]),
+  )
+
+  function resolveRiskLevel(entry: ProcedurePlanEntry, dept: DepartmentProfile): RiskLevel {
+    const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
+    if (saved) {
+      const values = {
+        inherentRisk: saved.inherentRisk,
+        previousInternalNcrCount: saved.previousInternalNcrCount,
+        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
+        overdueOpenNcrCount: saved.overdueOpenNcrCount,
+        customerComplaintLevel: saved.customerComplaintLevel,
+        changeImpact: saved.changeImpact,
+        monthsSinceLastAudit: saved.monthsSinceLastAudit,
+      }
+      return calculateProcedurePriority(values).level
+    }
+    const seedRisk = entry.riskLevel ?? '低'
+    const { level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
+    if (seedRisk === '高' || level === '高') return '高'
+    if (seedRisk === '中' || level === '中') return '中'
+    return '低'
+  }
+
+  function priorityScore(entry: ProcedurePlanEntry, dept: DepartmentProfile): number {
+    const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
+    if (saved) {
+      return calculateProcedurePriority({
+        inherentRisk: saved.inherentRisk,
+        previousInternalNcrCount: saved.previousInternalNcrCount,
+        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
+        overdueOpenNcrCount: saved.overdueOpenNcrCount,
+        customerComplaintLevel: saved.customerComplaintLevel,
+        changeImpact: saved.changeImpact,
+        monthsSinceLastAudit: saved.monthsSinceLastAudit,
+      }).score * 100
+    }
+    const riskOrder = { 高: 3, 中: 2, 低: 1 }
+    const seedRisk = riskOrder[entry.riskLevel ?? '低']
+    const deptPri = calculateDepartmentPriority(dept)
+    return seedRisk * 100 + deptPri
+  }
   const availableMonths = getWindowMonths(
     auditYear,
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
   )
 
   const monthLoad = new Array(12).fill(0)
@@ -151,14 +305,10 @@ export function autoArrangePlan(
   })
 
   const sortedEntries = [...planEntries].sort((a, b) => {
-    const riskOrder = { 高: 3, 中: 2, 低: 1 }
-    const ra = riskOrder[a.riskLevel ?? '低']
-    const rb = riskOrder[b.riskLevel ?? '低']
-    if (rb !== ra) return rb - ra
     const deptA = deptMap.get(a.departmentId)
     const deptB = deptMap.get(b.departmentId)
-    const priA = deptA ? calculateDepartmentPriority(deptA) : 0
-    const priB = deptB ? calculateDepartmentPriority(deptB) : 0
+    const priA = deptA ? priorityScore(a, deptA) : 0
+    const priB = deptB ? priorityScore(b, deptB) : 0
     if (priB !== priA) return priB - priA
     return a.qpCode.localeCompare(b.qpCode)
   })
@@ -176,14 +326,7 @@ export function autoArrangePlan(
       return
     }
 
-    const seedRisk = entry.riskLevel ?? '低'
-    const { level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
-    const riskLevel: RiskLevel =
-      seedRisk === '高' || level === '高'
-        ? '高'
-        : seedRisk === '中' || level === '中'
-          ? '中'
-          : '低'
+    const riskLevel = resolveRiskLevel(entry, dept)
 
     const freq = frequencyForRisk(riskLevel, openCarryForwardCount > 2 ? 1 : 0)
     const preferEarly =
@@ -205,7 +348,7 @@ export function autoArrangePlan(
       process: entry.process,
       documents: entry.documents,
       auditUnit: dept.auditUnit,
-      owner: entry.owner || dept.owner,
+      owner: dept.owner || entry.owner,
       auditors: dept.defaultAuditors || options.leadAuditor || '',
       auditCategory: entry.auditCategory,
       months,
@@ -239,7 +382,7 @@ export function buildAuditFocusOverview(rows: PlanRow[]): AuditFocusRow[] {
         sheet: f.sheet,
         qpCode: qp,
         department: f.department,
-        owner: f.owner,
+        owner: row?.owner ?? f.owner,
         riskLevel: f.riskLevel as RiskLevel,
         itemCount: countChecklistItems(qp, dept),
         auditCategory: row?.auditCategory ?? '系統稽核',

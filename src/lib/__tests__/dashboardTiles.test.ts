@@ -6,7 +6,7 @@ describe('buildDashboardRiskTiles', () => {
   it('builds clickable audit keys for plan rows', () => {
     const state = createDemoState()
     const company = state.companies.jiurun
-    const groups = buildDashboardRiskTiles(company, state.settings.scoringRules)
+    const groups = buildDashboardRiskTiles(company, state.companySettings.jiurun.scoringRules)
     expect(groups.length).toBeGreaterThan(0)
     const firstTile = groups[0].tiles[0]
     expect(firstTile.auditKey).toMatch(/^(QP|QR)-/)

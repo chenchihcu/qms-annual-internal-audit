@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeInternalAuditComplete,
   createDefaultPrepState,
   countPrepProgress,
   evaluatePrepSequence,
-  getEffectiveInternalAuditComplete,
   getPrepTemplate,
   isItemDone,
-  isProcedureAuditCompleteEnough,
   itemHasCallout,
+  migratePrepState,
   EXTERNAL_AUDIT_PREP_SEED,
+  DEFAULT_COMPANY_RELATIONSHIPS,
 } from '../externalAuditPrep'
-import type { CompanyData, ProcedureAudit } from '../../types'
+import { relationshipCheckKey } from '../../types'
+import type { CompanyData } from '../../types'
 
 const emptyCompany = (): CompanyData => ({
   name: '測試',
@@ -23,9 +23,18 @@ const emptyCompany = (): CompanyData => ({
   suggestions: [],
 })
 
+const baseSettings = {
+  auditYear: 2026,
+  leadAuditor: '王大明',
+  yearStart: '2026-01-01',
+  planWindowStart: '2026-02-01',
+  planWindowEnd: '2026-11-30',
+  scoringRules: { conform: 1, nonConform: 0, observation: 0.5 },
+}
+
 describe('EXTERNAL_AUDIT_PREP_SEED', () => {
-  it('has 19 prep items (no item 13) with expected scope modes', () => {
-    expect(EXTERNAL_AUDIT_PREP_SEED.items).toHaveLength(19)
+  it('has 23 prep items (no item 13) with expected scope modes', () => {
+    expect(EXTERNAL_AUDIT_PREP_SEED.items).toHaveLength(23)
     const modes = EXTERNAL_AUDIT_PREP_SEED.items.map((i) => i.scope.mode)
     expect(modes.filter((m) => m === 'both_separate').length).toBeGreaterThan(0)
     expect(modes.filter((m) => m === 'merged').length).toBeGreaterThan(0)
@@ -42,26 +51,41 @@ describe('EXTERNAL_AUDIT_PREP_SEED', () => {
 describe('isItemDone', () => {
   it('both_separate requires both companies', () => {
     const template = getPrepTemplate(1)!
-    const state = createDefaultPrepState(2026).items[0]
-    expect(isItemDone(template, state)).toBe(false)
-    expect(isItemDone(template, { ...state, jiurunDone: true })).toBe(false)
+    const prep = createDefaultPrepState(2026)
+    const state = prep.items[0]
+    expect(isItemDone(template, state, prep)).toBe(false)
+    expect(isItemDone(template, { ...state, jiurunDone: true }, prep)).toBe(false)
     expect(
-      isItemDone(template, { ...state, jiurunDone: true, zhenglongxingDone: true }),
+      isItemDone(template, { ...state, jiurunDone: true, zhenglongxingDone: true }, prep),
     ).toBe(true)
+  })
+
+  it('item 15 requires relationship check even when both company columns are checked', () => {
+    const template = getPrepTemplate(15)!
+    const prep = createDefaultPrepState(2026)
+    const state = prep.items.find((item) => item.no === 15)!
+    state.jiurunDone = true
+    state.zhenglongxingDone = true
+    expect(isItemDone(template, state, prep)).toBe(false)
+    const gate = DEFAULT_COMPANY_RELATIONSHIPS[0]
+    prep.relationshipChecks[relationshipCheckKey(gate.from, gate.to, gate.relation)] = true
+    expect(isItemDone(template, state, prep)).toBe(true)
   })
 
   it('merged uses mergedDone only', () => {
     const template = getPrepTemplate(2)!
-    const state = createDefaultPrepState(2026).items.find((i) => i.no === 2)!
-    expect(isItemDone(template, state)).toBe(false)
-    expect(isItemDone(template, { ...state, mergedDone: true })).toBe(true)
+    const prep = createDefaultPrepState(2026)
+    const state = prep.items.find((i) => i.no === 2)!
+    expect(isItemDone(template, state, prep)).toBe(false)
+    expect(isItemDone(template, { ...state, mergedDone: true }, prep)).toBe(true)
   })
 
   it('site_scope uses completed flag', () => {
     const template = getPrepTemplate(17)!
-    const state = createDefaultPrepState(2026).items.find((i) => i.no === 17)!
-    expect(isItemDone(template, state)).toBe(false)
-    expect(isItemDone(template, { ...state, completed: true })).toBe(true)
+    const prep = createDefaultPrepState(2026)
+    const state = prep.items.find((i) => i.no === 17)!
+    expect(isItemDone(template, state, prep)).toBe(false)
+    expect(isItemDone(template, { ...state, completed: true }, prep)).toBe(true)
   })
 })
 
@@ -72,13 +96,13 @@ describe('countPrepProgress', () => {
     prep.items[0].zhenglongxingDone = true
     prep.items[1].mergedDone = true
     const { done, total } = countPrepProgress(prep)
-    expect(total).toBe(19)
+    expect(total).toBe(23)
     expect(done).toBe(2)
   })
 })
 
 describe('evaluatePrepSequence', () => {
-  it('warns when open NCRs exist', () => {
+  it('warns when open NCRs exist with per-company counts', () => {
     const prep = createDefaultPrepState(2026)
     const companies = {
       jiurun: {
@@ -102,40 +126,30 @@ describe('evaluatePrepSequence', () => {
       },
       zhenglongxing: emptyCompany(),
     }
-    const result = evaluatePrepSequence(prep, companies)
+    const result = evaluatePrepSequence({
+      prep,
+      companies,
+      companySettings: {
+        jiurun: baseSettings,
+        zhenglongxing: baseSettings,
+      },
+      yearArchives: {},
+    })
     expect(result.ncrWarning).toBe(true)
     expect(result.openNcrCount).toBe(1)
-    expect(result.messages.some((m) => m.includes('NCR'))).toBe(true)
+    expect(result.openNcrByCompany.jiurun).toBe(1)
+    expect(result.messages.some((m) => m.includes('九潤 1'))).toBe(true)
   })
 
   it('warns when management review done before internal audit', () => {
     const prep = createDefaultPrepState(2026)
     prep.managementReviewComplete = true
-    const incompleteCompany = (): CompanyData => ({
-      ...emptyCompany(),
-      planRows: [
-        {
-          id: 'r1',
-          qpCode: 'QP-01',
-          departmentId: 'd1',
-          sequence: 1,
-          riskLevel: '中',
-          department: '管理部',
-          process: 'p',
-          documents: 'd',
-          auditUnit: '品保',
-          owner: 'o',
-          auditors: '',
-          auditCategory: '系統稽核',
-          months: Array(12).fill(null),
-          manualOverride: false,
-        },
-      ],
-      audits: [],
-    })
-    const result = evaluatePrepSequence(prep, {
-      jiurun: incompleteCompany(),
-      zhenglongxing: incompleteCompany(),
+    prep.internalAuditComplete = false
+    const result = evaluatePrepSequence({
+      prep,
+      companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
+      companySettings: { jiurun: baseSettings, zhenglongxing: baseSettings },
+      yearArchives: {},
     })
     expect(result.sequenceWarning).toBe(true)
     expect(result.messages.some((m) => m.includes('管理審查'))).toBe(true)
@@ -143,88 +157,50 @@ describe('evaluatePrepSequence', () => {
 
   it('no sequence warning when order is correct', () => {
     const prep = createDefaultPrepState(2026)
-    prep.internalAuditCompleteOverride = true
+    prep.internalAuditComplete = true
     prep.managementReviewComplete = true
-    const result = evaluatePrepSequence(prep, {
-      jiurun: emptyCompany(),
-      zhenglongxing: emptyCompany(),
+    const result = evaluatePrepSequence({
+      prep,
+      companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
+      companySettings: { jiurun: baseSettings, zhenglongxing: baseSettings },
+      yearArchives: {},
     })
     expect(result.sequenceWarning).toBe(false)
   })
 })
 
-describe('computeInternalAuditComplete', () => {
-  const baseAudit = (withDate: boolean, allJudged: boolean): ProcedureAudit => ({
-    id: 'a1',
-    qpCode: 'QP-01',
-    departmentId: 'd1',
-    department: '管理部',
-    process: 'p',
-    documents: 'd',
-    notifyDate: '',
-    auditDate: withDate ? '2026-03-01' : '',
-    departmentManager: '',
-    auditors: '',
-    auditCategory: '系統稽核',
-    items: [
-      {
-        id: 'i1',
-        category: 'c',
-        no: 1,
-        content: 'x',
-        judgment: allJudged ? '符合' : null,
-        description: '',
-      },
-    ],
-  })
-
-  it('is complete when audit has date', () => {
-    expect(isProcedureAuditCompleteEnough(baseAudit(true, false))).toBe(true)
-  })
-
-  it('is complete when all items judged without date', () => {
-    expect(isProcedureAuditCompleteEnough(baseAudit(false, true))).toBe(true)
-  })
-
-  it('requires both companies plan rows satisfied', () => {
-    const company = (): CompanyData => ({
-      ...emptyCompany(),
-      planRows: [
-        {
-          id: 'r1',
-          qpCode: 'QP-01',
-          departmentId: 'd1',
-          sequence: 1,
-          riskLevel: '中',
-          department: '管理部',
-          process: 'p',
-          documents: 'd',
-          auditUnit: '品保',
-          owner: 'o',
-          auditors: '',
-          auditCategory: '系統稽核',
-          months: Array(12).fill(null),
-          manualOverride: false,
-        },
-      ],
-      audits: [baseAudit(true, false)],
+describe('migratePrepState', () => {
+  it('preserves boolean flags', () => {
+    const migrated = migratePrepState({
+      year: 2026,
+      internalAuditComplete: true,
+      managementReviewComplete: false,
+      relationshipChecks: {},
+      items: createDefaultPrepState(2026).items,
     })
-    const summary = computeInternalAuditComplete({
-      jiurun: company(),
-      zhenglongxing: company(),
-    })
-    expect(summary.complete).toBe(true)
+    expect(migrated.internalAuditComplete).toBe(true)
+    expect(migrated.managementReviewComplete).toBe(false)
   })
 
-  it('uses override when set', () => {
-    const prep = createDefaultPrepState(2026)
-    prep.internalAuditCompleteOverride = true
-    expect(
-      getEffectiveInternalAuditComplete(prep, {
-        jiurun: emptyCompany(),
-        zhenglongxing: emptyCompany(),
-      }),
-    ).toBe(true)
+  it('normalizes per-company record to true only when both companies are checked', () => {
+    const migratedBoth = migratePrepState({
+      internalAuditComplete: { jiurun: true, zhenglongxing: true },
+      managementReviewComplete: { jiurun: true, zhenglongxing: true },
+    } as Parameters<typeof migratePrepState>[0])
+    expect(migratedBoth.internalAuditComplete).toBe(true)
+    expect(migratedBoth.managementReviewComplete).toBe(true)
+
+    const migratedMixed = migratePrepState({
+      internalAuditComplete: { jiurun: true, zhenglongxing: false },
+      managementReviewComplete: { jiurun: false, zhenglongxing: false },
+    } as Parameters<typeof migratePrepState>[0])
+    expect(migratedMixed.internalAuditComplete).toBe(false)
+    expect(migratedMixed.managementReviewComplete).toBe(false)
+  })
+
+  it('defaults onsiteSlots to empty array when missing', () => {
+    const migrated = migratePrepState({ year: 2026 })
+    expect(migrated.onsiteSlots).toEqual([])
   })
 })
 

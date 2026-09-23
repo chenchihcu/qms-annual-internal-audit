@@ -1,16 +1,22 @@
 import prepSeed from '../data/externalAuditPrep.seed.json'
+import relationshipSeed from '../data/companyRelationships.seed.json'
 import type {
   CompanyData,
   CompanyId,
+  CompanyRelationship,
   ExternalAuditPrepItemState,
   ExternalAuditPrepState,
-  ProcedureAudit,
+  ScoringRules,
+  YearArchiveEntry,
 } from '../types'
+import { COMPANY_IDS, COMPANY_LABELS, relationshipCheckKey } from '../types'
 
 export type PrepScopeMode = 'both_separate' | 'merged' | 'site_scope'
 
 export interface PrepTemplateItem {
+  id?: string
   no: number
+  sub?: string
   title: string
   owner: string
   scope: { mode: PrepScopeMode }
@@ -28,12 +34,27 @@ export const EXTERNAL_AUDIT_PREP_SEED = prepSeed as {
   otherNotes: string[]
 }
 
+export const DEFAULT_COMPANY_RELATIONSHIPS = relationshipSeed as CompanyRelationship[]
+
+function normalizeSequenceFlag(
+  value: boolean | Record<CompanyId, boolean> | undefined,
+): boolean {
+  if (typeof value === 'boolean') return value
+  if (value && typeof value === 'object') {
+    return COMPANY_IDS.every((id) => Boolean(value[id]))
+  }
+  return false
+}
+
 export function createDefaultPrepState(year: number): ExternalAuditPrepState {
   return {
     year,
+    externalAuditDate: undefined,
+    internalAuditComplete: false,
     managementReviewComplete: false,
+    relationshipChecks: {},
     items: EXTERNAL_AUDIT_PREP_SEED.items.map((item) => ({
-      id: `prep-${item.no}`,
+      id: item.id ?? `prep-${item.no}`,
       no: item.no,
       jiurunDone: false,
       zhenglongxingDone: false,
@@ -41,6 +62,26 @@ export function createDefaultPrepState(year: number): ExternalAuditPrepState {
       completed: false,
       remark: '',
     })),
+    onsiteSlots: [],
+  }
+}
+
+export function migratePrepState(
+  old: Partial<ExternalAuditPrepState> & {
+    internalAuditComplete?: boolean | Record<CompanyId, boolean>
+    managementReviewComplete?: boolean | Record<CompanyId, boolean>
+  },
+  externalAuditDateFromSettings?: string,
+): ExternalAuditPrepState {
+  const year = old.year ?? new Date().getFullYear()
+  return {
+    year,
+    externalAuditDate: old.externalAuditDate ?? externalAuditDateFromSettings,
+    internalAuditComplete: normalizeSequenceFlag(old.internalAuditComplete),
+    managementReviewComplete: normalizeSequenceFlag(old.managementReviewComplete),
+    relationshipChecks: old.relationshipChecks ?? {},
+    items: old.items ?? createDefaultPrepState(year).items,
+    onsiteSlots: old.onsiteSlots ?? [],
   }
 }
 
@@ -48,175 +89,115 @@ export function getPrepTemplate(no: number): PrepTemplateItem | undefined {
   return EXTERNAL_AUDIT_PREP_SEED.items.find((i) => i.no === no)
 }
 
+export function getPrepTemplateForState(
+  itemState: ExternalAuditPrepItemState,
+): PrepTemplateItem | undefined {
+  return (
+    EXTERNAL_AUDIT_PREP_SEED.items.find((item) => item.id === itemState.id) ??
+    getPrepTemplate(itemState.no)
+  )
+}
+
+function relationshipGatesSatisfied(
+  prepItemNo: number,
+  prep: ExternalAuditPrepState,
+  relationships: CompanyRelationship[],
+): boolean {
+  const gates = relationships.filter((rel) => rel.prepItemNo === prepItemNo)
+  return gates.every((gate) => prep.relationshipChecks[relationshipCheckKey(gate.from, gate.to, gate.relation)])
+}
+
 export function isItemDone(
   template: PrepTemplateItem,
-  state: ExternalAuditPrepItemState,
+  itemState: ExternalAuditPrepItemState,
+  prep: ExternalAuditPrepState,
+  relationships: CompanyRelationship[] = DEFAULT_COMPANY_RELATIONSHIPS,
 ): boolean {
+  let base = false
   switch (template.scope.mode) {
     case 'both_separate':
-      return state.jiurunDone && state.zhenglongxingDone
+      base = itemState.jiurunDone && itemState.zhenglongxingDone
+      break
     case 'merged':
-      return state.mergedDone
+      base = itemState.mergedDone
+      break
     case 'site_scope':
-      return state.completed
+      base = itemState.completed
+      break
     default:
       return false
   }
+  if (!base) return false
+  return relationshipGatesSatisfied(template.no, prep, relationships)
 }
 
-export function countPrepProgress(state: ExternalAuditPrepState): {
+export function countPrepProgress(
+  prep: ExternalAuditPrepState,
+  relationships: CompanyRelationship[] = DEFAULT_COMPANY_RELATIONSHIPS,
+): {
   done: number
   total: number
 } {
   let done = 0
-  for (const itemState of state.items) {
+  for (const itemState of prep.items) {
     const template = getPrepTemplate(itemState.no)
-    if (template && isItemDone(template, itemState)) done++
+    if (template && isItemDone(template, itemState, prep, relationships)) done++
   }
-  return { done, total: state.items.length }
+  return { done, total: prep.items.length }
 }
 
-export interface InternalAuditCompleteDetail {
-  companyId: string
-  companyName: string
-  plannedCount: number
-  completedCount: number
-  complete: boolean
+export interface PrepSequenceContext {
+  prep: ExternalAuditPrepState
+  companies: Record<CompanyId, CompanyData>
+  companySettings: Record<CompanyId, import('../types').AuditSettings>
+  yearArchives: Record<string, YearArchiveEntry>
 }
 
-export interface InternalAuditCompleteSummary {
-  complete: boolean
-  details: InternalAuditCompleteDetail[]
-  incompletePlanKeys: string[]
-}
-
-const DUAL_COMPANY_IDS: CompanyId[] = ['jiurun', 'zhenglongxing']
-
-/** 單一程序稽核是否已足夠完成（有實施日期，或查檢項皆已判定） */
-export function isProcedureAuditCompleteEnough(audit: ProcedureAudit | undefined): boolean {
-  if (!audit) return false
-  if (audit.auditDate.trim() !== '') return true
-  if (audit.items.length === 0) return false
-  return audit.items.every((item) => item.judgment !== null)
-}
-
-export function computeCompanyInternalAuditComplete(
-  companyId: string,
-  company: CompanyData,
-): InternalAuditCompleteDetail {
-  let completedCount = 0
-
-  for (const row of company.planRows) {
-    const audit = company.audits.find(
-      (a) => a.qpCode === row.qpCode && a.departmentId === row.departmentId,
-    )
-    if (isProcedureAuditCompleteEnough(audit)) {
-      completedCount++
-    }
-  }
-
-  return {
-    companyId,
-    companyName: company.name || companyId,
-    plannedCount: company.planRows.length,
-    completedCount,
-    complete: company.planRows.length === 0 || completedCount === company.planRows.length,
-  }
-}
-
-export function computeInternalAuditComplete(
-  companies: Record<string, CompanyData>,
-  companyIds: CompanyId[] = DUAL_COMPANY_IDS,
-): InternalAuditCompleteSummary {
-  const details = companyIds.map((id) =>
-    computeCompanyInternalAuditComplete(id, companies[id] ?? emptyCompany()),
-  )
-  const incompletePlanKeys = details.flatMap((d) =>
-    d.complete ? [] : [`${d.companyId}:${d.plannedCount - d.completedCount}`],
-  )
-  return {
-    complete: details.every((d) => d.complete),
-    details,
-    incompletePlanKeys,
-  }
-}
-
-function emptyCompany(): CompanyData {
-  return {
-    name: '',
-    departments: [],
-    planRows: [],
-    audits: [],
-    ncrs: [],
-    observations: [],
-    suggestions: [],
-  }
-}
-
-export function getInternalAuditCompleteOverride(prep: ExternalAuditPrepState): boolean | undefined {
-  if (prep.internalAuditCompleteOverride !== undefined) {
-    return prep.internalAuditCompleteOverride
-  }
-  if (prep.internalAuditComplete !== undefined) {
-    return prep.internalAuditComplete
-  }
-  return undefined
-}
-
-export function getEffectiveInternalAuditComplete(
-  prep: ExternalAuditPrepState,
-  companies: Record<string, CompanyData>,
-): boolean {
-  const override = getInternalAuditCompleteOverride(prep)
-  if (override !== undefined) return override
-  return computeInternalAuditComplete(companies).complete
+function companyDataForPrepYear(
+  companyId: CompanyId,
+  prepYear: number,
+  companies: Record<CompanyId, CompanyData>,
+  companySettings: Record<CompanyId, import('../types').AuditSettings>,
+  yearArchives: Record<string, YearArchiveEntry>,
+): CompanyData {
+  const liveYear = companySettings[companyId]?.auditYear
+  if (liveYear === prepYear) return companies[companyId]
+  const archived = yearArchives[String(prepYear)]?.companies[companyId]
+  return archived ?? companies[companyId]
 }
 
 export interface PrepSequenceWarnings {
   openNcrCount: number
+  openNcrByCompany: Record<CompanyId, number>
   ncrWarning: boolean
   sequenceWarning: boolean
-  internalAuditComputed: boolean
-  internalAuditOverridden: boolean
   messages: string[]
 }
 
-export function evaluatePrepSequence(
-  prep: ExternalAuditPrepState,
-  companies: Record<string, CompanyData>,
-): PrepSequenceWarnings {
+export function evaluatePrepSequence(context: PrepSequenceContext): PrepSequenceWarnings {
+  const { prep, companies, companySettings, yearArchives } = context
   const messages: string[] = []
-  let openNcrCount = 0
-  for (const co of Object.values(companies)) {
-    openNcrCount += co.ncrs.filter((n) => n.status !== '結案').length
+  const openNcrByCompany: Record<CompanyId, number> = { jiurun: 0, zhenglongxing: 0 }
+
+  for (const companyId of COMPANY_IDS) {
+    const co = companyDataForPrepYear(companyId, prep.year, companies, companySettings, yearArchives)
+    openNcrByCompany[companyId] = co.ncrs.filter((n) => n.status !== '結案').length
   }
 
+  const openNcrCount = openNcrByCompany.jiurun + openNcrByCompany.zhenglongxing
   const ncrWarning = openNcrCount > 0
   if (ncrWarning) {
-    messages.push(`尚有 ${openNcrCount} 件未結案內部 NCR，建議於外部稽核前關閉。`)
+    messages.push(
+      `未結內部 NCR：九潤 ${openNcrByCompany.jiurun}、正隆興 ${openNcrByCompany.zhenglongxing}（對齊外稽準備 ${prep.year} 年）。`,
+    )
   }
 
-  const internalAuditComputed = computeInternalAuditComplete(companies).complete
-  const internalAuditOverridden = getInternalAuditCompleteOverride(prep) !== undefined
-  const effectiveInternalComplete = getEffectiveInternalAuditComplete(prep, companies)
-
-  const sequenceWarning = prep.managementReviewComplete && !effectiveInternalComplete
+  const sequenceWarning = prep.managementReviewComplete && !prep.internalAuditComplete
   if (sequenceWarning) {
     messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求。')
   }
 
-  if (internalAuditOverridden && prep.managementReviewComplete && !internalAuditComputed) {
-    messages.push('內部稽核已手動標記完成，但程序稽核資料顯示尚有未完成項目。')
-  }
-
-  return {
-    openNcrCount,
-    ncrWarning,
-    sequenceWarning,
-    internalAuditComputed,
-    internalAuditOverridden,
-    messages,
-  }
+  return { openNcrCount, openNcrByCompany, ncrWarning, sequenceWarning, messages }
 }
 
 export function itemHasCallout(no: number): 'quality-objectives' | 'risk-climate' | 'satisfaction' | null {
@@ -224,4 +205,165 @@ export function itemHasCallout(no: number): 'quality-objectives' | 'risk-climate
   if (no === 5) return 'risk-climate'
   if (no === 15) return 'satisfaction'
   return null
+}
+
+export function relationshipsForPrepItem(
+  prepItemNo: number,
+  relationships: CompanyRelationship[] = DEFAULT_COMPANY_RELATIONSHIPS,
+): CompanyRelationship[] {
+  return relationships.filter((rel) => rel.prepItemNo === prepItemNo)
+}
+
+export function prepYearMismatchCompanies(
+  prepYear: number,
+  companySettings: Record<CompanyId, import('../types').AuditSettings>,
+): CompanyId[] {
+  return COMPANY_IDS.filter((id) => companySettings[id].auditYear !== prepYear)
+}
+
+export function formatPrepYearMismatch(
+  prepYear: number,
+  companySettings: Record<CompanyId, import('../types').AuditSettings>,
+): string | null {
+  const mismatched = prepYearMismatchCompanies(prepYear, companySettings)
+  if (mismatched.length === 0) return null
+  return `外稽準備年度為 ${prepYear}，但 ${mismatched.map((id) => COMPANY_LABELS[id]).join('、')} 內稽年度不同 — 請確認台帳與準備表對齊。`
+}
+
+export interface PrepDoneContext {
+  company: CompanyData
+  rules?: ScoringRules
+}
+
+export interface PrepSeparateHalfDone {
+  id: string
+  no: number
+  label: string
+  title: string
+  missing: 'jiurun' | 'zhenglongxing'
+}
+
+export interface PrepQpBlocked {
+  id: string
+  no: number
+  label: string
+  title: string
+  reasons: string[]
+}
+
+export interface PrepGapSummaryLine {
+  no: number
+  label: string
+  text: string
+}
+
+export interface PrepGaps {
+  separateHalfDone: PrepSeparateHalfDone[]
+  mergedOpen: string[]
+  siteOpen: string[]
+  separateOpen: string[]
+  qpBlocked: PrepQpBlocked[]
+}
+
+function prepItemLabel(template: PrepTemplateItem): string {
+  return `第${template.no}項`
+}
+
+function shortPrepTitle(template: PrepTemplateItem): string {
+  const cut = template.title.indexOf('（')
+  const base = cut > 0 ? template.title.slice(0, cut) : template.title
+  return base.length > 24 ? `${base.slice(0, 24)}…` : base
+}
+
+export function listPrepGaps(
+  state: ExternalAuditPrepState,
+  _context?: PrepDoneContext,
+): PrepGaps {
+  const separateHalfDone: PrepSeparateHalfDone[] = []
+  const mergedOpen: string[] = []
+  const siteOpen: string[] = []
+  const separateOpen: string[] = []
+
+  for (const itemState of state.items) {
+    const template = getPrepTemplate(itemState.no)
+    if (!template) continue
+    const label = prepItemLabel(template)
+
+    switch (template.scope.mode) {
+      case 'both_separate': {
+        const { jiurunDone, zhenglongxingDone } = itemState
+        if (jiurunDone && !zhenglongxingDone) {
+          separateHalfDone.push({
+            id: itemState.id,
+            no: template.no,
+            label,
+            title: template.title,
+            missing: 'zhenglongxing',
+          })
+        } else if (!jiurunDone && zhenglongxingDone) {
+          separateHalfDone.push({
+            id: itemState.id,
+            no: template.no,
+            label,
+            title: template.title,
+            missing: 'jiurun',
+          })
+        } else if (!jiurunDone && !zhenglongxingDone) {
+          separateOpen.push(itemState.id)
+        }
+        break
+      }
+      case 'merged':
+        if (!itemState.mergedDone) mergedOpen.push(itemState.id)
+        break
+      case 'site_scope':
+        if (!itemState.completed) siteOpen.push(itemState.id)
+        break
+    }
+  }
+
+  return { separateHalfDone, mergedOpen, siteOpen, separateOpen, qpBlocked: [] }
+}
+
+export function summarizePrepGaps(
+  state: ExternalAuditPrepState,
+  context?: PrepDoneContext,
+  limit = 5,
+): PrepGapSummaryLine[] {
+  const gaps = listPrepGaps(state, context)
+  const lines: PrepGapSummaryLine[] = []
+
+  for (const half of gaps.separateHalfDone) {
+    const company = half.missing === 'jiurun' ? '九潤' : '正隆興'
+    const template = getPrepTemplate(half.no)
+    lines.push({
+      no: half.no,
+      label: half.label,
+      text: `項次 ${half.label} ${template ? shortPrepTitle(template) : half.title} — 缺${company}抬頭`,
+    })
+  }
+
+  for (const id of gaps.mergedOpen) {
+    const itemState = state.items.find((item) => item.id === id)
+    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    if (!template) continue
+    lines.push({
+      no: template.no,
+      label: prepItemLabel(template),
+      text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 合併抬頭未完成`,
+    })
+  }
+
+  for (const id of gaps.siteOpen) {
+    const itemState = state.items.find((item) => item.id === id)
+    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    if (!template) continue
+    lines.push({
+      no: template.no,
+      label: prepItemLabel(template),
+      text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 現場範圍未完成`,
+    })
+  }
+
+  return lines.slice(0, limit)
 }
