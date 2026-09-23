@@ -423,6 +423,17 @@ export interface ExternalAuditPrepState {
   onsiteSlots: OnsiteAuditSlot[]
 }
 
+export interface SharedPlanRow extends PlanRow {
+  applicableCompanies: CompanyId[]
+}
+
+/** 兩家公司共用、供未來表單建立時複製的題目文字。 */
+export interface SharedChecklistQuestion {
+  category: string
+  no: number
+  content: string
+}
+
 export interface CompanyData {
   name: string
   keyCustomerName?: string
@@ -465,6 +476,10 @@ export interface AppState {
   companyAuditProfiles: Record<CompanyId, CompanyAuditProfile>
   yearArchives: Record<string, YearArchiveEntry>
   prepArchives?: Record<string, ExternalAuditPrepState>
+  sharedPlanRows?: SharedPlanRow[]
+  /** 舊計畫有差異時保留兩份原值，供人工核對與 JSON 匯出。 */
+  legacyCompanyPlanBackup?: Record<CompanyId, PlanRow[]>
+  sharedChecklistTemplates?: Record<string, SharedChecklistQuestion[]>
   version: number
   /** v6 legacy — migration only; not persisted in v7 */
   settings?: AuditSettings

@@ -1,5 +1,6 @@
 import type { AppState } from '../types'
 import { companySettingsFor } from '../types'
+import { getLegacyPlanConflicts } from './sharedPlan'
 
 export interface ImportSummary {
   version: number
@@ -8,6 +9,8 @@ export interface ImportSummary {
   ncrCount: number
   observationCount: number
   suggestionCount: number
+  sharedPlanCount: number
+  planConflictCount: number
 }
 
 export function summarizeImportState(state: AppState): ImportSummary {
@@ -26,6 +29,8 @@ export function summarizeImportState(state: AppState): ImportSummary {
     ncrCount,
     observationCount,
     suggestionCount,
+    sharedPlanCount: state.sharedPlanRows?.length ?? 0,
+    planConflictCount: getLegacyPlanConflicts(state).length,
   }
 }
 
@@ -34,7 +39,7 @@ export function parseImportJSON(json: string): AppState {
   if (parsed.version < 4) {
     throw new Error('不支援的資料版本')
   }
-  if (!parsed.companies || (!parsed.companySettings && !parsed.settings)) {
+  if (!parsed.companies || !parsed.companySettings) {
     throw new Error('JSON 缺少必要欄位')
   }
   return parsed
