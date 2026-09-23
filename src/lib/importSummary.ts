@@ -1,4 +1,5 @@
 import type { AppState } from '../types'
+import { getLegacyPlanConflicts } from './sharedPlan'
 
 export interface ImportSummary {
   version: number
@@ -7,6 +8,8 @@ export interface ImportSummary {
   ncrCount: number
   observationCount: number
   suggestionCount: number
+  sharedPlanCount: number
+  planConflictCount: number
 }
 
 export function summarizeImportState(state: AppState): ImportSummary {
@@ -25,6 +28,8 @@ export function summarizeImportState(state: AppState): ImportSummary {
     ncrCount,
     observationCount,
     suggestionCount,
+    sharedPlanCount: state.sharedPlanRows?.length ?? 0,
+    planConflictCount: getLegacyPlanConflicts(state).length,
   }
 }
 

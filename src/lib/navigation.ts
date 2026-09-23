@@ -12,6 +12,10 @@ export interface TabGroup {
 
 export const TAB_GROUPS: TabGroup[] = [
   {
+    label: '總覽',
+    tabs: [{ id: 'dashboard', label: '儀表板' }],
+  },
+  {
     label: '規劃',
     tabs: [
       { id: 'settings', label: '設定' },
@@ -34,10 +38,6 @@ export const TAB_GROUPS: TabGroup[] = [
   {
     label: '外部',
     tabs: [{ id: 'prep', label: '外部稽核準備' }],
-  },
-  {
-    label: '總覽',
-    tabs: [{ id: 'dashboard', label: '儀表板' }],
   },
 ]
 

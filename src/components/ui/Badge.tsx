@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
+import { useId, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react'
 
 const colors: Record<string, string> = {
   高: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
@@ -65,7 +65,7 @@ export function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${FOCUS_RING} ${variants[variant]} ${className}`}
+      className={`min-h-11 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING} ${variants[variant]} ${className}`}
       {...rest}
     >
       {children}
@@ -83,6 +83,11 @@ export function Input({
   id,
   min,
   max,
+  onBlur,
+  ariaLabel,
+  hint,
+  error,
+  required,
 }: {
   label?: string
   value: string | number
@@ -93,11 +98,20 @@ export function Input({
   id?: string
   min?: number
   max?: number
+  onBlur?: (value: string) => void
+  ariaLabel?: string
+  hint?: string
+  error?: string
+  required?: boolean
 }) {
-  const inputId = id ?? (label ? `input-${label.replace(/\s/g, '-')}` : undefined)
+  const generatedId = useId()
+  const inputId = id ?? `input-${generatedId}`
+  const hintId = `${inputId}-hint`
+  const errorId = `${inputId}-error`
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
   return (
-    <label className={`block ${className}`} htmlFor={inputId}>
-      {label && <span className="mb-1 block text-sm font-medium text-ink">{label}</span>}
+    <div className={className}>
+      {label && <label className="mb-1 block text-sm font-medium text-ink" htmlFor={inputId}>{label}{required && <><span aria-hidden="true">*</span><span className="sr-only">必填</span></>}</label>}
       <input
         id={inputId}
         type={type}
@@ -106,9 +120,16 @@ export function Input({
         max={max}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+        onBlur={(e) => onBlur?.(e.target.value)}
+        aria-label={ariaLabel}
+        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        required={required}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
       />
-    </label>
+      {hint && <p id={hintId} className="mt-1 text-xs text-muted">{hint}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{error}</p>}
+    </div>
   )
 }
 
@@ -118,22 +139,41 @@ export function Select({
   onChange,
   options,
   id,
+  ariaLabel,
+  hint,
+  error,
+  required,
+  disabled,
 }: {
   label?: string
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
   id?: string
+  ariaLabel?: string
+  hint?: string
+  error?: string
+  required?: boolean
+  disabled?: boolean
 }) {
-  const selectId = id ?? (label ? `select-${label.replace(/\s/g, '-')}` : undefined)
+  const generatedId = useId()
+  const selectId = id ?? `select-${generatedId}`
+  const hintId = `${selectId}-hint`
+  const errorId = `${selectId}-error`
+  const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
   return (
-    <label className="block" htmlFor={selectId}>
-      {label && <span className="mb-1 block text-sm font-medium text-ink">{label}</span>}
+    <div>
+      {label && <label className="mb-1 block text-sm font-medium text-ink" htmlFor={selectId}>{label}{required && <><span aria-hidden="true">*</span><span className="sr-only">必填</span></>}</label>}
       <select
         id={selectId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+        aria-label={ariaLabel}
+        aria-describedby={describedBy}
+        aria-invalid={error ? true : undefined}
+        required={required}
+        disabled={disabled}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -141,6 +181,8 @@ export function Select({
           </option>
         ))}
       </select>
-    </label>
+      {hint && <p id={hintId} className="mt-1 text-xs text-muted">{hint}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{error}</p>}
+    </div>
   )
 }

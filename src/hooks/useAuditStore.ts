@@ -5,22 +5,35 @@ import type {
   ChecklistItem,
   CompanyData,
   CompanyId,
+  DepartmentProfile,
   NCR,
   Observation,
   PlanRow,
   ExternalAuditPrepItemState,
   ProcedureAudit,
+  SharedChecklistQuestion,
+  SharedPlanRow,
   ThirdPartySuggestion,
 } from '../types'
-import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
+import { getCompanyManagementReviewDate } from '../types'
+import { createDemoState, migrateToV4, migrateV1State } from '../data/demoData'
 import { autoArrangePlan } from '../lib/planner'
 import { collectNCRsFromAudits, generateNCRNumber } from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
+import type { ProcedurePlanEntry } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
 import { loadStateFromStorage, saveStateToStorage } from '../lib/storage'
 import { applyAuditYearChange } from '../lib/settingsYear'
 import { parseImportJSON } from '../lib/importSummary'
+import { hydrateSharedPlan } from '../lib/sharedPlan'
+import {
+  canRemoveCompanyFromPlanRow,
+  COMPANY_IDS,
+  projectSharedPlan,
+  resolveLegacyPlanConflicts,
+  scheduledMonths,
+} from '../lib/sharedPlan'
 
 function patchCompany(
   state: AppState,
@@ -34,6 +47,95 @@ function patchCompany(
       [companyId]: { ...state.companies[companyId], ...patch },
     },
   }
+}
+
+/** 公司計畫列是共用計畫的相容投影；建立稽核當下取人員快照。 */
+export function getPlannedAuditors(
+  company: CompanyData,
+  qpCode: string,
+  departmentId: string,
+): string {
+  return company.planRows.find(
+    (row) => row.qpCode === qpCode && row.departmentId === departmentId,
+  )?.auditors ?? company.departments.find((dept) => dept.id === departmentId)?.defaultAuditors ?? ''
+}
+
+function createSharedChecklist(
+  state: AppState,
+  qpCode: string,
+  departmentId: string,
+  departmentName: string,
+): ChecklistItem[] {
+  const key = `${qpCode}|${departmentId}`
+  return createChecklistForProcedure(qpCode, departmentName, state.sharedChecklistTemplates?.[key])
+}
+
+/** 共用計畫是新表單表頭的唯一來源；建立後成為該公司當次表單快照。 */
+function createAuditFromSharedPlan(
+  state: AppState,
+  qpCode: string,
+  departmentId: string,
+): ProcedureAudit | null {
+  const row = state.sharedPlanRows?.find((candidate) =>
+    candidate.qpCode === qpCode
+    && candidate.departmentId === departmentId
+    && candidate.applicableCompanies.includes(state.activeCompanyId),
+  )
+  if (!row) return null
+  return {
+    id: `audit-${qpCode}-${departmentId}`,
+    qpCode,
+    departmentId,
+    department: row.department,
+    process: row.process,
+    documents: row.documents,
+    notifyDate: '',
+    auditDate: '',
+    departmentManager: row.owner,
+    auditors: row.auditors,
+    auditCategory: row.auditCategory,
+    items: createSharedChecklist(state, qpCode, departmentId, row.department),
+  }
+}
+
+function scopedPlannerInputs(state: AppState) {
+  const current = new Map((state.sharedPlanRows ?? []).map((row) => [row.id, row]))
+  const departments: DepartmentProfile[] = []
+  const planEntries: ProcedurePlanEntry[] = []
+  const existingRows: PlanRow[] = []
+  const source = new Map<string, {
+    originalDepartmentId: string
+    scope: CompanyId[]
+    previous?: SharedPlanRow
+  }>()
+  for (const entry of PROCEDURE_PLAN_TEMPLATE) {
+    const previous = current.get(`plan-${entry.qpCode}-${entry.departmentId}`)
+    const scope = previous?.applicableCompanies ?? [...COMPANY_IDS]
+    const profiles = scope.flatMap((companyId) =>
+      state.companies[companyId].departments.filter((department) => department.id === entry.departmentId),
+    )
+    if (profiles.length === 0) continue
+    const syntheticId = `shared-${entry.qpCode}-${entry.departmentId}`
+    const first = profiles[0]
+    departments.push({
+      ...first,
+      id: syntheticId,
+      riskOccurrence: Math.max(...profiles.map((profile) => profile.riskOccurrence)),
+      riskSeverity: Math.max(...profiles.map((profile) => profile.riskSeverity)),
+      stakeholders: [...new Set(profiles.flatMap((profile) => profile.stakeholders))],
+      defaultAuditors: previous?.auditors
+        ?? (profiles.every((profile) => profile.defaultAuditors === first.defaultAuditors)
+          ? first.defaultAuditors : state.settings.leadAuditor),
+    })
+    planEntries.push({ ...entry, departmentId: syntheticId })
+    source.set(syntheticId, { originalDepartmentId: entry.departmentId, scope, previous })
+    if (previous) {
+      const { applicableCompanies: _scope, ...row } = previous
+      void _scope
+      existingRows.push({ ...row, id: `plan-${entry.qpCode}-${syntheticId}`, departmentId: syntheticId })
+    }
+  }
+  return { departments, planEntries, existingRows, source }
 }
 
 export interface UpdateSettingsOptions {
@@ -89,43 +191,138 @@ export function useAuditStore() {
 
   const regeneratePlan = useCallback(() => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const openCount =
-        co.observations.filter((o) => o.status === 'open').length +
-        co.suggestions.filter((sg) => sg.status === 'open').length +
-        co.ncrs.filter((n) => n.status !== '結案').length
-      const planRows = autoArrangePlan(
+      if (!s.sharedPlanRows) return s
+      const openCountFor = (companyId: CompanyId) => {
+        const company = s.companies[companyId]
+        return company.observations.filter((o) => o.status === 'open').length
+          + company.suggestions.filter((suggestion) => suggestion.status === 'open').length
+          + company.ncrs.filter((ncr) => ncr.status !== '結案').length
+      }
+      const openCount = COMPANY_IDS.reduce((total, companyId) => total + openCountFor(companyId), 0)
+      const reviewDates = COMPANY_IDS.map((id) => getCompanyManagementReviewDate(s.settings, id)).filter(Boolean)
+      const scoped = scopedPlannerInputs(s)
+      const arranged = autoArrangePlan(
         {
-          departments: co.departments,
-          planEntries: PROCEDURE_PLAN_TEMPLATE,
+          departments: scoped.departments,
+          planEntries: scoped.planEntries,
           auditYear: s.settings.auditYear,
           planWindowStart: s.settings.planWindowStart,
           planWindowEnd: s.settings.planWindowEnd,
-          managementReviewDate: s.settings.managementReviewDate,
-          existingRows: co.planRows,
+          managementReviewDate: reviewDates.sort()[0] ?? '',
+          existingRows: scoped.existingRows,
           openCarryForwardCount: openCount,
         },
         { leadAuditor: s.settings.leadAuditor },
       )
-      return patchCompany(s, s.activeCompanyId, { planRows })
-    })
-  }, [])
-
-  const updatePlanRow = useCallback((id: string, patch: Partial<PlanRow>) => {
-    setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
-        planRows: co.planRows.map((r) =>
-          r.id === id ? { ...r, ...patch, manualOverride: true } : r,
-        ),
+      // 共用列需趕在兩家較早的管理審查前；單公司列只受該公司的日期限制。
+      // 重算單公司列時把其餘列當成既有負載，仍維持同一稽核團隊的月格平衡。
+      arranged.forEach((row, index) => {
+        const source = scoped.source.get(row.departmentId)
+        if (!source || source.scope.length !== 1 || row.manualOverride) return
+        const companyId = source.scope[0]
+        const department = scoped.departments.find((item) => item.id === row.departmentId)
+        const entry = scoped.planEntries.find((item) =>
+          item.qpCode === row.qpCode && item.departmentId === row.departmentId,
+        )
+        if (!department || !entry) return
+        const recalculated = autoArrangePlan({
+          departments: [department],
+          planEntries: [entry],
+          auditYear: s.settings.auditYear,
+          planWindowStart: s.settings.planWindowStart,
+          planWindowEnd: s.settings.planWindowEnd,
+          managementReviewDate: getCompanyManagementReviewDate(s.settings, companyId),
+          existingRows: arranged.filter((candidate) => candidate.id !== row.id),
+          openCarryForwardCount: openCountFor(companyId),
+        }, { leadAuditor: s.settings.leadAuditor })[0]
+        if (recalculated) arranged[index] = { ...recalculated, sequence: row.sequence }
       })
+      const sharedPlanRows: SharedPlanRow[] = arranged.map((row) => {
+        const original = scoped.source.get(row.departmentId)!
+        return {
+          ...row,
+          id: `plan-${row.qpCode}-${original.originalDepartmentId}`,
+          departmentId: original.originalDepartmentId,
+          department: original.previous?.department ?? row.department,
+          process: original.previous?.process ?? row.process,
+          documents: original.previous?.documents ?? row.documents,
+          auditUnit: original.previous?.auditUnit ?? row.auditUnit,
+          owner: original.previous?.owner ?? row.owner,
+          auditors: original.previous?.auditors ?? row.auditors,
+          auditCategory: original.previous?.auditCategory ?? row.auditCategory,
+          months: scheduledMonths(row),
+          applicableCompanies: original.scope,
+        }
+      })
+      const arrangedIds = new Set(sharedPlanRows.map((row) => row.id))
+      sharedPlanRows.push(...s.sharedPlanRows.filter((row) => !arrangedIds.has(row.id)))
+      return projectSharedPlan(s, sharedPlanRows)
     })
   }, [])
 
-  const setPlanMonthStatus = useCallback((rowId: string, monthIndex: number, status: MonthStatus) => {
+  const updatePlanRow = useCallback((id: string, patch: Partial<Pick<PlanRow, 'auditors' | 'owner' | 'auditUnit' | 'riskLevel' | 'documents'>>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      if (!s.sharedPlanRows) return s
+      return projectSharedPlan(s, s.sharedPlanRows.map((row) =>
+        row.id === id
+          ? { ...row, ...patch, manualOverride: row.manualOverride || patch.riskLevel !== undefined }
+          : row,
+      ))
+    })
+  }, [])
+
+  const setSharedPlanMonth = useCallback((rowId: string, monthIndex: number, planned: boolean) => {
+    setState((s) => {
+      if (!s.sharedPlanRows || monthIndex < 0 || monthIndex > 11) return s
+      return projectSharedPlan(s, s.sharedPlanRows.map((row) => {
+        if (row.id !== rowId) return row
+        const months = [...scheduledMonths(row)]
+        months[monthIndex] = planned ? '擬定' : null
+        return { ...row, months, manualOverride: true }
+      }))
+    })
+  }, [])
+
+  const updatePlanScope = useCallback((rowId: string, applicableCompanies: CompanyId[]) => {
+    setState((s) => {
+      if (!s.sharedPlanRows || applicableCompanies.length === 0) return s
+      const row = s.sharedPlanRows.find((candidate) => candidate.id === rowId)
+      if (!row) return s
+      const removed = row.applicableCompanies.filter((companyId) => !applicableCompanies.includes(companyId))
+      if (removed.some((companyId) => !canRemoveCompanyFromPlanRow(s, rowId, companyId))) return s
+      return projectSharedPlan(s, s.sharedPlanRows.map((candidate) =>
+        candidate.id === rowId ? { ...candidate, applicableCompanies } : candidate,
+      ))
+    })
+  }, [])
+
+  const confirmSharedPlan = useCallback((choices: Record<string, CompanyId>) => {
+    setState((s) => resolveLegacyPlanConflicts(s, choices))
+  }, [])
+
+  const updateSharedChecklistTemplate = useCallback((
+    qpCode: string,
+    departmentId: string,
+    questions: SharedChecklistQuestion[],
+  ) => {
+    if (questions.length === 0 || questions.some((question) => !question.content.trim())) return
+    setState((s) => ({
+      ...s,
+      sharedChecklistTemplates: {
+        ...s.sharedChecklistTemplates,
+        [`${qpCode}|${departmentId}`]: questions.map((question) => ({
+          ...question,
+          content: question.content.trim(),
+        })),
+      },
+    }))
+  }, [])
+
+  const setCompanyPlanMonthStatus = useCallback((companyId: CompanyId, rowId: string, monthIndex: number, status: MonthStatus) => {
+    setState((s) => {
+      if (!s.sharedPlanRows || monthIndex < 0 || monthIndex > 11) return s
+      const co = s.companies[companyId]
+      return patchCompany(s, companyId, {
         planRows: co.planRows.map((r) => {
           if (r.id !== rowId) return r
           const months = [...r.months] as MonthStatus[]
@@ -142,44 +339,12 @@ export function useAuditStore() {
       const auditId = `audit-${qpCode}-${departmentId}`
       const existing = co.audits.find((a) => a.id === auditId)
       if (existing) return existing
-
-      const dept = co.departments.find((d) => d.id === departmentId)
-      const entry = PROCEDURE_PLAN_TEMPLATE.find(
-        (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-      ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
-      if (!dept || !entry) {
-        return {
-          id: auditId,
-          qpCode,
-          departmentId,
-          department: dept?.name ?? departmentId,
-          process: entry?.process ?? qpCode,
-          documents: entry?.documents ?? qpCode,
-          notifyDate: '',
-          auditDate: '',
-          departmentManager: dept?.owner ?? '',
-          auditors: dept?.defaultAuditors ?? '',
-          auditCategory: entry?.auditCategory ?? '系統稽核',
-          items: createChecklistForProcedure(qpCode, dept?.name),
-        }
-      }
-
-      return {
-        id: auditId,
-        qpCode,
-        departmentId,
-        department: dept.name,
-        process: entry.process,
-        documents: entry.documents,
-        notifyDate: '',
-        auditDate: '',
-        departmentManager: dept.owner,
-        auditors: dept.defaultAuditors,
-        auditCategory: entry.auditCategory,
-        items: createChecklistForProcedure(qpCode, dept.name),
-      }
+      if (!state.sharedPlanRows) throw new Error('請先在年度計畫確認舊計畫差異。')
+      const newAudit = createAuditFromSharedPlan(state, qpCode, departmentId)
+      if (!newAudit) throw new Error('此程序不在本公司計畫範圍內。')
+      return newAudit
     },
-    [activeCompany],
+    [activeCompany, state],
   )
 
   const persistAudit = useCallback(
@@ -195,6 +360,7 @@ export function useAuditStore() {
     setState((s) => {
       const co = s.companies[s.activeCompanyId]
       const exists = co.audits.some((a) => a.id === audit.id)
+      if (!exists && !createAuditFromSharedPlan(s, audit.qpCode, audit.departmentId)) return s
       const audits = exists
         ? co.audits.map((a) => (a.id === audit.id ? audit : a))
         : [...co.audits, audit]
@@ -285,6 +451,9 @@ export function useAuditStore() {
       setState((s) => {
         const co = s.companies[s.activeCompanyId]
         const dept = co.departments.find((d) => d.id === input.departmentId)
+        const plan = co.planRows.find((row) =>
+          row.qpCode === input.qpCode && row.departmentId === input.departmentId,
+        )
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === input.qpCode && e.departmentId === input.departmentId,
         )
@@ -293,8 +462,8 @@ export function useAuditStore() {
           ncrNumber: generateNCRNumber(s.settings.auditYear, co.ncrs.length + 1),
           qpCode: input.qpCode,
           departmentId: input.departmentId,
-          department: dept?.name ?? input.departmentId,
-          process: input.process ?? entry?.process ?? input.qpCode,
+          department: plan?.department ?? dept?.name ?? input.departmentId,
+          process: input.process ?? plan?.process ?? entry?.process ?? input.qpCode,
           description: input.description,
           date: new Date().toISOString().slice(0, 10),
           status: '開立',
@@ -324,6 +493,9 @@ export function useAuditStore() {
       setState((s) => {
         const co = s.companies[s.activeCompanyId]
         const dept = co.departments.find((d) => d.id === input.departmentId)
+        const plan = co.planRows.find((row) =>
+          row.qpCode === input.qpCode && row.departmentId === input.departmentId,
+        )
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === input.qpCode && e.departmentId === input.departmentId,
         )
@@ -332,8 +504,8 @@ export function useAuditStore() {
           year: s.settings.auditYear,
           qpCode: input.qpCode,
           departmentId: input.departmentId,
-          department: dept?.name ?? input.departmentId,
-          process: entry?.process ?? input.qpCode,
+          department: plan?.department ?? dept?.name ?? input.departmentId,
+          process: plan?.process ?? entry?.process ?? input.qpCode,
           content: input.content,
           description: input.description ?? '',
           status: 'open',
@@ -415,28 +587,8 @@ export function useAuditStore() {
 
         const auditId = `audit-${qpCode}-${departmentId}`
         let audit = co.audits.find((a) => a.id === auditId)
-        const dept = co.departments.find((d) => d.id === departmentId)
-        const entry = PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-        )
-        if (!dept || !entry) return s
-
-        if (!audit) {
-          audit = {
-            id: auditId,
-            qpCode,
-            departmentId,
-            department: dept.name,
-            process: entry.process,
-            documents: entry.documents,
-            notifyDate: '',
-            auditDate: '',
-            departmentManager: dept.owner,
-            auditors: dept.defaultAuditors,
-            auditCategory: entry.auditCategory,
-            items: createChecklistForProcedure(qpCode, dept.name),
-          }
-        }
+        audit ??= createAuditFromSharedPlan(s, qpCode, departmentId) ?? undefined
+        if (!audit) return s
 
         const newItemId = `chk-cf-${Date.now()}`
         const newItem: ChecklistItem = {
@@ -478,28 +630,8 @@ export function useAuditStore() {
 
       const auditId = `audit-${qpCode}-${departmentId}`
       let audit = co.audits.find((a) => a.id === auditId)
-      const dept = co.departments.find((d) => d.id === departmentId)
-      const entry = PROCEDURE_PLAN_TEMPLATE.find(
-        (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-      ) ?? PROCEDURE_PLAN_TEMPLATE.find((e) => e.qpCode === qpCode)
-      if (!dept || !entry) return s
-
-      if (!audit) {
-        audit = {
-          id: auditId,
-          qpCode,
-          departmentId,
-          department: dept.name,
-          process: entry.process,
-          documents: entry.documents,
-          notifyDate: '',
-          auditDate: '',
-          departmentManager: dept.owner,
-          auditors: dept.defaultAuditors,
-          auditCategory: entry.auditCategory,
-          items: createChecklistForProcedure(qpCode, dept.name),
-        }
-      }
+      audit ??= createAuditFromSharedPlan(s, qpCode, departmentId) ?? undefined
+      if (!audit) return s
 
       const newItemId = `chk-ncr-cf-${Date.now()}`
       const year = ncr.sourceYear ?? s.settings.auditYear - 1
@@ -538,28 +670,8 @@ export function useAuditStore() {
 
         const auditId = `audit-${qpCode}-${departmentId}`
         let audit = co.audits.find((a) => a.id === auditId)
-        const dept = co.departments.find((d) => d.id === departmentId)
-        const entry = PROCEDURE_PLAN_TEMPLATE.find(
-          (e) => e.qpCode === qpCode && e.departmentId === departmentId,
-        )
-        if (!dept || !entry) return s
-
-        if (!audit) {
-          audit = {
-            id: auditId,
-            qpCode,
-            departmentId,
-            department: dept.name,
-            process: entry.process,
-            documents: entry.documents,
-            notifyDate: '',
-            auditDate: '',
-            departmentManager: dept.owner,
-            auditors: dept.defaultAuditors,
-            auditCategory: entry.auditCategory,
-            items: createChecklistForProcedure(qpCode, dept.name),
-          }
-        }
+        audit ??= createAuditFromSharedPlan(s, qpCode, departmentId) ?? undefined
+        if (!audit) return s
 
         const newItemId = `chk-sug-cf-${Date.now()}`
         const newItem: ChecklistItem = {
@@ -602,16 +714,10 @@ export function useAuditStore() {
         return
       }
     }
-    setState(parsed)
+    setState(hydrateSharedPlan(parsed))
   }, [])
 
   const resetToDemo = useCallback(() => setState(createDemoState()), [])
-
-  const clearAll = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem('qms-annual-internal-audit-v1')
-    setState(createDemoState())
-  }, [])
 
   const syncedState = useMemo(
     () => ({
@@ -631,7 +737,11 @@ export function useAuditStore() {
     updateDepartment,
     regeneratePlan,
     updatePlanRow,
-    setPlanMonthStatus,
+    updatePlanScope,
+    confirmSharedPlan,
+    setSharedPlanMonth,
+    setCompanyPlanMonthStatus,
+    updateSharedChecklistTemplate,
     getOrCreateAudit,
     updateAudit,
     updateChecklistItem,
@@ -652,7 +762,6 @@ export function useAuditStore() {
     exportJSON,
     importJSON,
     resetToDemo,
-    clearAll,
     getProcedureTitle,
   }
 }

@@ -14,6 +14,8 @@ export function Suggestions({ store }: { store: AuditStore }) {
   const currentYear = settings.auditYear
 
   const [carryError, setCarryError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formSuccess, setFormSuccess] = useState<string | null>(null)
   const [newSug, setNewSug] = useState({
     procedure: company.planRows[0]?.qpCode ?? 'QP-01',
     issue: '',
@@ -33,6 +35,9 @@ export function Suggestions({ store }: { store: AuditStore }) {
   const procedureOptions = [
     ...new Set(company.planRows.map((r) => r.qpCode)),
   ].map((qp) => ({ value: qp, label: qp }))
+  const selectedProcedure = procedureOptions.some((option) => option.value === newSug.procedure)
+    ? newSug.procedure
+    : procedureOptions[0]?.value ?? ''
 
   const tryCarryForward = (sugId: string, procedure: string) => {
     const row = company.planRows.find((r) => r.qpCode === procedure)
@@ -49,17 +54,40 @@ export function Suggestions({ store }: { store: AuditStore }) {
       <PrintDocHeader
         companyName={company.name}
         auditYear={settings.auditYear}
-        formTitle="第三方稽核建議事項一覽表"
+        formTitle="建議追蹤"
       />
 
       <Card className="no-print">
-        <h2 className="mb-3 text-lg font-semibold text-ink">新增建議事項</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <h2 className="mb-3 text-lg font-semibold text-ink">新增建議</h2>
+        <form
+          className="record-create-form"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!selectedProcedure) {
+              setFormSuccess(null)
+              setFormError('請先建立年度計畫。')
+              return
+            }
+            if (!newSug.issue.trim()) {
+              setFormSuccess(null)
+              setFormError('請填寫問題描述。')
+              return
+            }
+            addSuggestion({ ...newSug, procedure: selectedProcedure })
+            setNewSug((s) => ({ ...s, procedure: selectedProcedure, issue: '', progress: '' }))
+            setFormError(null)
+            setFormSuccess('已新增建議。')
+          }}
+        >
           <Select
             label="程序"
-            value={newSug.procedure}
+            value={selectedProcedure}
             onChange={(v) => setNewSug((s) => ({ ...s, procedure: v }))}
             options={procedureOptions}
+            disabled={!procedureOptions.length}
+            required
+            error={formError && !selectedProcedure ? formError : undefined}
           />
           <Input
             label="負責單位"
@@ -69,33 +97,28 @@ export function Suggestions({ store }: { store: AuditStore }) {
           <Input
             label="問題描述"
             value={newSug.issue}
-            onChange={(v) => setNewSug((s) => ({ ...s, issue: v }))}
+            onChange={(v) => { setNewSug((s) => ({ ...s, issue: v })); setFormError(null); setFormSuccess(null) }}
+            required
+            error={formError && selectedProcedure ? formError : undefined}
           />
           <Input
             label="進度"
             value={newSug.progress}
             onChange={(v) => setNewSug((s) => ({ ...s, progress: v }))}
           />
-          <div className="flex items-end">
-            <Button
-              onClick={() => {
-                if (!newSug.issue.trim()) return
-                addSuggestion(newSug)
-                setNewSug((s) => ({ ...s, issue: '', progress: '' }))
-              }}
-            >
-              新增
+          <div className="record-create-submit">
+            <Button type="submit">
+              新增建議
             </Button>
           </div>
-        </div>
+          <div className="record-create-feedback" aria-live="polite">
+            {formSuccess && <p role="status" className="text-sm font-medium text-green-800 dark:text-green-300">{formSuccess}</p>}
+          </div>
+        </form>
       </Card>
 
       <Card>
-        <h2 className="mb-2 text-lg font-semibold text-ink">第三方稽核建議事項一覽表</h2>
-        <p className="mb-4 text-sm text-muted">
-          對應紙本建議追蹤表：程序、問題、進度、負責單位；可帶入新年度查檢表。
-        </p>
-
+        <h2 className="mb-2 text-lg font-semibold text-ink">建議追蹤</h2>
         {carryError && (
           <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-100">
             {carryError}
@@ -103,11 +126,10 @@ export function Suggestions({ store }: { store: AuditStore }) {
         )}
 
         {all.length === 0 ? (
-          <EmptyState message="尚無第三方建議事項，請使用上方表單新增。" />
+          <EmptyState message="尚無建議；請先新增。" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-            <table className="w-full border-collapse text-sm">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="建議追蹤表">
+            <table className="stacked-table w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-page text-left text-muted">
                   <th className="border border-line p-2">年度</th>
@@ -122,23 +144,25 @@ export function Suggestions({ store }: { store: AuditStore }) {
               <tbody>
                 {all.map((sug) => (
                   <tr key={sug.id} className={sug.status === 'open' ? 'bg-amber-50/30 dark:bg-amber-950/10' : ''}>
-                    <td className="border border-line p-2">{sug.year}</td>
-                    <td className="border border-line p-2 font-medium text-ink">{sug.procedure}</td>
-                    <td className="border border-line p-2">{sug.issue}</td>
-                    <td className="border border-line p-2">
+                    <td data-label="年度" className="border border-line p-2">{sug.year}</td>
+                    <td data-label="程序" className="border border-line p-2 font-medium text-ink">{sug.procedure}</td>
+                    <td data-label="問題描述" className="border border-line p-2">{sug.issue}</td>
+                    <td data-label="進度" className="border border-line p-2">
                       <textarea
                         className={`w-full min-w-[160px] rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         rows={2}
                         value={sug.progress}
+                        aria-label={`${sug.year} 年 ${sug.procedure} ${sug.responsibleUnit} 進度`}
                         onChange={(e) => updateSuggestion(sug.id, { progress: e.target.value })}
                       />
                       <span className="print-only">{sug.progress}</span>
                     </td>
-                    <td className="border border-line p-2">{sug.responsibleUnit}</td>
-                    <td className="border border-line p-2">
+                    <td data-label="負責單位" className="border border-line p-2">{sug.responsibleUnit}</td>
+                    <td data-label="狀態" className="border border-line p-2">
                       <div className="no-print">
                         <Select
                           value={sug.status}
+                          ariaLabel={`${sug.year} 年 ${sug.procedure} ${sug.responsibleUnit} 狀態`}
                           onChange={(v) => updateSuggestion(sug.id, { status: v as SuggestionStatus })}
                           options={[
                             { value: 'open', label: '待追蹤' },
@@ -148,17 +172,17 @@ export function Suggestions({ store }: { store: AuditStore }) {
                       </div>
                       <span className="print-only"><Badge label={statusLabel[sug.status]} /></span>
                     </td>
-                    <td className="border border-line p-2 no-print">
+                    <td data-label="操作" className="border border-line p-2 no-print">
                       {sug.status === 'open' && !sug.carriedToYear && (
                         <Button
                           variant="secondary"
                           onClick={() => tryCarryForward(sug.id, sug.procedure)}
                         >
-                          帶入 {currentYear} 年
+                          帶入本年
                         </Button>
                       )}
                       {sug.carriedToYear && (
-                        <span className="text-xs text-primary">已帶入 {sug.carriedToYear}</span>
+                        <span className="text-xs text-link">已帶入 {sug.carriedToYear}</span>
                       )}
                     </td>
                   </tr>

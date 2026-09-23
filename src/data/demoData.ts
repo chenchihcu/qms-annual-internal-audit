@@ -5,6 +5,7 @@ import { createDefaultPrepState } from '../lib/externalAuditPrep'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
+import { hydrateSharedPlan } from '../lib/sharedPlan'
 
 const departments = [
   {
@@ -228,24 +229,24 @@ export function createDemoState(): AppState {
   prep.items[0].jiurunDone = true
   prep.items[0].zhenglongxingDone = true
 
-  return {
+  return hydrateSharedPlan({
     activeCompanyId: 'jiurun',
     settings,
     companies,
     externalAuditPrep: prep,
     version: 5,
-  }
+  })
 }
 
 export const STORAGE_KEY = 'qms-annual-internal-audit-v5'
 
 export function migrateToV4(raw: AppState): AppState {
-  if (raw.version >= 5 && raw.externalAuditPrep) return raw
+  if (raw.version >= 5 && raw.externalAuditPrep) return hydrateSharedPlan(raw)
   const demo = createDemoState()
   demo.activeCompanyId = raw.activeCompanyId
   demo.settings = raw.settings
   demo.companies = raw.companies
-  return demo
+  return hydrateSharedPlan(demo)
 }
 
 /** 舊版 v1 遷移（若存在） */
@@ -273,7 +274,7 @@ export function migrateV1State(raw: unknown): AppState | null {
   }
   if (old.ncrs) company.ncrs = old.ncrs as CompanyData['ncrs']
   if (old.observations) company.observations = old.observations as CompanyData['observations']
-  return demo
+  return hydrateSharedPlan(demo)
 }
 
 export { getProcedureTitle }

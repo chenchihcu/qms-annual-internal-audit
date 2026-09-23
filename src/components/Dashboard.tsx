@@ -4,6 +4,7 @@ import {
   hasAnyJudgment,
 } from '../lib/scoring'
 import { buildAuditFocusOverview } from '../lib/planner'
+import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { AppState, TabId } from '../types'
 import { Badge, Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
@@ -19,7 +20,7 @@ function KpiCard({
   value,
   hint,
   onClick,
-  accent = 'text-primary',
+  accent = 'text-link',
 }: {
   title: string
   value: string | number
@@ -39,7 +40,7 @@ function KpiCard({
       <button
         type="button"
         onClick={onClick}
-        className="w-full rounded-xl border border-line bg-surface p-5 text-left shadow-sm transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="min-h-11 w-full rounded-xl border border-line bg-surface p-5 text-left shadow-sm transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
       >
         {inner}
       </button>
@@ -51,7 +52,22 @@ function KpiCard({
 export function Dashboard({ state, onNavigate }: DashboardProps) {
   const { company, settings } = state
   const summary = calculateAnnualScore(company.audits, settings.scoringRules)
-  const focusRows = buildAuditFocusOverview(company.planRows)
+  const focusRows = buildAuditFocusOverview(company.planRows).flatMap((focus) => {
+    const template = PROCEDURE_PLAN_TEMPLATE.find((entry) =>
+      entry.qpCode === focus.qpCode && entry.departmentName === focus.department,
+    )
+    const plan = company.planRows.find((row) =>
+      row.qpCode === focus.qpCode
+      && (template ? row.departmentId === template.departmentId : row.department === focus.department),
+    )
+    return plan ? [{
+      ...focus,
+      department: plan.department,
+      owner: plan.owner,
+      riskLevel: plan.riskLevel,
+      auditCategory: plan.auditCategory,
+    }] : []
+  })
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -91,38 +107,35 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
-          title={`年度總分 · ${company.name}`}
+          title="年度總分"
           value={overallDisplay}
           hint={summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序'}
         />
         <KpiCard
           title="未結案 NCR"
           value={openNCR}
-          hint={`全部 ${company.ncrs.length} 件`}
+          hint={company.ncrs.length !== openNCR ? `共 ${company.ncrs.length} 件` : undefined}
           accent="text-red-600 dark:text-red-400"
           onClick={() => onNavigate('ncr')}
         />
         <KpiCard
-          title="本年查檢觀察"
+          title="查檢表觀察"
           value={summary.totalObservation}
-          hint="查檢表判定「觀察」"
           accent="text-amber-600 dark:text-amber-400"
           onClick={() => onNavigate('observations')}
         />
         <KpiCard
-          title="跨年待追蹤"
+          title="待追蹤觀察事項"
           value={openObs}
-          hint="前年度觀察 open"
           onClick={() => onNavigate('observations')}
         />
         <KpiCard
-          title="第三方建議"
+          title="第三方待追蹤建議"
           value={openSug}
-          hint="待追蹤建議"
           onClick={() => onNavigate('suggestions')}
         />
         <KpiCard
-          title="計畫稽核次數"
+          title="排程月份"
           value={plannedMonths}
           hint={`系統 ${byCategory.系統稽核} · 製程 ${byCategory.製程稽核} · 型態 ${byCategory.型態稽核}`}
           onClick={() => onNavigate('plan')}
@@ -131,7 +144,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
 
       {summary.overallStatus === 'scored' && (
         <Card className="no-print">
-          <p className="text-sm text-muted">年度總分進度</p>
+          <p className="text-sm text-muted">評分進度</p>
           <div
             className="mt-2 h-2 rounded-full bg-page"
             role="progressbar"
@@ -149,13 +162,12 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       )}
 
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-ink">稽核重點標示（QR-28-01 概覽）</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">稽核重點</h2>
         {focusRows.length === 0 ? (
-          <EmptyState message="尚無計畫列，請至「年度計畫」建立或自動編排。" />
+          <EmptyState message="尚無計畫列；請先建立或自動排程。" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-            <table className="w-full border-collapse text-sm">
+          <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="稽核重點表">
+            <table className="stacked-table w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line bg-page text-left text-muted">
                   <th className="p-2">Sheet</th>
@@ -170,13 +182,13 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
               <tbody>
                 {focusRows.map((row) => (
                   <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-line">
-                    <td className="p-2 text-muted">{row.sheet}</td>
-                    <td className="p-2"><Badge label={row.riskLevel} /></td>
-                    <td className="p-2 font-medium text-ink">{row.qpCode}</td>
-                    <td className="p-2">{row.department}</td>
-                    <td className="p-2">{row.owner}</td>
-                    <td className="p-2 text-center">{row.itemCount}</td>
-                    <td className="p-2 text-muted">{row.auditCategory}</td>
+                    <td data-label="Sheet" className="p-2 text-muted">{row.sheet}</td>
+                    <td data-label="風險等級" className="p-2"><Badge label={row.riskLevel} /></td>
+                    <td data-label="稽核程序" className="p-2 font-medium text-ink">{row.qpCode}</td>
+                    <td data-label="被稽核單位" className="p-2">{row.department}</td>
+                    <td data-label="負責人" className="p-2">{row.owner}</td>
+                    <td data-label="查檢項數" className="p-2 text-center">{row.itemCount}</td>
+                    <td data-label="稽核類型" className="p-2 text-muted">{row.auditCategory}</td>
                   </tr>
                 ))}
               </tbody>
@@ -186,9 +198,9 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       </Card>
 
       <Card>
-        <h2 className="mb-4 text-lg font-semibold text-ink">各程序稽核得分</h2>
+        <h2 className="mb-4 text-lg font-semibold text-ink">程序得分</h2>
         {!anyJudgment && scoredDepts.length === 0 ? (
-          <EmptyState message="尚無稽核判定，請至「程序稽核」填寫查檢表。" />
+          <EmptyState message="尚無判定；請先填寫查檢表。" />
         ) : (
           <div className="space-y-3">
             {summary.departmentScores

@@ -48,17 +48,30 @@ describe('isItemDone', () => {
   })
 
   it('merged uses mergedDone only', () => {
-    const template = getPrepTemplate(2)!
-    const state = createDefaultPrepState(2026).items.find((i) => i.no === 2)!
+    const template = getPrepTemplate(5)!
+    const state = createDefaultPrepState(2026).items.find((i) => i.no === 5)!
     expect(isItemDone(template, state)).toBe(false)
     expect(isItemDone(template, { ...state, mergedDone: true })).toBe(true)
+  })
+
+  it.each([2, 19])('item %i needs shared summary and both company source checks', (no) => {
+    const template = getPrepTemplate(no)!
+    const state = createDefaultPrepState(2026).items.find((i) => i.no === no)!
+    expect(isItemDone(template, { ...state, mergedDone: true })).toBe(false)
+    expect(isItemDone(template, {
+      ...state, mergedDone: true, jiurunDone: true,
+    })).toBe(false)
+    expect(isItemDone(template, {
+      ...state, mergedDone: true, jiurunDone: true, zhenglongxingDone: true,
+    })).toBe(true)
   })
 
   it('site_scope uses completed flag', () => {
     const template = getPrepTemplate(17)!
     const state = createDefaultPrepState(2026).items.find((i) => i.no === 17)!
     expect(isItemDone(template, state)).toBe(false)
-    expect(isItemDone(template, { ...state, completed: true })).toBe(true)
+    expect(isItemDone(template, { ...state, completed: true })).toBe(false)
+    expect(isItemDone(template, { ...state, completed: true, siteScope: 'A 廠' })).toBe(true)
   })
 })
 
@@ -68,6 +81,8 @@ describe('countPrepProgress', () => {
     prep.items[0].jiurunDone = true
     prep.items[0].zhenglongxingDone = true
     prep.items[1].mergedDone = true
+    prep.items[1].jiurunDone = true
+    prep.items[1].zhenglongxingDone = true
     const { done, total } = countPrepProgress(prep)
     expect(total).toBe(19)
     expect(done).toBe(2)
@@ -104,17 +119,27 @@ describe('evaluatePrepSequence', () => {
 
   it('warns when management review done before internal audit', () => {
     const prep = createDefaultPrepState(2026)
-    prep.managementReviewComplete = true
-    prep.internalAuditComplete = false
+    prep.items.find((i) => i.no === 4)!.jiurunDone = true
     const result = evaluatePrepSequence(prep, {
       jiurun: emptyCompany(),
       zhenglongxing: emptyCompany(),
     })
     expect(result.sequenceWarning).toBe(true)
-    expect(result.messages.some((m) => m.includes('管理審查'))).toBe(true)
+    expect(result.sequenceMessages.some((m) => m.includes('九潤精密管理審查'))).toBe(true)
   })
 
   it('no sequence warning when order is correct', () => {
+    const prep = createDefaultPrepState(2026)
+    prep.items.find((i) => i.no === 2)!.jiurunDone = true
+    prep.items.find((i) => i.no === 4)!.jiurunDone = true
+    const result = evaluatePrepSequence(prep, {
+      jiurun: emptyCompany(),
+      zhenglongxing: emptyCompany(),
+    })
+    expect(result.sequenceWarning).toBe(false)
+  })
+
+  it('preserves legacy summary flags without treating them as company confirmations', () => {
     const prep = createDefaultPrepState(2026)
     prep.internalAuditComplete = true
     prep.managementReviewComplete = true
@@ -123,6 +148,8 @@ describe('evaluatePrepSequence', () => {
       zhenglongxing: emptyCompany(),
     })
     expect(result.sequenceWarning).toBe(false)
+    expect(result.messages.some((m) => m.includes('舊版「內部稽核完成」'))).toBe(true)
+    expect(result.messages.some((m) => m.includes('舊版「管理審查完成」'))).toBe(true)
   })
 })
 

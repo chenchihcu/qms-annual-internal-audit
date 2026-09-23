@@ -31,6 +31,8 @@ export interface AuditSettings {
   planWindowStart: string
   planWindowEnd: string
   externalAuditDate?: string
+  /** 公司別管理審查日期；舊資料使用 managementReviewDate 作回退 */
+  managementReviewDates?: Partial<Record<CompanyId, string>>
   managementReviewDate?: string
   scoringRules: ScoringRules
 }
@@ -64,6 +66,18 @@ export interface PlanRow {
   manualOverride: boolean
 }
 
+/** 同場稽核的唯一計畫；months 只記錄排程月份，執行結果仍留在各公司 planRows。 */
+export interface SharedPlanRow extends PlanRow {
+  applicableCompanies: CompanyId[]
+}
+
+/** 兩家公司共用、供未來表單建立時複製的題目文字。 */
+export interface SharedChecklistQuestion {
+  category: string
+  no: number
+  content: string
+}
+
 export type ChecklistItemOrigin = 'seed' | 'custom' | 'carryforward'
 
 export interface ChecklistItem {
@@ -73,6 +87,8 @@ export interface ChecklistItem {
   content: string
   judgment: Judgment | null
   description: string
+  /** 受控紀錄的代碼或位置；每家公司自行保存引用快照與判定 */
+  evidenceReference?: string
   procedureRef?: string
   sourceYear?: number
   carriedFromId?: string
@@ -144,11 +160,14 @@ export interface ExternalAuditPrepItemState {
   zhenglongxingDone: boolean
   mergedDone: boolean
   completed: boolean
+  /** site_scope 項目實際查核的廠區範圍；舊資料可能尚未填寫 */
+  siteScope?: string
   remark: string
 }
 
 export interface ExternalAuditPrepState {
   year: number
+  /** 舊版共用完成旗標，保留匯入相容性；不代表兩家公司皆已確認 */
   internalAuditComplete: boolean
   managementReviewComplete: boolean
   items: ExternalAuditPrepItemState[]
@@ -168,6 +187,10 @@ export interface AppState {
   activeCompanyId: CompanyId
   settings: AuditSettings
   companies: Record<CompanyId, CompanyData>
+  sharedPlanRows?: SharedPlanRow[]
+  /** 舊計畫有差異時保留兩份原值，供人工核對與 JSON 匯出。 */
+  legacyCompanyPlanBackup?: Record<CompanyId, PlanRow[]>
+  sharedChecklistTemplates?: Record<string, SharedChecklistQuestion[]>
   externalAuditPrep: ExternalAuditPrepState
   version: number
 }
@@ -214,4 +237,8 @@ export const DEFAULT_SCORING_RULES: ScoringRules = {
   conform: 1,
   nonConform: 0,
   observation: 0.5,
+}
+
+export function getCompanyManagementReviewDate(settings: AuditSettings, companyId: CompanyId): string {
+  return settings.managementReviewDates?.[companyId] ?? settings.managementReviewDate ?? ''
 }

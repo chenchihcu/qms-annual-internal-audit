@@ -1,5 +1,6 @@
 import { createDemoState, migrateToV4, migrateV1State, STORAGE_KEY } from '../data/demoData'
 import type { AppState } from '../types'
+import { hydrateSharedPlan } from './sharedPlan'
 
 export const CORRUPT_BACKUP_KEY = `${STORAGE_KEY}-corrupt-backup`
 
@@ -18,7 +19,7 @@ export function loadStateFromStorage(): LoadStateResult {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as AppState
-      if (parsed.version >= 4 && parsed.externalAuditPrep) return { state: parsed }
+      if (parsed.version >= 4 && parsed.externalAuditPrep) return { state: hydrateSharedPlan(parsed) }
       if (parsed.companies) return { state: migrateToV4(parsed) }
     }
     const legacy = localStorage.getItem('qms-annual-internal-audit-v1')

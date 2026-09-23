@@ -7,7 +7,7 @@ export interface PrepTemplateItem {
   no: number
   title: string
   owner: string
-  scope: { mode: PrepScopeMode }
+  scope: { mode: PrepScopeMode; companyChecks?: boolean }
   notes: string
   forms: string[]
 }
@@ -34,6 +34,7 @@ export function createDefaultPrepState(year: number): ExternalAuditPrepState {
       zhenglongxingDone: false,
       mergedDone: false,
       completed: false,
+      siteScope: '',
       remark: '',
     })),
   }
@@ -51,9 +52,10 @@ export function isItemDone(
     case 'both_separate':
       return state.jiurunDone && state.zhenglongxingDone
     case 'merged':
-      return state.mergedDone
+      return state.mergedDone && (!template.scope.companyChecks ||
+        (state.jiurunDone && state.zhenglongxingDone))
     case 'site_scope':
-      return state.completed
+      return state.completed && Boolean(state.siteScope?.trim())
     default:
       return false
   }
@@ -76,6 +78,7 @@ export interface PrepSequenceWarnings {
   ncrWarning: boolean
   sequenceWarning: boolean
   messages: string[]
+  sequenceMessages: string[]
 }
 
 export function evaluatePrepSequence(
@@ -83,6 +86,7 @@ export function evaluatePrepSequence(
   companies: Record<string, CompanyData>,
 ): PrepSequenceWarnings {
   const messages: string[] = []
+  const sequenceMessages: string[] = []
   let openNcrCount = 0
   for (const co of Object.values(companies)) {
     openNcrCount += co.ncrs.filter((n) => n.status !== '結案').length
@@ -90,16 +94,32 @@ export function evaluatePrepSequence(
 
   const ncrWarning = openNcrCount > 0
   if (ncrWarning) {
-    messages.push(`尚有 ${openNcrCount} 件未結案內部 NCR，建議於外部稽核前關閉。`)
+    messages.push(`尚有 ${openNcrCount} 件內部 NCR 未結案；請於外稽前結案。`)
   }
 
-  const sequenceWarning =
-    prep.managementReviewComplete && !prep.internalAuditComplete
-  if (sequenceWarning) {
-    messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求。')
+  const internal = prep.items.find((item) => item.no === 2)
+  const review = prep.items.find((item) => item.no === 4)
+  const companyChecks = [
+    { label: '九潤精密', doneKey: 'jiurunDone' },
+    { label: '正隆興精密', doneKey: 'zhenglongxingDone' },
+  ] as const
+  for (const company of companyChecks) {
+    if (review?.[company.doneKey] && !internal?.[company.doneKey]) {
+      const message = `${company.label}管理審查已標記完成，但該公司內部稽核來源尚未確認；請核對日期與受控紀錄。`
+      sequenceMessages.push(message)
+      messages.push(message)
+    }
+  }
+  if (prep.internalAuditComplete &&
+    (!internal?.jiurunDone || !internal.zhenglongxingDone)) {
+    messages.push('保留舊版「內部稽核完成」標記；請在第 2 項逐公司核對來源。')
+  }
+  if (prep.managementReviewComplete &&
+    (!review?.jiurunDone || !review.zhenglongxingDone)) {
+    messages.push('保留舊版「管理審查完成」標記；請在第 4 項逐公司核對紀錄。')
   }
 
-  return { openNcrCount, ncrWarning, sequenceWarning, messages }
+  return { openNcrCount, ncrWarning, sequenceWarning: sequenceMessages.length > 0, messages, sequenceMessages }
 }
 
 export function itemHasCallout(no: number): 'quality-objectives' | 'risk-climate' | 'satisfaction' | null {
