@@ -5,6 +5,7 @@ import type {
   ChecklistItem,
   CompanyData,
   CompanyId,
+  NcrCompanyScope,
   NCR,
   Observation,
   ObservationRevisionFields,
@@ -39,11 +40,12 @@ import { isSeedChecklistItem } from '../lib/checklistItem'
 import { parseBackupJson, serializeBackup } from '../lib/backup'
 import { autoArrangePlan } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
-import { collectNCRsFromAudits, normalizeNCR, syncNCRDescriptions } from '../lib/ncr'
+import { collectNCRsFromAudits, generateNCRNumber, normalizeNCR, syncNCRDescriptions } from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
 import { companySettingsFor } from '../types'
+import { applyDepartmentOwnerChange } from '../lib/departmentOwner'
 
 interface LoadStateResult {
   state: AppState
@@ -387,18 +389,28 @@ export function useAuditStore() {
 
   const activeCompany = state.companies[state.activeCompanyId]
 
-  const updateSettings = useCallback((patch: Partial<AuditSettings>) => {
+  const updateSettings = useCallback((
+    patch: Partial<AuditSettings>,
+    options?: { resetExternalPrep?: boolean },
+  ) => {
     setState((s) => {
       const companyId = s.activeCompanyId
       if (patch.auditYear != null && (!Number.isInteger(patch.auditYear) || patch.auditYear < 2000 || patch.auditYear > 2200)) return s
       const base = patch.auditYear == null ? s : switchYearState(s, patch.auditYear, companyId)
       const current = base.companySettings[companyId]
-      const { auditYear: _ignored, ...rest } = patch
-      const nextSettings = patch.auditYear == null
+      const { auditYear: nextYear, ...rest } = patch
+      const nextSettings = nextYear == null
         ? { ...current, ...rest }
-        : base.companySettings[companyId]
+        : { ...base.companySettings[companyId], ...rest }
+      let externalAuditPrep = base.externalAuditPrep
+      if (nextYear != null && nextYear !== base.externalAuditPrep.year) {
+        externalAuditPrep = options?.resetExternalPrep
+          ? createDefaultPrepState(nextYear)
+          : { ...base.externalAuditPrep, year: nextYear }
+      }
       return {
         ...base,
+        externalAuditPrep,
         companySettings: {
           ...base.companySettings,
           [companyId]: nextSettings,
@@ -426,6 +438,10 @@ export function useAuditStore() {
     },
     [],
   )
+
+  const updateDepartmentOwner = useCallback((departmentId: string, newOwner: string) => {
+    setState((s) => applyDepartmentOwnerChange(s, departmentId, newOwner, settingsFor(s).scoringRules, s.activeCompanyId))
+  }, [])
 
   const updateProcedureRisk = useCallback((qpCode: string, departmentId: string, patch: Partial<ProcedureRiskRecord>) => {
     setState((s) => {
@@ -685,6 +701,47 @@ export function useAuditStore() {
       return patchCompany(s, s.activeCompanyId, { audits })
     })
   }, [])
+
+  const markChecklistItemNA = useCallback(
+    (auditId: string, itemId: string) => {
+      updateChecklistItem(auditId, itemId, { judgment: '不適用' })
+    },
+    [updateChecklistItem],
+  )
+
+  const addManualNCR = useCallback(
+    (input: {
+      qpCode: string
+      departmentId: string
+      description: string
+      process?: string
+      companyScope: NcrCompanyScope
+    }) => {
+      setState((s) => {
+        const co = s.companies[s.activeCompanyId]
+        const auditYear = settingsFor(s).auditYear
+        const dept = co.departments.find((d) => d.id === input.departmentId)
+        const entry = PROCEDURE_PLAN_TEMPLATE.find(
+          (e) => e.qpCode === input.qpCode && e.departmentId === input.departmentId,
+        )
+        const ncr = normalizeNCR({
+          id: `ncr-manual-${Date.now()}`,
+          ncrNumber: generateNCRNumber(auditYear, co.ncrs.length + 1),
+          qpCode: input.qpCode,
+          departmentId: input.departmentId,
+          department: dept?.name ?? input.departmentId,
+          process: input.process ?? entry?.process ?? input.qpCode,
+          description: input.description,
+          date: new Date().toISOString().slice(0, 10),
+          status: '開立',
+          companyScope: input.companyScope,
+          sourceYear: auditYear,
+        })
+        return patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] })
+      })
+    },
+    [],
+  )
 
   const updateNCR = useCallback((id: string, patch: Partial<NCR>) => {
     setState((s) => {
@@ -1275,6 +1332,7 @@ export function useAuditStore() {
     switchAuditYear,
     switchCompany,
     updateDepartment,
+    updateDepartmentOwner,
     updateProcedureRisk,
     regeneratePlan,
     replacePlanRows,
@@ -1286,6 +1344,8 @@ export function useAuditStore() {
     updateChecklistItem,
     addChecklistItem,
     removeChecklistItem,
+    markChecklistItemNA,
+    addManualNCR,
     updateNCR,
     updateObservation,
     addObservation,

@@ -3,10 +3,17 @@ import { migrateChecklistItem } from './checklistEvidence'
 import { carryPlanDatesToAudit } from './auditDates'
 import { normalizeAuditNotice } from './auditNotice'
 import { normalizeAttachments } from './attachments'
+import { isOldClonedDemo } from './demoRefresh'
 import { normalizeExternalAuditSchedule } from './externalAuditSchedule'
 import { normalizeNCR } from './ncr'
 import type { AppState, CompanyData, CompanyId, MonthStatus, NCR, PlanRow } from '../types'
 import { COMPANY_IDS, DEFAULT_VIEW_ROLE } from '../types'
+
+function resolveDataSource(state: AppState, incomingDataSource?: AppState['dataSource']): AppState['dataSource'] {
+  const source = incomingDataSource ?? state.dataSource
+  if (source === 'user' && !isOldClonedDemo(state)) return 'user'
+  return 'demo'
+}
 
 export const CURRENT_STORAGE_VERSION = 13
 
@@ -87,9 +94,15 @@ function refreshDemoCompanies(): AppState['companies'] {
 }
 
 export function migrateState(raw: AppState): AppState {
-  if (raw.version >= CURRENT_STORAGE_VERSION) return raw
+  if (raw.version >= CURRENT_STORAGE_VERSION) {
+    return {
+      ...raw,
+      dataSource: resolveDataSource(raw, raw.dataSource),
+    }
+  }
 
   const fromVersion = raw.version ?? 0
+  const incomingDataSource = raw.dataSource
   let next: AppState = {
     ...raw,
     version: CURRENT_STORAGE_VERSION,
@@ -151,5 +164,8 @@ export function migrateState(raw: AppState): AppState {
     }
   }
 
-  return next
+  return {
+    ...next,
+    dataSource: resolveDataSource(next, incomingDataSource),
+  }
 }

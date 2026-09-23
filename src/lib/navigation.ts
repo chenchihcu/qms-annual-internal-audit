@@ -272,9 +272,21 @@ export function isValidTabId(id: string): id is TabId {
   return VALID_TABS.has(id as TabId)
 }
 
+export type ObservationSection = 'current' | 'prior'
+
+export interface NavigateOptions {
+  auditKey?: string
+  section?: ObservationSection
+}
+
+export function isValidObservationSection(value: string): value is ObservationSection {
+  return value === 'current' || value === 'prior'
+}
+
 export interface HashState {
   tab: TabId
   auditKey?: string
+  section?: ObservationSection
 }
 
 export function parseAppHash(hash: string): HashState {
@@ -285,18 +297,28 @@ export function parseAppHash(hash: string): HashState {
   const tabParam = LEGACY_TAB_ALIASES[requestedTab] ?? requestedTab
   const tab = isValidTabId(tabParam) ? tabParam : 'dashboard'
   const auditKey = params.get('audit') ?? undefined
-  return { tab, auditKey }
+  const sectionRaw = params.get('section')
+  const section =
+    sectionRaw && isValidObservationSection(sectionRaw) ? sectionRaw : undefined
+  return { tab, auditKey, section }
 }
 
-export function buildAppHash(tab: TabId, auditKey?: string): string {
+export function buildAppHash(tab: TabId, options?: NavigateOptions | string): string {
+  const resolved: NavigateOptions | undefined =
+    typeof options === 'string' ? { auditKey: options } : options
   const params = new URLSearchParams()
   params.set('tab', tab)
-  if (auditKey) params.set('audit', auditKey)
+  if (tab === 'audit' && resolved?.auditKey) {
+    params.set('audit', resolved.auditKey)
+  }
+  if (tab === 'observations' && resolved?.section) {
+    params.set('section', resolved.section)
+  }
   return `#${params.toString()}`
 }
 
-export function syncHash(tab: TabId, auditKey?: string) {
-  const next = buildAppHash(tab, auditKey)
+export function syncHash(tab: TabId, options?: NavigateOptions | string) {
+  const next = buildAppHash(tab, options)
   if (window.location.hash !== next) {
     window.history.replaceState(null, '', next)
   }

@@ -6,6 +6,7 @@ import type {
   CompanyRelationship,
   ExternalAuditPrepItemState,
   ExternalAuditPrepState,
+  ScoringRules,
   YearArchiveEntry,
 } from '../types'
 import { COMPANY_IDS, COMPANY_LABELS, relationshipCheckKey } from '../types'
@@ -216,4 +217,142 @@ export function formatPrepYearMismatch(
   const mismatched = prepYearMismatchCompanies(prepYear, companySettings)
   if (mismatched.length === 0) return null
   return `外稽準備年度為 ${prepYear}，但 ${mismatched.map((id) => COMPANY_LABELS[id]).join('、')} 內稽年度不同 — 請確認台帳與準備表對齊。`
+}
+
+export interface PrepDoneContext {
+  company: CompanyData
+  rules?: ScoringRules
+}
+
+export interface PrepSeparateHalfDone {
+  id: string
+  no: number
+  label: string
+  title: string
+  missing: 'jiurun' | 'zhenglongxing'
+}
+
+export interface PrepQpBlocked {
+  id: string
+  no: number
+  label: string
+  title: string
+  reasons: string[]
+}
+
+export interface PrepGapSummaryLine {
+  no: number
+  label: string
+  text: string
+}
+
+export interface PrepGaps {
+  separateHalfDone: PrepSeparateHalfDone[]
+  mergedOpen: string[]
+  siteOpen: string[]
+  separateOpen: string[]
+  qpBlocked: PrepQpBlocked[]
+}
+
+function prepItemLabel(template: PrepTemplateItem): string {
+  return `第${template.no}項`
+}
+
+function shortPrepTitle(template: PrepTemplateItem): string {
+  const cut = template.title.indexOf('（')
+  const base = cut > 0 ? template.title.slice(0, cut) : template.title
+  return base.length > 24 ? `${base.slice(0, 24)}…` : base
+}
+
+export function listPrepGaps(
+  state: ExternalAuditPrepState,
+  _context?: PrepDoneContext,
+): PrepGaps {
+  const separateHalfDone: PrepSeparateHalfDone[] = []
+  const mergedOpen: string[] = []
+  const siteOpen: string[] = []
+  const separateOpen: string[] = []
+
+  for (const itemState of state.items) {
+    const template = getPrepTemplate(itemState.no)
+    if (!template) continue
+    const label = prepItemLabel(template)
+
+    switch (template.scope.mode) {
+      case 'both_separate': {
+        const { jiurunDone, zhenglongxingDone } = itemState
+        if (jiurunDone && !zhenglongxingDone) {
+          separateHalfDone.push({
+            id: itemState.id,
+            no: template.no,
+            label,
+            title: template.title,
+            missing: 'zhenglongxing',
+          })
+        } else if (!jiurunDone && zhenglongxingDone) {
+          separateHalfDone.push({
+            id: itemState.id,
+            no: template.no,
+            label,
+            title: template.title,
+            missing: 'jiurun',
+          })
+        } else if (!jiurunDone && !zhenglongxingDone) {
+          separateOpen.push(itemState.id)
+        }
+        break
+      }
+      case 'merged':
+        if (!itemState.mergedDone) mergedOpen.push(itemState.id)
+        break
+      case 'site_scope':
+        if (!itemState.completed) siteOpen.push(itemState.id)
+        break
+    }
+  }
+
+  return { separateHalfDone, mergedOpen, siteOpen, separateOpen, qpBlocked: [] }
+}
+
+export function summarizePrepGaps(
+  state: ExternalAuditPrepState,
+  context?: PrepDoneContext,
+  limit = 5,
+): PrepGapSummaryLine[] {
+  const gaps = listPrepGaps(state, context)
+  const lines: PrepGapSummaryLine[] = []
+
+  for (const half of gaps.separateHalfDone) {
+    const company = half.missing === 'jiurun' ? '九潤' : '正隆興'
+    const template = getPrepTemplate(half.no)
+    lines.push({
+      no: half.no,
+      label: half.label,
+      text: `項次 ${half.label} ${template ? shortPrepTitle(template) : half.title} — 缺${company}抬頭`,
+    })
+  }
+
+  for (const id of gaps.mergedOpen) {
+    const itemState = state.items.find((item) => item.id === id)
+    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    if (!template) continue
+    lines.push({
+      no: template.no,
+      label: prepItemLabel(template),
+      text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 合併抬頭未完成`,
+    })
+  }
+
+  for (const id of gaps.siteOpen) {
+    const itemState = state.items.find((item) => item.id === id)
+    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    if (!template) continue
+    lines.push({
+      no: template.no,
+      label: prepItemLabel(template),
+      text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 現場範圍未完成`,
+    })
+  }
+
+  return lines.slice(0, limit)
 }

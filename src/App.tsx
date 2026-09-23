@@ -6,7 +6,7 @@ import { AuditYearSwitcher } from './components/AuditYearSwitcher'
 import { Dashboard } from './components/Dashboard'
 import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
-import { ALL_TABS, parseAppHash, syncHash } from './lib/navigation'
+import { ALL_TABS, parseAppHash, syncHash, type NavigateOptions } from './lib/navigation'
 import { Icon } from './components/ui/Icon'
 
 const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
@@ -65,10 +65,15 @@ function App() {
   const headerScope = tab === 'prep' || tab === 'onsite'
     ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
     : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
-  const setTab = (next: TabId, nextAuditKey?: string) => {
-    const auditKeyForTab = next === 'audit' ? nextAuditKey : undefined
+  const setTab = (next: TabId, options?: NavigateOptions | string) => {
+    const auditKeyForTab =
+      next === 'audit'
+        ? typeof options === 'string'
+          ? options
+          : options?.auditKey
+        : undefined
     setHashState({ tab: next, auditKey: auditKeyForTab })
-    syncHash(next, auditKeyForTab)
+    syncHash(next, options)
     setMobileMenuOpen(false)
   }
   useEffect(() => {
@@ -213,9 +218,9 @@ function App() {
               <TabErrorBoundary tabLabel="查檢表">
                 <ProcedureAuditPanel
                   store={store}
-                  auditKey={auditKey}
-                  onAuditKeyChange={(id) => setTab('audit', id)}
-                  onBackToSchedule={() => setTab('schedule')}
+                  selectedKey={auditKey}
+                  onSelectedKeyChange={(id) => setTab('audit', id)}
+                  onNavigate={setTab}
                 />
               </TabErrorBoundary>
             )}

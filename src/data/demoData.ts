@@ -6,8 +6,11 @@ import type {
   CompanyId,
   ExternalAuditPrepState,
   Person,
+  PlanRow,
+  ProcedureAudit,
   YearArchiveEntry,
 } from '../types'
+import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { COMPANY_IDS, COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
 import { normalizeNCRList } from '../lib/ncr'
@@ -99,10 +102,18 @@ function createCompanySettings(): Record<CompanyId, AuditSettings> {
   ) as Record<CompanyId, AuditSettings>
 }
 
+type PartialItem = {
+  no: number
+  judgment: '符合' | '不符' | '觀察' | '不適用'
+  description?: string
+  objectiveEvidence?: string
+}
+
 function buildAudit(
   qpCode: string,
   departmentId: string,
-  partialItems: Array<{ no: number; judgment: '符合' | '不符' | '觀察' | '不適用'; description?: string }>,
+  partialItems: PartialItem[],
+  options?: { fullyJudged?: boolean; withEvidence?: boolean },
 ) {
   let entry = PROCEDURE_PLAN_TEMPLATE.find(
     (e) => e.qpCode === qpCode && e.departmentId === departmentId,
@@ -129,8 +140,24 @@ function buildAudit(
     if (item) {
       item.judgment = p.judgment
       item.description = p.description ?? ''
+      if (p.objectiveEvidence) item.objectiveEvidence = p.objectiveEvidence
     }
   })
+  if (options?.fullyJudged) {
+    items.forEach((checkItem) => {
+      if (!checkItem.judgment) checkItem.judgment = '符合'
+    })
+  }
+  if (options?.withEvidence) {
+    items.forEach((checkItem) => {
+      if (
+        (checkItem.judgment === '符合' || checkItem.judgment === '不符') &&
+        !checkItem.objectiveEvidence?.trim()
+      ) {
+        checkItem.objectiveEvidence = `${qpCode}-demo-紀錄`
+      }
+    })
+  }
   return {
     id: `audit-${qpCode}-${entry.departmentId}`,
     qpCode,
@@ -158,6 +185,27 @@ function buildAudit(
       impartialityNote: '',
     },
   }
+}
+
+function syncAuditsWithPlan(planRows: PlanRow[], audits: ProcedureAudit[]): ProcedureAudit[] {
+  const planByKey = new Map(planRows.map((row) => [`${row.qpCode}|${row.departmentId}`, row]))
+  return audits.map((audit) => {
+    const row = planByKey.get(`${audit.qpCode}|${audit.departmentId}`)
+    return row ? carryPlanDatesToAudit(row, audit, baseCompanySettings.auditYear) : audit
+  })
+}
+
+function applyDemoImpartialityConflicts(planRows: PlanRow[], companyId: CompanyId): PlanRow[] {
+  const conflictQp = companyId === 'jiurun' ? 'QP-16' : 'QP-05'
+  const conflictDeptId = 'dept-qa'
+  const dept = departments.find((d) => d.id === conflictDeptId)
+  if (!dept) return planRows
+
+  return planRows.map((row) =>
+    row.qpCode === conflictQp && row.departmentId === conflictDeptId
+      ? { ...row, auditors: dept.owner }
+      : row,
+  )
 }
 
 function createDemoPeople(): Person[] {
@@ -202,8 +250,122 @@ function createAuditProfiles(): Record<CompanyId, CompanyAuditProfile> {
   ])) as Record<CompanyId, CompanyAuditProfile>
 }
 
-function createCompanyData(companySuffix: string): CompanyData {
-  const planRows = autoArrangePlan(
+function createCompanyData(companyId: CompanyId): CompanyData {
+  const companySuffix = companyId === 'jiurun' ? 'jiurun' : 'zlx'
+
+  if (companyId === 'jiurun') {
+    let planRows = autoArrangePlan(
+      {
+        departments,
+        planEntries: PROCEDURE_PLAN_TEMPLATE,
+        auditYear: baseCompanySettings.auditYear,
+        planWindowStart: baseCompanySettings.planWindowStart,
+        planWindowEnd: baseCompanySettings.planWindowEnd,
+        managementReviewDate: baseCompanySettings.managementReviewDate,
+        openCarryForwardCount: 2,
+      },
+      { leadAuditor: baseCompanySettings.leadAuditor },
+    )
+    planRows = applyDemoImpartialityConflicts(planRows, companyId)
+
+    const qp16Audit = buildAudit('QP-16', 'dept-qa', [
+      {
+        no: 1,
+        judgment: '不符',
+        description: '不合格品隔離區標示不完整',
+        objectiveEvidence: '現場巡檢紀錄',
+      },
+    ])
+    qp16Audit.items = qp16Audit.items.map((item) =>
+      item.no === 1 ? { ...item, as9100Clause: '8.7' } : item,
+    )
+
+    let audits: ProcedureAudit[] = [
+      buildAudit('QP-28', 'dept-qa', [{ no: 1, judgment: '符合' }], {
+        fullyJudged: true,
+        withEvidence: true,
+      }),
+      qp16Audit,
+      buildAudit('QP-20', 'dept-admin', [{ no: 1, judgment: '符合' }]),
+    ]
+    audits = syncAuditsWithPlan(planRows, audits)
+
+    const ncrs = normalizeNCRList([
+      {
+        id: 'ncr-demo-1',
+        ncrNumber: `NCR-2026-001-${companySuffix}`,
+        qpCode: 'QP-16',
+        departmentId: 'dept-qa',
+        department: '品保部',
+        process: '製程/最終檢驗',
+        description: '不合格品隔離區標示不完整',
+        date: '2026-03-15',
+        status: '矯正中',
+        rootCause: '現場人員對隔離區標示規範不熟悉',
+        correctiveAction: '重訓並增設標示看板',
+        verificationEvidence: '',
+        responsiblePerson: '品保部經理',
+        dueDate: '2026-04-15',
+        containment: '立即補齊隔離區標示並暫停該區進料',
+        classification: '輕微',
+        checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
+      },
+    ])
+
+    return {
+      name: '',
+      departments,
+      planRows,
+      audits,
+      ncrs,
+      observations: [
+        {
+          id: `obs-2025-1-${companySuffix}`,
+          year: 2025,
+          qpCode: 'QP-01',
+          departmentId: 'dept-admin',
+          department: '管理部',
+          process: '文件管制',
+          content: '文件回收舊版時，部分部門未簽收確認',
+          description: '建議強化文件發放回收簽收紀錄',
+          status: 'open' as const,
+        },
+        {
+          id: `obs-2025-2-${companySuffix}`,
+          year: 2025,
+          qpCode: 'QP-22',
+          departmentId: 'dept-prod',
+          department: '生產製造部',
+          process: '追溯性',
+          content: '工單與現場實際用料偶有不一致',
+          description: '建議每班首件核對工單物料',
+          status: 'open' as const,
+        },
+      ],
+      suggestions: [
+        {
+          id: `sug-2025-1-${companySuffix}`,
+          year: 2025,
+          procedure: 'QP-18',
+          issue: '部分量測設備校正標籤資訊不完整',
+          progress: '已通知各單位補貼，待複查',
+          responsibleUnit: '品保部',
+          status: 'open' as const,
+        },
+        {
+          id: `sug-2025-2-${companySuffix}`,
+          year: 2025,
+          procedure: 'QP-09',
+          issue: '合約審查紀錄缺少客戶特殊要求欄位',
+          progress: '表單已修訂，舊案補登中',
+          responsibleUnit: '業務部',
+          status: 'open' as const,
+        },
+      ],
+    }
+  }
+
+  let planRows = autoArrangePlan(
     {
       departments,
       planEntries: PROCEDURE_PLAN_TEMPLATE,
@@ -211,65 +373,45 @@ function createCompanyData(companySuffix: string): CompanyData {
       planWindowStart: baseCompanySettings.planWindowStart,
       planWindowEnd: baseCompanySettings.planWindowEnd,
       managementReviewDate: baseCompanySettings.managementReviewDate,
-      openCarryForwardCount: 2,
+      openCarryForwardCount: 0,
     },
     { leadAuditor: baseCompanySettings.leadAuditor },
   )
+  planRows = applyDemoImpartialityConflicts(planRows, companyId)
 
-  const audits = [
-    buildAudit('QP-28', 'dept-qa', [
-      { no: 1, judgment: '符合' },
-    ]),
-    buildAudit('QP-16', 'dept-qa', [
-      { no: 1, judgment: '不符', description: '不合格品隔離區標示不完整' },
-    ]),
-    buildAudit('QP-20', 'dept-admin', [
-      { no: 1, judgment: '符合' },
+  let audits: ProcedureAudit[] = [
+    buildAudit(
+      'QP-28',
+      'dept-qa',
+      [
+        { no: 1, judgment: '符合', objectiveEvidence: 'QP-28-內稽紀錄' },
+        { no: 2, judgment: '符合', objectiveEvidence: 'QP-28-內稽紀錄' },
+      ],
+      { fullyJudged: true, withEvidence: true },
+    ),
+    buildAudit('QP-05', 'dept-qa', [{ no: 1, judgment: '符合' }]),
+    buildAudit('QP-21', 'dept-prod', [
+      { no: 1, judgment: '觀察', description: '首件檢查紀錄偶缺簽名' },
     ]),
   ]
-
-  const ncrs = [
-    {
-      id: 'ncr-demo-1',
-      ncrNumber: `NCR-2026-001-${companySuffix}`,
-      qpCode: 'QP-16',
-      departmentId: 'dept-qa',
-      department: '品保部',
-      process: '製程/最終檢驗',
-      description: '不合格品隔離區標示不完整',
-      date: '2026-03-15',
-      status: '矯正中' as const,
-      checklistItemId: audits[1].items.find((i) => i.judgment === '不符')?.id,
-    },
-  ]
+  audits = syncAuditsWithPlan(planRows, audits)
 
   return {
     name: '',
     departments,
     planRows,
     audits,
-    ncrs: normalizeNCRList(ncrs),
+    ncrs: [],
     observations: [
       {
         id: `obs-2025-1-${companySuffix}`,
         year: 2025,
-        qpCode: 'QP-01',
-        departmentId: 'dept-admin',
-        department: '管理部',
-        process: '文件管制',
-        content: '文件回收舊版時，部分部門未簽收確認',
-        description: '建議強化文件發放回收簽收紀錄',
-        status: 'open' as const,
-      },
-      {
-        id: `obs-2025-2-${companySuffix}`,
-        year: 2025,
-        qpCode: 'QP-22',
-        departmentId: 'dept-prod',
-        department: '生產製造部',
-        process: '追溯性',
-        content: '工單與現場實際用料偶有不一致',
-        description: '建議每班首件核對工單物料',
+        qpCode: 'QP-12',
+        departmentId: 'dept-qa',
+        department: '品保部',
+        process: '進料檢驗',
+        content: '供應商材質證明更新不及時',
+        description: '已列管追蹤，待供應商回覆',
         status: 'open' as const,
       },
     ],
@@ -277,19 +419,10 @@ function createCompanyData(companySuffix: string): CompanyData {
       {
         id: `sug-2025-1-${companySuffix}`,
         year: 2025,
-        procedure: 'QP-18',
-        issue: '部分量測設備校正標籤資訊不完整',
-        progress: '已通知各單位補貼，待複查',
-        responsibleUnit: '品保部',
-        status: 'open' as const,
-      },
-      {
-        id: `sug-2025-2-${companySuffix}`,
-        year: 2025,
-        procedure: 'QP-09',
-        issue: '合約審查紀錄缺少客戶特殊要求欄位',
-        progress: '表單已修訂，舊案補登中',
-        responsibleUnit: '業務部',
+        procedure: 'QP-07',
+        issue: '教育訓練矩陣未含新進人員',
+        progress: 'HR 補登中',
+        responsibleUnit: '管理部',
         status: 'open' as const,
       },
     ],
@@ -302,6 +435,7 @@ export function createDemoState(): AppState {
     companies[id] = {
       ...createCompanyData(id),
       name: COMPANY_LABELS[id],
+      keyCustomerName: id === 'zhenglongxing' ? COMPANY_LABELS.jiurun : '',
     }
   }
 
@@ -323,6 +457,7 @@ export function createDemoState(): AppState {
     companyAuditProfiles: createAuditProfiles(),
     yearArchives: {},
     prepArchives: {},
+    dataSource: 'demo',
     version: 7,
   }
 }

@@ -62,6 +62,7 @@ export interface PlannerInput {
   planWindowStart: string
   planWindowEnd: string
   managementReviewDate?: string
+  externalAuditDate?: string
   existingRows?: PlanRow[]
   openCarryForwardCount?: number
   procedureRisks?: ProcedureRiskRecord[]
@@ -75,24 +76,32 @@ function parseMonth(dateStr: string, year: number): number | null {
   if (!dateStr) return null
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return null
-  return d.getFullYear() === year ? d.getMonth() + 1 : d.getMonth() + 1
+  if (d.getFullYear() !== year) return null
+  return d.getMonth() + 1
 }
 
-function getWindowMonths(
+export function getWindowMonths(
   year: number,
   start: string,
   end: string,
   mgmtReview?: string,
+  externalAudit?: string,
 ): number[] {
   const startMonth = parseMonth(start, year) ?? 1
   const endMonth = parseMonth(end, year) ?? 12
   let bufferEnd = endMonth
 
+  const cutoffMonths: number[] = []
   if (mgmtReview) {
     const reviewMonth = parseMonth(mgmtReview, year)
-    if (reviewMonth && reviewMonth > 1) {
-      bufferEnd = Math.min(bufferEnd, reviewMonth - 1)
-    }
+    if (reviewMonth && reviewMonth > 1) cutoffMonths.push(reviewMonth - 1)
+  }
+  if (externalAudit) {
+    const extMonth = parseMonth(externalAudit, year)
+    if (extMonth && extMonth > 1) cutoffMonths.push(extMonth - 1)
+  }
+  if (cutoffMonths.length > 0) {
+    bufferEnd = Math.min(bufferEnd, ...cutoffMonths)
   }
 
   const months: number[] = []
@@ -228,6 +237,7 @@ export function autoArrangePlan(
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
     existingRows,
     openCarryForwardCount = 0,
     procedureRisks = [],
@@ -282,6 +292,7 @@ export function autoArrangePlan(
     planWindowStart,
     planWindowEnd,
     managementReviewDate,
+    externalAuditDate,
   )
 
   const monthLoad = new Array(12).fill(0)
@@ -337,7 +348,7 @@ export function autoArrangePlan(
       process: entry.process,
       documents: entry.documents,
       auditUnit: dept.auditUnit,
-      owner: entry.owner || dept.owner,
+      owner: dept.owner || entry.owner,
       auditors: dept.defaultAuditors || options.leadAuditor || '',
       auditCategory: entry.auditCategory,
       months,
@@ -371,7 +382,7 @@ export function buildAuditFocusOverview(rows: PlanRow[]): AuditFocusRow[] {
         sheet: f.sheet,
         qpCode: qp,
         department: f.department,
-        owner: f.owner,
+        owner: row?.owner ?? f.owner,
         riskLevel: f.riskLevel as RiskLevel,
         itemCount: countChecklistItems(qp, dept),
         auditCategory: row?.auditCategory ?? '系統稽核',

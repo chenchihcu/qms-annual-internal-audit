@@ -4,6 +4,16 @@ export type RiskLevel = '高' | '中' | '低'
 
 export type Judgment = '符合' | '不符' | '觀察' | '不適用'
 
+export type CertificateScope = 'shared' | 'dual' | 'jiurun' | 'zhenglongxing'
+
+export type NcrCompanyScope = 'jiurun' | 'zhenglongxing' | 'both'
+
+export const NCR_COMPANY_SCOPE_LABELS: Record<NcrCompanyScope, string> = {
+  jiurun: '九潤',
+  zhenglongxing: '正隆興',
+  both: '兩證',
+}
+
 export type NCRStatus = '開立' | '矯正中' | '結案'
 
 export type NCRClassification = '重大' | '輕微'
@@ -246,6 +256,8 @@ export interface ChecklistItem {
   sampleSize?: string
   objectiveEvidence?: string
   attachments?: EvidenceAttachment[]
+  certificateScope?: CertificateScope
+  judgmentByCompany?: { jiurun: Judgment | null; zhenglongxing: Judgment | null }
 }
 
 /** QR-28-02 程序導向查檢表 */
@@ -311,6 +323,7 @@ export interface NCR {
   attachments?: EvidenceAttachment[]
   observationId?: string
   carriedToYear?: number
+  companyScope?: NcrCompanyScope
 }
 
 export interface Observation {
@@ -328,6 +341,7 @@ export interface Observation {
   carryForwards?: Array<{ year: number; auditId: string; checklistItemId: string }>
   convertedNcrId?: string
   ncrId?: string
+  companySide?: CompanyId
   sourceType?: 'internal_audit' | 'third_party_audit'
   sourceAuditId?: string
   sourceChecklistItemId?: string

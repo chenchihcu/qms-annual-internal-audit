@@ -22,4 +22,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-qms-annual-internal-audit.zip.b64
+# Windows cache paths accidentally created in workspace
+%SystemDrive%/

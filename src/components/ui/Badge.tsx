@@ -96,6 +96,7 @@ export function Input({
   disabled = false,
   className = '',
   ariaLabel,
+  onBlur,
 }: {
   label?: string
   value: string | number
@@ -105,6 +106,7 @@ export function Input({
   disabled?: boolean
   className?: string
   ariaLabel?: string
+  onBlur?: () => void
 }) {
   return (
     <label className={`block ${className}`}>
@@ -115,6 +117,7 @@ export function Input({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
         aria-label={ariaLabel}
         className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
       />

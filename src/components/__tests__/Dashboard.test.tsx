@@ -1,13 +1,23 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { createDemoState } from '../../data/demoData'
+import { companySettingsFor } from '../../types'
 import { Dashboard } from '../Dashboard'
 
-function renderDashboard() {
+function syncedDemoState() {
   const base = createDemoState()
+  const companyId = base.activeCompanyId
+  return {
+    ...base,
+    settings: companySettingsFor(base, companyId),
+    company: base.companies[companyId],
+  }
+}
+
+function renderDashboard() {
   return render(
     <Dashboard
-      state={{ ...base, company: base.companies.jiurun }}
+      state={syncedDemoState()}
       onNavigate={() => {}}
     />,
   )
@@ -59,10 +69,9 @@ describe('Dashboard attention list', () => {
 
   it('navigates via row click handler for scored demo row', async () => {
     let tab: string | undefined
-    const base = createDemoState()
     render(
       <Dashboard
-        state={{ ...base, company: base.companies.jiurun }}
+        state={syncedDemoState()}
         onNavigate={(next) => {
           tab = next
         }}
