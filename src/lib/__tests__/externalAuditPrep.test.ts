@@ -33,8 +33,8 @@ const baseSettings = {
 }
 
 describe('EXTERNAL_AUDIT_PREP_SEED', () => {
-  it('has 19 prep items (no item 13) with expected scope modes', () => {
-    expect(EXTERNAL_AUDIT_PREP_SEED.items).toHaveLength(19)
+  it('has 23 prep items (no item 13) with expected scope modes', () => {
+    expect(EXTERNAL_AUDIT_PREP_SEED.items).toHaveLength(23)
     const modes = EXTERNAL_AUDIT_PREP_SEED.items.map((i) => i.scope.mode)
     expect(modes.filter((m) => m === 'both_separate').length).toBeGreaterThan(0)
     expect(modes.filter((m) => m === 'merged').length).toBeGreaterThan(0)
@@ -96,7 +96,7 @@ describe('countPrepProgress', () => {
     prep.items[0].zhenglongxingDone = true
     prep.items[1].mergedDone = true
     const { done, total } = countPrepProgress(prep)
-    expect(total).toBe(19)
+    expect(total).toBe(23)
     expect(done).toBe(2)
   })
 })

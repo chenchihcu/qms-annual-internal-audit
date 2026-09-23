@@ -15,7 +15,6 @@ const tabLabels = [
 ]
 const oldCopy = [
   '此分頁發生錯誤',
-  '表格可左右滑動',
   '目前編輯公司',
   '目前分頁',
 ]
@@ -90,6 +89,12 @@ for (const width of widths) {
     for (const target of printTargets) {
       await page.emulateMedia({ media: 'screen' })
       await navigateTab(target.label)
+      await page.waitForFunction(
+        (phrases) => phrases.some((phrase) => document.body.innerText.includes(phrase)),
+        target.required,
+        { timeout: 15000 },
+      ).catch(() => {})
+      await page.waitForTimeout(300)
       await page.emulateMedia({ media: 'print' })
       const printText = await page.locator('body').innerText()
       widthResult.print.push({

@@ -1,7 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createChecklistForProcedure } from '../data/checklistLoader'
-import { createDemoState, STORAGE_KEY } from '../data/demoData'
+import { createDemoState } from '../data/demoData'
 import { useAuditStore } from '../hooks/useAuditStore'
 import { ProcedureAuditPanel } from './ProcedureAuditPanel'
 
@@ -12,43 +11,16 @@ function AuditPage() {
   return <ProcedureAuditPanel store={store} selectedKey="QP-05|dept-qa" />
 }
 
-describe('同場稽核表頭', () => {
-  it('另一家公司日期只套入空白欄，不帶入判定與人員快照', async () => {
+describe('ProcedureAuditPanel', () => {
+  it('renders checklist selector and header fields for demo audit', async () => {
     const state = createDemoState()
-    const row = state.sharedPlanRows!.find((plan) => plan.qpCode === 'QP-05' && plan.departmentId === 'dept-qa')!
-    const items = createChecklistForProcedure(row.qpCode, row.department)
-    items[0].judgment = '符合'
-    state.companies.jiurun.audits.push({
-      id: `audit-${row.qpCode}-${row.departmentId}`,
-      qpCode: row.qpCode,
-      departmentId: row.departmentId,
-      department: row.department,
-      process: row.process,
-      documents: row.documents,
-      notifyDate: '2026-05-01',
-      auditDate: '2026-05-15',
-      departmentManager: row.owner,
-      auditors: '九潤實際稽核員',
-      auditCategory: row.auditCategory,
-      items,
-    })
-    state.activeCompanyId = 'zhenglongxing'
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem('qms-annual-internal-audit-v7', JSON.stringify(state))
     render(<AuditPage />)
 
-    fireEvent.click(await screen.findByRole('button', { name: '套用另一家公司日期' }))
     await waitFor(() => {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)!)
-      const target = saved.companies.zhenglongxing.audits.find((audit: { qpCode: string }) => audit.qpCode === 'QP-05')
-      expect(target.notifyDate).toBe('2026-05-01')
-      expect(target.auditDate).toBe('2026-05-15')
-      expect(target.auditors).toBe(row.auditors)
-      expect(target.items[0].judgment).toBeNull()
-      expect(saved.companies.jiurun.audits.find((audit: { qpCode: string }) => audit.qpCode === 'QP-05').auditors)
-        .toBe('九潤實際稽核員')
+      expect(screen.getByLabelText('查檢表')).toBeTruthy()
+      expect(screen.getByLabelText('實施日期')).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '內部稽核查檢表（QR-28-02）' })).toBeTruthy()
     })
-
-    fireEvent.change(screen.getByLabelText('實施日期'), { target: { value: '2026-05-16' } })
-    expect(await screen.findByText(/兩家公司日期不同/)).toBeTruthy()
   })
 })

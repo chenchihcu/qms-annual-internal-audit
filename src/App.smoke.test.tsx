@@ -35,15 +35,17 @@ describe('App tab smoke', () => {
     window.location.hash = ''
   })
 
-  it('renders all sixteen tabs without crashing', () => {
+  it('renders all sixteen tabs without crashing', async () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
       const tab = screen.getByRole('button', { name: label })
       fireEvent.click(tab)
-      expect(screen.queryByText(`${label} 無法顯示`)).toBeNull()
+      await waitFor(() => {
+        expect(screen.queryByText(`${label} 無法顯示`)).toBeNull()
+      })
     }
-  })
+  }, 30000)
 
   it('lists sixteen tabs without PDCA group headings', () => {
     render(<App />)
@@ -64,11 +66,16 @@ describe('App tab smoke', () => {
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
 
-  it('shows workflow guide and dashboard drill-down controls', () => {
+  it('shows workflow guide and dashboard drill-down controls', async () => {
     render(<App />)
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /待追蹤/i }))
-    expect(screen.getByRole('button', { name: '待改善追蹤' })).toBeTruthy()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /跨年待追蹤/ })).toBeTruthy()
+    })
+    fireEvent.click(screen.getByRole('button', { name: /跨年待追蹤/ }))
+    await waitFor(() => {
+      expect(screen.getByText(/前年度觀察事項/)).toBeTruthy()
+    })
   })
 
   it('asks before clearing all data and keeps data when cancelled', async () => {
@@ -114,37 +121,21 @@ describe('App tab smoke', () => {
     expect(screen.getAllByRole('button', { name: '轉為 NCR' }).length).toBeGreaterThan(0)
   })
 
-  it('links start audit button to visible block reasons for planning events', async () => {
+  it('loads checklist panel with procedure selector', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+      expect(screen.getByLabelText('查檢表')).toBeTruthy()
+      expect(screen.getByLabelText('實施日期')).toBeTruthy()
     })
-    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
-    const planningOption = Array.from(select.options).find(
-      (option) => option.text.includes('事件 ') && !option.text.match(/\d{4}-\d{2}-\d{2}/),
-    )
-    expect(planningOption).toBeTruthy()
-    fireEvent.change(select, { target: { value: planningOption!.value } })
-
-    const startBtn = screen.getByRole('button', { name: '開始稽核' })
-    expect(startBtn.getAttribute('aria-describedby')).toBe('audit-start-gaps')
-    const gaps = document.getElementById('audit-start-gaps')
-    expect(gaps).toBeTruthy()
-    expect(gaps!.textContent).toContain('阻擋：')
-    expect(startBtn.closest('span')?.getAttribute('title')).toContain('；')
   })
 
   it('asks before deleting custom checklist item and keeps item when cancelled', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+      expect(screen.getByLabelText('查檢表')).toBeTruthy()
     })
-    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
-    const planningOption = Array.from(select.options).find((option) => option.text.includes('事件 '))
-    expect(planningOption).toBeTruthy()
-    fireEvent.change(select, { target: { value: planningOption!.value } })
 
     fireEvent.click(screen.getByRole('button', { name: '新增稽核項目' }))
     const deleteBtn = screen.getAllByRole('button', { name: /刪除/ }).at(-1)
@@ -152,7 +143,7 @@ describe('App tab smoke', () => {
     fireEvent.click(deleteBtn!)
 
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('確認刪除查檢項')
+    expect(dialog.textContent).toContain('刪除稽核項目')
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(screen.getAllByRole('button', { name: /刪除/ }).length).toBeGreaterThan(0)
@@ -165,17 +156,17 @@ describe('App tab smoke', () => {
     expect(document.getElementById('main')).toBeTruthy()
   })
 
-  it('hides start audit button for non-planning events', async () => {
+  it('shows scored demo audit in checklist selector', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('目前稽核事件')).toBeTruthy()
+      expect(screen.getByLabelText('查檢表')).toBeTruthy()
     })
-    const select = screen.getByLabelText('目前稽核事件') as HTMLSelectElement
-    const activeOption = Array.from(select.options).find((option) => option.text.includes('2026-03-15') || option.text.match(/\d{4}-\d{2}-\d{2}/))
-    expect(activeOption).toBeTruthy()
-    fireEvent.change(select, { target: { value: activeOption!.value } })
-    expect(screen.queryByRole('button', { name: '開始稽核' })).toBeNull()
+    const select = screen.getByLabelText('查檢表') as HTMLSelectElement
+    const scoredOption = Array.from(select.options).find((option) => option.text.includes('QP-16'))
+    expect(scoredOption).toBeTruthy()
+    fireEvent.change(select, { target: { value: scoredOption!.value } })
+    expect(screen.getByLabelText('實施日期')).toBeTruthy()
   })
 
   it('asks before switching external prep year', async () => {

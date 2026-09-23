@@ -14,7 +14,9 @@ import { COMPANY_IDS, COMPANY_LABELS, relationshipCheckKey } from '../types'
 export type PrepScopeMode = 'both_separate' | 'merged' | 'site_scope'
 
 export interface PrepTemplateItem {
+  id?: string
   no: number
+  sub?: string
   title: string
   owner: string
   scope: { mode: PrepScopeMode }
@@ -52,7 +54,7 @@ export function createDefaultPrepState(year: number): ExternalAuditPrepState {
     managementReviewComplete: false,
     relationshipChecks: {},
     items: EXTERNAL_AUDIT_PREP_SEED.items.map((item) => ({
-      id: `prep-${item.no}`,
+      id: item.id ?? `prep-${item.no}`,
       no: item.no,
       jiurunDone: false,
       zhenglongxingDone: false,
@@ -85,6 +87,15 @@ export function migratePrepState(
 
 export function getPrepTemplate(no: number): PrepTemplateItem | undefined {
   return EXTERNAL_AUDIT_PREP_SEED.items.find((i) => i.no === no)
+}
+
+export function getPrepTemplateForState(
+  itemState: ExternalAuditPrepItemState,
+): PrepTemplateItem | undefined {
+  return (
+    EXTERNAL_AUDIT_PREP_SEED.items.find((item) => item.id === itemState.id) ??
+    getPrepTemplate(itemState.no)
+  )
 }
 
 function relationshipGatesSatisfied(

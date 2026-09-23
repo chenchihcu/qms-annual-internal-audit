@@ -5,27 +5,23 @@ import App from '../../App'
 describe('RiskAssessment matrix layout', () => {
   beforeEach(() => {
     window.location.hash = ''
+    localStorage.clear()
   })
 
-  it('shows matrix table and persists factor on cell click', async () => {
+  it('shows department risk table and persists factor edits', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '風險評估（QR-02-01）' })).toBeTruthy()
     })
 
-    const matrix = document.querySelector('[data-risk-matrix]')
-    expect(matrix).toBeTruthy()
-
-    const firstRow = document.querySelector('[data-risk-key]') as HTMLTableRowElement
-    expect(firstRow).toBeTruthy()
-
-    const complaintBtn = within(firstRow).getByRole('button', { name: /客訴/ })
-    fireEvent.click(complaintBtn)
+    const table = screen.getByRole('region', { name: '部門風險評估表格' })
+    const occurrenceInput = within(table).getAllByLabelText(/發生度 O/)[0] as HTMLInputElement
+    fireEvent.change(occurrenceInput, { target: { value: '1' } })
 
     await waitFor(() => {
-      expect(complaintBtn.textContent).toBe('無')
+      expect(occurrenceInput.value).toBe('1')
     })
   })
 

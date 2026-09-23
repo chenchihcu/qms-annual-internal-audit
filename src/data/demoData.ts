@@ -19,6 +19,8 @@ import {
   DEFAULT_COMPANY_RELATIONSHIPS,
   migratePrepState,
 } from '../lib/externalAuditPrep'
+import { normalizeExternalAuditSchedule } from '../lib/externalAuditSchedule'
+import { hydrateSharedPlan } from '../lib/sharedPlan'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
@@ -195,14 +197,13 @@ function syncAuditsWithPlan(planRows: PlanRow[], audits: ProcedureAudit[]): Proc
   })
 }
 
-function applyDemoImpartialityConflicts(planRows: PlanRow[], companyId: CompanyId): PlanRow[] {
-  const conflictQp = companyId === 'jiurun' ? 'QP-16' : 'QP-05'
+function applyDemoImpartialityConflicts(planRows: PlanRow[]): PlanRow[] {
   const conflictDeptId = 'dept-qa'
   const dept = departments.find((d) => d.id === conflictDeptId)
   if (!dept) return planRows
 
   return planRows.map((row) =>
-    row.qpCode === conflictQp && row.departmentId === conflictDeptId
+    row.qpCode === 'QP-05' && row.departmentId === conflictDeptId
       ? { ...row, auditors: dept.owner }
       : row,
   )
@@ -266,7 +267,7 @@ function createCompanyData(companyId: CompanyId): CompanyData {
       },
       { leadAuditor: baseCompanySettings.leadAuditor },
     )
-    planRows = applyDemoImpartialityConflicts(planRows, companyId)
+    planRows = applyDemoImpartialityConflicts(planRows)
 
     const qp16Audit = buildAudit('QP-16', 'dept-qa', [
       {
@@ -373,11 +374,11 @@ function createCompanyData(companyId: CompanyId): CompanyData {
       planWindowStart: baseCompanySettings.planWindowStart,
       planWindowEnd: baseCompanySettings.planWindowEnd,
       managementReviewDate: baseCompanySettings.managementReviewDate,
-      openCarryForwardCount: 0,
+      openCarryForwardCount: 2,
     },
     { leadAuditor: baseCompanySettings.leadAuditor },
   )
-  planRows = applyDemoImpartialityConflicts(planRows, companyId)
+  planRows = applyDemoImpartialityConflicts(planRows)
 
   let audits: ProcedureAudit[] = [
     buildAudit(
@@ -446,7 +447,17 @@ export function createDemoState(): AppState {
   prep.items[0].jiurunDone = true
   prep.items[0].zhenglongxingDone = true
 
-  return {
+  const zlxPlanById = new Map(companies.zhenglongxing.planRows.map((row) => [row.id, row]))
+  companies.zhenglongxing.planRows = companies.jiurun.planRows.map((row) => {
+    const existing = zlxPlanById.get(row.id)
+    return {
+      ...row,
+      months: existing?.months ?? row.months,
+      manualOverride: existing?.manualOverride ?? row.manualOverride,
+    }
+  })
+
+  let state: AppState = {
     activeCompanyId: 'jiurun',
     companySettings: createCompanySettings(),
     companies,
@@ -460,6 +471,28 @@ export function createDemoState(): AppState {
     dataSource: 'demo',
     version: 7,
   }
+
+  state = hydrateSharedPlan(state)
+  state = {
+    ...state,
+    companies: {
+      jiurun: {
+        ...state.companies.jiurun,
+        planRows: applyDemoImpartialityConflicts(state.companies.jiurun.planRows),
+      },
+      zhenglongxing: {
+        ...state.companies.zhenglongxing,
+        planRows: applyDemoImpartialityConflicts(state.companies.zhenglongxing.planRows),
+      },
+    },
+    externalAuditSchedule: normalizeExternalAuditSchedule(
+      undefined,
+      baseCompanySettings.auditYear,
+      prep.externalAuditDate ?? `${baseCompanySettings.auditYear}-09-15`,
+    ),
+  }
+
+  return state
 }
 
 export function createBlankState(): AppState {

@@ -128,7 +128,7 @@ describe('storage migration', () => {
     demo.version = 11
     demo.companySettings.jiurun.leadAuditor = 'v11 自訂主任'
     demo.companies.jiurun.planRows = demo.companies.jiurun.planRows.map((row) =>
-      row.qpCode === 'QP-16' ? { ...row, auditors: '王稽核' } : row,
+      row.qpCode === 'QP-05' ? { ...row, auditors: '王稽核' } : row,
     )
     localStorage.setItem('qms-annual-internal-audit-v11', JSON.stringify(demo))
 
@@ -138,7 +138,7 @@ describe('storage migration', () => {
     expect(state.dataSource).toBe('demo')
     expect(
       state.companies.jiurun.planRows.some(
-        (row) => row.qpCode === 'QP-16' && row.auditors === '品保部經理',
+        (row) => row.qpCode === 'QP-05' && row.auditors === '品保部經理',
       ),
     ).toBe(true)
   })

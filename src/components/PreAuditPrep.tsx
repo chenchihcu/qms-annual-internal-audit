@@ -6,7 +6,7 @@ import type { PrepScopeMode } from '../lib/externalAuditPrep'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
   countPrepProgress,
-  getPrepTemplate,
+  getPrepTemplateForState,
   isItemDone,
   itemHasCallout,
   relationshipsForPrepItem,
@@ -383,7 +383,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </thead>
             <tbody>
               {externalAuditPrep.items.map((itemState) => {
-                const template = getPrepTemplate(itemState.no)
+                const template = getPrepTemplateForState(itemState)
                 if (!template) return null
                 const mode = template.scope.mode
                 const done = isItemDone(template, itemState, externalAuditPrep, companyRelationships)
