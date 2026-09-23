@@ -15,7 +15,7 @@ import type {
 import { createDemoState, STORAGE_KEY } from '../data/demoData'
 import { autoArrangePlan } from '../lib/planner'
 import { carryForwardNcrIntoCompany, carryForwardObservationIntoCompany } from '../lib/carryForward'
-import { collectNCRsFromAudits, generateNCRNumber } from '../lib/ncr'
+import { collectNCRsFromAudits, generateNCRNumber, isPriorOpenNcr } from '../lib/ncr'
 import { collectObservationsFromAudits, promoteObservationToNcr as applyPromoteObservationToNcr } from '../lib/observation'
 import {
   createChecklistForProcedure,
@@ -29,6 +29,7 @@ import { loadStateFromStorage, saveStateToStorage } from '../lib/storage'
 import { applyAuditYearChange } from '../lib/settingsYear'
 import { parseImportJSON } from '../lib/importSummary'
 import { applyDepartmentOwnerChange } from '../lib/departmentOwner'
+import { backfillCertificateScopeForAudit } from '../lib/certificateScope'
 
 function patchCompanyState(state: AppState, patch: Partial<CompanyData>): AppState {
   return {
@@ -41,9 +42,26 @@ export interface UpdateSettingsOptions {
   resetExternalPrep?: boolean
 }
 
+function hydrateCompanyNcrs(company: CompanyData, auditYear: number): CompanyData {
+  const ncrs = company.ncrs.map((n) =>
+    n.sourceYear == null ? { ...n, sourceYear: auditYear } : n,
+  )
+  const changed = ncrs.some((n, i) => n !== company.ncrs[i])
+  return changed ? { ...company, ncrs } : company
+}
+
+function hydrateCompanyAudits(company: CompanyData): CompanyData {
+  const audits = company.audits.map(backfillCertificateScopeForAudit)
+  const changed = audits.some((a, i) => a !== company.audits[i])
+  return changed ? { ...company, audits } : company
+}
+
 function hydrateAppState(raw: AppState): AppState {
+  let company = hydrateCompanyNcrs(raw.company, raw.settings.auditYear)
+  company = hydrateCompanyAudits(company)
   return {
     ...raw,
+    company,
     externalAuditPrep: ensurePrepItems({
       ...raw.externalAuditPrep,
       auditedProducts: raw.externalAuditPrep?.auditedProducts ?? [],
@@ -57,6 +75,7 @@ export function useAuditStore() {
   const [loadWarning] = useState<string | undefined>(initial.warning)
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => {
     const result = saveStateToStorage(state)
@@ -72,7 +91,13 @@ export function useAuditStore() {
     (patch: Partial<AuditSettings>, options?: UpdateSettingsOptions) => {
       setState((s) => {
         if (patch.auditYear !== undefined && patch.auditYear !== s.settings.auditYear) {
-          return applyAuditYearChange(s, patch.auditYear, options?.resetExternalPrep ?? false)
+          const { state: next, warnings } = applyAuditYearChange(
+            s,
+            patch.auditYear,
+            options?.resetExternalPrep ?? false,
+          )
+          setActionError(warnings.length > 0 ? warnings.join('；') : null)
+          return next
         }
         return { ...s, settings: { ...s.settings, ...patch } }
       })
@@ -153,9 +178,16 @@ export function useAuditStore() {
       const existing = co.audits.find((a) => a.id === auditId)
       if (existing) {
         const dept = co.departments.find((d) => d.id === departmentId)
-        const items = mergeChecklistWithSeed(existing.items, qpCode, dept?.name)
-        if (items.length === existing.items.length) return existing
-        return { ...existing, items }
+        const mergedItems = mergeChecklistWithSeed(existing.items, qpCode, dept?.name)
+        const withScope = backfillCertificateScopeForAudit({
+          ...existing,
+          items: mergedItems,
+        })
+        const itemsUnchanged =
+          withScope.items.length === existing.items.length &&
+          withScope.items.every((item, i) => item === existing.items[i])
+        if (itemsUnchanged) return existing
+        return withScope
       }
 
       const dept = co.departments.find((d) => d.id === departmentId)
@@ -324,6 +356,7 @@ export function useAuditStore() {
           date: new Date().toISOString().slice(0, 10),
           status: '開立',
           companyScope: input.companyScope,
+          sourceYear: s.settings.auditYear,
         }
         return patchCompanyState(s, { ncrs: [...co.ncrs, ncr] })
       })
@@ -454,8 +487,11 @@ export function useAuditStore() {
         if (!obs || obs.carriedToYear) return s
         try {
           const updated = carryForwardObservationIntoCompany(co, obs, s.settings.auditYear)
+          setActionError(null)
           return patchCompanyState(s, updated)
-        } catch {
+        } catch (err) {
+          const message = err instanceof Error ? err.message : '觀察事項帶入失敗'
+          setActionError(message)
           return s
         }
       })
@@ -467,13 +503,47 @@ export function useAuditStore() {
     setState((s) => {
       const co = s.company
       const ncr = co.ncrs.find((n) => n.id === ncrId)
-      if (!ncr || ncr.status === '結案' || ncr.carriedToYear) return s
+      if (!ncr || ncr.carriedToYear) return s
       try {
         const updated = carryForwardNcrIntoCompany(co, ncr, s.settings.auditYear)
+        setActionError(null)
         return patchCompanyState(s, updated)
-      } catch {
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'NCR 帶入失敗'
+        setActionError(message)
         return s
       }
+    })
+  }, [])
+
+  const importPriorYearCarryForward = useCallback(() => {
+    setState((s) => {
+      const currentYear = s.settings.auditYear
+      let co = s.company
+      const warnings: string[] = []
+
+      for (const obs of co.observations.filter(
+        (o) => o.status === 'open' && o.year < currentYear && !o.carriedToYear,
+      )) {
+        try {
+          co = carryForwardObservationIntoCompany(co, obs, currentYear)
+        } catch (err) {
+          warnings.push(err instanceof Error ? err.message : '觀察事項帶入失敗')
+        }
+      }
+
+      for (const ncr of co.ncrs.filter(
+        (n) => isPriorOpenNcr(n, currentYear) && !n.carriedToYear,
+      )) {
+        try {
+          co = carryForwardNcrIntoCompany(co, ncr, currentYear)
+        } catch (err) {
+          warnings.push(err instanceof Error ? err.message : 'NCR 帶入失敗')
+        }
+      }
+
+      setActionError(warnings.length > 0 ? warnings.join('；') : null)
+      return co === s.company ? s : patchCompanyState(s, co)
     })
   }, [])
 
@@ -560,6 +630,7 @@ export function useAuditStore() {
     loadWarning,
     lastSavedAt,
     saveError,
+    actionError,
     updateSettings,
     updateDepartment,
     updateDepartmentOwner,
@@ -583,6 +654,7 @@ export function useAuditStore() {
     updateExternalPrepSequence,
     carryForwardObservation,
     carryForwardNCR,
+    importPriorYearCarryForward,
     carryForwardSuggestion,
     exportJSON,
     importJSON,

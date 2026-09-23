@@ -1,3 +1,4 @@
+import { ncrCompanyScopeForDualSide } from './certificateScope'
 import { generateNCRNumber } from './ncr'
 import { countObservationJudgments } from './scoring'
 import type { CompanyData, CompanyId, NCR, Observation, ProcedureAudit } from '../types'
@@ -13,6 +14,14 @@ export interface AuditObservationEntry {
   description: string
   sourceYear?: number
   sideLabel?: string
+}
+
+function observationKey(checklistItemId: string, side?: CompanyId): string {
+  return side ? `${checklistItemId}|${side}` : checklistItemId
+}
+
+function observationIdForItem(itemId: string, side?: CompanyId): string {
+  return side ? `obs-chk-${itemId}-${side}` : `obs-chk-${itemId}`
 }
 
 export function listAuditObservationEntries(audits: ProcedureAudit[]): AuditObservationEntry[] {
@@ -73,6 +82,9 @@ export function promoteObservationToNcr(
     const description = obs.description
       ? `${obs.content}\n${obs.description}`
       : obs.content
+    const companyScope = obs.companySide
+      ? ncrCompanyScopeForDualSide(obs.companySide)
+      : 'both'
     const ncr: NCR = {
       id: ncrId,
       ncrNumber: generateNCRNumber(auditYear, company.ncrs.length + 1),
@@ -83,7 +95,7 @@ export function promoteObservationToNcr(
       description,
       date: new Date().toISOString().slice(0, 10),
       status: '開立',
-      companyScope: 'both',
+      companyScope,
       sourceYear: obs.year,
     }
     ncrs = [...company.ncrs, ncr]
@@ -99,15 +111,26 @@ export function promoteObservationToNcr(
 export function findObservationByChecklistItem(
   observations: Observation[],
   checklistItemId: string,
+  companySide?: CompanyId,
 ): Observation | undefined {
-  return observations.find((o) => o.carriedToChecklistId === checklistItemId)
+  return observations.find(
+    (o) =>
+      o.carriedToChecklistId === checklistItemId &&
+      (companySide ? o.companySide === companySide : !o.companySide),
+  )
 }
 
 export function isObservationStale(obs: Observation, audits: ProcedureAudit[]): boolean {
   if (!obs.carriedToChecklistId) return false
   for (const audit of audits) {
     const item = audit.items.find((i) => i.id === obs.carriedToChecklistId)
-    if (item && item.judgment !== '觀察') return true
+    if (!item) continue
+    if (obs.companySide) {
+      const byCo = item.judgmentByCompany
+      if (byCo && byCo[obs.companySide] !== '觀察') return true
+      continue
+    }
+    if (item.judgment !== '觀察') return true
   }
   return false
 }
@@ -117,19 +140,66 @@ export function collectObservationsFromAudits(
   year: number,
   existing: Observation[] = [],
 ): Observation[] {
-  const byItemId = new Map(
+  const byKey = new Map(
     existing
       .filter((o) => o.carriedToChecklistId)
-      .map((o) => [o.carriedToChecklistId!, o]),
+      .map((o) => [observationKey(o.carriedToChecklistId!, o.companySide), o]),
   )
 
   const result: Observation[] = [...existing]
 
   for (const audit of audits) {
     for (const item of audit.items) {
+      const scope = item.certificateScope ?? 'shared'
+
+      if (scope === 'dual' && item.judgmentByCompany) {
+        for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
+          if (item.judgmentByCompany[side] !== '觀察') continue
+          const key = observationKey(item.id, side)
+          const existingObs = byKey.get(key)
+          if (existingObs) {
+            if (existingObs.status === 'closed') continue
+            const idx = result.findIndex((o) => o.id === existingObs.id)
+            if (idx >= 0) {
+              result[idx] = {
+                ...existingObs,
+                content: item.content,
+                description: item.description || existingObs.description,
+                year,
+                qpCode: audit.qpCode,
+                departmentId: audit.departmentId,
+                department: audit.department,
+                process: audit.process,
+                status: 'open',
+                companySide: side,
+              }
+            }
+            continue
+          }
+
+          const obs: Observation = {
+            id: observationIdForItem(item.id, side),
+            year,
+            qpCode: audit.qpCode,
+            departmentId: audit.departmentId,
+            department: audit.department,
+            process: audit.process,
+            content: item.content,
+            description: item.description || '',
+            status: 'open',
+            carriedToChecklistId: item.id,
+            companySide: side,
+          }
+          result.push(obs)
+          byKey.set(key, obs)
+        }
+        continue
+      }
+
       if (item.judgment !== '觀察') continue
 
-      const existingObs = byItemId.get(item.id)
+      const key = observationKey(item.id)
+      const existingObs = byKey.get(key)
       if (existingObs) {
         if (existingObs.status === 'closed') continue
         const idx = result.findIndex((o) => o.id === existingObs.id)
@@ -150,7 +220,7 @@ export function collectObservationsFromAudits(
       }
 
       const obs: Observation = {
-        id: `obs-chk-${item.id}`,
+        id: observationIdForItem(item.id),
         year,
         qpCode: audit.qpCode,
         departmentId: audit.departmentId,
@@ -162,7 +232,7 @@ export function collectObservationsFromAudits(
         carriedToChecklistId: item.id,
       }
       result.push(obs)
-      byItemId.set(item.id, obs)
+      byKey.set(key, obs)
     }
   }
 

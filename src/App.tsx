@@ -119,6 +119,7 @@ function App() {
       savedLabel={savedLabel}
       loadWarning={store.loadWarning ?? null}
       saveError={store.saveError}
+      actionError={store.actionError}
       isDark={isDark}
       onToggleTheme={() => setIsDark(toggleTheme() === 'dark')}
       onPrint={() => window.print()}

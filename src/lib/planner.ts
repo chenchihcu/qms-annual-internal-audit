@@ -36,7 +36,8 @@ function parseMonth(dateStr: string, year: number): number | null {
   if (!dateStr) return null
   const d = new Date(dateStr)
   if (isNaN(d.getTime())) return null
-  return d.getFullYear() === year ? d.getMonth() + 1 : d.getMonth() + 1
+  if (d.getFullYear() !== year) return null
+  return d.getMonth() + 1
 }
 
 export function getWindowMonths(

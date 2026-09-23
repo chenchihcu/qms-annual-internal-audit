@@ -1,6 +1,20 @@
 import { createChecklistForProcedure } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
+import { isPriorOpenNcr } from './ncr'
 import type { ChecklistItem, CompanyData, Observation, NCR, ProcedureAudit } from '../types'
+
+function carryForwardErrorMessage(qpCode: string, departmentId: string): string {
+  const dept = PROCEDURE_PLAN_TEMPLATE.find(
+    (e) => e.qpCode === qpCode && e.departmentId === departmentId,
+  )
+  const deptName =
+    PROCEDURE_PLAN_TEMPLATE.find((e) => e.departmentId === departmentId)?.departmentName ??
+    departmentId
+  if (!dept) {
+    return `找不到 ${qpCode}／${deptName} 的程序或部門，無法帶入查檢表`
+  }
+  return `找不到 ${qpCode}／${deptName} 的部門資料，無法帶入查檢表`
+}
 
 function findPlanEntry(qpCode: string, departmentId: string) {
   return (
@@ -20,7 +34,7 @@ function ensureAudit(
   const dept = company.departments.find((d) => d.id === departmentId)
   const entry = findPlanEntry(qpCode, departmentId)
   if (!dept || !entry) {
-    throw new Error(`carryForward: missing dept/entry for ${qpCode}/${departmentId}`)
+    throw new Error(carryForwardErrorMessage(qpCode, departmentId))
   }
 
   if (!audit) {
@@ -118,28 +132,35 @@ export function carryForwardNcrIntoCompany(
   return { ...company, audits: updatedAudits, ncrs }
 }
 
+export interface AutoCarryForwardResult {
+  company: CompanyData
+  warnings: string[]
+}
+
 export function autoCarryForwardCompany(
   company: CompanyData,
   targetYear: number,
-): CompanyData {
+): AutoCarryForwardResult {
   let next = company
+  const warnings: string[] = []
+
   for (const obs of company.observations) {
     if (obs.status === 'open' && obs.year < targetYear && !obs.carriedToYear) {
       try {
         next = carryForwardObservationIntoCompany(next, obs, targetYear)
-      } catch {
-        /* skip if plan entry missing */
+      } catch (err) {
+        warnings.push(err instanceof Error ? err.message : '觀察事項帶入失敗')
       }
     }
   }
   for (const ncr of next.ncrs) {
-    if (ncr.status !== '結案' && !ncr.carriedToYear) {
+    if (isPriorOpenNcr(ncr, targetYear) && !ncr.carriedToYear) {
       try {
         next = carryForwardNcrIntoCompany(next, ncr, targetYear)
-      } catch {
-        /* skip */
+      } catch (err) {
+        warnings.push(err instanceof Error ? err.message : 'NCR 帶入失敗')
       }
     }
   }
-  return next
+  return { company: next, warnings }
 }

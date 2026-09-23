@@ -17,7 +17,7 @@ export function applyAuditYearChange(
   state: AppState,
   newYear: number,
   resetExternalPrep: boolean,
-): AppState {
+): { state: AppState; warnings: string[] } {
   const settings = { ...state.settings, auditYear: newYear }
   let externalAuditPrep = state.externalAuditPrep
   if (newYear !== state.externalAuditPrep.year) {
@@ -26,7 +26,10 @@ export function applyAuditYearChange(
       : ensurePrepItems({ ...state.externalAuditPrep, year: newYear })
   }
 
-  const company = autoCarryForwardCompany(state.company, newYear)
+  const { company, warnings } = autoCarryForwardCompany(state.company, newYear)
 
-  return { ...state, settings, externalAuditPrep, company }
+  return {
+    state: { ...state, settings, externalAuditPrep, company },
+    warnings,
+  }
 }

@@ -3,6 +3,7 @@ import {
   collectNCRsFromAudits,
   isNcrStale,
   findChecklistItem,
+  isPriorOpenNcr,
 } from '../ncr'
 import type { ChecklistItem, NCR, ProcedureAudit } from '../../types'
 
@@ -62,6 +63,56 @@ describe('collectNCRsFromAudits', () => {
     const first = collectNCRsFromAudits(audits, 2026, [])
     const second = collectNCRsFromAudits(audits, 2026, first)
     expect(second).toHaveLength(1)
+    expect(first[0].sourceYear).toBe(2026)
+  })
+})
+
+describe('isPriorOpenNcr', () => {
+  it('treats current-year NCR as not prior', () => {
+    const ncr: NCR = {
+      id: 'n1',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-01',
+      departmentId: 'd1',
+      department: '管理部',
+      process: 'p',
+      description: 'd',
+      date: '2026-01-01',
+      status: '開立',
+      sourceYear: 2026,
+    }
+    expect(isPriorOpenNcr(ncr, 2026)).toBe(false)
+  })
+
+  it('treats prior-year open NCR as prior', () => {
+    const ncr: NCR = {
+      id: 'n1',
+      ncrNumber: 'NCR-2025-001',
+      qpCode: 'QP-01',
+      departmentId: 'd1',
+      department: '管理部',
+      process: 'p',
+      description: 'd',
+      date: '2025-12-01',
+      status: '開立',
+      sourceYear: 2025,
+    }
+    expect(isPriorOpenNcr(ncr, 2026)).toBe(true)
+  })
+
+  it('ignores NCR without sourceYear', () => {
+    const ncr: NCR = {
+      id: 'n1',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-01',
+      departmentId: 'd1',
+      department: '管理部',
+      process: 'p',
+      description: 'd',
+      date: '2026-01-01',
+      status: '開立',
+    }
+    expect(isPriorOpenNcr(ncr, 2026)).toBe(false)
   })
 })
 

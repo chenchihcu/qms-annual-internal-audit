@@ -16,6 +16,7 @@ function renderShell(tab: (typeof ALL_TABS)[number]['id'] = 'settings') {
       savedLabel={null}
       loadWarning={null}
       saveError={null}
+      actionError={null}
       isDark={false}
       onToggleTheme={vi.fn()}
       onPrint={vi.fn()}

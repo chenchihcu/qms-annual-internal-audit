@@ -90,6 +90,23 @@ describe('scoreChecklistItems', () => {
     expect(result.applicableItems).toBe(2)
     expect(result.score).toBe(100)
   })
+
+  it('scores judged dual side while other side remains pending', () => {
+    const dual: ChecklistItem = {
+      id: 'dual-partial',
+      category: '雙證',
+      no: 4,
+      content: '雙證',
+      judgment: null,
+      description: '',
+      certificateScope: 'dual',
+      judgmentByCompany: { jiurun: '符合', zhenglongxing: null },
+    }
+    const result = scoreChecklistItems([dual])
+    expect(result.breakdown.pending).toBe(1)
+    expect(result.applicableItems).toBe(1)
+    expect(result.status).toBe('incomplete')
+  })
 })
 
 describe('calculateAnnualScore', () => {

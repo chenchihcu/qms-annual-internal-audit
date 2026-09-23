@@ -1,5 +1,6 @@
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { AuditSettings, CompanyData, PlanRow, ScoringRules } from '../types'
+import { isPriorOpenNcr } from './ncr'
 import { isChecklistItemPending } from './scoring'
 import { isAuditComplete, scoreProcedureAudit } from './scoring'
 
@@ -141,7 +142,7 @@ export function buildMergedCertificateCoverage(
     (o) => o.status === 'open' && o.year < auditYear && !o.carriedToYear,
   ).length
   const uncarriedNcrCount = company.ncrs.filter(
-    (n) => n.status !== '結案' && !n.carriedToYear,
+    (n) => isPriorOpenNcr(n, auditYear) && !n.carriedToYear,
   ).length
 
   const allInternalAuditComplete = gaps.length === 0 && dualPendingItems.length === 0

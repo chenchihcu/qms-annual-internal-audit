@@ -130,6 +130,7 @@ export interface Observation {
   status: ObservationStatus
   carriedToYear?: number
   carriedToChecklistId?: string
+  companySide?: CompanyId
 }
 
 /** 第三方稽核建議事項一覽表 */

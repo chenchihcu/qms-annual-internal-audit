@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { NavigateOptions, ObservationSection } from '../lib/navigation'
+import { isPriorOpenNcr } from '../lib/ncr'
 import { listAuditObservationEntries } from '../lib/observation'
 import { planRowSelectOptions } from '../lib/planRowOptions'
 import type { ObservationStatus, TabId } from '../types'
@@ -28,15 +29,14 @@ export function Observations({ store, section, onNavigate }: ObservationsProps) 
     promoteObservationToNcr,
     carryForwardObservation,
     carryForwardNCR,
+    importPriorYearCarryForward,
     regeneratePlan,
     addObservation,
   } = store
   const { company, settings } = state
   const currentYear = settings.auditYear
   const priorObs = company.observations.filter((o) => o.year < currentYear)
-  const openPriorNCR = company.ncrs.filter(
-    (n) => n.status !== '結案' && (n.sourceYear ?? currentYear - 1) < currentYear,
-  )
+  const openPriorNCR = company.ncrs.filter((n) => isPriorOpenNcr(n, currentYear))
 
   const currentRef = useRef<HTMLDivElement>(null)
   const priorRef = useRef<HTMLDivElement>(null)
@@ -60,12 +60,7 @@ export function Observations({ store, section, onNavigate }: ObservationsProps) 
   }, [section])
 
   const importCarryForwardOnly = () => {
-    for (const obs of priorObs.filter((o) => o.status === 'open' && !o.carriedToYear)) {
-      carryForwardObservation(obs.id, obs.qpCode || 'QP-01', obs.departmentId)
-    }
-    for (const ncr of openPriorNCR.filter((n) => !n.carriedToYear)) {
-      carryForwardNCR(ncr.id, ncr.qpCode, ncr.departmentId)
-    }
+    importPriorYearCarryForward()
   }
 
   const handleAddObservation = () => {

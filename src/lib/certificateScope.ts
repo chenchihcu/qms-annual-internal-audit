@@ -1,4 +1,5 @@
-import type { CertificateScope, ChecklistItem, CompanyId } from '../types'
+import type { CertificateScope, ChecklistItem, CompanyId, ProcedureAudit } from '../types'
+import { isSeedChecklistItem } from './checklistItem'
 
 /** qpCode + department + no → 證書判定範圍（種子對照，不修改 checklists.seed.json） */
 const DUAL_CERTIFICATE_ITEMS: Array<{
@@ -71,4 +72,31 @@ export function listDualCertificateItemKeys(): string[] {
   return DUAL_CERTIFICATE_ITEMS.filter((e) => e.scope === 'dual').map((e) =>
     scopeKey(e.qpCode, e.department, e.no),
   )
+}
+
+function scopesMatch(item: ChecklistItem, expected: CertificateScope): boolean {
+  const current = item.certificateScope ?? 'shared'
+  if (current !== expected) return false
+  if (expected === 'dual') return item.judgmentByCompany != null
+  return true
+}
+
+/** 既有種子列回填 certificateScope（自訂／跨年列不動） */
+export function backfillCertificateScopeForItem(
+  item: ChecklistItem,
+  qpCode: string,
+  department: string,
+): ChecklistItem {
+  if (!isSeedChecklistItem(item)) return item
+  const expected = resolveCertificateScope(qpCode, department, item.no)
+  if (scopesMatch(item, expected)) return item
+  return applyCertificateScopeToItem(item, qpCode, department)
+}
+
+export function backfillCertificateScopeForAudit(audit: ProcedureAudit): ProcedureAudit {
+  const items = audit.items.map((item) =>
+    backfillCertificateScopeForItem(item, audit.qpCode, audit.department),
+  )
+  const changed = items.some((item, i) => item !== audit.items[i])
+  return changed ? { ...audit, items } : audit
 }

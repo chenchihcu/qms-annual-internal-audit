@@ -8,7 +8,7 @@ describe('applyAuditYearChange', () => {
     state.externalAuditPrep.items[0].jiurunDone = true
     state.externalAuditPrep.items[0].remark = '已準備'
 
-    const next = applyAuditYearChange(state, 2027, false)
+    const { state: next } = applyAuditYearChange(state, 2027, false)
     expect(next.settings.auditYear).toBe(2027)
     expect(next.externalAuditPrep.year).toBe(2027)
     expect(next.externalAuditPrep.items[0].jiurunDone).toBe(true)
@@ -19,7 +19,7 @@ describe('applyAuditYearChange', () => {
     const state = createDemoState()
     state.externalAuditPrep.items[0].jiurunDone = true
 
-    const next = applyAuditYearChange(state, 2027, true)
+    const { state: next } = applyAuditYearChange(state, 2027, true)
     expect(next.externalAuditPrep.year).toBe(2027)
     expect(next.externalAuditPrep.items[0].jiurunDone).toBe(false)
   })
@@ -37,13 +37,36 @@ describe('applyAuditYearChange', () => {
       description: '',
       status: 'open',
     })
-    const next = applyAuditYearChange(state, 2027, false)
+    const { state: next } = applyAuditYearChange(state, 2027, false)
     expect(
       next.company.observations.find((o) => o.id === 'obs-prior')?.carriedToYear,
     ).toBe(2027)
     expect(
       next.company.audits.some((a) =>
         a.items.some((i) => i.content.includes('跨年觀察')),
+      ),
+    ).toBe(true)
+  })
+
+  it('auto carry-forwards prior-year open NCR on year change', () => {
+    const state = createDemoState()
+    state.company.ncrs.push({
+      id: 'ncr-prior',
+      ncrNumber: 'NCR-2025-001',
+      qpCode: 'QP-01',
+      departmentId: 'dept-admin',
+      department: '管理部',
+      process: 'p',
+      description: '跨年 NCR',
+      date: '2025-12-01',
+      status: '開立',
+      sourceYear: 2025,
+    })
+    const { state: next } = applyAuditYearChange(state, 2027, false)
+    expect(next.company.ncrs.find((n) => n.id === 'ncr-prior')?.carriedToYear).toBe(2027)
+    expect(
+      next.company.audits.some((a) =>
+        a.items.some((i) => i.content.includes('跨年 NCR')),
       ),
     ).toBe(true)
   })

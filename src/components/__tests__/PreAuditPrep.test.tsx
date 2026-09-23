@@ -16,6 +16,7 @@ function makeStore(
     lastSavedAt: null,
     loadWarning: null,
     saveError: null,
+    actionError: null,
     updateSettings: vi.fn(),
     updatePlanRow: vi.fn(),
     addPlanRow: vi.fn(),

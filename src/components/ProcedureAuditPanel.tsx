@@ -73,10 +73,7 @@ export function ProcedureAuditPanel({
   useEffect(() => {
     if (!qpCode || !departmentId) return
     const audit = getOrCreateAudit(qpCode, departmentId)
-    const needsPersist =
-      !persistedAudit ||
-      audit.items.length !== (persistedAudit?.items.length ?? 0)
-    if (needsPersist) updateAudit(audit)
+    if (audit !== persistedAudit) updateAudit(audit)
   }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
 
   if (!qpCode || !departmentId) {

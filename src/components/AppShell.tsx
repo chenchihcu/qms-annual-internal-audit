@@ -12,6 +12,7 @@ export interface AppShellProps {
   savedLabel: string | null
   loadWarning: string | null
   saveError: string | null
+  actionError: string | null
   isDark: boolean
   onToggleTheme: () => void
   onPrint: () => void
@@ -27,6 +28,7 @@ export function AppShell({
   savedLabel,
   loadWarning,
   saveError,
+  actionError,
   isDark,
   onToggleTheme,
   onPrint,
@@ -61,12 +63,16 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="no-print border-b border-line bg-surface px-6 py-4">
-          {(loadWarning || saveError) && (
+          {[loadWarning, saveError, actionError].filter(Boolean).length > 0 && (
             <div
               role="alert"
-              className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+              className="mb-3 space-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
             >
-              {loadWarning ?? saveError}
+              {[loadWarning, saveError, actionError]
+                .filter((msg): msg is string => Boolean(msg))
+                .map((msg) => (
+                  <p key={msg}>{msg}</p>
+                ))}
             </div>
           )}
 

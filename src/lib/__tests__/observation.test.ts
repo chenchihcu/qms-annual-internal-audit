@@ -74,6 +74,25 @@ describe('listAuditObservationEntries', () => {
     expect(entries).toHaveLength(1)
     expect(entries[0].sideLabel).toBe('九潤精密')
   })
+
+  it('creates observation records for dual-certificate 觀察 sides', () => {
+    const items: ChecklistItem[] = [
+      {
+        id: 'chk-dual',
+        category: '測試',
+        no: 1,
+        content: '雙證觀察',
+        judgment: null,
+        description: '說明',
+        certificateScope: 'dual',
+        judgmentByCompany: { jiurun: '觀察', zhenglongxing: '符合' },
+      },
+    ]
+    const obs = collectObservationsFromAudits([baseAudit(items)], 2026, [])
+    expect(obs).toHaveLength(1)
+    expect(obs[0].id).toBe('obs-chk-chk-dual-jiurun')
+    expect(obs[0].companySide).toBe('jiurun')
+  })
 })
 
 describe('promoteObservationToNcr', () => {

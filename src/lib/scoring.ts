@@ -103,33 +103,35 @@ export function scoreChecklistItems(
 
   for (const item of items) {
     const scope = item.certificateScope ?? 'shared'
-    if (scope === 'dual' && item.judgmentByCompany) {
-      if (item.judgmentByCompany.jiurun) judgedCount++
-      if (item.judgmentByCompany.zhenglongxing) judgedCount++
-    } else if (item.judgment) {
-      judgedCount++
-    }
 
-    if (isChecklistItemPending(item)) {
-      breakdown.pending += scope === 'dual' ? 2 : 1
-      scoringUnits += scope === 'dual' ? 2 : 1
-      continue
-    }
-
-    if (scope === 'dual' && item.judgmentByCompany) {
+    if (scope === 'dual') {
+      const byCo = item.judgmentByCompany ?? { jiurun: null, zhenglongxing: null }
       for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
-        const j = item.judgmentByCompany[side]
-        if (!j) continue
+        const j = byCo[side]
         scoringUnits++
-        const r = applyJudgmentToBreakdown(j, breakdown, rules)
-        numerator += r.numerator
-        applicable += r.applicable
+        if (j) judgedCount++
+        if (isJudgmentPending(j, item.description)) {
+          breakdown.pending++
+          continue
+        }
+        if (j) {
+          const r = applyJudgmentToBreakdown(j, breakdown, rules)
+          numerator += r.numerator
+          applicable += r.applicable
+        }
       }
       continue
     }
 
+    scoringUnits++
+    if (item.judgment) judgedCount++
+
+    if (isChecklistItemPending(item)) {
+      breakdown.pending++
+      continue
+    }
+
     if (item.judgment) {
-      scoringUnits++
       const r = applyJudgmentToBreakdown(item.judgment, breakdown, rules)
       numerator += r.numerator
       applicable += r.applicable

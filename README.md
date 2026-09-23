@@ -53,6 +53,7 @@ npm test       # 單元測試
 ## 資料
 
 - 查檢表種子：`src/data/checklists.seed.json`（`import.finalized: true`）  
+- 舊稿備份：`docs/legacy-checklists.seed.json`（非程式載入來源）  
 - localStorage：`qms-annual-internal-audit-v6`（自動從 v5 合併遷移）  
 
 ## 技術棧

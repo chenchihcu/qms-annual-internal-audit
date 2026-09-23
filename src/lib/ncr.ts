@@ -33,6 +33,13 @@ function isNonConformForNcr(item: ChecklistItem, ncr: NCR): boolean {
   return item.judgment === '不符'
 }
 
+/** 未結案且來源年早於目標年（缺 sourceYear 不算前年度） */
+export function isPriorOpenNcr(ncr: NCR, targetYear: number): boolean {
+  if (ncr.status === '結案') return false
+  if (ncr.sourceYear == null) return false
+  return ncr.sourceYear < targetYear
+}
+
 /** NCR linked to a checklist item that is no longer 不符 */
 export function isNcrStale(ncr: NCR, audits: ProcedureAudit[]): boolean {
   if (!ncr.checklistItemId) return false
@@ -69,6 +76,7 @@ function buildNcrFromItem(
     status: '開立',
     checklistItemId,
     companyScope,
+    sourceYear: year,
   }
 }
 

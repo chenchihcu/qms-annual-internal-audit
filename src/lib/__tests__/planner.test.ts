@@ -150,6 +150,17 @@ describe('autoArrangePlan', () => {
     expect(months.length).toBeGreaterThan(0)
   })
 
+  it('ignores external audit dates outside audit year', () => {
+    const months = getWindowMonths(
+      2026,
+      '2026-01-01',
+      '2026-12-31',
+      undefined,
+      '2027-03-15',
+    )
+    expect(months).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+  })
+
   it('prefers department owner over seed entry owner when arranging', () => {
     const departments = [
       baseDept({ owner: '部門主管甲' }),
