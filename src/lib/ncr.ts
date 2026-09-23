@@ -93,6 +93,33 @@ export function collectNCRsFromAudits(
   return result
 }
 
+export function syncNCRDescriptions(
+  ncrs: NCR[],
+  audits: ProcedureAudit[],
+): NCR[] {
+  const itemMap = new Map<string, ChecklistItem>()
+  for (const audit of audits) {
+    for (const item of audit.items) {
+      itemMap.set(item.id, item)
+    }
+  }
+
+  return ncrs.map((ncr) => {
+    if (!ncr.checklistItemId) return ncr
+    const item = itemMap.get(ncr.checklistItemId)
+    if (!item || item.judgment !== '不符') return ncr
+    const finding = item.description || item.content
+    const evidence = item.evidenceReference ?? item.description
+    return {
+      ...ncr,
+      description: finding,
+      requirementSnapshot: ncr.requirementSnapshot ?? item.content,
+      evidenceSnapshot: ncr.evidenceSnapshot ?? evidence,
+      findingSnapshot: ncr.findingSnapshot ?? finding,
+    }
+  })
+}
+
 export function updateNCRStatus(ncrs: NCR[], id: string, status: NCRStatus): NCR[] {
   return ncrs.map((n) => (n.id === id ? { ...n, status } : n))
 }

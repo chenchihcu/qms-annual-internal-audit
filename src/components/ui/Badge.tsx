@@ -1,29 +1,38 @@
-import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
+import { forwardRef, type ReactNode } from 'react'
+import type { IconName } from '../../lib/uiIcons'
+import { badgeIconFor } from '../../lib/uiIcons'
+import { Icon } from './Icon'
 
 const colors: Record<string, string> = {
-  高: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
-  中: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
-  低: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800',
-  開立: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-  矯正中: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  符合: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  不符: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-  觀察: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  不適用: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  待追蹤: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  已結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  '已轉 NCR': 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+  高: 'bg-red-100 text-red-800 border-red-200',
+  中: 'bg-amber-100 text-amber-800 border-amber-200',
+  低: 'bg-green-100 text-green-800 border-green-200',
+  開立: 'bg-red-100 text-red-800',
+  矯正中: 'bg-amber-100 text-amber-800',
+  結案: 'bg-green-100 text-green-800',
+  符合: 'bg-green-100 text-green-800',
+  不符: 'bg-red-100 text-red-800',
+  觀察: 'bg-amber-100 text-amber-800',
+  不適用: 'bg-slate-100 text-slate-600',
+  規劃中: 'bg-slate-100 text-slate-700 border-slate-200',
+  執行中: 'bg-blue-100 text-blue-800 border-blue-200',
+  已回報: 'bg-green-100 text-green-800 border-green-200',
+  NCR: 'bg-red-100 text-red-800 border-red-200',
+  建議: 'bg-violet-100 text-violet-800 border-violet-200',
+  待追蹤: 'bg-amber-100 text-amber-800 border-amber-200',
+  已結案: 'bg-green-100 text-green-800 border-green-200',
+  '已轉 NCR': 'bg-red-100 text-red-800 border-red-200',
+  系統稽核: 'bg-slate-100 text-slate-700 border-slate-200',
+  製程稽核: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  型態稽核: 'bg-purple-100 text-purple-800 border-purple-200',
 }
 
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
-
 export function Badge({ label, className = '' }: { label: string; className?: string }) {
-  const yearMatch = /^(\d{4})年$/.exec(label)
-  const color = colors[label] ?? (yearMatch ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200')
+  const color = colors[label] ?? 'bg-slate-100 text-slate-700'
+  const icon = badgeIconFor(label)
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${color} ${className}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${color} ${className}`}>
+      {icon && <Icon name={icon} size="sm" />}
       {label}
     </span>
   )
@@ -37,41 +46,46 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   )
 }
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export const Button = forwardRef<HTMLButtonElement, {
   children: ReactNode
+  onClick?: () => void
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
-  ref?: Ref<HTMLButtonElement>
-}
-
-export function Button({
+  className?: string
+  type?: 'button' | 'submit'
+  disabled?: boolean
+  icon?: IconName
+  'aria-describedby'?: string
+}>(({
   children,
   onClick,
   variant = 'primary',
   className = '',
   type = 'button',
   disabled,
-  ref,
-  ...rest
-}: ButtonProps) {
+  icon,
+  'aria-describedby': ariaDescribedBy,
+}, ref) => {
   const variants = {
-    primary: 'bg-primary text-white hover:opacity-90',
-    secondary: 'bg-surface text-ink border border-line hover:bg-page',
+    primary: 'bg-blue-700 text-white hover:bg-blue-800',
+    secondary: 'bg-surface text-slate-700 border border-line hover:bg-slate-50',
     danger: 'bg-red-600 text-white hover:bg-red-700',
-    ghost: 'text-muted hover:bg-page hover:text-ink',
+    ghost: 'text-slate-600 hover:bg-slate-100',
   }
   return (
     <button
       ref={ref}
       type={type}
       disabled={disabled}
+      aria-describedby={ariaDescribedBy}
       onClick={onClick}
-      className={`rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${FOCUS_RING} ${variants[variant]} ${className}`}
-      {...rest}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:opacity-50 ${variants[variant]} ${className}`}
     >
+      {icon && <Icon name={icon} />}
       {children}
     </button>
   )
-}
+})
+Button.displayName = 'Button'
 
 export function Input({
   label,
@@ -79,37 +93,30 @@ export function Input({
   onChange,
   type = 'text',
   step,
+  disabled = false,
   className = '',
-  id,
-  min,
-  max,
-  disabled,
+  ariaLabel,
 }: {
   label?: string
   value: string | number
   onChange: (v: string) => void
   type?: string
   step?: string
-  className?: string
-  id?: string
-  min?: number
-  max?: number
   disabled?: boolean
+  className?: string
+  ariaLabel?: string
 }) {
-  const inputId = id ?? (label ? `input-${label.replace(/\s/g, '-')}` : undefined)
   return (
-    <label className={`block ${className}`} htmlFor={inputId}>
-      {label && <span className="mb-1 block text-sm font-medium text-ink">{label}</span>}
+    <label className={`block ${className}`}>
+      {label && <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>}
       <input
-        id={inputId}
         type={type}
         step={step}
-        min={min}
-        max={max}
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:opacity-50 ${FOCUS_RING}`}
+        aria-label={ariaLabel}
+        className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
       />
     </label>
   )
@@ -120,23 +127,25 @@ export function Select({
   value,
   onChange,
   options,
-  id,
+  disabled = false,
+  ariaLabel,
 }: {
   label?: string
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
-  id?: string
+  disabled?: boolean
+  ariaLabel?: string
 }) {
-  const selectId = id ?? (label ? `select-${label.replace(/\s/g, '-')}` : undefined)
   return (
-    <label className="block" htmlFor={selectId}>
-      {label && <span className="mb-1 block text-sm font-medium text-ink">{label}</span>}
+    <label className="block">
+      {label && <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>}
       <select
-        id={selectId}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+        aria-label={ariaLabel}
+        className="min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-600"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

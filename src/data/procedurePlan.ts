@@ -19,8 +19,8 @@ const DEPT_ID: Record<string, string> = {
   管理部: 'dept-admin',
   生產製造部: 'dept-prod',
   業務部: 'dept-sales',
-  開發工程部: 'dept-eng',
   開發工程: 'dept-eng',
+  開發工程部: 'dept-eng',
   管理代表: 'dept-mr',
 }
 

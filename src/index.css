@@ -1,79 +1,67 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme {
-  --color-page: #f8fafc;
-  --color-surface: #ffffff;
-  --color-ink: #0f172a;
-  --color-muted: #475569;
-  --color-line: #e2e8f0;
-  --color-primary: #1d4ed8;
-  --font-sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", ui-sans-serif, system-ui, sans-serif;
+  --color-page: var(--theme-page);
+  --color-surface: var(--theme-surface);
+  --color-ink: var(--theme-ink);
+  --color-muted: var(--theme-muted);
+  --color-line: var(--theme-line);
+  --color-brand: var(--theme-brand);
+  --color-focus: var(--theme-focus);
 }
 
-html.dark {
-  color-scheme: dark;
-  --color-page: #0f172a;
-  --color-surface: #1e293b;
-  --color-ink: #f1f5f9;
-  --color-muted: #94a3b8;
-  --color-line: #334155;
-  --color-primary: #3b82f6;
+:root {
+  --theme-page: #f8fafc;
+  --theme-surface: #ffffff;
+  --theme-ink: #0f172a;
+  --theme-muted: #64748b;
+  --theme-line: #e2e8f0;
+  --theme-brand: #1d4ed8;
+  --theme-focus: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --theme-page: #0f172a;
+    --theme-surface: #1e293b;
+    --theme-ink: #f1f5f9;
+    --theme-muted: #94a3b8;
+    --theme-line: #334155;
+    --theme-brand: #3b82f6;
+    --theme-focus: #60a5fa;
+  }
 }
 
 @layer base {
+  /* Screen type scale: body/titles 14px (text-sm); captions 12px (text-xs). html stays 16px for rem. */
+  html {
+    font-family: system-ui, "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    font-size: 16px;
+  }
+
   body {
-    @apply bg-page text-ink font-sans antialiased;
-    font-size: 14px;
-    line-height: 1.6;
+    @apply bg-page text-ink text-sm antialiased;
   }
 
-  /* Netlify deploy badge / HUD — keep off interactive UI & print */
-  iframe[src*="netlify"],
-  a[href*="netlify.com"][target="_blank"][rel*="noopener"],
-  #netlify-badge,
-  [data-netlify-hud],
-  [data-netlify-deploy-status],
-  .netlify-badge,
-  [data-qms-netlify-hud-hidden],
-  body > a[href*="netlify.com"]:not(#root *),
-  body > nf-badge,
-  body > nf-hud,
-  body > nf-toolbar,
-  body > netlify-hud {
-    display: none !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
+  h1, h2, h3, h4 {
+    @apply text-sm font-semibold;
   }
 
-  a.skip-link {
-    @apply absolute left-2 top-2 z-[100] -translate-y-16 rounded-lg bg-primary px-3 py-2 text-sm text-white transition;
+  button, input, select, textarea {
+    font: inherit;
   }
 
-  a.skip-link:focus {
-    @apply translate-y-0;
+  :focus-visible {
+    outline: 2px solid var(--theme-focus);
+    outline-offset: 2px;
   }
 }
 
 @media print {
-  body.printing-qr-form > #root > div > header,
-  body.printing-qr-form > #root > div > footer,
-  body.printing-qr-form > #root > div > main > *:not(.print-area) {
-    display: none !important;
-  }
-
-  iframe[src*="netlify"],
-  #netlify-badge,
-  .netlify-badge,
-  [data-qms-netlify-hud-hidden],
-  body > a[href*="netlify.com"]:not(#root *),
-  body > nf-badge,
-  body > nf-hud,
-  body > nf-toolbar,
-  body > netlify-hud {
-    display: none !important;
-    visibility: hidden !important;
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm;
   }
 
   .no-print {
@@ -86,8 +74,17 @@ html.dark {
 
   body {
     background: white;
-    font-size: 11pt;
+    font-size: 10.5pt;
     color: #000;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-area {
+    width: 100%;
   }
 
   .print-break {
@@ -100,12 +97,20 @@ html.dark {
 
   .qr-form-header h1 {
     font-size: 16pt;
+    letter-spacing: 0.05em;
+    margin-bottom: 4pt;
+  }
+
+  .qr-form-header p {
+    font-size: 11pt;
+    margin: 2pt 0;
   }
 
   .qr-header-table,
   .qr-checklist,
   .qr-plan-table {
     border: 1.5pt solid #000;
+    width: 100%;
   }
 
   .qr-header-table td,
@@ -116,10 +121,13 @@ html.dark {
   .qr-plan-table th {
     border: 0.75pt solid #000;
     padding: 4pt 6pt;
+    vertical-align: top;
+    word-break: break-word;
+    white-space: normal;
   }
 
   .qr-label {
-    background: #f0f0f0;
+    background: #f0f0f0 !important;
     font-weight: 600;
     width: 18%;
     white-space: nowrap;
@@ -130,6 +138,19 @@ html.dark {
     background: #e8e8e8 !important;
   }
 
+  .qr-checklist {
+    font-size: 9pt;
+  }
+
+  .qr-checklist td,
+  .qr-checklist th {
+    line-height: 1.35;
+  }
+
+  .qr-plan-table {
+    font-size: 8.5pt;
+  }
+
   table {
     page-break-inside: auto;
   }
@@ -137,20 +158,14 @@ html.dark {
   tr {
     page-break-inside: avoid;
   }
+
+  .print-area .rounded-lg,
+  .print-area .rounded-xl,
+  .print-area .border {
+    box-shadow: none !important;
+  }
 }
 
 .print-only {
   display: none;
 }
-
-/* 查檢表長文不截斷（螢幕與列印） */
-.qr-checklist td.align-top {
-  vertical-align: top;
-}
-
-.qr-checklist .audit-content-cell {
-  min-width: 12rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-

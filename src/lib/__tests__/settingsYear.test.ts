@@ -8,9 +8,9 @@ describe('applyAuditYearChange', () => {
     state.externalAuditPrep.items[0].jiurunDone = true
     state.externalAuditPrep.items[0].remark = '已準備'
 
-    const next = applyAuditYearChange(state, 2027, false)
-    expect(next.settings.auditYear).toBe(2027)
-    expect(next.externalAuditPrep.year).toBe(2027)
+    const next = applyAuditYearChange(state, 'jiurun', 2027, false)
+    expect(next.companySettings.jiurun.auditYear).toBe(2027)
+    expect(next.externalAuditPrep.year).toBe(2026)
     expect(next.externalAuditPrep.items[0].jiurunDone).toBe(true)
     expect(next.externalAuditPrep.items[0].remark).toBe('已準備')
   })
@@ -19,7 +19,7 @@ describe('applyAuditYearChange', () => {
     const state = createDemoState()
     state.externalAuditPrep.items[0].jiurunDone = true
 
-    const next = applyAuditYearChange(state, 2027, true)
+    const next = applyAuditYearChange(state, 'jiurun', 2027, true)
     expect(next.externalAuditPrep.year).toBe(2027)
     expect(next.externalAuditPrep.items[0].jiurunDone).toBe(false)
   })

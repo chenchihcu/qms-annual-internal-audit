@@ -1,129 +1,304 @@
-import { useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { calculateRiskLevel, RISK_BANDS, suggestRiskBump } from '../lib/risk'
-import { scoreProcedureAudit } from '../lib/scoring'
-import { Badge, Card } from './ui/Badge'
+import { exportRiskExcel } from '../lib/formExport'
+import { autoArrangePlan, MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
+import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
+import {
+  buildEffectiveProcedureRisks,
+  calculateProcedurePriority,
+  cycleFactorScale,
+  formatFactorBreakdown,
+  formatFactorLabel,
+  inherentScaleFromSeed,
+  PROCEDURE_RISK_WEIGHTS,
+  suggestMonthsScaleFromAudits,
+  suggestOverdueScaleFromOpenCount,
+  type ProcedurePriorityInput,
+} from '../lib/risk'
+import type { PlanRow, ProcedureRiskRecord } from '../types'
+import { ACTION_ICONS, RISK_FILTER_ICONS } from '../lib/uiIcons'
+import { Badge, Button, Card, Input } from './ui/Badge'
+import { EmptyState } from './ui/EmptyState'
+import { FilterChips } from './ui/FilterChips'
+import { PageToolbar } from './ui/PageToolbar'
+import { PlanPreviewPanel } from './ui/PlanPreviewPanel'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
+type RiskFactorField = keyof ProcedurePriorityInput
+type RiskFilter = 'all' | 'unsaved' | 'provisional'
+
+const FACTOR_COLUMNS: Array<{ field: RiskFactorField; label: string; required?: boolean; hint: string }> = [
+  { field: 'inherentRisk', label: '固有', required: true, hint: '低／中／高（程序種子）' },
+  { field: 'previousInternalNcrCount', label: '內稽', hint: '0件～≥4件' },
+  { field: 'previousThirdPartyNcrCount', label: '三方', hint: '0件～≥4件' },
+  { field: 'overdueOpenNcrCount', label: '逾期', hint: '0件～≥4件' },
+  { field: 'customerComplaintLevel', label: '客訴', hint: '無／中／高' },
+  { field: 'changeImpact', label: '變更', hint: '無／中／高' },
+  { field: 'monthsSinceLastAudit', label: '距上次', hint: '＜6月～≥24月' },
+]
+
+function isRowPersisted(
+  saved: { inherentRisk: number } | undefined,
+): boolean {
+  return Boolean(saved && saved.inherentRisk >= 1)
+}
 
 export function RiskAssessment({ store }: { store: AuditStore }) {
-  const { state, updateDepartment } = store
+  const { state, updateProcedureRisk, replacePlanRows } = store
   const { company, settings } = state
+  const [previewRows, setPreviewRows] = useState<PlanRow[] | null>(null)
+  const [filter, setFilter] = useState<RiskFilter>('all')
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
 
-  const deptStats = useMemo(() => {
-    return company.departments.map((dept) => {
-      const deptAudits = company.audits.filter((a) => a.departmentId === dept.id)
-      const scored = deptAudits.filter(
-        (a) => scoreProcedureAudit(a, settings.scoringRules).status === 'scored',
-      )
-      const scores = scored.map((a) => scoreProcedureAudit(a, settings.scoringRules).score ?? 0)
-      const score = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
-      const ncrCount = company.ncrs.filter(
-        (n) => n.departmentId === dept.id && n.status !== '結案',
-      ).length
-      const suggested = suggestRiskBump(dept.riskOccurrence, ncrCount, score ?? 100)
-      return { dept, score, ncrCount, suggested }
+  const referenceDate = `${settings.auditYear}-06-01`
+
+  const rows = useMemo(() => company.planRows.map((plan) => {
+    const saved = company.procedureRisks?.find(
+      (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId,
+    )
+    const openNcr = company.ncrs.filter(
+      (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId && item.status !== '結案',
+    ).length
+    const seedInherent = inherentScaleFromSeed(plan.riskLevel)
+    const values: ProcedurePriorityInput = {
+      inherentRisk: saved?.inherentRisk ?? seedInherent,
+      previousInternalNcrCount: saved?.previousInternalNcrCount,
+      previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
+      overdueOpenNcrCount: saved?.overdueOpenNcrCount,
+      customerComplaintLevel: saved?.customerComplaintLevel,
+      changeImpact: saved?.changeImpact,
+      monthsSinceLastAudit: saved?.monthsSinceLastAudit,
+    }
+    const persisted = isRowPersisted(saved)
+    const result = calculateProcedurePriority(values)
+    const suggestions = {
+      overdue: suggestOverdueScaleFromOpenCount(openNcr),
+      months: suggestMonthsScaleFromAudits(company.audits, plan.qpCode, plan.departmentId, referenceDate),
+    }
+    return { plan, saved, values, result, persisted, seedInherent, openNcr, suggestions }
+  }).sort((a, b) => b.result.score - a.result.score), [company, referenceDate])
+
+  const visibleRows = useMemo(() => rows.filter((row) => {
+    if (filter === 'unsaved') return !row.persisted
+    if (filter === 'provisional') return row.persisted && row.result.provisional
+    return true
+  }), [rows, filter])
+
+  const effectiveRisks = () => buildEffectiveProcedureRisks(company)
+
+  const persistDisplayedRisks = () => {
+    effectiveRisks().forEach((record) => {
+      updateProcedureRisk(record.qpCode, record.departmentId, record)
     })
-  }, [company.departments, company.audits, company.ncrs, settings.scoringRules])
+  }
+
+  const previewPlan = () => {
+    const openCount = company.observations.filter((item) => item.status === 'open').length
+      + company.suggestions.filter((item) => item.status === 'open').length
+      + company.ncrs.filter((item) => item.status !== '結案').length
+    setPreviewRows(autoArrangePlan({
+      departments: company.departments,
+      planEntries: PROCEDURE_PLAN_TEMPLATE,
+      auditYear: settings.auditYear,
+      planWindowStart: settings.planWindowStart,
+      planWindowEnd: settings.planWindowEnd,
+      managementReviewDate: settings.managementReviewDate,
+      existingRows: company.planRows,
+      openCarryForwardCount: openCount,
+      procedureRisks: effectiveRisks(),
+    }, { leadAuditor: settings.leadAuditor }))
+  }
+
+  const applySuggestions = (qpCode: string, departmentId: string, suggestions: { overdue?: number; months?: number }) => {
+    const patch: Partial<ProcedureRiskRecord> = {}
+    if (suggestions.overdue != null) patch.overdueOpenNcrCount = suggestions.overdue
+    if (suggestions.months != null) patch.monthsSinceLastAudit = suggestions.months
+    if (Object.keys(patch).length > 0) {
+      updateProcedureRisk(qpCode, departmentId, patch)
+    }
+  }
+
+  const filterOptions = [
+    { id: 'all' as RiskFilter, label: '全部', icon: RISK_FILTER_ICONS['全部'] },
+    { id: 'unsaved' as RiskFilter, label: '未存檔', icon: RISK_FILTER_ICONS['未存檔'] },
+    { id: 'provisional' as RiskFilter, label: '暫定', icon: RISK_FILTER_ICONS['暫定'] },
+  ]
 
   return (
-    <div className="space-y-6 print-area">
+    <div className="space-y-6 print-area qr-form">
       <PrintDocHeader
         companyName={company.name}
         auditYear={settings.auditYear}
-        formTitle="風險指標評估 QR-02-01"
+        formTitle="方案風險與優先順序 QR-02-01"
       />
-
       <Card>
-        <h2 className="mb-2 text-lg font-semibold text-ink">風險指標評估（QR-02-01）</h2>
-        <p className="mb-4 text-sm text-muted">
-          風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
-        </p>
+        <PageToolbar
+          title="方案風險"
+          actions={(
+            <>
+              <Button variant="secondary" icon="save" onClick={persistDisplayedRisks}>採用目前評估並全部存檔</Button>
+              <Button icon={ACTION_ICONS.preview} onClick={previewPlan}>預覽套用至年度計畫</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportRiskExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+            </>
+          )}
+        />
 
-        <div className="overflow-x-auto">
-          <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2">部門 · 負責人</th>
-                <th className="border border-line p-2 w-24">發生度 O</th>
-                <th className="border border-line p-2 w-24">嚴重度 S</th>
-                <th className="border border-line p-2 w-20">指數</th>
-                <th className="border border-line p-2 w-20">等級</th>
-                <th className="border border-line p-2">稽核後建議 O</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deptStats.map(({ dept, score, ncrCount, suggested }) => {
-                const { index, level } = calculateRiskLevel(
-                  dept.riskOccurrence,
-                  dept.riskSeverity,
-                )
-                return (
-                  <tr key={dept.id}>
-                    <td className="border border-line p-2">
-                      <div className="font-medium text-ink">{dept.name}</div>
-                      <div className="text-xs text-muted">{dept.owner}</div>
-                    </td>
-                    <td className="border border-line p-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        className={`w-16 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
-                        value={dept.riskOccurrence}
-                        onChange={(e) =>
-                          updateDepartment(dept.id, {
-                            riskOccurrence: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="border border-line p-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        className={`w-16 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
-                        value={dept.riskSeverity}
-                        onChange={(e) =>
-                          updateDepartment(dept.id, {
-                            riskSeverity: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="border border-line p-2 text-center font-semibold text-ink">{index}</td>
-                    <td className="border border-line p-2"><Badge label={level} /></td>
-                    <td className="border border-line p-2">
-                      <div className="flex items-center gap-2">
-                        <span className={suggested > dept.riskOccurrence ? 'font-bold text-red-600 dark:text-red-400' : ''}>
-                          {suggested}
-                        </span>
-                        {suggested > dept.riskOccurrence && (
-                          <button
-                            type="button"
-                            className={`text-xs text-primary hover:underline ${FOCUS_RING}`}
-                            onClick={() =>
-                              updateDepartment(dept.id, { riskOccurrence: suggested })
+        {previewRows && (
+          <PlanPreviewPanel
+            title="年度計畫套用預覽"
+            description={`依方案風險優先順序重排月格；${MANUAL_OVERRIDE_PLAN_NOTE}`}
+            rows={previewRows.map((row) => ({
+              id: row.id,
+              label: `${row.qpCode} · ${row.department} · ${row.riskLevel}`,
+              schedule: row.months.map((status, index) => status ? `${index + 1}月` : '').filter(Boolean).join('、') || '未排程',
+            }))}
+            onApply={() => { persistDisplayedRisks(); replacePlanRows(previewRows); setPreviewRows(null) }}
+            onCancel={() => setPreviewRows(null)}
+            applyLabel="確認套用"
+          />
+        )}
+
+        <FilterChips
+          className="justify-end no-print"
+          options={filterOptions}
+          value={filter}
+          onChange={setFilter}
+          ariaLabel="風險清單篩選"
+        />
+
+        <details className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 no-print">
+          <summary className="cursor-pointer text-sm font-medium text-slate-700">計分說明</summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {FACTOR_COLUMNS.map(({ field, label, hint }) => (
+              <span key={field}>
+                <strong>{label}</strong> {hint} → 加權 {PROCEDURE_RISK_WEIGHTS[field]}%
+              </span>
+            ))}
+          </div>
+        </details>
+
+        {visibleRows.length === 0 ? (
+          <EmptyState message="目前沒有程序列。" />
+        ) : (
+          <ScrollRegion ariaLabel="方案風險矩陣 QR-02-01">
+            <table className="qr-risk-matrix w-full min-w-[960px] border-collapse text-sm" data-risk-matrix>
+              <thead className="sticky top-0 z-10 bg-slate-50">
+                <tr className="text-left">
+                  <th className="border p-2">QP</th>
+                  <th className="border p-2">部門</th>
+                  {FACTOR_COLUMNS.map(({ label, hint }) => (
+                    <th key={label} className="border p-1 text-center text-xs" title={hint}>{label}</th>
+                  ))}
+                  <th className="border p-2 text-center">分</th>
+                  <th className="border p-2">狀態</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map(({ plan, saved, result, persisted, seedInherent, openNcr, suggestions }) => {
+                  const statusLabel = !persisted
+                    ? '未存檔'
+                    : result.provisional
+                      ? `暫定 ${7 - result.missingFactors.length}/7`
+                      : '已確認'
+                  const expanded = expandedRowId === plan.id
+                  const breakdownFields = FACTOR_COLUMNS.map(({ field }) => field)
+                  const hasSuggestions = suggestions.overdue != null || suggestions.months != null
+                  return (
+                    <Fragment key={plan.id}>
+                      <tr
+                        data-risk-key={plan.id}
+                        className={`cursor-pointer hover:bg-slate-50 ${expanded ? 'bg-blue-50/40' : ''}`}
+                        onClick={() => setExpandedRowId(expanded ? null : plan.id)}
+                      >
+                        <td className="border p-2 font-medium whitespace-nowrap">{plan.qpCode}</td>
+                        <td className="border p-2 whitespace-nowrap">{plan.department}</td>
+                        {FACTOR_COLUMNS.map(({ field, label, required }) => {
+                          const raw = field === 'inherentRisk' ? saved?.inherentRisk : saved?.[field]
+                          const cycleBase = field === 'inherentRisk' ? (raw ?? seedInherent) : raw
+                          const displayValue = field === 'inherentRisk' ? (raw ?? seedInherent) : raw
+                          const display = formatFactorLabel(field, displayValue)
+                          const showBlank = raw == null && field !== 'inherentRisk'
+                          return (
+                            <td key={field} className="border p-0.5 text-center">
+                              <button
+                                type="button"
+                                className="no-print min-h-10 min-w-10 rounded border border-slate-200 px-0.5 text-xs font-medium leading-tight hover:border-blue-400 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                                aria-label={`${plan.qpCode} ${plan.department} ${label}`}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  const next = cycleFactorScale(field, cycleBase, Boolean(required))
+                                  updateProcedureRisk(plan.qpCode, plan.departmentId, { [field]: next })
+                                }}
+                              >
+                                {showBlank ? '—' : display}
+                              </button>
+                              <span className="print-only">{display}</span>
+                            </td>
+                          )
+                        })}
+                        <td className="border p-2 text-center font-bold text-blue-800">{result.score}</td>
+                        <td className="border p-2 whitespace-nowrap">
+                          <Badge
+                            label={statusLabel}
+                            className={
+                              !persisted
+                                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                : result.provisional
+                                  ? ''
+                                  : 'border-green-200 bg-green-100 text-green-800'
                             }
-                          >
-                            採用
-                          </button>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted">
-                        平均得分 {score !== null ? `${Math.round(score)}%` : '未評'} · NCR {ncrCount}
-                      </p>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                          />
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr className="bg-slate-50/80">
+                          <td colSpan={FACTOR_COLUMNS.length + 4} className="border p-3">
+                            <p className="mb-1 text-xs font-medium text-slate-600">{plan.process}</p>
+                            <p className="mb-2 text-xs text-slate-600">
+                              加權拆帳：
+                              {breakdownFields.map((field, index) => {
+                                const breakdownScale = saved?.[field] ?? (field === 'inherentRisk' ? seedInherent : undefined)
+                                return (
+                                  <span key={field}>
+                                    {index > 0 ? ' · ' : ' '}
+                                    {formatFactorBreakdown(field, breakdownScale)}
+                                  </span>
+                                )
+                              })}
+                            </p>
+                            {hasSuggestions && (
+                              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-amber-900">
+                                <span>
+                                  台帳建議：
+                                  {suggestions.overdue != null && ` 逾期 ${formatFactorLabel('overdueOpenNcrCount', suggestions.overdue)}（未結 ${openNcr} 件）`}
+                                  {suggestions.months != null && ` 距上次 ${formatFactorLabel('monthsSinceLastAudit', suggestions.months)}`}
+                                </span>
+                                <Button
+                                  variant="secondary"
+                                  className="!px-2 !py-0.5 text-xs"
+                                  onClick={() => applySuggestions(plan.qpCode, plan.departmentId, suggestions)}
+                                >
+                                  採用建議
+                                </Button>
+                              </div>
+                            )}
+                            <Input
+                              label="證據／來源"
+                              value={saved?.evidenceReference ?? ''}
+                              onChange={(value) => updateProcedureRisk(plan.qpCode, plan.departmentId, { evidenceReference: value })}
+                            />
+                            <p className="mt-1 text-xs text-slate-500">客訴編號、內稽／第三方 NCR、變更紀錄、上次稽核日期</p>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </ScrollRegion>
+        )}
       </Card>
     </div>
   )

@@ -1,0 +1,10 @@
+[
+  {
+    "id": "rel-zlx-jiurun-customer",
+    "from": "zhenglongxing",
+    "to": "jiurun",
+    "relation": "primary_customer",
+    "prepItemNo": 15,
+    "label": "正隆興須對主要客戶（九潤精密科技）做客戶滿意度調查"
+  }
+]

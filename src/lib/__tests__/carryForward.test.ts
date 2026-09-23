@@ -53,7 +53,7 @@ describe('applyObservationCarryForward', () => {
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.settings.auditYear,
+      state.companySettings.jiurun.auditYear,
       'chk-cf-test-1',
     )
     expect(next).not.toBeNull()
@@ -81,7 +81,7 @@ describe('applyObservationCarryForward', () => {
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.settings.auditYear,
+      state.companySettings.jiurun.auditYear,
       'chk-cf-test-zlx',
     )
     expect(next).not.toBeNull()
@@ -97,7 +97,7 @@ describe('applyObservationCarryForward', () => {
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.settings.auditYear,
+      state.companySettings.jiurun.auditYear,
       'chk-cf-test-2',
     )
     const twice = applyObservationCarryForward(
@@ -105,7 +105,7 @@ describe('applyObservationCarryForward', () => {
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.settings.auditYear,
+      state.companySettings.jiurun.auditYear,
       'chk-cf-test-3',
     )
     expect(twice).toBeNull()

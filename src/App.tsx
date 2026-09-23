@@ -1,54 +1,51 @@
-import { Component, type ReactNode, useCallback, useEffect, useState } from 'react'
+import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuditStore } from './hooks/useAuditStore'
 import type { CompanyId, TabId } from './types'
 import { COMPANY_LABELS } from './types'
+import { AuditYearSwitcher } from './components/AuditYearSwitcher'
 import { Dashboard } from './components/Dashboard'
-import { AnnualPlan } from './components/AnnualPlan'
-import { ProcedureAuditPanel } from './components/ProcedureAuditPanel'
-import { NCRList } from './components/NCRList'
-import { Observations } from './components/Observations'
-import { Suggestions } from './components/Suggestions'
-import { PreAuditPrep } from './components/PreAuditPrep'
-import { RiskAssessment } from './components/RiskAssessment'
-import { SettingsPanel } from './components/SettingsPanel'
-import { ClauseMappingPanel } from './components/ClauseMappingPanel'
-import { TAB_GROUPS, parseAppHash, syncHash } from './lib/navigation'
-import { VIEW_ROLE_LABELS, type ViewRole } from './types'
-import { preloadPdfExportFont } from './lib/formExport'
-import { shouldShowDemoBanner } from './lib/demoMode'
-import { getStoredTheme, toggleTheme } from './lib/theme'
-import { DemoBanner } from './components/DemoBanner'
+import { ProcessForm } from './components/ui/ProcessForm'
+import { WorkflowGuide } from './components/ui/WorkflowGuide'
+import { ALL_TABS, parseAppHash, syncHash } from './lib/navigation'
+import { Icon } from './components/ui/Icon'
 
-const FOCUS_RING =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
+const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
+const ProcedureAuditPanel = lazy(() => import('./components/ProcedureAuditPanel').then((module) => ({ default: module.ProcedureAuditPanel })))
+const NCRList = lazy(() => import('./components/NCRList').then((module) => ({ default: module.NCRList })))
+const Observations = lazy(() => import('./components/Observations').then((module) => ({ default: module.Observations })))
+const Suggestions = lazy(() => import('./components/Suggestions').then((module) => ({ default: module.Suggestions })))
+const PreAuditPrep = lazy(() => import('./components/PreAuditPrep').then((module) => ({ default: module.PreAuditPrep })))
+const RiskAssessment = lazy(() => import('./components/RiskAssessment').then((module) => ({ default: module.RiskAssessment })))
+const StakeholdersPage = lazy(() => import('./components/StakeholdersPage').then((module) => ({ default: module.StakeholdersPage })))
+const SettingsPanel = lazy(() => import('./components/SettingsPanel').then((module) => ({ default: module.SettingsPanel })))
+const PersonnelPage = lazy(() => import('./components/PersonnelPage').then((module) => ({ default: module.PersonnelPage })))
+const AuditSchedulePage = lazy(() => import('./components/AuditSchedulePage').then((module) => ({ default: module.AuditSchedulePage })))
+const FollowupsPage = lazy(() => import('./components/FollowupsPage').then((module) => ({ default: module.FollowupsPage })))
+const OnsiteSchedulePage = lazy(() => import('./components/OnsiteSchedulePage').then((module) => ({ default: module.OnsiteSchedulePage })))
 
 class TabErrorBoundary extends Component<
-  { children: ReactNode; onReset?: () => void },
-  { error: string | null }
+  { children: ReactNode; tabLabel: string },
+  { error: Error | null }
 > {
-  state: { error: string | null } = { error: null }
+  state = { error: null as Error | null }
 
-  static getDerivedStateFromError(err: Error) {
-    return { error: err.message || String(err) }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
   }
 
   render() {
     if (this.state.error) {
       return (
-        <div
-          role="alert"
-          className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-100"
-        >
-          此分頁發生錯誤：{this.state.error}
-          <div className="mt-3 flex gap-2">
-            <button
-              type="button"
-              className={`rounded-lg border border-rose-300 px-3 py-1.5 text-sm ${FOCUS_RING}`}
-              onClick={() => this.setState({ error: null })}
-            >
-              重試
-            </button>
-          </div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-6">
+          <h2 className="text-sm font-semibold text-red-800">{this.props.tabLabel} 無法顯示</h2>
+          <p className="mt-2 text-sm text-red-700">{this.state.error.message}</p>
+          <button
+            type="button"
+            className="mt-4 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm text-red-800 hover:bg-red-100"
+            onClick={() => this.setState({ error: null })}
+          >
+            重試
+          </button>
         </div>
       )
     }
@@ -58,99 +55,117 @@ class TabErrorBoundary extends Component<
 
 function App() {
   const store = useAuditStore()
-  const initialHash = parseAppHash(window.location.hash)
-  const [tab, setTab] = useState<TabId>(initialHash.tab)
-  const [auditKey, setAuditKey] = useState<string | undefined>(initialHash.auditKey)
-  const [ncrId, setNcrId] = useState<string | undefined>(initialHash.ncrId)
-  const [planMonth, setPlanMonth] = useState<number | undefined>(initialHash.planMonth)
-  const [isDark, setIsDark] = useState(() => getStoredTheme() === 'dark')
-  const { settings, activeCompanyId, company } = store.state
-  const viewRole = settings.viewRole ?? 'lead_auditor'
-
+  const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
+  const { tab, auditKey } = hashState
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarNavRef = useRef<HTMLElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
+  const { settings, activeCompanyId, company, externalAuditPrep } = store.state
+  const headerScope = tab === 'prep' || tab === 'onsite'
+    ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
+    : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
+  const setTab = (next: TabId, nextAuditKey?: string) => {
+    const auditKeyForTab = next === 'audit' ? nextAuditKey : undefined
+    setHashState({ tab: next, auditKey: auditKeyForTab })
+    syncHash(next, auditKeyForTab)
+    setMobileMenuOpen(false)
+  }
   useEffect(() => {
-    void preloadPdfExportFont().catch(() => {
-      // 首次匯出時仍會重試並在 UI 顯示錯誤
-    })
+    const update = () => setHashState(parseAppHash(window.location.hash))
+    window.addEventListener('hashchange', update)
+    return () => window.removeEventListener('hashchange', update)
   }, [])
-
   useEffect(() => {
-    syncHash(tab, auditKey, ncrId, planMonth)
-  }, [tab, auditKey, ncrId, planMonth])
-
+    const activeEntry = ALL_TABS.find((item) => item.id === tab)
+    document.title = activeEntry
+      ? `${activeEntry.label} · QMS 年度內部稽核`
+      : 'QMS 年度內部稽核系統'
+    mainRef.current?.focus({ preventScroll: true })
+  }, [tab])
   useEffect(() => {
-    const onHash = () => {
-      const parsed = parseAppHash(window.location.hash)
-      setTab(parsed.tab)
-      setAuditKey(parsed.auditKey)
-      setNcrId(parsed.ncrId)
-      setPlanMonth(parsed.planMonth)
+    if (!mobileMenuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false)
+        menuButtonRef.current?.focus()
+      }
     }
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
-  }, [])
-
-  const navigate = useCallback(
-    (nextTab: TabId, nextAuditKey?: string, nextNcrId?: string, nextPlanMonth?: number) => {
-      setTab(nextTab)
-      if (nextAuditKey !== undefined) setAuditKey(nextAuditKey)
-      if (nextNcrId !== undefined) setNcrId(nextNcrId)
-      if (nextPlanMonth !== undefined) setPlanMonth(nextPlanMonth)
-      else if (nextTab !== 'audit') setPlanMonth(undefined)
-    },
-    [],
+    window.addEventListener('keydown', onKey)
+    const firstNav = sidebarNavRef.current?.querySelector('button') as HTMLButtonElement | null
+    firstNav?.focus()
+    return () => window.removeEventListener('keydown', onKey)
+  }, [mobileMenuOpen])
+  const activeEntry = ALL_TABS.find((item) => item.id === tab)
+  const renderSidebar = () => (
+    <div className="flex h-full flex-col">
+      <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-blue-100">
+          <Icon name="home" className="text-blue-200" />
+          首頁
+        </span>
+        <span className="mt-1 block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
+      </button>
+      <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
+        {ALL_TABS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            aria-current={tab === item.id ? 'page' : undefined}
+            aria-controls={item.formId}
+          >
+            <Icon name={item.icon} className="mt-0.5" />
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v7</p>
+    </div>
   )
 
-  const handleAuditKeyChange = useCallback((key: string) => {
-    setAuditKey(key)
-    setPlanMonth(undefined)
-  }, [])
-
-  const savedLabel = store.lastSavedAt
-    ? store.lastSavedAt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })
-    : null
-
-  const showDemoBanner = shouldShowDemoBanner(store.state)
-
   return (
-    <div className="min-h-screen pb-16">
-      <a href="#main-content" className="skip-link no-print">
-        跳到主要內容
+    <div className="min-h-screen bg-page lg:flex">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg"
+      >
+        跳至主要內容
       </a>
+      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface no-print lg:block">{renderSidebar()}</aside>
+      <aside id="mobile-sidebar" className={`fixed inset-y-0 left-0 z-40 w-56 border-r border-line bg-surface transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
+      {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
 
-      <header className="border-b border-line bg-surface no-print">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-          {showDemoBanner && (
-            <DemoBanner onDismiss={store.dismissDemoBanner} />
-          )}
-          {(store.loadWarning || store.saveError) && (
-            <div
-              role="alert"
-              className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-            >
-              {store.loadWarning ?? store.saveError}
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-ink">QMS 年度內部稽核系統</h1>
-              <p className="text-sm text-muted">
-                {company.name} · {settings.auditYear} 年 · 主任稽核員：{settings.leadAuditor || '—'}
-                {savedLabel && <span className="ml-2 text-xs">· 已儲存 {savedLabel}</span>}
-              </p>
+      <div className="min-w-0 flex-1">
+      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur no-print">
+        <div className="px-4 py-3 sm:px-6 lg:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <button ref={menuButtonRef} type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽" aria-expanded={mobileMenuOpen} aria-controls="mobile-sidebar">
+                <Icon name="menu" />
+                選單
+              </button>
+              <button type="button" onClick={() => setTab('dashboard')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" aria-label="回到首頁">
+                <Icon name="home" />
+                首頁
+              </button>
+              <div className="min-h-11 px-2 text-left">
+                <span className="block truncate text-sm font-medium text-ink">{headerScope}</span>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <AuditYearSwitcher store={store} compact />
               <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="切換公司">
                 {(Object.keys(COMPANY_LABELS) as CompanyId[]).map((id) => (
                   <button
                     key={id}
                     type="button"
-                    aria-pressed={activeCompanyId === id}
                     onClick={() => store.switchCompany(id)}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${FOCUS_RING} ${
+                    className={`min-h-11 rounded-md px-3 py-1.5 text-sm font-medium transition ${
                       activeCompanyId === id
-                        ? 'bg-primary text-white'
-                        : 'text-muted hover:bg-page'
+                        ? 'bg-blue-700 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {COMPANY_LABELS[id]}
@@ -159,146 +174,128 @@ function App() {
               </div>
               <button
                 type="button"
-                className={`rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-page ${FOCUS_RING}`}
-                onClick={() => setIsDark(toggleTheme() === 'dark')}
-                aria-pressed={isDark}
-              >
-                {isDark ? '淺色' : '深色'}
-              </button>
-              <div className="flex items-center gap-2">
-                <label htmlFor="view-role" className="sr-only">
-                  檢視角色
-                </label>
-                <select
-                  id="view-role"
-                  value={viewRole}
-                  onChange={(e) => store.updateViewRole(e.target.value as ViewRole)}
-                  className={`rounded-lg border border-line bg-surface px-2 py-1.5 text-sm ${FOCUS_RING}`}
-                  aria-label="檢視角色"
-                >
-                  {(Object.keys(VIEW_ROLE_LABELS) as ViewRole[]).map((role) => (
-                    <option key={role} value={role}>
-                      {VIEW_ROLE_LABELS[role]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                className={`rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:bg-page ${FOCUS_RING}`}
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-slate-50"
                 onClick={() => window.print()}
               >
+                <Icon name="printer" />
                 列印目前頁面
               </button>
             </div>
           </div>
-
-          <nav className="mt-4 hidden gap-1 overflow-x-auto md:flex" aria-label="主要分頁">
-            {TAB_GROUPS.map((group) => (
-              <div key={group.label} className="flex shrink-0 items-center gap-1 pr-2">
-                <span className="px-1 text-xs font-semibold text-muted">{group.label}</span>
-                {group.tabs.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    aria-current={tab === t.id ? 'page' : undefined}
-                    onClick={() => navigate(t.id)}
-                    className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${FOCUS_RING} ${
-                      tab === t.id ? 'bg-primary text-white' : 'text-muted hover:bg-page'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </nav>
-
-          <div className="mt-4 md:hidden">
-            <label className="block text-xs font-medium text-muted" htmlFor="mobile-tab">
-              目前分頁
-            </label>
-            <select
-              id="mobile-tab"
-              value={tab}
-              onChange={(e) => navigate(e.target.value as TabId)}
-              className={`mt-1 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm ${FOCUS_RING}`}
-            >
-              {TAB_GROUPS.map((group) => (
-                <optgroup key={group.label} label={group.label}>
-                  {group.tabs.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
         </div>
       </header>
 
-      <main id="main-content" className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        {tab === 'dashboard' && (
-          <TabErrorBoundary>
-            <Dashboard state={store.state} onNavigate={navigate} />
-          </TabErrorBoundary>
+      <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6 outline-none">
+        {store.storageWarning && (
+          <div role="alert" className="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+            <Icon name="warning" className="mt-0.5 text-amber-700" />
+            <div>
+              <strong className="block">資料保護模式</strong>
+              <span>{store.storageWarning}</span>
+            </div>
+          </div>
         )}
-        {tab === 'plan' && (
-          <TabErrorBoundary>
-            <AnnualPlan store={store} onNavigate={navigate} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'audit' && (
-          <TabErrorBoundary>
-            <ProcedureAuditPanel
-              store={store}
-              selectedKey={auditKey}
-              selectedPlanMonth={planMonth}
-              onSelectedKeyChange={handleAuditKeyChange}
+        <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
+        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="top" />
+        {activeEntry?.formId ? (
+          <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
+            {tab === 'plan' && (
+              <TabErrorBoundary tabLabel="年度稽核計畫">
+                <AnnualPlan store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'schedule' && (
+              <TabErrorBoundary tabLabel="稽核日程">
+                <AuditSchedulePage store={store} onOpenAudit={(id) => setTab('audit', id)} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'audit' && (
+              <TabErrorBoundary tabLabel="查檢表">
+                <ProcedureAuditPanel
+                  store={store}
+                  auditKey={auditKey}
+                  onAuditKeyChange={(id) => setTab('audit', id)}
+                  onBackToSchedule={() => setTab('schedule')}
+                />
+              </TabErrorBoundary>
+            )}
+            {tab === 'followups' && (
+              <TabErrorBoundary tabLabel="待改善追蹤">
+                <FollowupsPage store={store} onNavigate={(next) => setTab(next)} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'ncr' && (
+              <TabErrorBoundary tabLabel="不符合">
+                <NCRList store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'observations' && (
+              <TabErrorBoundary tabLabel="觀察事項">
+                <Observations store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'suggestions' && (
+              <TabErrorBoundary tabLabel="第三方建議">
+                <Suggestions store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'prep' && (
+              <TabErrorBoundary tabLabel="外稽準備">
+                <PreAuditPrep store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'onsite' && (
+              <TabErrorBoundary tabLabel="外稽當日行程">
+                <OnsiteSchedulePage store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'stakeholders' && (
+              <TabErrorBoundary tabLabel="利害關係人">
+                <StakeholdersPage store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'risk' && (
+              <TabErrorBoundary tabLabel="方案風險">
+                <RiskAssessment store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'personnel' && (
+              <TabErrorBoundary tabLabel="人員合格名單">
+                <PersonnelPage store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'standard' && (
+              <TabErrorBoundary tabLabel="標準">
+                <SettingsPanel store={store} section="standard" />
+              </TabErrorBoundary>
+            )}
+            {tab === 'procedure' && (
+              <TabErrorBoundary tabLabel="程序">
+                <SettingsPanel store={store} section="procedure" />
+              </TabErrorBoundary>
+            )}
+            {tab === 'system-settings' && (
+              <TabErrorBoundary tabLabel="系統設定">
+                <SettingsPanel store={store} section="system" />
+              </TabErrorBoundary>
+            )}
+          </ProcessForm>
+        ) : (
+          <TabErrorBoundary tabLabel="稽核總覽">
+            <Dashboard
+              state={store.state}
+              onNavigate={setTab}
             />
           </TabErrorBoundary>
         )}
-        {tab === 'ncr' && (
-          <TabErrorBoundary>
-            <NCRList store={store} selectedNcrId={ncrId} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'observations' && (
-          <TabErrorBoundary>
-            <Observations store={store} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'suggestions' && (
-          <TabErrorBoundary>
-            <Suggestions store={store} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'prep' && (
-          <TabErrorBoundary>
-            <PreAuditPrep store={store} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'clauses' && (
-          <TabErrorBoundary>
-            <ClauseMappingPanel store={store} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'risk' && (
-          <TabErrorBoundary>
-            <RiskAssessment store={store} />
-          </TabErrorBoundary>
-        )}
-        {tab === 'settings' && (
-          <TabErrorBoundary>
-            <SettingsPanel store={store} />
-          </TabErrorBoundary>
-        )}
+        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="bottom" />
+        </Suspense>
       </main>
 
       <footer className="border-t border-line py-4 text-center text-xs text-muted no-print">
-        ISO 9001 / AS9100D 內部稽核 · 對應 QR-28-01/02/03/04/05 · 資料儲存於本機
+        ISO 9001 / AS9100D 內部稽核
       </footer>
+      </div>
     </div>
   )
 }

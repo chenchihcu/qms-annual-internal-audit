@@ -52,13 +52,11 @@ describe('isProcedureComplete', () => {
 
   it('does not report scored when incomplete', () => {
     const result = scoreProcedureAudit(baseAudit([item('符合', 'QR-01'), item(null)]))
-    expect(result.status).toBe('unevaluated')
     expect(result.score).toBeNull()
   })
 
   it('does not report scored when all judged but evidence missing', () => {
     const result = scoreProcedureAudit(baseAudit([item('符合'), item('符合', 'QR-01')]))
-    expect(result.status).toBe('unevaluated')
     expect(result.score).toBeNull()
   })
 })

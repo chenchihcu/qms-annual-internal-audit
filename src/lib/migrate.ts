@@ -5,8 +5,8 @@ import { normalizeAuditNotice } from './auditNotice'
 import { normalizeAttachments } from './attachments'
 import { normalizeExternalAuditSchedule } from './externalAuditSchedule'
 import { normalizeNCR } from './ncr'
-import type { AppState, CompanyData, MonthStatus, NCR, PlanRow } from '../types'
-import { DEFAULT_VIEW_ROLE } from '../types'
+import type { AppState, CompanyData, CompanyId, MonthStatus, NCR, PlanRow } from '../types'
+import { COMPANY_IDS, DEFAULT_VIEW_ROLE } from '../types'
 
 export const CURRENT_STORAGE_VERSION = 13
 
@@ -94,10 +94,12 @@ export function migrateState(raw: AppState): AppState {
     ...raw,
     version: CURRENT_STORAGE_VERSION,
     companies: { ...raw.companies },
+    companySettings: { ...raw.companySettings },
   }
 
-  for (const companyId of Object.keys(next.companies) as Array<keyof typeof next.companies>) {
-    next.companies[companyId] = migrateCompany(next.companies[companyId], next.settings.auditYear)
+  for (const companyId of COMPANY_IDS) {
+    const settings = next.companySettings[companyId]
+    next.companies[companyId] = migrateCompany(next.companies[companyId], settings.auditYear)
   }
 
   if (fromVersion < 9 && next.dataSource === 'demo') {
@@ -114,16 +116,26 @@ export function migrateState(raw: AppState): AppState {
     }
   }
 
+  const activeSettings = next.companySettings[next.activeCompanyId]
+  const companySettings = COMPANY_IDS.reduce(
+    (acc, companyId) => {
+      const settings = next.companySettings[companyId]
+      acc[companyId] = {
+        ...settings,
+        viewRole: settings.viewRole ?? DEFAULT_VIEW_ROLE,
+      }
+      return acc
+    },
+    {} as Record<CompanyId, AppState['companySettings'][CompanyId]>,
+  )
+
   next = {
     ...next,
-    settings: {
-      ...next.settings,
-      viewRole: next.settings.viewRole ?? DEFAULT_VIEW_ROLE,
-    },
+    companySettings,
     externalAuditSchedule: normalizeExternalAuditSchedule(
       next.externalAuditSchedule,
-      next.settings.auditYear,
-      next.settings.externalAuditDate ?? `${next.settings.auditYear}-09-15`,
+      activeSettings.auditYear,
+      activeSettings.externalAuditDate ?? `${activeSettings.auditYear}-09-15`,
     ),
   }
 
@@ -133,8 +145,8 @@ export function migrateState(raw: AppState): AppState {
       companies: refreshDemoCompanies(),
       externalAuditSchedule: normalizeExternalAuditSchedule(
         undefined,
-        next.settings.auditYear,
-        next.settings.externalAuditDate ?? `${next.settings.auditYear}-09-15`,
+        activeSettings.auditYear,
+        activeSettings.externalAuditDate ?? `${activeSettings.auditYear}-09-15`,
       ),
     }
   }
