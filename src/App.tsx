@@ -138,8 +138,8 @@ function App() {
       >
         跳至主要內容
       </a>
-      <aside className="hidden w-56 shrink-0 border-r border-line bg-surface no-print lg:block">{renderSidebar()}</aside>
-      <aside id="mobile-sidebar" className={`fixed inset-y-0 left-0 z-40 w-56 border-r border-line bg-surface transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
+      <aside className="hidden w-max max-w-xs shrink-0 border-r border-line bg-surface no-print lg:block">{renderSidebar()}</aside>
+      <aside id="mobile-sidebar" className={`fixed inset-y-0 left-0 z-40 w-max max-w-xs border-r border-line bg-surface transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
       {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
 
       <div className="min-w-0 flex-1">
