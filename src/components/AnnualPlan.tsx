@@ -191,9 +191,9 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
 
         <div className="overflow-x-auto">
           <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-          <table className="qr-plan-table w-full min-w-[1000px] border-collapse text-sm">
+          <table className="qr-plan-table w-max border-collapse text-sm">
             <thead>
-              <tr className="bg-page text-left text-muted">
+              <tr className="whitespace-nowrap bg-page text-left text-muted">
                 <th className="border border-line p-2">項次</th>
                 <th className="border border-line p-2">風險</th>
                 <th className="border border-line p-2">QP</th>
@@ -213,13 +213,13 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                 return (
                 <tr
                   key={row.id}
-                  className={
+                  className={`whitespace-nowrap ${
                     unscheduled
                       ? 'bg-rose-50/60 dark:bg-rose-950/20'
                       : row.manualOverride
                         ? 'bg-amber-50/50 dark:bg-amber-950/20'
                         : ''
-                  }
+                  }`}
                 >
                   <td className="border border-line p-2">{row.sequence}</td>
                   <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>

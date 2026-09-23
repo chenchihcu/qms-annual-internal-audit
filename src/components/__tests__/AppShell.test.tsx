@@ -54,4 +54,16 @@ describe('AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: '儀表板' }))
     expect(onNavigate).toHaveBeenCalledWith('dashboard')
   })
+
+  it('toggles the sidebar from a labelled control and closes it after navigation', () => {
+    const { onNavigate } = renderShell('settings')
+    const toggle = screen.getByRole('button', { name: '開啟選單' })
+    expect(toggle.getAttribute('aria-controls')).toBe('app-nav')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: '關閉選單' }).getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '儀表板' }))
+    expect(onNavigate).toHaveBeenCalledWith('dashboard')
+    expect(screen.getByRole('button', { name: '開啟選單' }).getAttribute('aria-expanded')).toBe('false')
+  })
 })
