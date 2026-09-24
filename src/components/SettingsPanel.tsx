@@ -250,33 +250,78 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
         <details>
           <summary className="mb-4 cursor-pointer text-sm font-semibold">年度資料生命週期與追溯</summary>
           <p className="mb-4 text-sm text-slate-600">系統把「受控來源」、「本年度工作資料」與「已發生的稽核紀錄」分開管理；年度切換只切換年度資料集，不會覆蓋其他年度。</p>
-          <div className="grid gap-3 lg:grid-cols-3">
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs font-bold text-slate-500">01 · 受控來源主檔</p>
-              <h3 className="mt-1 font-semibold">標準／程序／查檢表種子</h3>
-              <p className="mt-2 text-sm text-slate-600">可依正式文件改版；在稽核開始前確認適用版本，不能用新主檔回寫已完成事件。</p>
-              <a className="mt-3 inline-block text-sm font-medium text-blue-700 underline" href={buildAppHash('standard')}>{tabLabel('standard')}</a>
-            </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <p className="text-xs font-bold text-blue-700">02 · 年度工作資料</p>
-              <h3 className="mt-1 font-semibold text-blue-950">{state.settings.auditYear} 年／{activeCompany.name}</h3>
-              <p className="mt-2 text-sm text-blue-900">計畫 {activeCompany.planRows.length} 列 · 稽核事件 {activeCompany.audits.length} 件 · 不符合 {activeCompany.ncrs.length} 件 · 觀察 {activeCompany.observations.length} 件。</p>
-              <a className="mt-3 inline-block text-sm font-medium text-blue-700 underline" href={buildAppHash('plan')}>{tabLabel('plan')}</a>
-            </div>
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs font-bold text-slate-500">03 · 歷史紀錄</p>
-              <h3 className="mt-1 font-semibold">事件快照與改善鏈</h3>
-              <p className="mt-2 text-sm text-slate-600">已開始事件來源快照 {sourceSnapshottedAudits.length}/{startedAudits.length}；有來源連結的不符合 {linkedNcrs} 件、觀察 {linkedObservations} 件。</p>
-              <a className="mt-3 inline-block text-sm font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a>
-            </div>
-          </div>
-          <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>年度維護：目前年度資料會在切換年度時封存；已存在年度可返回續編，新年度建立自己的計畫、事件與準備資料。已保存年度：{archivedYears.length ? archivedYears.join('、') : '尚無其他年度'}。</li>
-              <li>資料變動：年度計畫、稽核日期、查檢判定與證據可依實際工作更新；不符合與觀察事項由來源事件／查檢項目連結，後續矯正與追蹤在結果表單完成。</li>
-              <li>紀錄追溯：開始稽核時固定適用標準、程序代碼／版本、正式紀錄位置與團隊快照；回報後查檢內容鎖定，避免後來改版的主檔改寫歷史。</li>
-            </ul>
-          </div>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+            <li>
+              <strong>受控來源主檔</strong>：標準／程序／查檢表種子可依正式文件改版；在稽核開始前確認適用版本，不能用新主檔回寫已完成事件。
+              {' '}
+              <a className="font-medium text-blue-700 underline" href={buildAppHash('standard')}>{tabLabel('standard')}</a>
+            </li>
+            <li>
+              <strong>{state.settings.auditYear} 年／{activeCompany.name} 工作資料</strong>
+              <ScrollRegion ariaLabel="本年度工作資料統計表">
+                <table className="mt-2 w-full min-w-[360px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left">
+                      <th className="border p-2">項目</th>
+                      <th className="border p-2 w-24">數量</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border p-2">計畫列</td>
+                      <td className="border p-2">{activeCompany.planRows.length}</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-2">稽核事件</td>
+                      <td className="border p-2">{activeCompany.audits.length}</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-2">不符合</td>
+                      <td className="border p-2">{activeCompany.ncrs.length}</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-2">觀察</td>
+                      <td className="border p-2">{activeCompany.observations.length}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </ScrollRegion>
+              {' '}
+              <a className="font-medium text-blue-700 underline" href={buildAppHash('plan')}>{tabLabel('plan')}</a>
+            </li>
+            <li>
+              <strong>歷史紀錄</strong>
+              <ScrollRegion ariaLabel="追溯統計表">
+                <table className="mt-2 w-full min-w-[360px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left">
+                      <th className="border p-2">項目</th>
+                      <th className="border p-2 w-24">數量</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="border p-2">已開始事件來源快照</td>
+                      <td className="border p-2">{sourceSnapshottedAudits.length}/{startedAudits.length}</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-2">有來源連結的不符合</td>
+                      <td className="border p-2">{linkedNcrs}</td>
+                    </tr>
+                    <tr>
+                      <td className="border p-2">有來源連結的觀察</td>
+                      <td className="border p-2">{linkedObservations}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </ScrollRegion>
+              {' '}
+              <a className="font-medium text-blue-700 underline" href={buildAppHash('audit')}>{tabLabel('audit')}</a>
+            </li>
+            <li>年度維護：目前年度資料會在切換年度時封存；已存在年度可返回續編，新年度建立自己的計畫、事件與準備資料。已保存年度：{archivedYears.length ? archivedYears.join('、') : '尚無其他年度'}。</li>
+            <li>資料變動：年度計畫、稽核日期、查檢判定與證據可依實際工作更新；不符合與觀察事項由來源事件／查檢項目連結，後續矯正與追蹤在結果表單完成。</li>
+            <li>紀錄追溯：開始稽核時固定適用標準、程序代碼／版本、正式紀錄位置與團隊快照；回報後查檢內容鎖定，避免後來改版的主檔改寫歷史。</li>
+          </ul>
         </details>
       </Card>
 
@@ -315,11 +360,6 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
             onCancel={() => setShowClearDialog(false)}
           />
         )}
-        <h3 className="mb-2 font-semibold">關於</h3>
-        <p className="text-sm text-slate-600">
-          QMS 年度內部稽核系統 v7 — 程序導向（QP 查檢表）、雙公司台帳分倉。
-          目前公司：{state.company.name}
-        </p>
       </Card>
       </>}
     </div>

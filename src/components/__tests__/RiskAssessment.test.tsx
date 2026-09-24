@@ -13,10 +13,15 @@ describe('RiskAssessment matrix layout', () => {
     fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '風險評估（QR-02-01）' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
     })
 
+    expect(screen.getByText(/風險指數 = 發生度 O × 嚴重度 S/)).toBeTruthy()
+    expect(screen.queryByText(/時程與稽核人員由年度計畫共用/)).toBeNull()
+
     const table = screen.getByRole('region', { name: '部門風險評估表格' })
+    expect(within(table).getByText('平均分')).toBeTruthy()
+    expect(within(table).getByText('未結 NCR')).toBeTruthy()
     const occurrenceInput = within(table).getAllByLabelText(/發生度 O/)[0] as HTMLInputElement
     fireEvent.change(occurrenceInput, { target: { value: '1' } })
 
@@ -34,6 +39,7 @@ describe('RiskAssessment matrix layout', () => {
     })
 
     const guide = document.querySelector('[data-workflow-guide="top"]')!
+    expect(guide.textContent).not.toMatch(/評估全部 QP/)
     const gapItems = guide.querySelectorAll('li')
     expect(gapItems.length).toBeLessThanOrEqual(3)
     if (gapItems.length > 0) {

@@ -93,7 +93,8 @@ for (const width of widths) {
       }
     }
   }
-  await page.getByRole('button', { name: mobile ? '回到首頁' : '回到稽核總覽', exact: true }).click()
+  if (mobile) await page.getByRole('button', { name: '開啟導覽' }).click()
+  await page.getByRole('button', { name: '回到稽核總覽', exact: true }).click()
   if (!page.url().includes('tab=dashboard')) findings.push(`${width}:home-button-route`)
   await openTab(page, '稽核員能力與任命', mobile)
   await page.getByRole('button', { name: '新增人員' }).click()

@@ -200,7 +200,7 @@ export function Observations({ store }: { store: AuditStore }) {
         </Card>
       )}
 
-      <Card>
+      <div>
         <PrintDocHeader
           companyName={company.name}
           auditYear={currentYear}
@@ -387,7 +387,7 @@ export function Observations({ store }: { store: AuditStore }) {
             )}
           </ScrollRegion>
         )}
-      </Card>
+      </div>
 
       {showForm && (
         <Card className="border-blue-200 no-print">

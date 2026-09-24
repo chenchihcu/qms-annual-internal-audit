@@ -1,5 +1,7 @@
 # Production Release Checklist
 
+> **Historical snapshot**：以下為 v6 RC 發佈時紀錄，部署 hash 與測試數為當時證據。目前程式為 v7 儲存鍵、16 頁左側導覽；日常驗證請用 `npm run lint`、`npm test`、`npm run build`（2026-09 約 277 tests / 53 files）。
+
 Release target: v6 人員資格、年度／事件、觀察台帳與十頁版型 release candidate
 
 ## Gate 1 — Artifact Verification

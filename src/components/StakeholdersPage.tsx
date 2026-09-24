@@ -16,7 +16,6 @@ import { calculateRiskLevel } from '../lib/risk'
 import type { DepartmentProfile, StakeholderTag } from '../types'
 import { STAKEHOLDER_TAGS } from '../types'
 import { StakeholderRulesPanel } from './stakeholders/StakeholderRulesPanel'
-import { Card } from './ui/Badge'
 import { PageToolbar } from './ui/PageToolbar'
 import { ScrollRegion } from './ui/ScrollRegion'
 
@@ -219,7 +218,7 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <div>
         <PageToolbar title="利害關係人" />
         <StakeholderRulesPanel />
         <ScrollRegion ariaLabel="部門利害關係人工作表" className="mt-4">
@@ -245,7 +244,7 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
-      </Card>
+      </div>
     </div>
   )
 }

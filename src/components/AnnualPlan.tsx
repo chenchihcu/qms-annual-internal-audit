@@ -7,11 +7,13 @@ import { evaluateDateSequence } from '../lib/coverage'
 import { FOCUS_RING } from '../lib/focusRing'
 import { cycleMonthStatus } from '../lib/planner'
 import { parseAuditYear } from '../lib/settingsYear'
-import { MONTH_STATUS_LEGEND, STAKEHOLDER_TAGS } from '../types'
+import { MONTH_STATUS_LEGEND } from '../types'
 import type { MonthStatus } from '../types'
-import { Badge, Button, Card, Input } from './ui/Badge'
+import { Badge, Button, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -31,8 +33,7 @@ function statusShort(status: MonthStatus): string {
 }
 
 export function AnnualPlan({ store }: { store: AuditStore }) {
-  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus, updateDepartment } =
-    store
+  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus } = store
   const { settings, company } = state
   const dateWarnings = evaluateDateSequence(settings)
 
@@ -115,14 +116,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         </div>
       )}
 
-      <Card>
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4 no-print">
-          <div>
-            <h2 className="text-lg font-semibold text-ink">年度稽核計畫（QR-28-01）</h2>
-            <p className="text-sm text-muted">程序導向編排 · 月格狀態對應紙本圖例</p>
-          </div>
-          <Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
-        </div>
+      <div>
+        <PageToolbar
+          title="年度稽核計畫"
+          actions={<Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>}
+        />
 
         <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
           {MONTH_STATUS_LEGEND.map((l) => (
@@ -131,50 +129,53 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           <span className="text-muted">（點擊月格循環切換狀態）</span>
         </div>
 
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 no-print">
-          <Input
-            label="稽核年度"
-            type="number"
-            value={yearDraft}
-            onChange={requestYearChange}
-            onBlur={revertInvalidYear}
-          />
-          <Input
-            label="主任稽核員"
-            value={settings.leadAuditor}
-            onChange={(v) => updateSettings({ leadAuditor: v })}
-          />
-          <Input
-            label="年度起始"
-            type="date"
-            value={settings.yearStart}
-            onChange={(v) => updateSettings({ yearStart: v })}
-          />
-          <Input
-            label="計畫窗口起"
-            type="date"
-            value={settings.planWindowStart}
-            onChange={(v) => updateSettings({ planWindowStart: v })}
-          />
-          <Input
-            label="計畫窗口迄"
-            type="date"
-            value={settings.planWindowEnd}
-            onChange={(v) => updateSettings({ planWindowEnd: v })}
-          />
-          <Input
-            label="外部稽核日期"
-            type="date"
-            value={settings.externalAuditDate ?? ''}
-            onChange={(v) => updateSettings({ externalAuditDate: v })}
-          />
-          <Input
-            label="管理審查日期"
-            type="date"
-            value={settings.managementReviewDate ?? ''}
-            onChange={(v) => updateSettings({ managementReviewDate: v })}
-          />
-        </div>
+        <details className="mb-6 no-print">
+          <summary className="cursor-pointer text-sm font-medium text-ink">計畫窗口與日期設定</summary>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Input
+              label="稽核年度"
+              type="number"
+              value={yearDraft}
+              onChange={requestYearChange}
+              onBlur={revertInvalidYear}
+            />
+            <Input
+              label="主任稽核員"
+              value={settings.leadAuditor}
+              onChange={(v) => updateSettings({ leadAuditor: v })}
+            />
+            <Input
+              label="年度起始"
+              type="date"
+              value={settings.yearStart}
+              onChange={(v) => updateSettings({ yearStart: v })}
+            />
+            <Input
+              label="計畫窗口起"
+              type="date"
+              value={settings.planWindowStart}
+              onChange={(v) => updateSettings({ planWindowStart: v })}
+            />
+            <Input
+              label="計畫窗口迄"
+              type="date"
+              value={settings.planWindowEnd}
+              onChange={(v) => updateSettings({ planWindowEnd: v })}
+            />
+            <Input
+              label="外部稽核日期"
+              type="date"
+              value={settings.externalAuditDate ?? ''}
+              onChange={(v) => updateSettings({ externalAuditDate: v })}
+            />
+            <Input
+              label="管理審查日期"
+              type="date"
+              value={settings.managementReviewDate ?? ''}
+              onChange={(v) => updateSettings({ managementReviewDate: v })}
+            />
+          </div>
+        </details>
 
         <PrintDocHeader
           companyName={company.name}
@@ -189,8 +190,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           ))}
         </div>
 
-        <div className="overflow-x-auto">
-          <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+        <ScrollRegion ariaLabel="年度稽核計畫月格表">
           <table className="qr-plan-table w-max border-collapse text-sm">
             <thead>
               <tr className="whitespace-nowrap bg-page text-left text-muted">
@@ -268,50 +268,8 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
               )})}
             </tbody>
           </table>
-        </div>
-      </Card>
-
-      <Card className="no-print">
-        <h3 className="mb-4 text-lg font-semibold text-ink">利害關係人設定</h3>
-        <div className="space-y-4">
-          {company.departments.map((dept) => (
-            <div key={dept.id} className="rounded-lg border border-line p-4">
-              <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="font-medium text-ink">{dept.name}</span>
-                <span className="text-sm text-muted">負責人</span>
-                <DepartmentOwnerField
-                  departmentId={dept.id}
-                  savedOwner={dept.owner}
-                  ariaLabel={`${dept.name} 負責人`}
-                  onSaveRequest={ownerConfirm.requestChange}
-                  className="min-w-[12rem] flex-1"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {STAKEHOLDER_TAGS.map((tag) => {
-                  const active = dept.stakeholders.includes(tag)
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      aria-pressed={active}
-                      className={`rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${active ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'border-line text-muted'}`}
-                      onClick={() => {
-                        const stakeholders = active
-                          ? dept.stakeholders.filter((s) => s !== tag)
-                          : [...dept.stakeholders, tag]
-                        updateDepartment(dept.id, { stakeholders })
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+        </ScrollRegion>
+      </div>
     </div>
   )
 }

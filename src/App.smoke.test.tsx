@@ -66,16 +66,50 @@ describe('App tab smoke', () => {
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
 
-  it('shows workflow guide and dashboard drill-down controls', async () => {
+  it('shows workflow guide gaps without purpose text and dashboard drill-down controls', async () => {
     render(<App />)
-    expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /跨年待追蹤/ })).toBeTruthy()
-    })
-    fireEvent.click(screen.getByRole('button', { name: /跨年待追蹤/ }))
+    const guide = document.querySelector('[data-workflow-guide="top"]')
+    expect(guide).toBeTruthy()
+    expect(guide!.textContent).not.toMatch(/掌握年度 PDCA/)
+    expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
+    const metricsTable = await screen.findByRole('region', { name: '年度指標統計表' })
+    const priorObsRow = within(metricsTable).getByText('跨年待追蹤').closest('tr')
+    expect(priorObsRow).toBeTruthy()
+    fireEvent.click(within(priorObsRow as HTMLElement).getByRole('button', { name: '前往' }))
     await waitFor(() => {
       expect(screen.getByText(/前年度觀察事項/)).toBeTruthy()
     })
+  })
+
+  it('hides workflow guide on system settings when there are no gaps', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '評分與備份' })).toBeTruthy()
+    })
+    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
+    expect(screen.queryByText('關於')).toBeNull()
+    expect(screen.queryByText(/QMS 年度內部稽核系統 v7/)).toBeNull()
+  })
+
+  it('keeps sidebar local storage notice without footer tagline', () => {
+    render(<App />)
+    const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
+    expect(within(nav.closest('aside') as HTMLElement).getByText('資料儲存於本機 · v7')).toBeTruthy()
+    expect(screen.queryByText('ISO 9001 / AS9100D 內部稽核')).toBeNull()
+  })
+
+  it('shows NCR import guidance only when manual form is expanded', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '不符合' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '不符合' })).toBeTruthy()
+    })
+    expect(screen.queryByText(/查檢表判定「不符」時自動匯入/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '手動新增 NCR' }))
+    expect(
+      screen.getByText(/查檢表判定「不符」時自動匯入，描述為矯正說明且不會被查檢表覆寫；此處可登錄會議或現場發現。/),
+    ).toBeTruthy()
   })
 
   it('asks before clearing all data and keeps data when cancelled', async () => {

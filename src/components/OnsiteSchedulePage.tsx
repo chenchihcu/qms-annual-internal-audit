@@ -6,7 +6,7 @@ import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { OnsiteAuditSlot, OnsiteSite } from '../types'
 import { COMPANY_LABELS } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Card, Input, Select } from './ui/Badge'
+import { Button, Input, Select } from './ui/Badge'
 import { CheckboxList } from './ui/CheckboxList'
 import { EmptyState } from './ui/EmptyState'
 import { PageToolbar } from './ui/PageToolbar'
@@ -84,7 +84,7 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <Card>
+      <div>
         <PageToolbar
           title="外稽當日行程"
           meta={(
@@ -189,7 +189,7 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
             </table>
           </ScrollRegion>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

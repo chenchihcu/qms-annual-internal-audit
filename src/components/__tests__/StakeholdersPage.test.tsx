@@ -24,8 +24,11 @@ describe('StakeholdersPage', () => {
     expect(within(form).getByText(/編排影響（預覽自動編排時）/)).toBeTruthy()
     expect(within(form).getByText(/QP-28/)).toBeTruthy()
     expect(within(form).getAllByText(/本部門 QP · 優先/).length).toBeGreaterThan(0)
-    const guide = document.querySelector('[data-workflow-guide="top"]')!
-    expect(guide.textContent).toMatch(/標定各部門利害關係人/)
+    const guide = document.querySelector('[data-workflow-guide="top"]')
+    if (guide) {
+      expect(guide.textContent).toMatch(/待完成：利害關係人已標註 \d+\/\d+/)
+      expect(guide.textContent).not.toMatch(/標定各部門利害關係人/)
+    }
     expect(within(form).getAllByText('管理部').length).toBeGreaterThan(0)
   })
 

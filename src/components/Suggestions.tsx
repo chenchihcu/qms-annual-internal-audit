@@ -81,7 +81,7 @@ export function Suggestions({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <Card>
+      <div>
         <PrintDocHeader
           companyName={company.name}
           auditYear={currentYear}
@@ -151,7 +151,7 @@ export function Suggestions({ store }: { store: AuditStore }) {
             </table>
           </ScrollRegion>
         )}
-      </Card>
+      </div>
 
       {showForm && (
         <Card className="border-blue-200 no-print">

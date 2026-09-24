@@ -9,7 +9,7 @@ import {
 import type { FollowupFilter } from '../lib/followupQueue'
 import type { TabId } from '../types'
 import { FOLLOWUP_FILTER_ICONS } from '../lib/uiIcons'
-import { Badge, Card } from './ui/Badge'
+import { Badge } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
 import { PageToolbar } from './ui/PageToolbar'
@@ -35,7 +35,7 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <div>
         <PageToolbar title="待改善追蹤" />
 
         <FilterChips
@@ -83,7 +83,7 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
             </table>
           </ScrollRegion>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

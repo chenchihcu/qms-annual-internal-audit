@@ -14,7 +14,7 @@ import {
 import { exportPrepExcel } from '../lib/formExport'
 import { buildAppHash, tabLabel } from '../lib/navigation'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Card, Input } from './ui/Badge'
+import { Button, Input } from './ui/Badge'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -287,19 +287,13 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         )}
         </div>
       </details>
-      <Card>
+      <div>
         <PageToolbar
           title="外稽準備"
-          meta={`${externalAuditPrep.year} 年 · 外稽 ${externalAuditPrep.externalAuditDate || '未設定'}`}
           actions={(
             <>
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-              <div className="h-3 w-32 rounded-full bg-slate-100" title={`準備清單 ${done}/${total}`}>
-                <div
-                  className="h-3 rounded-full bg-green-500 transition-all"
-                  style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-                />
-              </div>
+              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
             </>
           )}
         />
@@ -467,7 +461,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             ))}
           </ul>
         </details>
-      </Card>
+      </div>
       {pendingPrepYear != null && (
         <ConfirmDialog
           open
