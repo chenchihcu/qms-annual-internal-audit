@@ -290,16 +290,10 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
       <div>
         <PageToolbar
           title="外稽準備"
-          meta={`${externalAuditPrep.year} 年 · 外稽 ${externalAuditPrep.externalAuditDate || '未設定'}`}
           actions={(
             <>
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-              <div className="h-3 w-32 rounded-full bg-slate-100" title={`準備清單 ${done}/${total}`}>
-                <div
-                  className="h-3 rounded-full bg-green-500 transition-all"
-                  style={{ width: `${total ? (done / total) * 100 : 0}%` }}
-                />
-              </div>
+              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
             </>
           )}
         />

@@ -287,10 +287,6 @@ function App() {
         )}
         </Suspense>
       </main>
-
-      <footer className="border-t border-line py-4 text-center text-xs text-muted no-print">
-        ISO 9001 / AS9100D 內部稽核
-      </footer>
       </div>
     </div>
   )

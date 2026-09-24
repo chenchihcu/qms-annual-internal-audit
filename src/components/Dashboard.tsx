@@ -162,9 +162,9 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
   ]
 
   const categoryRows = [
-    { key: 'system', label: '系統稽核', value: String(byCategory.系統稽核), hint: '計畫程序列數' },
-    { key: 'process', label: '製程稽核', value: String(byCategory.製程稽核), hint: '計畫程序列數' },
-    { key: 'config', label: '型態稽核', value: String(byCategory.型態稽核), hint: '計畫程序列數' },
+    { key: 'system', label: '系統稽核', value: String(byCategory.系統稽核), hint: '—' },
+    { key: 'process', label: '製程稽核', value: String(byCategory.製程稽核), hint: '—' },
+    { key: 'config', label: '型態稽核', value: String(byCategory.型態稽核), hint: '—' },
   ]
 
   const coverageSummaryRows = [

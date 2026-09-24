@@ -51,7 +51,6 @@ export function NCRList({ store }: { store: AuditStore }) {
 
         <PageToolbar
           title="不符合"
-          meta="查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。"
           actions={(
             <Button
               icon={showForm ? undefined : ACTION_ICONS.add}
@@ -64,7 +63,7 @@ export function NCRList({ store }: { store: AuditStore }) {
 
         {showForm && (
           <div className="mb-6 no-print">
-            <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
+            <p className="mb-3 text-sm text-muted">查檢表判定「不符」時自動匯入，描述為矯正說明且不會被查檢表覆寫；此處可登錄會議或現場發現。</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Select
                 label="程序／部門"

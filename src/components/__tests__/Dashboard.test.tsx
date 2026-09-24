@@ -41,6 +41,10 @@ describe('Dashboard attention list', () => {
     expect(within(metricsTable).getByText('系統稽核')).toBeTruthy()
     expect(within(metricsTable).getByText('製程稽核')).toBeTruthy()
     expect(within(metricsTable).getByText('型態稽核')).toBeTruthy()
+    expect(within(metricsTable).queryByText('計畫程序列數')).toBeNull()
+    const systemRow = within(metricsTable).getByText('系統稽核').closest('tr')
+    expect(systemRow).toBeTruthy()
+    expect(within(systemRow as HTMLElement).getByText('—')).toBeTruthy()
   })
 
   it('renders scored procedure rows with navigation handler', async () => {

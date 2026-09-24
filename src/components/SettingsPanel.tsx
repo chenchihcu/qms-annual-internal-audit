@@ -360,11 +360,6 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
             onCancel={() => setShowClearDialog(false)}
           />
         )}
-        <h3 className="mb-2 font-semibold">關於</h3>
-        <p className="text-sm text-slate-600">
-          QMS 年度內部稽核系統 v7 — 程序導向（QP 查檢表）、雙公司台帳分倉。
-          目前公司：{state.company.name}
-        </p>
       </Card>
       </>}
     </div>

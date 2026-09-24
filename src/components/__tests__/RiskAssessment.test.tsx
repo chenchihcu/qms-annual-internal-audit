@@ -16,6 +16,9 @@ describe('RiskAssessment matrix layout', () => {
       expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
     })
 
+    expect(screen.getByText(/風險指數 = 發生度 O × 嚴重度 S/)).toBeTruthy()
+    expect(screen.queryByText(/時程與稽核人員由年度計畫共用/)).toBeNull()
+
     const table = screen.getByRole('region', { name: '部門風險評估表格' })
     expect(within(table).getByText('平均分')).toBeTruthy()
     expect(within(table).getByText('未結 NCR')).toBeTruthy()

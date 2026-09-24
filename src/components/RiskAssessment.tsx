@@ -67,12 +67,9 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
         <PageToolbar
           title="方案風險"
           meta={(
-            <>
-              <span className="no-print">時程與稽核人員由年度計畫共用。</span>
-              <span className="block">
-                風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
-              </span>
-            </>
+            <span className="block">
+              風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
+            </span>
           )}
         />
 

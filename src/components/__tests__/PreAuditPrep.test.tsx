@@ -59,6 +59,13 @@ describe('PreAuditPrep', () => {
     expect(screen.getByText(/◎◎ 兩公司各自準備 · 合併 共用證據 · 稽核廠區範圍 依現場/)).toBeTruthy()
   })
 
+  it('shows visible prep checklist progress without toolbar year meta', () => {
+    const store = makeStore()
+    render(<PreAuditPrep store={store} />)
+    expect(screen.getByText(/準備清單 \d+\/\d+/)).toBeTruthy()
+    expect(screen.queryByText(/\d{4} 年 · 外稽/)).toBeNull()
+  })
+
   it('merged checkbox label uses compact copy', () => {
     const store = makeStore()
     render(<PreAuditPrep store={store} />)
