@@ -7,8 +7,8 @@ import {
   calculateAnnualScore,
   formatScoreDisplay,
   hasAnyJudgment,
+  type ScoreStatus,
 } from '../lib/scoring'
-import { buildAuditFocusOverview } from '../lib/planner'
 import {
   countPrepProgress,
   listPrepGaps,
@@ -19,9 +19,9 @@ import { buildPlanRowKey } from '../lib/planRowOptions'
 import { FOCUS_RING } from '../lib/focusRing'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { TabId } from '../types'
-import { Badge, Card } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 interface DashboardProps {
   state: AuditStore['state']
@@ -30,38 +30,17 @@ interface DashboardProps {
 
 const linkButtonClass = `text-left hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${FOCUS_RING}`
 
-function KpiCard({
-  title,
-  value,
-  hint,
-  onClick,
-  accent = 'text-primary',
-}: {
-  title: string
-  value: string | number
-  hint?: string
-  onClick?: () => void
-  accent?: string
-}) {
-  const inner = (
-    <>
-      <p className="text-sm text-muted">{title}</p>
-      <p className={`mt-1 text-3xl font-bold ${accent}`}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-muted">{hint}</p>}
-    </>
-  )
-  if (onClick) {
-    return (
-      <button
-        type="button"
-        onClick={onClick}
-        className="w-full rounded-xl border border-line bg-surface p-5 text-left shadow-sm transition hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-      >
-        {inner}
-      </button>
-    )
+function scoreStatusLabel(status: ScoreStatus): string {
+  switch (status) {
+    case 'scored':
+      return '已評'
+    case 'incomplete':
+      return '未完成'
+    case 'unevaluated':
+      return '未評'
+    case 'not_applicable':
+      return '不適用'
   }
-  return <Card>{inner}</Card>
 }
 
 function navigateGap(g: PlanGap, onNavigate: DashboardProps['onNavigate']) {
@@ -90,7 +69,6 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     settings.auditYear,
     settings.scoringRules,
   )
-  const focusRows = buildAuditFocusOverview(company.planRows)
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const openObs = company.observations.filter((o) => o.status === 'open').length
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
@@ -99,9 +77,6 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     0,
   )
   const scoredDepts = summary.departmentScores.filter((d) => d.status === 'scored')
-  const incompleteDepts = summary.departmentScores.filter(
-    (d) => d.status === 'incomplete' || d.status === 'unevaluated',
-  )
   const anyJudgment = hasAnyJudgment(company.audits)
 
   const navigateToAudit = (auditId: string) => {
@@ -125,10 +100,118 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
   })
 
-  const overallPercent =
-    summary.overallStatus === 'scored' && summary.overallScore !== null
-      ? summary.overallScore
-      : 0
+  const prepHint =
+    prepGaps.separateHalfDone.length > 0
+      ? `${prepGaps.separateHalfDone.length} 項只勾一家`
+      : prepGapTotal > 0
+        ? `尚有 ${prepGapTotal} 項待備`
+        : '抬頭規則已齊'
+
+  const annualMetricRows = [
+    {
+      key: 'overall',
+      label: '年度總分',
+      value: overallDisplay,
+      hint: summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序',
+      tab: null as TabId | null,
+    },
+    {
+      key: 'open-ncr',
+      label: '未結案 NCR',
+      value: String(openNCR),
+      hint: `全部 ${company.ncrs.length} 件`,
+      tab: 'ncr' as TabId,
+    },
+    {
+      key: 'observation',
+      label: '本年查檢觀察',
+      value: String(summary.totalObservation),
+      hint: '查檢表判定「觀察」',
+      tab: 'observations' as TabId,
+      section: 'current' as const,
+    },
+    {
+      key: 'prior-obs',
+      label: '跨年待追蹤',
+      value: String(openObs),
+      hint: '前年度觀察 open',
+      tab: 'observations' as TabId,
+      section: 'prior' as const,
+    },
+    {
+      key: 'suggestions',
+      label: '第三方建議',
+      value: String(openSug),
+      hint: '待追蹤建議',
+      tab: 'suggestions' as TabId,
+    },
+    {
+      key: 'planned',
+      label: '計畫稽核次數',
+      value: String(plannedMonths),
+      hint: '年度計畫月格合計',
+      tab: 'plan' as TabId,
+    },
+    {
+      key: 'prep',
+      label: '外部稽核準備（兩證）',
+      value: `${prepProgress.done}/${prepProgress.total}`,
+      hint: prepHint,
+      tab: 'prep' as TabId,
+    },
+  ]
+
+  const categoryRows = [
+    { key: 'system', label: '系統稽核', value: String(byCategory.系統稽核), hint: '計畫程序列數' },
+    { key: 'process', label: '製程稽核', value: String(byCategory.製程稽核), hint: '計畫程序列數' },
+    { key: 'config', label: '型態稽核', value: String(byCategory.型態稽核), hint: '計畫程序列數' },
+  ]
+
+  const coverageSummaryRows = [
+    {
+      key: 'internal-complete',
+      label: '內部稽核完成',
+      value: mergedCoverage.allInternalAuditComplete ? '是' : '否',
+    },
+    {
+      key: 'open-ncr-total',
+      label: '未結 NCR 合計',
+      value: String(mergedCoverage.totalOpenNcr),
+    },
+    {
+      key: 'ncr-jiurun',
+      label: '未結 NCR（九潤）',
+      value: String(mergedCoverage.openNcrByScope.jiurun),
+    },
+    {
+      key: 'ncr-zlx',
+      label: '未結 NCR（正隆興）',
+      value: String(mergedCoverage.openNcrByScope.zhenglongxing),
+    },
+    {
+      key: 'ncr-both',
+      label: '未結 NCR（兩證）',
+      value: String(mergedCoverage.openNcrByScope.both),
+    },
+    {
+      key: 'plan-gaps',
+      label: '共用計畫缺口',
+      value: String(mergedCoverage.gaps.length),
+      hint: '件',
+    },
+    {
+      key: 'dual-pending',
+      label: '雙證未判定',
+      value: String(mergedCoverage.dualPendingItems.length),
+      hint: '項',
+    },
+    {
+      key: 'prep-gaps',
+      label: '外稽準備漏口',
+      value: String(prepGapTotal),
+      hint: '項',
+    },
+  ]
 
   return (
     <div className="space-y-6 print-area">
@@ -138,89 +221,89 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
         formTitle="年度稽核儀表板"
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard
-          title="年度總分"
-          value={overallDisplay}
-          hint={summary.overallStatus === 'scored' ? '已評程序加權' : '尚無已評程序'}
-        />
-        <KpiCard
-          title="未結案 NCR"
-          value={openNCR}
-          hint={`全部 ${company.ncrs.length} 件`}
-          accent="text-red-600 dark:text-red-400"
-          onClick={() => onNavigate('ncr')}
-        />
-        <KpiCard
-          title="本年查檢觀察"
-          value={summary.totalObservation}
-          hint="查檢表判定「觀察」"
-          accent="text-amber-600 dark:text-amber-400"
-          onClick={() => onNavigate('observations', { section: 'current' })}
-        />
-        <KpiCard
-          title="跨年待追蹤"
-          value={openObs}
-          hint="前年度觀察 open"
-          onClick={() => onNavigate('observations', { section: 'prior' })}
-        />
-        <KpiCard
-          title="第三方建議"
-          value={openSug}
-          hint="待追蹤建議"
-          onClick={() => onNavigate('suggestions')}
-        />
-        <KpiCard
-          title="計畫稽核次數"
-          value={plannedMonths}
-          hint={`系統 ${byCategory.系統稽核} · 製程 ${byCategory.製程稽核} · 型態 ${byCategory.型態稽核}`}
-          onClick={() => onNavigate('plan')}
-        />
-        <KpiCard
-          title="外部稽核準備（兩證）"
-          value={`${prepProgress.done}/${prepProgress.total}`}
-          hint={
-            prepGaps.separateHalfDone.length > 0
-              ? `${prepGaps.separateHalfDone.length} 項只勾一家`
-              : prepGapTotal > 0
-                ? `尚有 ${prepGapTotal} 項待備`
-                : '抬頭規則已齊'
-          }
-          accent={
-            prepGaps.separateHalfDone.length > 0
-              ? 'text-amber-600 dark:text-amber-400'
-              : prepGapTotal > 0
-                ? 'text-amber-600 dark:text-amber-400'
-                : 'text-green-700 dark:text-green-400'
-          }
-          onClick={() => onNavigate('prep')}
-        />
+      <div>
+        <h2 className="mb-4 text-sm font-semibold text-ink">年度指標</h2>
+        <ScrollRegion ariaLabel="年度指標統計表">
+          <table className="stacked-table w-full min-w-[640px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line bg-page text-left text-muted">
+                <th className="p-2">指標</th>
+                <th className="p-2 w-28">數值</th>
+                <th className="p-2">補充</th>
+                <th className="p-2 w-24 no-print">前往</th>
+              </tr>
+            </thead>
+            <tbody>
+              {annualMetricRows.map((row) => (
+                <tr key={row.key} className="border-b border-line">
+                  <td data-label="指標" className="p-2 font-medium text-ink">{row.label}</td>
+                  <td data-label="數值" className="p-2 font-semibold text-ink">{row.value}</td>
+                  <td data-label="補充" className="p-2 text-muted">{row.hint}</td>
+                  <td data-label="前往" className="p-2 no-print">
+                    {row.tab ? (
+                      <button
+                        type="button"
+                        className={`text-sm text-link hover:underline ${FOCUS_RING}`}
+                        onClick={() =>
+                          onNavigate(
+                            row.tab!,
+                            row.section ? { section: row.section } : undefined,
+                          )
+                        }
+                      >
+                        前往
+                      </button>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {categoryRows.map((row) => (
+                <tr key={row.key} className="border-b border-line">
+                  <td data-label="指標" className="p-2 font-medium text-ink">{row.label}</td>
+                  <td data-label="數值" className="p-2 font-semibold text-ink">{row.value}</td>
+                  <td data-label="補充" className="p-2 text-muted">{row.hint}</td>
+                  <td data-label="前往" className="p-2 no-print">
+                    <button
+                      type="button"
+                      className={`text-sm text-link hover:underline ${FOCUS_RING}`}
+                      onClick={() => onNavigate('plan')}
+                    >
+                      前往
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollRegion>
       </div>
 
-      <Card className="no-print">
-        <h2 className="mb-3 text-lg font-semibold text-ink">兩張證書缺口（合併檢視）</h2>
-        <p className="mb-3 text-sm text-muted">
-          內部稽核完成：
-          <span
-            className={
-              mergedCoverage.allInternalAuditComplete
-                ? 'font-semibold text-green-700'
-                : 'font-semibold text-red-600'
-            }
-          >
-            {mergedCoverage.allInternalAuditComplete ? '是' : '否'}
-          </span>
-          · 未結 NCR 合計 {mergedCoverage.totalOpenNcr}
-          {mergedCoverage.totalOpenNcr > 0 && (
-            <span className="ml-1">
-              （九潤 {mergedCoverage.openNcrByScope.jiurun} · 正隆興{' '}
-              {mergedCoverage.openNcrByScope.zhenglongxing} · 兩證{' '}
-              {mergedCoverage.openNcrByScope.both}）
-            </span>
-          )}
-        </p>
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-line p-3">
+      <div className="no-print">
+        <h2 className="mb-4 text-sm font-semibold text-ink">兩張證書缺口（合併檢視）</h2>
+        <ScrollRegion ariaLabel="兩證缺口摘要統計表">
+          <table className="stacked-table w-full min-w-[480px] border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-line bg-page text-left text-muted">
+                <th className="p-2">項目</th>
+                <th className="p-2 w-28">數值</th>
+                <th className="p-2 w-16">單位</th>
+              </tr>
+            </thead>
+            <tbody>
+              {coverageSummaryRows.map((row) => (
+                <tr key={row.key} className="border-b border-line">
+                  <td data-label="項目" className="p-2 text-ink">{row.label}</td>
+                  <td data-label="數值" className="p-2 font-semibold text-ink">{row.value}</td>
+                  <td data-label="單位" className="p-2 text-muted">{row.hint ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollRegion>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
             <p className="mb-2 font-medium text-ink">
               共用計畫／查檢
               <span className="ml-2 text-xs text-muted">缺口 {mergedCoverage.gaps.length}</span>
@@ -247,7 +330,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
               </ul>
             )}
           </div>
-          <div className="rounded-lg border border-line p-3">
+          <div>
             <p className="mb-2 font-medium text-ink">
               ◎◎ 雙證查檢項
               <span className="ml-2 text-xs text-muted">
@@ -306,139 +389,62 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
             </ul>
           </div>
         )}
-      </Card>
+      </div>
 
-      {summary.overallStatus === 'scored' && (
-        <Card className="no-print">
-          <p className="text-sm text-muted">年度總分進度</p>
-          <div
-            className="mt-2 h-2 rounded-full bg-page"
-            role="progressbar"
-            aria-valuenow={overallPercent}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="年度總分"
-          >
-            <div
-              className="h-2 rounded-full bg-primary transition-all"
-              style={{ width: `${Math.min(overallPercent, 100)}%` }}
-            />
-          </div>
-        </Card>
-      )}
-
-      <Card>
-        <h2 className="mb-4 text-lg font-semibold text-ink">稽核重點標示（QR-28-01 概覽）</h2>
-        {focusRows.length === 0 ? (
-          <EmptyState message="尚無計畫列，請至「年度計畫」建立或自動編排。" />
+      <div>
+        <h2 className="mb-4 text-sm font-semibold text-ink">各程序稽核得分</h2>
+        {!anyJudgment && scoredDepts.length === 0 ? (
+          <EmptyState message="尚無稽核判定，請至「程序稽核」填寫查檢表。" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
-            <table className="w-full border-collapse text-sm">
+          <ScrollRegion ariaLabel="各程序稽核得分統計表">
+            <table className="stacked-table w-full min-w-[640px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line bg-page text-left text-muted">
-                  <th className="p-2">Sheet</th>
-                  <th className="p-2">風險等級</th>
-                  <th className="p-2">稽核程序</th>
-                  <th className="p-2">被稽核單位</th>
-                  <th className="p-2">負責人</th>
-                  <th className="p-2 text-center">查檢項數</th>
-                  <th className="p-2">稽核類型</th>
+                  <th className="p-2">程序</th>
+                  <th className="p-2 w-24">狀態</th>
+                  <th className="p-2 w-24">得分</th>
+                  <th className="p-2 w-24 text-center">適用項</th>
+                  <th className="p-2 w-32 no-print">前往</th>
                 </tr>
               </thead>
               <tbody>
-                {focusRows.map((row) => (
-                  <tr key={`${row.sheet}-${row.qpCode}-${row.department}`} className="border-b border-line">
-                    <td className="p-2 text-muted">{row.sheet}</td>
-                    <td className="p-2"><Badge label={row.riskLevel} /></td>
-                    <td className="p-2 font-medium text-ink">{row.qpCode}</td>
-                    <td className="p-2">{row.department}</td>
-                    <td className="p-2">{row.owner}</td>
-                    <td className="p-2 text-center">{row.itemCount}</td>
-                    <td className="p-2 text-muted">{row.auditCategory}</td>
+                {summary.departmentScores.map((d) => (
+                  <tr key={d.auditId} className="border-b border-line">
+                    <td data-label="程序" className="p-2 font-medium text-ink">{d.label}</td>
+                    <td data-label="狀態" className="p-2 text-ink">{scoreStatusLabel(d.status)}</td>
+                    <td data-label="得分" className="p-2 font-semibold text-ink">
+                      {formatScoreDisplay({
+                        score: d.score,
+                        status: d.status,
+                        totalItems: 0,
+                        applicableItems: d.applicableItems,
+                        breakdown: {
+                          conform: 0,
+                          nonConform: 0,
+                          observation: 0,
+                          notApplicable: 0,
+                          pending: 0,
+                        },
+                      })}
+                    </td>
+                    <td data-label="適用項" className="p-2 text-center text-ink">{d.applicableItems}</td>
+                    <td data-label="前往" className="p-2 no-print">
+                      <button
+                        type="button"
+                        className={`text-sm text-link hover:underline ${FOCUS_RING}`}
+                        aria-label={`開啟 ${d.label}`}
+                        onClick={() => navigateToAudit(d.auditId)}
+                      >
+                        開啟
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
-      </Card>
-
-      <Card>
-        <h2 className="mb-4 text-lg font-semibold text-ink">各程序稽核得分</h2>
-        {!anyJudgment && scoredDepts.length === 0 ? (
-          <EmptyState message="尚無稽核判定，請至「程序稽核」填寫查檢表。" />
-        ) : (
-          <div className="space-y-3">
-            {summary.departmentScores
-              .filter((d) => d.status === 'scored')
-              .map((d) => (
-                <button
-                  key={d.auditId}
-                  type="button"
-                  className={`flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-page no-print ${FOCUS_RING}`}
-                  onClick={() => navigateToAudit(d.auditId)}
-                >
-                  <span className="w-40 shrink-0 text-sm font-medium text-ink">{d.label}</span>
-                  <div className="flex-1">
-                    <div
-                      className="h-3 rounded-full bg-page"
-                      role="progressbar"
-                      aria-valuenow={d.score ?? 0}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-label={d.label}
-                    >
-                      <div
-                        className={`h-3 rounded-full ${(d.score ?? 0) >= 80 ? 'bg-green-500' : (d.score ?? 0) >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
-                        style={{ width: `${Math.min(d.score ?? 0, 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="w-14 text-right text-sm font-semibold text-ink">
-                    {formatScoreDisplay({
-                      score: d.score,
-                      status: d.status,
-                      totalItems: 0,
-                      applicableItems: d.applicableItems,
-                      breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
-                    })}
-                  </span>
-                </button>
-              ))}
-            {incompleteDepts.length > 0 && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-                <p className="mb-1 font-semibold">未完成程序（{incompleteDepts.length}）</p>
-                <ul className="list-inside list-disc space-y-0.5">
-                  {incompleteDepts.map((d) => (
-                    <li key={d.auditId}>
-                      <button
-                        type="button"
-                        className={`text-left hover:underline ${FOCUS_RING}`}
-                        onClick={() => navigateToAudit(d.auditId)}
-                      >
-                        {d.label} — {formatScoreDisplay({
-                          score: d.score,
-                          status: d.status,
-                          totalItems: 0,
-                          applicableItems: d.applicableItems,
-                          breakdown: {
-                            conform: 0,
-                            nonConform: 0,
-                            observation: 0,
-                            notApplicable: 0,
-                            pending: 0,
-                          },
-                        })}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
+      </div>
     </div>
   )
 }

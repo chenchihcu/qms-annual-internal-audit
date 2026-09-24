@@ -20,7 +20,10 @@ describe('ProcedureAuditPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
       expect(screen.getByLabelText('實施日期')).toBeTruthy()
-      expect(screen.getByRole('heading', { name: '內部稽核查檢表（QR-28-02）' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '查檢表' })).toBeTruthy()
+      expect(screen.getByRole('region', { name: '查檢判定計數統計表' })).toBeTruthy()
+      expect(screen.getByText('程序得分')).toBeTruthy()
+      expect(screen.getByText('未判定')).toBeTruthy()
     })
   })
 })

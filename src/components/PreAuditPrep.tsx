@@ -14,7 +14,7 @@ import {
 import { exportPrepExcel } from '../lib/formExport'
 import { buildAppHash, tabLabel } from '../lib/navigation'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Card, Input } from './ui/Badge'
+import { Button, Input } from './ui/Badge'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -287,7 +287,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         )}
         </div>
       </details>
-      <Card>
+      <div>
         <PageToolbar
           title="外稽準備"
           meta={`${externalAuditPrep.year} 年 · 外稽 ${externalAuditPrep.externalAuditDate || '未設定'}`}
@@ -467,7 +467,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             ))}
           </ul>
         </details>
-      </Card>
+      </div>
       {pendingPrepYear != null && (
         <ConfirmDialog
           open

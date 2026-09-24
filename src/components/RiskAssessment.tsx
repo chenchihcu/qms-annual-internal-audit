@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { buildAppHash } from '../lib/navigation'
 import { calculateRiskLevel, RISK_BANDS, suggestRiskBump } from '../lib/risk'
 import { scoreProcedureAudit } from '../lib/scoring'
-import { STAKEHOLDER_TAGS } from '../types'
-import { Badge, Card } from './ui/Badge'
+import { Badge } from './ui/Badge'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
@@ -14,6 +16,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
   const { company, settings } = state
   const [riskDrafts, setRiskDrafts] = useState<Record<string, string>>({})
   const [riskErrors, setRiskErrors] = useState<Record<string, string>>({})
+  const taggedDepartments = company.departments.filter((dept) => dept.stakeholders.length > 0).length
 
   const updateRiskValue = (departmentId: string, field: 'riskOccurrence' | 'riskSeverity', raw: string) => {
     const key = `${departmentId}:${field}`
@@ -60,14 +63,20 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
         formTitle="風險指標評估 QR-02-01"
       />
 
-      <Card>
-        <h2 className="mb-2 text-lg font-semibold text-ink">風險評估（QR-02-01）</h2>
-        <p className="mb-2 text-sm text-muted no-print">時程與稽核人員由年度計畫共用。</p>
-        <p className="mb-4 text-sm text-muted">
-          風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
-        </p>
+      <div>
+        <PageToolbar
+          title="方案風險"
+          meta={(
+            <>
+              <span className="no-print">時程與稽核人員由年度計畫共用。</span>
+              <span className="block">
+                風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
+              </span>
+            </>
+          )}
+        />
 
-        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="部門風險評估表格">
+        <ScrollRegion ariaLabel="部門風險評估表格">
           <table className="stacked-table w-full border-collapse text-sm">
             <thead>
               <tr className="bg-page text-left text-muted">
@@ -76,12 +85,14 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 <th className="border border-line p-2 w-24">嚴重度 S</th>
                 <th className="border border-line p-2 w-20">指數</th>
                 <th className="border border-line p-2 w-20">等級</th>
+                <th className="border border-line p-2 w-24">平均分</th>
+                <th className="border border-line p-2 w-24">未結 NCR</th>
                 <th className="border border-line p-2">建議 O</th>
               </tr>
             </thead>
             <tbody>
               {deptStats.length === 0 && (
-                <tr><td colSpan={6} className="border border-line p-4 text-center text-muted">尚無部門資料</td></tr>
+                <tr><td colSpan={8} className="border border-line p-4 text-center text-muted">尚無部門資料</td></tr>
               )}
               {deptStats.map(({ dept, score, ncrCount, suggested }) => {
                 const { index, level } = calculateRiskLevel(
@@ -126,7 +137,11 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                     </td>
                     <td data-label="風險指數" className="border border-line p-2 text-center font-semibold text-ink">{index}</td>
                     <td data-label="風險等級" className="border border-line p-2"><Badge label={level} /></td>
-                    <td className="border border-line p-2">
+                    <td data-label="平均分" className="border border-line p-2 text-ink">
+                      {score !== null ? `${Math.round(score)}%` : '未評'}
+                    </td>
+                    <td data-label="未結 NCR" className="border border-line p-2 text-ink">{ncrCount}</td>
+                    <td data-label="建議 O" className="border border-line p-2">
                       <div className="flex items-center gap-2">
                         <span className={suggested > dept.riskOccurrence ? 'font-bold text-red-600 dark:text-red-400' : ''}>
                           {suggested}
@@ -143,48 +158,28 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                           </button>
                         )}
                       </div>
-                      <p className="text-xs text-muted">
-                        平均分 {score !== null ? `${Math.round(score)}%` : '未評'} · NCR {ncrCount}
-                      </p>
                     </td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
-        </div>
-      </Card>
+        </ScrollRegion>
+      </div>
 
-      <Card className="no-print">
-        <h3 className="mb-4 text-lg font-semibold text-ink">利害關係人（{company.name}）</h3>
-        <div>
-          {company.departments.map((dept) => (
-            <div key={dept.id} className="border-b border-line py-4 first:pt-0 last:border-b-0 last:pb-0">
-              <p className="mb-2 font-medium text-ink">{dept.name} · {dept.owner}</p>
-              <div className="flex flex-wrap gap-2">
-                {STAKEHOLDER_TAGS.map((tag) => {
-                  const active = dept.stakeholders.includes(tag)
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      aria-pressed={active}
-                      className={`min-h-11 rounded-full border px-3 py-1 text-xs ${FOCUS_RING} ${active ? 'border-primary bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'border-line text-muted'}`}
-                      onClick={() => updateDepartment(dept.id, {
-                        stakeholders: active
-                          ? dept.stakeholders.filter((item) => item !== tag)
-                          : [...dept.stakeholders, tag],
-                      })}
-                    >
-                      {tag}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <div className="no-print rounded-lg border border-line bg-surface p-4">
+        <p className="text-sm text-ink">
+          利害關係人已標註{' '}
+          <span className="font-semibold">{taggedDepartments}/{company.departments.length}</span>{' '}
+          部門（{company.name}）
+        </p>
+        <a
+          href={buildAppHash('stakeholders')}
+          className="mt-2 inline-block text-sm font-medium text-link hover:underline"
+        >
+          至利害關係人編輯
+        </a>
+      </div>
     </div>
   )
 }

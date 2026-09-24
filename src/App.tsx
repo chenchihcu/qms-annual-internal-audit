@@ -104,12 +104,8 @@ function App() {
   const activeEntry = ALL_TABS.find((item) => item.id === tab)
   const renderSidebar = () => (
     <div className="flex h-full flex-col">
-      <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
-        <span className="flex items-center gap-1.5 text-xs font-medium text-blue-100">
-          <Icon name="home" className="text-blue-200" />
-          首頁
-        </span>
-        <span className="mt-1 block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
+      <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
+        <span className="block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
       </button>
       <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
         {ALL_TABS.map((item) => (
@@ -143,17 +139,13 @@ function App() {
       {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
 
       <div className="min-w-0 flex-1">
-      <header className="sticky top-0 z-20 border-b border-line bg-surface/95 backdrop-blur no-print">
+      <header className="sticky top-0 z-20 border-b border-line bg-surface no-print">
         <div className="px-4 py-3 sm:px-6 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <button ref={menuButtonRef} type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽" aria-expanded={mobileMenuOpen} aria-controls="mobile-sidebar">
                 <Icon name="menu" />
                 選單
-              </button>
-              <button type="button" onClick={() => setTab('dashboard')} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" aria-label="回到首頁">
-                <Icon name="home" />
-                首頁
               </button>
               <div className="min-h-11 px-2 text-left">
                 <span className="block truncate text-sm font-medium text-ink">{headerScope}</span>
@@ -201,7 +193,7 @@ function App() {
           </div>
         )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
-        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="top" />
+        <WorkflowGuide tab={tab} state={store.state} />
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
@@ -293,7 +285,6 @@ function App() {
             />
           </TabErrorBoundary>
         )}
-        <WorkflowGuide tab={tab} state={store.state} auditKey={auditKey} position="bottom" />
         </Suspense>
       </main>
 

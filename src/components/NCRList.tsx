@@ -3,11 +3,14 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { FOCUS_RING } from '../lib/focusRing'
 import { isNcrStale } from '../lib/ncr'
 import { planRowSelectOptions } from '../lib/planRowOptions'
+import { ACTION_ICONS } from '../lib/uiIcons'
 import type { NCRStatus, NcrCompanyScope } from '../types'
 import { NCR_COMPANY_SCOPE_LABELS } from '../types'
-import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { Badge, Button, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 const COMPANY_SCOPES: NcrCompanyScope[] = ['jiurun', 'zhenglongxing', 'both']
@@ -16,6 +19,7 @@ export function NCRList({ store }: { store: AuditStore }) {
   const { state, updateNCR, addManualNCR } = store
   const { company, settings } = state
 
+  const [showForm, setShowForm] = useState(false)
   const [newNcr, setNewNcr] = useState({
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
     departmentId: company.planRows[0]?.departmentId ?? '',
@@ -38,66 +42,74 @@ export function NCRList({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <Card className="no-print">
-        <h2 className="mb-2 text-lg font-semibold text-ink">手動新增 NCR</h2>
-        <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Select
-            label="程序／部門"
-            value={`${newNcr.qpCode}|${newNcr.departmentId}`}
-            onChange={(v) => {
-              const [qp, dept] = v.split('|')
-              setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
-            }}
-            options={planRowOptions}
-          />
-          <Select
-            label="證書"
-            value={newNcr.companyScope}
-            onChange={(v) => setNewNcr((s) => ({ ...s, companyScope: v as NcrCompanyScope }))}
-            options={COMPANY_SCOPES.map((s) => ({
-              value: s,
-              label: NCR_COMPANY_SCOPE_LABELS[s],
-            }))}
-          />
-          <div>
-            <Input
-              label="描述"
-              value={newNcr.description}
-              onChange={(v) => {
-                setNewNcr((s) => ({ ...s, description: v }))
-                if (descriptionError && v.trim()) setDescriptionError(undefined)
-              }}
-            />
-            {descriptionError && (
-              <p className="mt-1 text-xs text-red-600" role="alert">{descriptionError}</p>
-            )}
-          </div>
-          <div className="flex items-end">
-            <Button onClick={handleAddNcr} disabled={!newNcr.description.trim()}>
-              新增 NCR
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-ink">不符合事項清單（QR-28-03）</h2>
-          <p className="text-sm text-muted">查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。</p>
-        </div>
-
+      <div>
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="不符合事項清單 QR-28-03"
         />
 
+        <PageToolbar
+          title="不符合"
+          meta="查檢表判定「不符」時自動匯入；描述為矯正說明，不會被查檢表覆寫。"
+          actions={(
+            <Button
+              icon={showForm ? undefined : ACTION_ICONS.add}
+              onClick={() => setShowForm((value) => !value)}
+            >
+              {showForm ? '收起登錄' : '手動新增 NCR'}
+            </Button>
+          )}
+        />
+
+        {showForm && (
+          <div className="mb-6 no-print">
+            <p className="mb-3 text-sm text-muted">主要仍由查檢表判定「不符」自動產生；此處可登錄會議或現場發現。</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Select
+                label="程序／部門"
+                value={`${newNcr.qpCode}|${newNcr.departmentId}`}
+                onChange={(v) => {
+                  const [qp, dept] = v.split('|')
+                  setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
+                }}
+                options={planRowOptions}
+              />
+              <Select
+                label="證書"
+                value={newNcr.companyScope}
+                onChange={(v) => setNewNcr((s) => ({ ...s, companyScope: v as NcrCompanyScope }))}
+                options={COMPANY_SCOPES.map((s) => ({
+                  value: s,
+                  label: NCR_COMPANY_SCOPE_LABELS[s],
+                }))}
+              />
+              <div>
+                <Input
+                  label="描述"
+                  value={newNcr.description}
+                  onChange={(v) => {
+                    setNewNcr((s) => ({ ...s, description: v }))
+                    if (descriptionError && v.trim()) setDescriptionError(undefined)
+                  }}
+                />
+                {descriptionError && (
+                  <p className="mt-1 text-xs text-red-600" role="alert">{descriptionError}</p>
+                )}
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleAddNcr} disabled={!newNcr.description.trim()}>
+                  新增 NCR
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />
         ) : (
-          <div className="overflow-x-auto">
-            <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+          <ScrollRegion ariaLabel="不符合事項清單">
             <table className="qr-checklist w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-page text-left text-muted">
@@ -174,9 +186,9 @@ export function NCRList({ store }: { store: AuditStore }) {
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

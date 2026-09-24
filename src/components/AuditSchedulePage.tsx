@@ -9,7 +9,7 @@ import {
 } from '../lib/auditSchedule'
 import type { CategoryFilter, ScheduleFilter } from '../lib/auditSchedule'
 import { CATEGORY_FILTER_ICONS, SCHEDULE_FILTER_ICONS } from '../lib/uiIcons'
-import { Badge, Card } from './ui/Badge'
+import { Badge } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
 import { PageToolbar } from './ui/PageToolbar'
@@ -53,7 +53,7 @@ export function AuditSchedulePage({ store, onOpenAudit }: AuditSchedulePageProps
 
   return (
     <div className="space-y-6">
-      <Card>
+      <div>
         <PageToolbar title="稽核日程" />
 
         <FilterChips
@@ -113,7 +113,7 @@ export function AuditSchedulePage({ store, onOpenAudit }: AuditSchedulePageProps
             </table>
           </ScrollRegion>
         )}
-      </Card>
+      </div>
     </div>
   )
 }

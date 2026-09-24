@@ -150,13 +150,6 @@ export const ATTENTION_FILTER_ICONS: Record<string, IconName> = {
   全部: 'layers',
 }
 
-export const PDCA_SECTION_ICONS: Record<string, IconName> = {
-  'P · 方案規劃': 'clipboardList',
-  'D · 稽核執行': 'playCircle',
-  'C · 結果與改善': 'circleAlert',
-  'A · 結案與改進': 'flag',
-}
-
 export const SCHEDULE_FILTER_ICONS: Record<string, IconName> = {
   執行中: 'playCircle',
   本月: 'calendar',

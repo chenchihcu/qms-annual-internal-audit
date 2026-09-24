@@ -400,7 +400,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         auditYear={state.settings.auditYear}
         formTitle="人員合格名單"
       />
-      <Card>
+      <div>
         <PageToolbar
           title="人員合格名單"
           actions={(
@@ -420,7 +420,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
             系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。空白範圍不算「全部」，開始稽核時仍須符合當次 QP 與單位。
           </p>
         </details>
-      </Card>
+      </div>
 
       {editing && (
       <div ref={editCardRef}>
@@ -485,7 +485,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       </Card>
       </div>)}
 
-      <Card>
+      <div>
         {rows.length === 0 ? (
           <EmptyState message="目前沒有人員。" />
         ) : (
@@ -546,7 +546,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
             </table>
           </ScrollRegion>
         )}
-      </Card>
+      </div>
       {pendingCancel && (
         <ConfirmDialog
           open

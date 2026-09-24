@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { createDemoState } from '../../data/demoData'
 import { companySettingsFor } from '../../types'
 import { Dashboard } from '../Dashboard'
@@ -28,14 +28,19 @@ describe('Dashboard attention list', () => {
     window.location.hash = ''
   })
 
-  it('shows focus and score sections from the integrated dashboard', async () => {
+  it('shows annual metrics and score tables', async () => {
     renderDashboard()
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '稽核重點標示（QR-28-01 概覽）' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '年度指標' })).toBeTruthy()
     })
 
     expect(screen.getByRole('heading', { name: '各程序稽核得分' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '稽核重點標示（QR-28-01 概覽）' })).toBeNull()
+    const metricsTable = screen.getByRole('region', { name: '年度指標統計表' })
+    expect(within(metricsTable).getByText('系統稽核')).toBeTruthy()
+    expect(within(metricsTable).getByText('製程稽核')).toBeTruthy()
+    expect(within(metricsTable).getByText('型態稽核')).toBeTruthy()
   })
 
   it('renders scored procedure rows with navigation handler', async () => {
@@ -45,29 +50,20 @@ describe('Dashboard attention list', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /QP-16 · 品保部/ })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '開啟 QP-16 · 品保部' })).toBeTruthy()
     })
 
-    fireEvent.click(screen.getByRole('button', { name: /QP-16 · 品保部/ }))
+    fireEvent.click(screen.getByRole('button', { name: '開啟 QP-16 · 品保部' }))
     expect(tab).toBe('audit')
   })
 
-  it('lists incomplete procedures separately from scored rows', async () => {
+  it('lists incomplete procedures with status column in score table', async () => {
     renderDashboard()
 
+    const scoreTable = await screen.findByRole('region', { name: '各程序稽核得分統計表' })
     await waitFor(() => {
-      expect(screen.getByText(/未完成程序（/)).toBeTruthy()
+      expect(within(scoreTable).getAllByText('未完成').length).toBeGreaterThan(0)
+      expect(within(scoreTable).getAllByText('已評').length).toBeGreaterThan(0)
     })
-  })
-
-  it('does not render score bars for incomplete procedures', async () => {
-    renderDashboard()
-
-    await waitFor(() => {
-      expect(screen.getByText(/未完成程序（/)).toBeTruthy()
-    })
-
-    const incompleteSection = screen.getByText(/未完成程序（/).closest('div')
-    expect(incompleteSection?.querySelector('.bg-green-500, .bg-amber-500, .bg-red-500')).toBeNull()
   })
 })

@@ -11,9 +11,11 @@ import { isAuditComplete, isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import type { ChecklistItem, CompanyId, Judgment, TabId } from '../types'
 import { COMPANY_LABELS } from '../types'
-import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { Badge, Button, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -178,16 +180,18 @@ export function ProcedureAuditPanel({
         onCancel={() => setDeleteTarget(null)}
       />
 
-      <Card>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4 no-print">
-          <h2 className="text-lg font-semibold text-ink">內部稽核查檢表（QR-28-02）</h2>
-          <Select
-            label="查檢表"
-            value={selectedKey}
-            onChange={setSelectedKey}
-            options={auditOptions}
-          />
-        </div>
+      <div>
+        <PageToolbar
+          title="查檢表"
+          actions={(
+            <Select
+              label="查檢表"
+              value={selectedKey}
+              onChange={setSelectedKey}
+              options={auditOptions}
+            />
+          )}
+        />
 
         <PrintDocHeader
           companyName={company.name}
@@ -196,7 +200,7 @@ export function ProcedureAuditPanel({
           subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
         />
 
-        <div className="overflow-x-auto">
+        <ScrollRegion ariaLabel="查檢表表頭資訊">
           <table className="qr-header-table mb-6 w-full min-w-[640px] border-collapse text-sm">
             <tbody>
               <tr>
@@ -284,22 +288,43 @@ export function ProcedureAuditPanel({
               </tr>
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted">
-            程序得分：<span className="text-lg font-bold text-primary">{formatScoreDisplay(score)}</span>
-            <span className="ml-3 text-xs">
-              未判定 {score.breakdown.pending}／共 {score.totalItems}
-            </span>
-          </p>
-          <Button variant="secondary" className="no-print" onClick={() => addChecklistItem(audit.id)}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <ScrollRegion ariaLabel="查檢判定計數統計表" className="min-w-0 flex-1">
+            <table className="stacked-table w-full min-w-[480px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-line bg-page text-left text-muted">
+                  <th className="p-2">程序得分</th>
+                  <th className="p-2">共幾項</th>
+                  <th className="p-2">符合</th>
+                  <th className="p-2">不符</th>
+                  <th className="p-2">觀察</th>
+                  <th className="p-2">不適用</th>
+                  <th className="p-2">未判定</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-label="程序得分" className="border border-line p-2 font-semibold text-primary">
+                    {formatScoreDisplay(score)}
+                  </td>
+                  <td data-label="共幾項" className="border border-line p-2">{score.totalItems}</td>
+                  <td data-label="符合" className="border border-line p-2">{score.breakdown.conform}</td>
+                  <td data-label="不符" className="border border-line p-2">{score.breakdown.nonConform}</td>
+                  <td data-label="觀察" className="border border-line p-2">{score.breakdown.observation}</td>
+                  <td data-label="不適用" className="border border-line p-2">{score.breakdown.notApplicable}</td>
+                  <td data-label="未判定" className="border border-line p-2">{score.breakdown.pending}</td>
+                </tr>
+              </tbody>
+            </table>
+          </ScrollRegion>
+          <Button variant="secondary" className="no-print shrink-0" onClick={() => addChecklistItem(audit.id)}>
             新增稽核項目
           </Button>
         </div>
 
-        <div className="overflow-x-auto">
-          <p className="mb-2 text-xs text-muted no-print">表格可左右滑動</p>
+        <ScrollRegion ariaLabel="查檢表項目清單">
           <table className="qr-checklist w-full border-collapse text-sm">
             <thead>
               <tr className="bg-page text-left text-muted">
@@ -430,8 +455,8 @@ export function ProcedureAuditPanel({
               })}
             </tbody>
           </table>
-        </div>
-      </Card>
+        </ScrollRegion>
+      </div>
     </div>
   )
 }

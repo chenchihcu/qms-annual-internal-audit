@@ -66,16 +66,28 @@ describe('App tab smoke', () => {
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
 
-  it('shows workflow guide and dashboard drill-down controls', async () => {
+  it('shows workflow guide gaps without purpose text and dashboard drill-down controls', async () => {
     render(<App />)
-    expect(document.querySelector('[data-workflow-guide="top"]')).toBeTruthy()
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /跨年待追蹤/ })).toBeTruthy()
-    })
-    fireEvent.click(screen.getByRole('button', { name: /跨年待追蹤/ }))
+    const guide = document.querySelector('[data-workflow-guide="top"]')
+    expect(guide).toBeTruthy()
+    expect(guide!.textContent).not.toMatch(/掌握年度 PDCA/)
+    expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
+    const metricsTable = await screen.findByRole('region', { name: '年度指標統計表' })
+    const priorObsRow = within(metricsTable).getByText('跨年待追蹤').closest('tr')
+    expect(priorObsRow).toBeTruthy()
+    fireEvent.click(within(priorObsRow as HTMLElement).getByRole('button', { name: '前往' }))
     await waitFor(() => {
       expect(screen.getByText(/前年度觀察事項/)).toBeTruthy()
     })
+  })
+
+  it('hides workflow guide on system settings when there are no gaps', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '評分與備份' })).toBeTruthy()
+    })
+    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 
   it('asks before clearing all data and keeps data when cancelled', async () => {

@@ -1,5 +1,5 @@
 import type { TabId } from '../types'
-import { TAB_ICONS, TAB_GROUP_ICONS, TAB_GROUP_KEYS, type IconName } from './uiIcons'
+import { TAB_ICONS, TAB_GROUP_ICONS, type IconName } from './uiIcons'
 
 export interface TabEntry {
   id: TabId
@@ -69,11 +69,6 @@ export const TAB_GROUPS: TabGroup[] = [
     tabs: [tab('system-settings', '系統設定', 'system-settings-form')],
   },
 ]
-
-export function tabGroupIcon(label: string): IconName {
-  const key = TAB_GROUP_KEYS[label]
-  return key ? TAB_GROUP_ICONS[key] : 'layoutDashboard'
-}
 
 export const ALL_TABS: TabEntry[] = TAB_GROUPS.flatMap((g) => g.tabs)
 
