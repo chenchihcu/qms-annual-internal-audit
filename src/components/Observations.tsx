@@ -156,10 +156,10 @@ export function Observations({ store }: { store: AuditStore }) {
                   <ul className="space-y-2 text-sm">
                     {priorObs.map((obs) => (
                       <li key={obs.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2">
-                        <span className="min-w-0 truncate">
+                        <span className="min-w-0">
                           <Badge label={`${obs.year}年`} />
                           <span className="ml-2 font-medium">{obs.qpCode} · {obs.department}</span>
-                          <span className="ml-2 text-slate-600">{obs.content}</span>
+                          <span className="ml-2 break-words text-slate-600">{obs.content}</span>
                           {obs.carriedToYear && (
                             <span className="ml-2 text-xs text-blue-600">已帶入 {obs.carriedToYear} 年</span>
                           )}

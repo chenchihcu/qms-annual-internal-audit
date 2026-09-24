@@ -248,8 +248,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     setPrepYearDraft(null)
   }
 
+  const activeCompany = state.companies[state.activeCompanyId]
   const mergedCoverage = buildMergedCertificateCoverage(
-    state.company,
+    activeCompany,
     settings.auditYear,
     settings.scoringRules,
   )

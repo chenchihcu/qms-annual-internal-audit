@@ -136,6 +136,7 @@ export function NCRList({ store }: { store: AuditStore }) {
                             onChange={(v) =>
                               updateNCR(ncr.id, { companyScope: v as NcrCompanyScope })
                             }
+                            ariaLabel={`${ncr.ncrNumber} 證書範圍`}
                             options={COMPANY_SCOPES.map((s) => ({
                               value: s,
                               label: NCR_COMPANY_SCOPE_LABELS[s],
@@ -158,6 +159,7 @@ export function NCRList({ store }: { store: AuditStore }) {
                           rows={2}
                           value={ncr.description}
                           onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
+                          aria-label={`${ncr.ncrNumber} 描述`}
                         />
                         <span className="print-only">{ncr.description}</span>
                       </td>
@@ -167,6 +169,7 @@ export function NCRList({ store }: { store: AuditStore }) {
                           className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
                           value={ncr.date}
                           onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
+                          aria-label={`${ncr.ncrNumber} 日期`}
                         />
                         <span className="print-only">{ncr.date}</span>
                       </td>
@@ -175,6 +178,7 @@ export function NCRList({ store }: { store: AuditStore }) {
                           <Select
                             value={ncr.status}
                             onChange={(v) => updateNCR(ncr.id, { status: v as NCRStatus })}
+                            ariaLabel={`${ncr.ncrNumber} 狀態`}
                             options={STATUSES.map((s) => ({ value: s, label: s }))}
                           />
                         </div>
