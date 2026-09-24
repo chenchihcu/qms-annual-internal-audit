@@ -95,7 +95,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
       <ConfirmDialog
         open={regenConfirm}
         title="自動編排年度計畫"
-        description="未手動鎖定（未標示 manualOverride）的計畫列，月格狀態將依風險與窗口重新計算。已手動調整的列會保留。"
+        description="未手動鎖定的計畫列，月格狀態將依風險與窗口重新計算。已手動調整的列會保留。"
         confirmLabel="重新編排"
         onConfirm={() => {
           regeneratePlan()
@@ -184,6 +184,13 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           subtitle={`主任稽核員：${settings.leadAuditor}`}
         />
 
+        <div className="print-only mb-4 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+          <p>計畫窗口：{settings.planWindowStart || '—'} ～ {settings.planWindowEnd || '—'}</p>
+          <p>年度起始：{settings.yearStart || '—'}</p>
+          <p>管理審查日期：{settings.managementReviewDate || '—'}</p>
+          <p>外部稽核日期：{settings.externalAuditDate || '—'}</p>
+        </div>
+
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">
           {MONTH_STATUS_LEGEND.map((l) => (
             <span key={l.label}>{l.label}</span>
@@ -223,7 +230,21 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                 >
                   <td className="border border-line p-2">{row.sequence}</td>
                   <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>
-                  <td className="border border-line p-2 font-medium">{row.qpCode}</td>
+                  <td className="border border-line p-2 font-medium">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span>{row.qpCode}</span>
+                      {unscheduled && (
+                        <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
+                          未排月格
+                        </span>
+                      )}
+                      {!unscheduled && row.manualOverride && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 no-print">
+                          已手動調整
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="border border-line p-2">{row.department}</td>
                   <td className="border border-line p-2">
                     <div>{row.process}</div>
@@ -245,6 +266,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                       className={`w-full rounded border border-line bg-surface px-1 py-0.5 text-sm no-print ${FOCUS_RING}`}
                       value={row.auditors}
                       onChange={(e) => updatePlanRow(row.id, { auditors: e.target.value })}
+                      aria-label={`${row.qpCode} ${row.department} 稽核人員`}
                     />
                     <span className="print-only">{row.auditors}</span>
                   </td>

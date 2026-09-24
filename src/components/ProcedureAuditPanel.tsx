@@ -79,7 +79,7 @@ export function ProcedureAuditPanel({
   }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
 
   if (!qpCode || !departmentId) {
-    return <p className="text-muted">請先於年度計畫建立程序稽核項目</p>
+    return <p className="text-muted">請先於年度稽核計畫建立查檢項目</p>
   }
 
   const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
@@ -151,12 +151,12 @@ export function ProcedureAuditPanel({
         onChange={(e) => onChange((e.target.value || null) as Judgment | null)}
         aria-label={label ?? '判定'}
       >
-        <option value="">—</option>
+        <option value="">未判定</option>
         {JUDGMENTS.map((j) => (
           <option key={j} value={j}>{j}</option>
         ))}
       </select>
-      <span className="print-only">{value && <Badge label={value} />}</span>
+      <span className="print-only">{value ? <Badge label={value} /> : '未判定'}</span>
     </div>
   )
 
@@ -357,12 +357,18 @@ export function ProcedureAuditPanel({
                     )}
                     <td className="border border-line p-2 align-top text-center">{item.no}</td>
                     <td className="border border-line p-2 align-top">
+                      {isChecklistItemPending(item) && (
+                        <span className="mb-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
+                          未判定
+                        </span>
+                      )}
                       <input
                         className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         value={item.content}
                         onChange={(e) =>
                           updateChecklistItem(audit.id, item.id, { content: e.target.value })
                         }
+                        aria-label={`${audit.qpCode} NO ${item.no} 稽核內容`}
                       />
                       <span className="print-only">{item.content}</span>
                       {item.as9100Clause && (

@@ -148,7 +148,7 @@ function App() {
                 選單
               </button>
               <div className="min-h-11 px-2 text-left">
-                <span className="block truncate text-sm font-medium text-ink">{headerScope}</span>
+                <span className="block truncate text-sm font-medium text-ink" title={headerScope}>{headerScope}</span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -193,7 +193,7 @@ function App() {
           </div>
         )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
-        <WorkflowGuide tab={tab} state={store.state} />
+        <WorkflowGuide tab={tab} state={store.state} onNavigate={setTab} />
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
