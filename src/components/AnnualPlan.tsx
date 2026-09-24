@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
 import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { evaluateDateSequence } from '../lib/coverage'
 import { FOCUS_RING } from '../lib/focusRing'
+import { buildAppHash } from '../lib/navigation'
+import { getDisplayMonthStatus } from '../lib/planStatus'
 import { cycleMonthStatus } from '../lib/planner'
-import { parseAuditYear } from '../lib/settingsYear'
+import { auditorCandidates, departmentMemberCandidates, resolveLeadAuditorPersonId } from '../lib/personnel'
+import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { MONTH_STATUS_LEGEND } from '../types'
 import type { MonthStatus } from '../types'
 import { Badge, Button, Input } from './ui/Badge'
@@ -37,61 +40,36 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
   const { settings, company } = state
   const dateWarnings = evaluateDateSequence(settings)
 
-  const [yearDraft, setYearDraft] = useState(String(settings.auditYear))
-  const [yearDialog, setYearDialog] = useState<{ open: boolean; newYear: number }>({
-    open: false,
-    newYear: settings.auditYear,
-  })
   const [regenConfirm, setRegenConfirm] = useState(false)
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptOwner = (departmentId: string) =>
     company.departments.find((d) => d.id === departmentId)?.owner ?? ''
 
-  useEffect(() => {
-    setYearDraft(String(settings.auditYear))
-  }, [settings.auditYear])
+  const leadAuditorName = useMemo(() => {
+    const personId = resolveLeadAuditorPersonId(
+      state.people,
+      state.activeCompanyId,
+      settings.auditYear,
+      state.annualPersonnelAssignments,
+      settings.planWindowEnd || `${settings.auditYear}-12-31`,
+    )
+    return state.people.find((person) => person.id === personId)?.name ?? '主任稽核員任命未完成'
+  }, [state.people, state.activeCompanyId, state.annualPersonnelAssignments, settings.auditYear, settings.planWindowEnd])
 
-  const requestYearChange = (raw: string) => {
-    setYearDraft(raw)
-    const n = parseAuditYear(raw)
-    if (n === null || n === settings.auditYear) return
-    setYearDialog({ open: true, newYear: n })
-  }
+  const externalAuditDate = state.externalAuditPrep.externalAuditDate ?? settings.externalAuditDate ?? ''
 
-  const revertInvalidYear = () => {
-    if (parseAuditYear(yearDraft) === null) {
-      setYearDraft(String(settings.auditYear))
-    }
-  }
+  const requiredStandards = useMemo(
+    () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards
+      .filter((standard) => standard.confirmationStatus === 'confirmed')
+      .map((standard) => `${standard.name}:${standard.version}`),
+    [state.companyAuditProfiles, state.activeCompanyId],
+  )
 
-  const confirmYearKeepPrep = () => {
-    updateSettings({ auditYear: yearDialog.newYear }, { resetExternalPrep: false })
-    setYearDialog({ open: false, newYear: yearDialog.newYear })
-  }
-
-  const confirmYearResetPrep = () => {
-    updateSettings({ auditYear: yearDialog.newYear }, { resetExternalPrep: true })
-    setYearDialog({ open: false, newYear: yearDialog.newYear })
-  }
-
-  const cancelYearChange = () => {
-    setYearDraft(String(settings.auditYear))
-    setYearDialog({ open: false, newYear: settings.auditYear })
-  }
+  const referenceDate = settings.planWindowEnd || `${settings.auditYear}-12-31`
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <ConfirmDialog
-        open={yearDialog.open}
-        title="變更稽核年度"
-        description={`將稽核年度改為 ${yearDialog.newYear} 年。預設會保留外部稽核準備清單的勾選與備註，僅更新年度標記。`}
-        confirmLabel="保留準備清單"
-        secondaryLabel="改為空白新年清單"
-        onConfirm={confirmYearKeepPrep}
-        onSecondary={confirmYearResetPrep}
-        onCancel={cancelYearChange}
-      />
       <ConfirmDialog
         open={regenConfirm}
         title="自動編排年度計畫"
@@ -126,24 +104,12 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           {MONTH_STATUS_LEGEND.map((l) => (
             <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
           ))}
-          <span className="text-muted">（點擊月格循環切換狀態）</span>
+          <span className="text-muted">（點擊月格切換排程；滿意／不滿意等由查檢與 NCR 推導）</span>
         </div>
 
         <details className="mb-6 no-print">
           <summary className="cursor-pointer text-sm font-medium text-ink">計畫窗口與日期設定</summary>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Input
-              label="稽核年度"
-              type="number"
-              value={yearDraft}
-              onChange={requestYearChange}
-              onBlur={revertInvalidYear}
-            />
-            <Input
-              label="主任稽核員"
-              value={settings.leadAuditor}
-              onChange={(v) => updateSettings({ leadAuditor: v })}
-            />
             <Input
               label="年度起始"
               type="date"
@@ -162,12 +128,15 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
               value={settings.planWindowEnd}
               onChange={(v) => updateSettings({ planWindowEnd: v })}
             />
-            <Input
-              label="外部稽核日期"
-              type="date"
-              value={settings.externalAuditDate ?? ''}
-              onChange={(v) => updateSettings({ externalAuditDate: v })}
-            />
+            <div>
+              <span className="mb-1 block text-sm font-medium text-ink">外部稽核日期</span>
+              <p className="text-sm text-muted">
+                {externalAuditDate || '尚未填寫'}
+                <a href={buildAppHash('prep')} className="ml-2 font-medium text-link hover:underline">
+                  至外稽準備編輯
+                </a>
+              </p>
+            </div>
             <Input
               label="管理審查日期"
               type="date"
@@ -181,14 +150,14 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           companyName={company.name}
           auditYear={settings.auditYear}
           formTitle="年度內部稽核計畫 QR-28-01"
-          subtitle={`主任稽核員：${settings.leadAuditor}`}
+          subtitle={`主任稽核員：${leadAuditorName}`}
         />
 
         <div className="print-only mb-4 grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
           <p>計畫窗口：{settings.planWindowStart || '—'} ～ {settings.planWindowEnd || '—'}</p>
           <p>年度起始：{settings.yearStart || '—'}</p>
           <p>管理審查日期：{settings.managementReviewDate || '—'}</p>
-          <p>外部稽核日期：{settings.externalAuditDate || '—'}</p>
+          <p>外部稽核日期：{externalAuditDate || '—'}</p>
         </div>
 
         <div className="print-only mb-2 flex flex-wrap justify-center gap-3 text-xs">
@@ -257,35 +226,53 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                       displayOwner={row.owner}
                       ariaLabel={`${row.qpCode} 負責人`}
                       onSaveRequest={ownerConfirm.requestChange}
+                      candidates={departmentMemberCandidates(
+                        state.people,
+                        state.activeCompanyId,
+                        row.departmentId,
+                        referenceDate,
+                      )}
                       inputClassName="px-1 py-0.5"
                     />
                   </td>
                   <td className="border border-line p-2 text-xs">{row.auditCategory}</td>
                   <td className="border border-line p-2">
-                    <input
-                      className={`w-full rounded border border-line bg-surface px-1 py-0.5 text-sm no-print ${FOCUS_RING}`}
+                    <AuditorMultiSelect
                       value={row.auditors}
-                      onChange={(e) => updatePlanRow(row.id, { auditors: e.target.value })}
-                      aria-label={`${row.qpCode} ${row.department} 稽核人員`}
+                      onChange={(auditors) => updatePlanRow(row.id, { auditors })}
+                      candidates={auditorCandidates(
+                        state.people,
+                        state.activeCompanyId,
+                        row.qpCode,
+                        row.departmentId,
+                        referenceDate,
+                        requiredStandards,
+                      )}
+                      people={state.people}
+                      compact
+                      ariaLabel={`${row.qpCode} ${row.department} 稽核人員`}
                     />
-                    <span className="print-only">{row.auditors}</span>
                   </td>
-                  {(Array.isArray(row.months) ? row.months : []).map((status, i) => (
+                  {(Array.isArray(row.months) ? row.months : []).map((scheduledStatus, i) => {
+                    const displayStatus = scheduledStatus
+                      ? getDisplayMonthStatus(row, i, company.audits, company.ncrs, settings.auditYear)
+                      : null
+                    return (
                     <td key={i} className="border border-line p-0.5 text-center">
                       <button
                         type="button"
-                        title={statusLabel(status)}
-                        aria-label={`${row.qpCode} ${i + 1} 月：${statusLabel(status)}`}
-                        className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(status)}`}
-                        onClick={() => setPlanMonthStatus(row.id, i, cycleMonthStatus(status))}
+                        title={`排程：${statusLabel(scheduledStatus)} · 顯示：${statusLabel(displayStatus)}`}
+                        aria-label={`${row.qpCode} ${i + 1} 月：${statusLabel(displayStatus)}`}
+                        className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(displayStatus)}`}
+                        onClick={() => setPlanMonthStatus(row.id, i, cycleMonthStatus(scheduledStatus))}
                       >
-                        {statusShort(status)}
+                        {statusShort(displayStatus)}
                       </button>
-                      <span className={`print-only inline-block h-6 w-6 text-xs leading-6 ${statusClass(status)}`}>
-                        {statusShort(status)}
+                      <span className={`print-only inline-block h-6 w-6 text-xs leading-6 ${statusClass(displayStatus)}`}>
+                        {statusShort(displayStatus)}
                       </span>
                     </td>
-                  ))}
+                  )})}
                 </tr>
               )})}
             </tbody>

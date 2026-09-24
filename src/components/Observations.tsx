@@ -1,10 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportObservationsExcel } from '../lib/formExport'
 import { MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
+import type { ObservationSection } from '../lib/navigation'
 import type { ObservationStatus } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
+import { departmentMemberCandidates } from '../lib/personnel'
+import { procedureQpSelectOptions } from '../lib/planRowOptions'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { PersonNameSelect } from './ui/PersonNameSelect'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
@@ -16,7 +20,15 @@ type YearFilter = 'all' | string
 type SourceFilter = 'all' | 'internal_audit' | 'third_party_audit' | 'checklist_unsynced'
 type StatusFilter = 'all' | ObservationStatus
 
-export function Observations({ store }: { store: AuditStore }) {
+export function Observations({
+  store,
+  section,
+  highlightRecordId,
+}: {
+  store: AuditStore
+  section?: ObservationSection
+  highlightRecordId?: string
+}) {
   const {
     state,
     updateObservation,
@@ -42,6 +54,29 @@ export function Observations({ store }: { store: AuditStore }) {
   const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [priorDetailsOpen, setPriorDetailsOpen] = useState(section === 'prior')
+  const [saveMessage, setSaveMessage] = useState(false)
+  const priorSectionRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (section === 'prior') {
+      setPriorDetailsOpen(true)
+      requestAnimationFrame(() => {
+        priorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    } else if (section === 'current') {
+      setYearFilter(String(currentYear))
+      setStatusFilter('open')
+    }
+  }, [section, currentYear])
+
+  useEffect(() => {
+    if (!highlightRecordId) return
+    setExpandedId(highlightRecordId)
+    requestAnimationFrame(() => {
+      document.getElementById(`observation-${highlightRecordId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [highlightRecordId])
   const allObservations = useMemo(() => [
     ...company.observations,
     ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.observations ?? []),
@@ -56,6 +91,18 @@ export function Observations({ store }: { store: AuditStore }) {
     ...company.audits,
     ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.audits ?? []),
   ], [company.audits, state.yearArchives, state.activeCompanyId, currentYear])
+
+  const procedureOptions = useMemo(
+    () => [{ value: '', label: '請選擇' }, ...procedureQpSelectOptions(company.planRows)],
+    [company.planRows],
+  )
+
+  const referenceDate = `${currentYear}-12-31`
+
+  const formOwnerCandidates = useMemo(
+    () => departmentMemberCandidates(state.people, state.activeCompanyId, form.departmentId, referenceDate),
+    [state.people, state.activeCompanyId, form.departmentId, referenceDate],
+  )
   const records = useMemo(() => allObservations.filter((item) =>
     (yearFilter === 'all' || item.year === Number(yearFilter)) &&
     (sourceFilter === 'all' || sourceFilter === 'checklist_unsynced' || (item.sourceType ?? 'internal_audit') === sourceFilter) &&
@@ -145,9 +192,9 @@ export function Observations({ store }: { store: AuditStore }) {
               匯入全部待追蹤項目
             </Button>
           </div>
-          <details className="mt-3">
+          <details className="mt-3" open={priorDetailsOpen} onToggle={(e) => setPriorDetailsOpen((e.target as HTMLDetailsElement).open)}>
             <summary className="cursor-pointer text-sm font-medium text-slate-800">逐筆帶入</summary>
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 space-y-4" ref={priorSectionRef}>
               <div>
                 <h3 className="mb-2 text-sm font-medium">前年度觀察事項（{priorObs.length}）</h3>
                 {priorObs.length === 0 ? (
@@ -215,6 +262,9 @@ export function Observations({ store }: { store: AuditStore }) {
             </>
           )}
         />
+        {saveMessage && !showForm && (
+          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+        )}
 
         <FilterChips
           options={yearFilterOptions}
@@ -274,7 +324,7 @@ export function Observations({ store }: { store: AuditStore }) {
                   const expanded = expandedId === item.id || editId === item.id
                   const sourceLabel = (item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'
                   return (
-                    <div key={item.id} className="rounded-lg border border-slate-200">
+                    <div key={item.id} id={`observation-${item.id}`} className="rounded-lg border border-slate-200">
                       <div
                         className={`flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between ${expanded ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}
                       >
@@ -356,7 +406,17 @@ export function Observations({ store }: { store: AuditStore }) {
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <Input label="觀察事項" value={editDraft.content} onChange={(value) => setEditDraft({ ...editDraft, content: value })} />
                                 <Input label="處理要求／說明" value={editDraft.description} onChange={(value) => setEditDraft({ ...editDraft, description: value })} />
-                                <Input label="責任人" value={editDraft.owner} onChange={(value) => setEditDraft({ ...editDraft, owner: value })} />
+                                <PersonNameSelect
+                                  label="責任人"
+                                  value={editDraft.owner}
+                                  onChange={(value) => setEditDraft({ ...editDraft, owner: value })}
+                                  candidates={departmentMemberCandidates(
+                                    state.people,
+                                    state.activeCompanyId,
+                                    item.departmentId,
+                                    `${item.year}-12-31`,
+                                  )}
+                                />
                                 <Input label="預定完成日" type="date" value={editDraft.dueDate} onChange={(value) => setEditDraft({ ...editDraft, dueDate: value })} />
                                 <Input label="結案日期" type="date" value={editDraft.closedAt} onChange={(value) => setEditDraft({ ...editDraft, closedAt: value })} />
                                 <Input label="結案證據／紀錄" value={editDraft.closeEvidence} onChange={(value) => setEditDraft({ ...editDraft, closeEvidence: value })} />
@@ -397,16 +457,21 @@ export function Observations({ store }: { store: AuditStore }) {
             {form.sourceType === 'internal_audit' && <Select label="內部稽核事件" value={form.sourceAuditId} onChange={(value) => { const audit = auditEvents.find((item) => item.id === value); setForm({ ...form, sourceAuditId: value, sourceReference: audit?.reportReference || value, occurrenceDate: audit?.auditDate || audit?.plannedDate || '', qpCode: audit?.qpCode || '', departmentId: audit?.departmentId || form.departmentId }) }} options={[{ value: '', label: '請選擇事件' }, ...auditEvents.map((audit) => ({ value: audit.id, label: `${audit.year ?? currentYear} · ${audit.qpCode} · ${audit.department} · ${audit.auditDate || audit.plannedDate || '日期待確認'}` }))]} />}
             <Input label="來源事件／報告編號" value={form.sourceReference} onChange={(value) => setForm({ ...form, sourceReference: value })} />
             <Input label="發生日" type="date" value={form.occurrenceDate} onChange={(value) => setForm({ ...form, occurrenceDate: value })} />
-            <Input label="程序 QP" value={form.qpCode} onChange={(value) => setForm({ ...form, qpCode: value })} />
+            <Select label="程序 QP" value={form.qpCode} onChange={(value) => setForm({ ...form, qpCode: value })} options={procedureOptions} />
             <Select label="責任單位" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={company.departments.map((department) => ({ value: department.id, label: department.name }))} />
-            <Input label="責任人" value={form.owner} onChange={(value) => setForm({ ...form, owner: value })} />
+            <PersonNameSelect
+              label="責任人"
+              value={form.owner}
+              onChange={(value) => setForm({ ...form, owner: value })}
+              candidates={formOwnerCandidates}
+            />
             <Input label="觀察事項" value={form.content} onChange={(value) => setForm({ ...form, content: value })} />
             <Input label="處理要求／說明" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
             <Input label="預定完成日" type="date" value={form.dueDate} onChange={(value) => setForm({ ...form, dueDate: value })} />
           </div>
           {form.occurrenceDate && Number(form.occurrenceDate.slice(0, 4)) !== currentYear && <p className="mt-2 text-sm text-amber-700">請先切換至 {form.occurrenceDate.slice(0, 4)} 年度，再登錄該年度紀錄。</p>}
           <div className="mt-4 flex gap-2">
-            <Button disabled={!form.content.trim() || !form.sourceReference.trim() || !form.occurrenceDate || Number(form.occurrenceDate.slice(0, 4)) !== currentYear || (form.sourceType === 'internal_audit' && !form.sourceAuditId)} onClick={() => { const department = company.departments.find((item) => item.id === form.departmentId); addObservation({ year: currentYear, qpCode: form.qpCode || '待確認', departmentId: form.departmentId, department: department?.name ?? '待確認', process: '', content: form.content, description: form.description, status: 'open', sourceType: form.sourceType, sourceAuditId: form.sourceAuditId || undefined, sourceReference: form.sourceReference, occurrenceDate: form.occurrenceDate, owner: form.owner, dueDate: form.dueDate, followUps: [] }); setShowForm(false); setForm({ ...form, sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', content: '', description: '', owner: '', dueDate: '' }) }}>儲存紀錄</Button>
+            <Button disabled={!form.content.trim() || !form.sourceReference.trim() || !form.occurrenceDate || Number(form.occurrenceDate.slice(0, 4)) !== currentYear || (form.sourceType === 'internal_audit' && !form.sourceAuditId)} onClick={() => { const department = company.departments.find((item) => item.id === form.departmentId); addObservation({ year: currentYear, qpCode: form.qpCode || '待確認', departmentId: form.departmentId, department: department?.name ?? '待確認', process: '', content: form.content, description: form.description, status: 'open', sourceType: form.sourceType, sourceAuditId: form.sourceAuditId || undefined, sourceReference: form.sourceReference, occurrenceDate: form.occurrenceDate, owner: form.owner, dueDate: form.dueDate, followUps: [] }); setShowForm(false); setSaveMessage(true); setForm({ ...form, sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', content: '', description: '', owner: '', dueDate: '' }) }}>儲存紀錄</Button>
             <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
           </div>
         </Card>

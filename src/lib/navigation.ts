@@ -272,6 +272,7 @@ export type ObservationSection = 'current' | 'prior'
 export interface NavigateOptions {
   auditKey?: string
   section?: ObservationSection
+  recordId?: string
 }
 
 export function isValidObservationSection(value: string): value is ObservationSection {
@@ -282,6 +283,7 @@ export interface HashState {
   tab: TabId
   auditKey?: string
   section?: ObservationSection
+  recordId?: string
 }
 
 export function parseAppHash(hash: string): HashState {
@@ -295,7 +297,8 @@ export function parseAppHash(hash: string): HashState {
   const sectionRaw = params.get('section')
   const section =
     sectionRaw && isValidObservationSection(sectionRaw) ? sectionRaw : undefined
-  return { tab, auditKey, section }
+  const recordId = params.get('record') ?? undefined
+  return { tab, auditKey, section, recordId }
 }
 
 export function buildAppHash(tab: TabId, options?: NavigateOptions | string): string {
@@ -308,6 +311,10 @@ export function buildAppHash(tab: TabId, options?: NavigateOptions | string): st
   }
   if (tab === 'observations' && resolved?.section) {
     params.set('section', resolved.section)
+  }
+  const recordTabs: TabId[] = ['ncr', 'observations', 'suggestions', 'followups']
+  if (resolved?.recordId && recordTabs.includes(tab)) {
+    params.set('record', resolved.recordId)
   }
   return `#${params.toString()}`
 }

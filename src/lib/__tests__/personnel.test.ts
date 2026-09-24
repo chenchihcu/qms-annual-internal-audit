@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Person, QualificationRecord } from '../../types'
 import {
+  auditorCandidates,
+  departmentMemberCandidates,
   formatScopeList,
   QUALIFICATION_SCOPE_ALL,
   qualificationState,
   scopeIncludes,
   validateAuditTeam,
+  verifierCandidates,
 } from '../personnel'
 
 const qualification = (patch: Partial<QualificationRecord> = {}): QualificationRecord => ({
@@ -109,5 +112,44 @@ describe('personnel qualification validation', () => {
     expect(formatScopeList([], '全部程序')).toBe('範圍待確認')
     expect(formatScopeList([QUALIFICATION_SCOPE_ALL], '全部程序')).toBe('全部程序')
     expect(formatScopeList(['QP-28', 'QP-01'], '全部程序')).toBe('QP-28、QP-01')
+  })
+
+  it('lists auditor candidates by effective qualification scope', () => {
+    expect(auditorCandidates([person], 'jiurun', 'QP-28', 'dept-qa', '2026-06-01').map((p) => p.id)).toEqual(['p1'])
+    expect(auditorCandidates([person], 'jiurun', 'QP-01', 'dept-qa', '2026-06-01')).toHaveLength(0)
+  })
+
+  it('lists department members by affiliation', () => {
+    const deptMember = {
+      ...person,
+      id: 'p2',
+      name: '部門員工',
+      affiliations: [{ id: 'a2', companyId: 'jiurun' as const, departmentId: 'dept-qa' }],
+    }
+    const members = departmentMemberCandidates([person, deptMember], 'jiurun', 'dept-qa', '2026-06-01')
+    expect(members.map((p) => p.id)).toEqual(['p2'])
+  })
+
+  it('lists verifier candidates from lead auditor and management representative', () => {
+    const lead = {
+      ...person,
+      appointments: [{
+        id: 'lead-app',
+        role: 'internal_lead_auditor' as const,
+        companyId: 'jiurun' as const,
+        documentReference: 'LA-001',
+        scope: '年度內部稽核',
+        effectiveFrom: '2026-01-01',
+      }],
+    }
+    const mgr = {
+      ...person,
+      id: 'p2',
+      name: '管理代表甲',
+      appointments: [],
+      qualifications: [qualification({ role: 'management_representative' })],
+    }
+    const verifiers = verifierCandidates([lead, mgr], 'jiurun', 2026, [], '2026-06-01')
+    expect(verifiers.map((p) => p.name)).toEqual(['管理代表甲', '稽核員甲'])
   })
 })

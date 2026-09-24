@@ -1,9 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { buildAppHash } from '../lib/navigation'
-import { calculateRiskLevel, RISK_BANDS, suggestRiskBump } from '../lib/risk'
-import { scoreProcedureAudit } from '../lib/scoring'
-import { Badge } from './ui/Badge'
+import {
+  calculateProcedurePriority,
+  cycleFactorScale,
+  factorKind,
+  factorNames,
+  formatFactorLabel,
+  inherentScaleFromSeed,
+  parseRiskInputValue,
+  PROCEDURE_RISK_WEIGHTS,
+} from '../lib/risk'
+import type { ProcedurePriorityInput } from '../lib/risk'
+import type { PlanRow, ProcedureRiskRecord } from '../types'
+import { Badge, Button, Input } from './ui/Badge'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
@@ -11,150 +20,275 @@ import { ScrollRegion } from './ui/ScrollRegion'
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
 
-export function RiskAssessment({ store }: { store: AuditStore }) {
-  const { state, updateDepartment } = store
-  const { company, settings } = state
-  const [riskDrafts, setRiskDrafts] = useState<Record<string, string>>({})
-  const [riskErrors, setRiskErrors] = useState<Record<string, string>>({})
-  const taggedDepartments = company.departments.filter((dept) => dept.stakeholders.length > 0).length
+const OPTIONAL_FACTORS: Array<keyof ProcedurePriorityInput> = [
+  'previousInternalNcrCount',
+  'previousThirdPartyNcrCount',
+  'overdueOpenNcrCount',
+  'customerComplaintLevel',
+  'changeImpact',
+  'monthsSinceLastAudit',
+]
 
-  const updateRiskValue = (departmentId: string, field: 'riskOccurrence' | 'riskSeverity', raw: string) => {
-    const key = `${departmentId}:${field}`
-    setRiskDrafts((drafts) => ({ ...drafts, [key]: raw }))
-    const value = Number(raw)
-    if (!raw || !Number.isInteger(value) || value < 1 || value > 5) {
-      setRiskErrors((errors) => ({ ...errors, [key]: '請輸入 1 至 5 的整數。' }))
-      return
+function rowKey(row: PlanRow): string {
+  return `${row.qpCode}|${row.departmentId}`
+}
+
+function savedRecord(
+  company: AuditStore['state']['company'],
+  row: PlanRow,
+): ProcedureRiskRecord | undefined {
+  return company.procedureRisks?.find(
+    (item) => item.qpCode === row.qpCode && item.departmentId === row.departmentId,
+  )
+}
+
+function isPersisted(saved: ProcedureRiskRecord | undefined): boolean {
+  return Boolean(saved && saved.inherentRisk >= 1 && saved.updatedAt)
+}
+
+type RowDraft = {
+  inherentRisk: string
+  evidenceReference: string
+  optional: Partial<Record<keyof ProcedurePriorityInput, string>>
+}
+
+function draftFromSaved(row: PlanRow, saved?: ProcedureRiskRecord): RowDraft {
+  const optional: Partial<Record<keyof ProcedurePriorityInput, string>> = {}
+  for (const key of OPTIONAL_FACTORS) {
+    const value = saved?.[key]
+    optional[key] = value == null ? '' : String(value)
+  }
+  return {
+    inherentRisk: saved ? String(saved.inherentRisk) : String(inherentScaleFromSeed(row.riskLevel)),
+    evidenceReference: saved?.evidenceReference ?? '',
+    optional,
+  }
+}
+
+function draftToPatch(draft: RowDraft): Partial<ProcedureRiskRecord> | null {
+  const inherent = parseRiskInputValue(draft.inherentRisk)
+  if (inherent == null) return null
+  const patch: Partial<ProcedureRiskRecord> = {
+    inherentRisk: inherent,
+    evidenceReference: draft.evidenceReference.trim(),
+  }
+  for (const key of OPTIONAL_FACTORS) {
+    const raw = draft.optional[key]?.trim() ?? ''
+    if (raw === '') {
+      patch[key] = undefined
+    } else {
+      const parsed = parseRiskInputValue(raw)
+      if (parsed == null) return null
+      patch[key] = parsed
     }
-    updateDepartment(departmentId, { [field]: value })
-    setRiskDrafts((drafts) => {
-      const next = { ...drafts }
-      delete next[key]
-      return next
-    })
-    setRiskErrors((errors) => {
-      const next = { ...errors }
+  }
+  return patch
+}
+
+export function RiskAssessment({ store }: { store: AuditStore }) {
+  const { state, updateProcedureRisk } = store
+  const { company, settings } = state
+  const [drafts, setDrafts] = useState<Record<string, RowDraft>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [savedFlash, setSavedFlash] = useState<Record<string, boolean>>({})
+
+  const getDraft = useCallback(
+    (row: PlanRow): RowDraft => {
+      const key = rowKey(row)
+      if (drafts[key]) return drafts[key]
+      return draftFromSaved(row, savedRecord(company, row))
+    },
+    [company, drafts],
+  )
+
+  const setDraftField = (row: PlanRow, patch: Partial<RowDraft>) => {
+    const key = rowKey(row)
+    setDrafts((prev) => ({
+      ...prev,
+      [key]: { ...getDraft(row), ...patch },
+    }))
+    setErrors((prev) => {
+      const next = { ...prev }
       delete next[key]
       return next
     })
   }
 
-  const deptStats = useMemo(() => {
-    return company.departments.map((dept) => {
-      const deptAudits = company.audits.filter((a) => a.departmentId === dept.id)
-      const scored = deptAudits.filter(
-        (a) => scoreProcedureAudit(a, settings.scoringRules).status === 'scored',
-      )
-      const scores = scored.map((a) => scoreProcedureAudit(a, settings.scoringRules).score ?? 0)
-      const score = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null
-      const ncrCount = company.ncrs.filter(
-        (n) => n.departmentId === dept.id && n.status !== '結案',
-      ).length
-      const suggested = suggestRiskBump(dept.riskOccurrence, ncrCount, score ?? 100)
-      return { dept, score, ncrCount, suggested }
+  const cycleFactor = (row: PlanRow, field: keyof ProcedurePriorityInput) => {
+    const draft = getDraft(row)
+    const saved = savedRecord(company, row)
+    const currentRaw = field === 'inherentRisk'
+      ? draft.inherentRisk
+      : draft.optional[field] ?? ''
+    const current = currentRaw === '' ? undefined : Number(currentRaw)
+    const required = field === 'inherentRisk'
+    const next = cycleFactorScale(field, current, required)
+    if (field === 'inherentRisk') {
+      setDraftField(row, { inherentRisk: next == null ? '' : String(next) })
+    } else {
+      setDraftField(row, {
+        optional: { ...draft.optional, [field]: next == null ? '' : String(next) },
+      })
+    }
+    if (saved && field !== 'inherentRisk') {
+      const kind = factorKind(field)
+      if (kind === 'band' || kind === 'months' || kind === 'count') {
+        // keep draft only
+      }
+    }
+  }
+
+  const saveRow = (row: PlanRow) => {
+    const key = rowKey(row)
+    const patch = draftToPatch(getDraft(row))
+    if (!patch) {
+      setErrors((prev) => ({ ...prev, [key]: '固有風險須為 1 至 5；其餘因素若填寫亦須為 1 至 5。' }))
+      return
+    }
+    updateProcedureRisk(row.qpCode, row.departmentId, patch)
+    setDrafts((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
     })
-  }, [company.departments, company.audits, company.ncrs, settings.scoringRules])
+    setSavedFlash((prev) => ({ ...prev, [key]: true }))
+    setTimeout(() => {
+      setSavedFlash((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
+    }, 2000)
+  }
+
+  const rows = useMemo(() => company.planRows, [company.planRows])
 
   return (
     <div className="space-y-6 print-area">
       <PrintDocHeader
         companyName={company.name}
         auditYear={settings.auditYear}
-        formTitle="風險指標評估 QR-02-01"
+        formTitle="程序風險評估 QR-02-01"
       />
 
       <div>
-        <PageToolbar
-          title="方案風險"
-          meta={(
-            <span className="block">
-              風險指數 = 發生度 O × 嚴重度 S（各 1–5 分）· 高 {RISK_BANDS.high.min}–{RISK_BANDS.high.max} · 中 {RISK_BANDS.medium.min}–{RISK_BANDS.medium.max} · 低 {RISK_BANDS.low.min}–{RISK_BANDS.low.max}
-            </span>
-          )}
-        />
+        <PageToolbar title="方案風險" />
 
-        <ScrollRegion ariaLabel="部門風險評估表格">
-          <table className="stacked-table w-full border-collapse text-sm">
+        <ScrollRegion ariaLabel="程序風險評估表格">
+          <table className="stacked-table w-full min-w-[960px] border-collapse text-sm">
             <thead>
               <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2">部門／負責人</th>
-                <th className="border border-line p-2 w-24">發生度 O</th>
-                <th className="border border-line p-2 w-24">嚴重度 S</th>
-                <th className="border border-line p-2 w-20">指數</th>
-                <th className="border border-line p-2 w-20">等級</th>
-                <th className="border border-line p-2 w-24">平均分</th>
-                <th className="border border-line p-2 w-24">未結 NCR</th>
-                <th className="border border-line p-2">建議 O</th>
+                <th className="border border-line p-2">QP · 部門</th>
+                <th className="border border-line p-2">固有風險</th>
+                <th className="border border-line p-2">優先分</th>
+                <th className="border border-line p-2">等級</th>
+                <th className="border border-line p-2">暫定</th>
+                <th className="border border-line p-2">證據引用</th>
+                <th className="border border-line p-2 no-print">操作</th>
               </tr>
             </thead>
             <tbody>
-              {deptStats.length === 0 && (
-                <tr><td colSpan={8} className="border border-line p-4 text-center text-muted">尚無部門資料</td></tr>
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="border border-line p-4 text-center text-muted">
+                    尚無年度計畫列
+                  </td>
+                </tr>
               )}
-              {deptStats.map(({ dept, score, ncrCount, suggested }) => {
-                const { index, level } = calculateRiskLevel(
-                  dept.riskOccurrence,
-                  dept.riskSeverity,
-                )
+              {rows.map((row) => {
+                const key = rowKey(row)
+                const draft = getDraft(row)
+                const saved = savedRecord(company, row)
+                const persisted = isPersisted(saved)
+                const inherent = parseRiskInputValue(draft.inherentRisk)
+                const priorityInput: ProcedurePriorityInput = {
+                  inherentRisk: inherent ?? inherentScaleFromSeed(row.riskLevel),
+                }
+                for (const factor of OPTIONAL_FACTORS) {
+                  const raw = draft.optional[factor]?.trim()
+                  if (raw) {
+                    const parsed = parseRiskInputValue(raw)
+                    if (parsed != null) priorityInput[factor] = parsed
+                  }
+                }
+                const priority = calculateProcedurePriority(priorityInput)
+                const dirty = persisted
+                  ? JSON.stringify(draft) !== JSON.stringify(draftFromSaved(row, saved))
+                  : true
+
                 return (
-                  <tr key={dept.id}>
-                    <td data-label="部門／負責人" className="border border-line p-2">
-                      <div className="font-medium text-ink">{dept.name}</div>
-                      <div className="text-xs text-muted">{dept.owner}</div>
-                    </td>
-                    <td data-label="發生度 O" className="border border-line p-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        step={1}
-                        className={`min-h-11 w-20 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
-                        value={riskDrafts[`${dept.id}:riskOccurrence`] ?? dept.riskOccurrence}
-                        aria-label={`${dept.name} 發生度 O（1 至 5）`}
-                        aria-invalid={Boolean(riskErrors[`${dept.id}:riskOccurrence`])}
-                        aria-describedby={riskErrors[`${dept.id}:riskOccurrence`] ? `${dept.id}-risk-occurrence-error` : undefined}
-                        onChange={(e) => updateRiskValue(dept.id, 'riskOccurrence', e.target.value)}
-                      />
-                      {riskErrors[`${dept.id}:riskOccurrence`] && <p id={`${dept.id}-risk-occurrence-error`} className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{riskErrors[`${dept.id}:riskOccurrence`]}</p>}
-                    </td>
-                    <td data-label="嚴重度 S" className="border border-line p-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        step={1}
-                        className={`min-h-11 w-20 rounded border border-line bg-surface px-2 py-1 ${FOCUS_RING}`}
-                        value={riskDrafts[`${dept.id}:riskSeverity`] ?? dept.riskSeverity}
-                        aria-label={`${dept.name} 嚴重度 S（1 至 5）`}
-                        aria-invalid={Boolean(riskErrors[`${dept.id}:riskSeverity`])}
-                        aria-describedby={riskErrors[`${dept.id}:riskSeverity`] ? `${dept.id}-risk-severity-error` : undefined}
-                        onChange={(e) => updateRiskValue(dept.id, 'riskSeverity', e.target.value)}
-                      />
-                      {riskErrors[`${dept.id}:riskSeverity`] && <p id={`${dept.id}-risk-severity-error`} className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{riskErrors[`${dept.id}:riskSeverity`]}</p>}
-                    </td>
-                    <td data-label="風險指數" className="border border-line p-2 text-center font-semibold text-ink">{index}</td>
-                    <td data-label="風險等級" className="border border-line p-2"><Badge label={level} /></td>
-                    <td data-label="平均分" className="border border-line p-2 text-ink">
-                      {score !== null ? `${Math.round(score)}%` : '未評'}
-                    </td>
-                    <td data-label="未結 NCR" className="border border-line p-2 text-ink">{ncrCount}</td>
-                    <td data-label="建議 O" className="border border-line p-2">
-                      <div className="flex items-center gap-2">
-                        <span className={suggested > dept.riskOccurrence ? 'font-bold text-red-600 dark:text-red-400' : ''}>
-                          {suggested}
+                  <tr key={key} className={!persisted ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                    <td data-label="QP · 部門" className="border border-line p-2 align-top">
+                      <div className="font-medium text-ink">{row.qpCode}</div>
+                      <div className="text-xs text-muted">{row.department}</div>
+                      {!persisted && (
+                        <span className="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 no-print">
+                          未存檔
                         </span>
-                        {suggested > dept.riskOccurrence && (
-                          <button
-                            type="button"
-                            className={`min-h-11 px-2 text-xs text-link hover:underline ${FOCUS_RING}`}
-                            onClick={() =>
-                              updateDepartment(dept.id, { riskOccurrence: suggested })
-                            }
-                          >
-                            採用
-                          </button>
-                        )}
+                      )}
+                    </td>
+                    <td data-label="固有風險" className="border border-line p-2 align-top">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className={`min-h-9 rounded border border-line px-2 text-xs font-medium no-print ${FOCUS_RING}`}
+                          onClick={() => cycleFactor(row, 'inherentRisk')}
+                          aria-label={`${row.qpCode} 固有風險`}
+                        >
+                          {formatFactorLabel('inherentRisk', inherent ?? undefined)}
+                        </button>
+                        <span className="print-only">{formatFactorLabel('inherentRisk', inherent ?? undefined)}</span>
+                        <span className="text-xs text-muted">({draft.inherentRisk || '—'})</span>
                       </div>
+                      <details className="mt-2 no-print">
+                        <summary className="cursor-pointer text-xs text-link">其他因素（可暫定）</summary>
+                        <ul className="mt-1 space-y-1 text-xs">
+                          {OPTIONAL_FACTORS.map((field) => (
+                            <li key={field} className="flex flex-wrap items-center gap-2">
+                              <span className="min-w-[8rem] text-muted">{factorNames[field]}</span>
+                              <button
+                                type="button"
+                                className={`rounded border border-line px-1.5 py-0.5 ${FOCUS_RING}`}
+                                onClick={() => cycleFactor(row, field)}
+                              >
+                                {formatFactorLabel(field, parseRiskInputValue(draft.optional[field] ?? '') ?? undefined)}
+                              </button>
+                              <span className="text-muted">
+                                {PROCEDURE_RISK_WEIGHTS[field]}%
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </td>
+                    <td data-label="優先分" className="border border-line p-2 align-top font-semibold">
+                      {priority.score}
+                    </td>
+                    <td data-label="等級" className="border border-line p-2 align-top">
+                      <Badge label={priority.level} />
+                    </td>
+                    <td data-label="暫定" className="border border-line p-2 align-top text-xs">
+                      {priority.provisional ? '是' : '否'}
+                    </td>
+                    <td data-label="證據引用" className="border border-line p-2 align-top">
+                      <Input
+                        value={draft.evidenceReference}
+                        onChange={(value) => setDraftField(row, { evidenceReference: value })}
+                        className="no-print min-w-[8rem]"
+                        ariaLabel={`${row.qpCode} 證據引用`}
+                      />
+                      <span className="print-only">{draft.evidenceReference || '—'}</span>
+                    </td>
+                    <td data-label="操作" className="border border-line p-2 align-top no-print">
+                      {errors[key] && (
+                        <p className="mb-1 text-xs font-medium text-red-700" role="alert">{errors[key]}</p>
+                      )}
+                      <Button
+                        onClick={() => saveRow(row)}
+                        disabled={!dirty && persisted}
+                      >
+                        {savedFlash[key] ? '已存檔' : '存檔'}
+                      </Button>
                     </td>
                   </tr>
                 )
@@ -162,20 +296,6 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
-      </div>
-
-      <div className="no-print rounded-lg border border-line bg-surface p-4">
-        <p className="text-sm text-ink">
-          利害關係人已標註{' '}
-          <span className="font-semibold">{taggedDepartments}/{company.departments.length}</span>{' '}
-          部門（{company.name}）
-        </p>
-        <a
-          href={buildAppHash('stakeholders')}
-          className="mt-2 inline-block text-sm font-medium text-link hover:underline"
-        >
-          至利害關係人編輯
-        </a>
       </div>
     </div>
   )

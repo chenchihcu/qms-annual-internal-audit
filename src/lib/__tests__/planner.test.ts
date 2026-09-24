@@ -87,7 +87,8 @@ describe('calculateDepartmentPriority', () => {
 describe('cycleMonthStatus', () => {
   it('cycles through legend states', () => {
     expect(cycleMonthStatus(null)).toBe('擬定')
-    expect(cycleMonthStatus('擬定')).toBe('滿意')
+    expect(cycleMonthStatus('擬定')).toBe(null)
+    expect(cycleMonthStatus('滿意')).toBe(null)
     expect(cycleMonthStatus('矯正圓滿')).toBe(null)
   })
 })

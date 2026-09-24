@@ -40,7 +40,13 @@ import { isSeedChecklistItem } from '../lib/checklistItem'
 import { parseBackupJson, serializeBackup } from '../lib/backup'
 import { autoArrangePlan } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
-import { collectNCRsFromAudits, generateNCRNumber, normalizeNCR, syncNCRDescriptions } from '../lib/ncr'
+import {
+  canTransitionNcrStatus,
+  collectNCRsFromAudits,
+  generateNCRNumber,
+  normalizeNCR,
+  syncNCRDescriptions,
+} from '../lib/ncr'
 import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
@@ -270,9 +276,11 @@ function validateAuditStartState(state: AppState, audit: ProcedureAudit) {
   const errors = [...result.errors]
   if (!audit.auditDate) errors.unshift('開始稽核前須填寫實際實施日期')
   if (standards.length === 0) errors.unshift('公司適用標準與版本尚未確認')
-  if (!profile.auditProcedureCode.trim()) errors.unshift('稽核程序代碼尚未確認')
-  if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') errors.unshift('稽核程序版本尚未確認')
-  if (!profile.formalRecordLocation.trim()) errors.unshift('正式紀錄保存位置尚未確認')
+  if (!profile.auditProcedureCode.trim()) errors.unshift('稽核程序代碼尚未填寫')
+  if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') {
+    errors.unshift('稽核程序版本仍為待確認')
+  }
+  if (!profile.formalRecordLocation.trim()) errors.unshift('正式紀錄保存位置尚未填寫')
   return {
     ...result,
     canStart: errors.length === 0,
@@ -286,17 +294,42 @@ function validateAuditStartState(state: AppState, audit: ProcedureAudit) {
 
 function syncObservationsFromAudits(audits: ProcedureAudit[], existing: Observation[], year: number): Observation[] {
   const result = [...existing]
+  const hasObservation = (id: string, checklistItemId: string) =>
+    result.some((observation) => observation.id === id || observation.sourceChecklistItemId === checklistItemId)
+
   audits.forEach((audit) => audit.items.forEach((item) => {
+    const scope = item.certificateScope ?? 'shared'
+    const base = {
+      year: audit.year ?? year,
+      qpCode: audit.qpCode,
+      departmentId: audit.departmentId,
+      department: audit.department,
+      process: audit.process,
+      content: item.content,
+      description: item.description,
+      status: 'open' as const,
+      sourceType: 'internal_audit' as const,
+      sourceAuditId: audit.id,
+      sourceChecklistItemId: item.id,
+      sourceReference: audit.reportReference ?? audit.id,
+      occurrenceDate: audit.auditDate || audit.plannedDate || '',
+      followUps: [] as Observation['followUps'],
+    }
+
+    if (scope === 'dual' && item.judgmentByCompany) {
+      for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
+        if (item.judgmentByCompany[side] !== '觀察') continue
+        const id = `observation-${item.id}-${side}`
+        if (hasObservation(id, item.id)) continue
+        result.push({ ...base, id, companySide: side })
+      }
+      return
+    }
+
     if (item.judgment !== '觀察') return
     const id = `observation-${item.id}`
-    if (result.some((observation) => observation.id === id || observation.sourceChecklistItemId === item.id)) return
-    result.push({
-      id, year: audit.year ?? year, qpCode: audit.qpCode, departmentId: audit.departmentId,
-      department: audit.department, process: audit.process, content: item.content,
-      description: item.description, status: 'open', sourceType: 'internal_audit', sourceAuditId: audit.id,
-      sourceChecklistItemId: item.id, sourceReference: audit.reportReference ?? audit.id,
-      occurrenceDate: audit.auditDate || audit.plannedDate || '', followUps: [],
-    })
+    if (hasObservation(id, item.id)) return
+    result.push({ ...base, id })
   }))
   return result
 }
@@ -743,19 +776,23 @@ export function useAuditStore() {
     [],
   )
 
-  const updateNCR = useCallback((id: string, patch: Partial<NCR>) => {
+  const updateNCR = useCallback((id: string, patch: Partial<NCR>): { ok: boolean; missing?: string[] } => {
+    const co = state.companies[state.activeCompanyId]
+    const current = co.ncrs.find((n) => n.id === id)
+    if (!current) return { ok: false, missing: ['找不到 NCR'] }
+    const next = { ...current, ...patch }
+    if (patch.status === '結案') {
+      const gate = canTransitionNcrStatus(next, '結案')
+      if (!gate.ok) return { ok: false, missing: gate.missing }
+    }
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const company = s.companies[s.activeCompanyId]
       return patchCompany(s, s.activeCompanyId, {
-        ncrs: co.ncrs.map((n) => {
-          if (n.id !== id) return n
-          const next = { ...n, ...patch }
-          if (next.status === '結案' && (!next.correctiveActionReference || !next.effectivenessReference || !next.effectivenessVerifiedBy || !next.effectivenessVerifiedAt)) return n
-          return next
-        }),
+        ncrs: company.ncrs.map((n) => (n.id === id ? next : n)),
       })
     })
-  }, [])
+    return { ok: true }
+  }, [state])
 
   const updateObservation = useCallback((id: string, patch: Partial<Observation>) => {
     setState((s) => {
@@ -989,7 +1026,16 @@ export function useAuditStore() {
         if (externalAuditDate !== undefined) {
           prep.externalAuditDate = externalAuditDate
         }
-        return { ...s, externalAuditPrep: prep }
+        const companySettings = { ...s.companySettings }
+        if (externalAuditDate !== undefined) {
+          for (const companyId of Object.keys(companySettings) as CompanyId[]) {
+            companySettings[companyId] = {
+              ...companySettings[companyId],
+              externalAuditDate,
+            }
+          }
+        }
+        return { ...s, externalAuditPrep: prep, companySettings }
       })
     },
     [],

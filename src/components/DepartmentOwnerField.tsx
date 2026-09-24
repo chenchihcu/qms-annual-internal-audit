@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 
 import { FOCUS_RING } from '../lib/focusRing'
+import type { Person } from '../types'
+import { PersonNameSelect } from './ui/PersonNameSelect'
 
 export interface DepartmentOwnerFieldProps {
   departmentId: string
@@ -10,6 +12,7 @@ export interface DepartmentOwnerFieldProps {
   displayOwner?: string
   ariaLabel: string
   onSaveRequest: (departmentId: string, value: string) => void
+  candidates?: Person[]
   className?: string
   inputClassName?: string
 }
@@ -20,6 +23,7 @@ export function DepartmentOwnerField({
   displayOwner,
   ariaLabel,
   onSaveRequest,
+  candidates = [],
   className = '',
   inputClassName = '',
 }: DepartmentOwnerFieldProps) {
@@ -40,23 +44,37 @@ export function DepartmentOwnerField({
     setDraft(null)
   }
 
+  const usePicker = candidates.length > 0
+
   return (
     <div className={`no-print ${className}`}>
       <div className="flex flex-wrap items-center gap-1">
-        <input
-          type="text"
-          className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400 dark:border-amber-600' : ''} ${inputClassName}`}
-          value={value}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && dirty) {
-              e.preventDefault()
-              handleSave()
-            }
-            if (e.key === 'Escape') handleCancel()
-          }}
-          aria-label={ariaLabel}
-        />
+        {usePicker ? (
+          <div className={`min-w-[5rem] flex-1 ${dirty ? 'rounded border border-amber-400 dark:border-amber-600' : ''}`}>
+            <PersonNameSelect
+              value={value}
+              onChange={setDraft}
+              candidates={candidates}
+              ariaLabel={ariaLabel}
+              className={inputClassName}
+            />
+          </div>
+        ) : (
+          <input
+            type="text"
+            className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400 dark:border-amber-600' : ''} ${inputClassName}`}
+            value={value}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && dirty) {
+                e.preventDefault()
+                handleSave()
+              }
+              if (e.key === 'Escape') handleCancel()
+            }}
+            aria-label={ariaLabel}
+          />
+        )}
         {dirty && (
           <>
             <button

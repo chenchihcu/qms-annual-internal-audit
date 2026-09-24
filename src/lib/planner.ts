@@ -425,8 +425,9 @@ export function buildAuditFocusOverview(rows: PlanRow[]): AuditFocusRow[] {
   }))
 }
 
+/** 月格僅切換排程（空白 ↔ 擬定）；執行結果由查檢與 NCR 推導顯示。 */
 export function cycleMonthStatus(current: MonthStatus): MonthStatus {
-  const order: MonthStatus[] = [null, '擬定', '滿意', '不滿意', '矯正中', '矯正圓滿']
-  const idx = order.indexOf(current)
-  return order[(idx + 1) % order.length]
+  if (current == null) return '擬定'
+  if (current === '擬定') return null
+  return null
 }

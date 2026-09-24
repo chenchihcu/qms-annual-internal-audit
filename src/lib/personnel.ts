@@ -255,3 +255,100 @@ export function personRoles(person: Person, year: number, annualRoles: Array<{ p
   annualRoles.filter((a) => a.personId === person.id && a.year === year).forEach((a) => roles.add(a.role))
   return [...roles]
 }
+
+function affiliationActiveOnDate(
+  affiliation: Person['affiliations'][number],
+  companyId: CompanyId,
+  departmentId: string,
+  onDate: string,
+): boolean {
+  return (
+    affiliation.companyId === companyId
+    && affiliation.departmentId === departmentId
+    && (!affiliation.effectiveFrom || affiliation.effectiveFrom <= onDate)
+    && (!affiliation.effectiveTo || affiliation.effectiveTo >= onDate)
+  )
+}
+
+function sortPeopleByName(people: Person[]): Person[] {
+  return [...people].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
+}
+
+/** 符合此次 QP／部門／日期的有效內部稽核員（含主任稽核員資格） */
+export function auditorCandidates(
+  people: Person[],
+  companyId: CompanyId,
+  qpCode: string,
+  departmentId: string,
+  onDate: string,
+  requiredStandards: string[] = [],
+): Person[] {
+  const date = onDate || new Date().toISOString().slice(0, 10)
+  return sortPeopleByName(
+    people.filter(
+      (person) => person.active
+        && matchingAuditQualifications(person, companyId, qpCode, departmentId, date, requiredStandards).length > 0,
+    ),
+  )
+}
+
+/** 指定公司與責任單位的在職所屬人員 */
+export function departmentMemberCandidates(
+  people: Person[],
+  companyId: CompanyId,
+  departmentId: string,
+  onDate: string,
+): Person[] {
+  const date = onDate || new Date().toISOString().slice(0, 10)
+  return sortPeopleByName(
+    people.filter(
+      (person) => person.active
+        && person.affiliations.some((affiliation) => affiliationActiveOnDate(affiliation, companyId, departmentId, date)),
+    ),
+  )
+}
+
+/** 效果確認人、評定／確認人：本年度主任稽核員與管理代表 */
+export function verifierCandidates(
+  people: Person[],
+  companyId: CompanyId,
+  year: number,
+  annualRoles: Array<{ personId: string; year: number; companyId?: CompanyId; role: PersonnelRole }>,
+  onDate?: string,
+): Person[] {
+  const date = onDate ?? `${year}-12-31`
+  const result: Person[] = []
+  const seen = new Set<string>()
+
+  const leadId = resolveLeadAuditorPersonId(people, companyId, year, annualRoles, date)
+  if (leadId) {
+    const lead = people.find((person) => person.id === leadId)
+    if (lead?.active) {
+      result.push(lead)
+      seen.add(lead.id)
+    }
+  }
+
+  people.forEach((person) => {
+    if (!person.active || seen.has(person.id)) return
+    const roles = personRoles(person, year, annualRoles)
+    const hasMgrRole = roles.includes('management_representative')
+    const hasAppointment = person.appointments.some(
+      (appointment) => (
+        appointment.role === 'management_representative'
+        && appointment.companyId === companyId
+        && Boolean(appointment.documentReference.trim())
+        && Boolean(appointment.effectiveFrom)
+        && appointment.effectiveFrom <= date
+        && (!appointment.effectiveTo || appointment.effectiveTo >= date)
+        && (!appointment.supersededAt || appointment.supersededAt > date)
+      ),
+    )
+    if (hasMgrRole || hasAppointment) {
+      result.push(person)
+      seen.add(person.id)
+    }
+  })
+
+  return sortPeopleByName(result)
+}

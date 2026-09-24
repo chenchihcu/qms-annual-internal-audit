@@ -1,34 +1,36 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from '../../App'
 
 describe('RiskAssessment matrix layout', () => {
+  beforeAll(async () => {
+    await import('../RiskAssessment')
+  })
+
   beforeEach(() => {
     window.location.hash = ''
     localStorage.clear()
   })
 
-  it('shows department risk table and persists factor edits', async () => {
+  it('shows procedure risk table and saves inherent risk on demand', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
-    })
+    const table = await screen.findByRole('region', { name: '程序風險評估表格' }, { timeout: 10000 })
 
-    expect(screen.getByText(/風險指數 = 發生度 O × 嚴重度 S/)).toBeTruthy()
-    expect(screen.queryByText(/時程與稽核人員由年度計畫共用/)).toBeNull()
+    expect(screen.queryByText(/部門發生度／嚴重度請至/)).toBeNull()
+    expect(screen.queryByText(/至利害關係人編輯部門 O／S/)).toBeNull()
+    expect(screen.queryByText(/風險指數 = 發生度 O × 嚴重度 S/)).toBeNull()
 
-    const table = screen.getByRole('region', { name: '部門風險評估表格' })
-    expect(within(table).getByText('平均分')).toBeTruthy()
-    expect(within(table).getByText('未結 NCR')).toBeTruthy()
-    const occurrenceInput = within(table).getAllByLabelText(/發生度 O/)[0] as HTMLInputElement
-    fireEvent.change(occurrenceInput, { target: { value: '1' } })
+    expect(within(table).getByText('固有風險')).toBeTruthy()
+    const saveButtons = within(table).getAllByRole('button', { name: '存檔' })
+    expect(saveButtons.length).toBeGreaterThan(0)
+    fireEvent.click(saveButtons[0])
 
     await waitFor(() => {
-      expect(occurrenceInput.value).toBe('1')
+      expect(within(table).getByRole('button', { name: '已存檔' })).toBeTruthy()
     })
-  })
+  }, 15000)
 
   it('workflow guide shows summary gap not per-row list', async () => {
     render(<App />)

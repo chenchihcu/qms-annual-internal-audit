@@ -5,6 +5,7 @@ import App from '../../App'
 describe('StakeholdersPage', () => {
   beforeEach(() => {
     window.location.hash = ''
+    localStorage.clear()
   })
 
   it('shows formula, ranking, and department rows', async () => {

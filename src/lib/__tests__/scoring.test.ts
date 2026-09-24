@@ -12,7 +12,17 @@ function item(
   description = '',
   id = Math.random().toString(),
 ): ChecklistItem {
-  return { id, category: '測試', no: 1, content: 'test', judgment, description }
+  const needsEvidence = judgment === '符合' || judgment === '不符'
+  return {
+    id,
+    category: '測試',
+    no: 1,
+    content: 'test',
+    judgment,
+    description,
+    objectiveEvidence: needsEvidence ? '佐證紀錄' : '',
+    notApplicableReason: judgment === '不適用' ? description : undefined,
+  }
 }
 
 describe('isChecklistItemPending', () => {
@@ -32,7 +42,7 @@ describe('scoreChecklistItems', () => {
   })
 
   it('excludes 不適用 from denominator when description provided', () => {
-    const items = [item('符合'), item('不適用', '不適用原因'), item('不符')]
+    const items = [item('符合'), item('不適用', '不適用原因'), item('不符', '')]
     const result = scoreChecklistItems(items)
     expect(result.applicableItems).toBe(2)
     expect(result.score).toBe(50)
@@ -85,6 +95,7 @@ describe('scoreChecklistItems', () => {
       description: '',
       certificateScope: 'dual',
       judgmentByCompany: { jiurun: '符合', zhenglongxing: '符合' },
+      objectiveEvidence: '雙證佐證',
     }
     const result = scoreChecklistItems([dual])
     expect(result.applicableItems).toBe(2)
@@ -101,6 +112,7 @@ describe('scoreChecklistItems', () => {
       description: '',
       certificateScope: 'dual',
       judgmentByCompany: { jiurun: '符合', zhenglongxing: null },
+      objectiveEvidence: '九潤佐證',
     }
     const result = scoreChecklistItems([dual])
     expect(result.breakdown.pending).toBe(1)

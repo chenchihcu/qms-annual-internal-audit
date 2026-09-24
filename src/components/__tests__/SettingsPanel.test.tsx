@@ -11,6 +11,37 @@ function SystemSettingsPage() {
   return <SettingsPanel store={store} section="system" />
 }
 
+function ProcedureSettingsPage() {
+  const store = useAuditStore()
+  return <SettingsPanel store={store} section="procedure" />
+}
+
+describe('SettingsPanel profile feedback', () => {
+  it('shows field errors on procedure page without guide duplication', async () => {
+    const state = createDemoState()
+    localStorage.setItem('qms-annual-internal-audit-v7', JSON.stringify(state))
+    render(<ProcedureSettingsPage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('仍為待確認')).toBeTruthy()
+      expect(screen.getByText('尚未填寫')).toBeTruthy()
+    })
+  })
+
+  it('shows snapshot ready message after completing procedure fields', async () => {
+    const state = createDemoState()
+    localStorage.setItem('qms-annual-internal-audit-v7', JSON.stringify(state))
+    render(<ProcedureSettingsPage />)
+
+    fireEvent.change(screen.getByLabelText('程序版本'), { target: { value: 'Rev.6' } })
+    fireEvent.change(screen.getByLabelText('正式紀錄保存位置'), { target: { value: '品保部文件櫃 A-1' } })
+
+    await waitFor(() => {
+      expect(screen.getByRole('status').textContent).toMatch(/已寫入。開始稽核時會固定/)
+    })
+  })
+})
+
 describe('SettingsPanel lifecycle counts', () => {
   it('renders work data and traceability count tables with explanatory copy', async () => {
     const state = createDemoState()

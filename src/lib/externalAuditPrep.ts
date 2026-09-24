@@ -1,5 +1,6 @@
 import prepSeed from '../data/externalAuditPrep.seed.json'
 import relationshipSeed from '../data/companyRelationships.seed.json'
+import { buildMergedCertificateCoverage } from './coverage'
 import type {
   CompanyData,
   CompanyId,
@@ -140,7 +141,7 @@ export function countPrepProgress(
 } {
   let done = 0
   for (const itemState of prep.items) {
-    const template = getPrepTemplate(itemState.no)
+    const template = getPrepTemplateForState(itemState)
     if (template && isItemDone(template, itemState, prep, relationships)) done++
   }
   return { done, total: prep.items.length }
@@ -192,7 +193,14 @@ export function evaluatePrepSequence(context: PrepSequenceContext): PrepSequence
     )
   }
 
-  const sequenceWarning = prep.managementReviewComplete && !prep.internalAuditComplete
+  const internalComplete = COMPANY_IDS.every((companyId) => {
+    const co = companyDataForPrepYear(companyId, prep.year, companies, companySettings, yearArchives)
+    const settings = companySettings[companyId]
+    const auditYear = settings?.auditYear ?? prep.year
+    const rules = settings?.scoringRules ?? { conform: 100, nonConform: 0, observation: 50 }
+    return buildMergedCertificateCoverage(co, auditYear, rules).allInternalAuditComplete
+  })
+  const sequenceWarning = prep.managementReviewComplete && !internalComplete
   if (sequenceWarning) {
     messages.push('管理審查已標記完成，但內部稽核尚未完成 — 違反時間順序要求。')
   }
@@ -252,6 +260,7 @@ export interface PrepQpBlocked {
 }
 
 export interface PrepGapSummaryLine {
+  id: string
   no: number
   label: string
   text: string
@@ -285,7 +294,13 @@ export function listPrepGaps(
   const separateOpen: string[] = []
 
   for (const itemState of state.items) {
-    const template = getPrepTemplate(itemState.no)
+    const template = getPrepTemplateForState(itemState)
+    // #region agent log
+    if (itemState.no === 2) {
+      const byId = EXTERNAL_AUDIT_PREP_SEED.items.find((item) => item.id === itemState.id)
+      fetch('http://127.0.0.1:7321/ingest/123e2b23-b370-4bb6-9a82-27ec3a248c96',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f0bcf7'},body:JSON.stringify({sessionId:'f0bcf7',runId:'post-fix',hypothesisId:'A',location:'externalAuditPrep.ts:listPrepGaps',message:'item no 2 template lookup',data:{itemId:itemState.id,itemNo:itemState.no,lookupId:template?.id??null,lookupMode:template?.scope.mode??null,byId:byId?.id??null,byIdMode:byId?.scope.mode??null,mergedDone:itemState.mergedDone},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
     if (!template) continue
     const label = prepItemLabel(template)
 
@@ -335,8 +350,9 @@ export function summarizePrepGaps(
 
   for (const half of gaps.separateHalfDone) {
     const company = half.missing === 'jiurun' ? '九潤' : '正隆興'
-    const template = getPrepTemplate(half.no)
+    const template = getPrepTemplateForState({ id: half.id, no: half.no } as ExternalAuditPrepItemState)
     lines.push({
+      id: half.id,
       no: half.no,
       label: half.label,
       text: `項次 ${half.label} ${template ? shortPrepTitle(template) : half.title} — 缺${company}抬頭`,
@@ -345,9 +361,10 @@ export function summarizePrepGaps(
 
   for (const id of gaps.mergedOpen) {
     const itemState = state.items.find((item) => item.id === id)
-    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    const template = itemState ? getPrepTemplateForState(itemState) : undefined
     if (!template) continue
     lines.push({
+      id,
       no: template.no,
       label: prepItemLabel(template),
       text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 合併抬頭未完成`,
@@ -356,14 +373,24 @@ export function summarizePrepGaps(
 
   for (const id of gaps.siteOpen) {
     const itemState = state.items.find((item) => item.id === id)
-    const template = itemState ? getPrepTemplate(itemState.no) : undefined
+    const template = itemState ? getPrepTemplateForState(itemState) : undefined
     if (!template) continue
     lines.push({
+      id,
       no: template.no,
       label: prepItemLabel(template),
       text: `項次 ${prepItemLabel(template)} ${shortPrepTitle(template)} — 現場範圍未完成`,
     })
   }
 
-  return lines.slice(0, limit)
+  const sliced = lines.slice(0, limit)
+  // #region agent log
+  const keyCounts: Record<string, number> = {}
+  for (const line of sliced) {
+    const key = `${line.no}-${line.text}`
+    keyCounts[key] = (keyCounts[key] ?? 0) + 1
+  }
+  fetch('http://127.0.0.1:7321/ingest/123e2b23-b370-4bb6-9a82-27ec3a248c96',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f0bcf7'},body:JSON.stringify({sessionId:'f0bcf7',runId:'pre-fix',hypothesisId:'B-C',location:'externalAuditPrep.ts:summarizePrepGaps',message:'prep gap summary keys',data:{lineCount:sliced.length,mergedOpen:gaps.mergedOpen,separateOpen:gaps.separateOpen,keys:sliced.map((line)=>`${line.no}-${line.text}`),duplicateKeys:Object.entries(keyCounts).filter(([,count])=>count>1).map(([key,count])=>({key,count}))},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+  return sliced
 }

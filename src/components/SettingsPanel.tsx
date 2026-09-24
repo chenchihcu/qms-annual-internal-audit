@@ -1,9 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { backupFilename, describeBackup, parseBackupJson } from '../lib/backup'
 import { downloadBlob } from '../lib/download'
 import { exportAllAuditsExcel, exportAllFormsExcel, exportAnnualPlanHtml, exportAuditHtml, exportStandardExcel } from '../lib/formExport'
 import { buildAppHash, tabLabel } from '../lib/navigation'
+import {
+  PROFILE_SNAPSHOT_READY_MESSAGE,
+  procedureFieldErrors,
+  standardFieldErrors,
+} from '../lib/auditProfileValidation'
+import { procedureSourceReady, standardReady } from '../lib/workflowStatus'
 import { CHECKLIST_SEED, getSeedStats, isSeedFinalized, seedImportProgress } from '../data/checklistLoader'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
@@ -22,6 +28,31 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
   const [showDemoDialog, setShowDemoDialog] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
   const [restoreStatus, setRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [scoringSavedMessage, setScoringSavedMessage] = useState(false)
+  const [profileReadyMessage, setProfileReadyMessage] = useState(false)
+  const prevProfileReadyRef = useRef<boolean | null>(null)
+  const profile = state.companyAuditProfiles[state.activeCompanyId]
+
+  const profileReady =
+    section === 'standard'
+      ? standardReady(state, state.activeCompanyId)
+      : section === 'procedure'
+        ? procedureSourceReady(state, state.activeCompanyId)
+        : null
+
+  useEffect(() => {
+    if (profileReady === null) return
+    if (prevProfileReadyRef.current === false && profileReady) {
+      setProfileReadyMessage(true)
+    }
+    if (!profileReady) {
+      setProfileReadyMessage(false)
+    }
+    prevProfileReadyRef.current = profileReady
+  }, [profileReady])
+
+  const procedureErrors = section === 'procedure' ? procedureFieldErrors(profile) : null
+  const standardErrors = section === 'standard' ? standardFieldErrors(profile) : null
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -68,7 +99,6 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
   }
 
   const seedStats = getSeedStats()
-  const profile = state.companyAuditProfiles[state.activeCompanyId]
   const activeCompany = state.companies[state.activeCompanyId]
   const archivedYears = Object.keys(state.yearArchives).sort((a, b) => Number(a) - Number(b))
   const startedAudits = activeCompany.audits.filter((audit) => audit.status && audit.status !== '規劃中')
@@ -94,17 +124,92 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
           title="標準"
           actions={<Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportStandardExcel(state, state.activeCompanyId)}>匯出 Excel</Button>}
         />
-        <div className="space-y-3">{state.companyAuditProfiles[state.activeCompanyId].applicableStandards.map((standard, index) => <div key={standard.name} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4"><label className="block"><span className="mb-1 block text-sm font-medium text-slate-700">標準</span><span className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{standard.name}</span></label><Input label="版本" value={standard.version} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, version: value }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} /><Select label="適用性" value={standard.confirmationStatus} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]} /><Input label="依據引用（證書／決議）" value={standard.evidenceReference} onChange={(value) => { const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]; standards[index] = { ...standard, evidenceReference: value }; updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards }) }} /></div>)}</div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="證書範圍" value={state.companyAuditProfiles[state.activeCompanyId].certificateScope} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateScope: value })} /><Input label="證書／依據編號" value={state.companyAuditProfiles[state.activeCompanyId].certificateReference} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateReference: value })} /></div>
+        <div className="space-y-3">
+          {profile.applicableStandards.map((standard, index) => (
+            <div key={standard.name} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">標準</span>
+                <span className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{standard.name}</span>
+              </label>
+              <Input
+                label="版本"
+                value={standard.version}
+                onChange={(value) => {
+                  const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
+                  standards[index] = { ...standard, version: value }
+                  updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
+                }}
+              />
+              <Select
+                label="適用性"
+                value={standard.confirmationStatus}
+                onChange={(value) => {
+                  const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
+                  standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }
+                  updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
+                }}
+                options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]}
+              />
+              <Input
+                label="依據引用（證書／決議）"
+                value={standard.evidenceReference}
+                error={standardErrors?.evidenceByIndex[index]}
+                onChange={(value) => {
+                  const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
+                  standards[index] = { ...standard, evidenceReference: value }
+                  updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
+                }}
+              />
+            </div>
+          ))}
+          {standardErrors?.confirmation && (
+            <p className="text-xs font-medium text-red-700" role="alert">{standardErrors.confirmation}</p>
+          )}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Input
+            label="證書範圍"
+            value={state.companyAuditProfiles[state.activeCompanyId].certificateScope}
+            error={standardErrors?.certificateScope}
+            onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateScope: value })}
+          />
+          <Input
+            label="證書／依據編號"
+            value={state.companyAuditProfiles[state.activeCompanyId].certificateReference}
+            error={standardErrors?.certificateReference}
+            onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateReference: value })}
+          />
+        </div>
+        {profileReadyMessage && profileReady && (
+          <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
+        )}
       </Card>}
 
       {section === 'procedure' && <Card>
         <PageToolbar title="程序" />
         <div className="grid gap-3 sm:grid-cols-3">
-          <Input label="稽核程序代碼" value={profile.auditProcedureCode} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })} />
-          <Input label="程序版本" value={profile.auditProcedureVersion} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })} />
-          <Input label="正式紀錄保存位置" value={profile.formalRecordLocation} onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })} />
+          <Input
+            label="稽核程序代碼"
+            value={profile.auditProcedureCode}
+            error={procedureErrors?.auditProcedureCode}
+            onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })}
+          />
+          <Input
+            label="程序版本"
+            value={profile.auditProcedureVersion}
+            error={procedureErrors?.auditProcedureVersion}
+            onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })}
+          />
+          <Input
+            label="正式紀錄保存位置"
+            value={profile.formalRecordLocation}
+            error={procedureErrors?.formalRecordLocation}
+            onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })}
+          />
         </div>
+        {profileReadyMessage && profileReady && (
+          <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
+        )}
       </Card>}
 
       {section === 'system' && <>
@@ -120,6 +225,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
                 scoringRules: { ...state.settings.scoringRules, conform: Number(v) },
               })
             }
+            onBlur={() => setScoringSavedMessage(true)}
           />
           <Input
             label="不符得分"
@@ -130,6 +236,7 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
                 scoringRules: { ...state.settings.scoringRules, nonConform: Number(v) },
               })
             }
+            onBlur={() => setScoringSavedMessage(true)}
           />
           <Input
             label="觀察得分（部分）"
@@ -141,8 +248,12 @@ export function SettingsPanel({ store, section }: { store: AuditStore; section: 
                 scoringRules: { ...state.settings.scoringRules, observation: Number(v) },
               })
             }
+            onBlur={() => setScoringSavedMessage(true)}
           />
         </div>
+        {scoringSavedMessage && (
+          <p className="mt-3 text-sm text-green-700" role="status">評分規則已寫入</p>
+        )}
         <p className="mt-4 text-sm text-slate-500">
           完整備份含雙公司資料、設定、外部稽核前準備與版本號（本機備份 v7）。
           還原前會確認覆寫；舊版 v5/v4/v1 備份會自動遷移。

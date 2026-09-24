@@ -329,39 +329,17 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位</p>
           <div className="space-y-3 text-sm">
-            <div>
-              <label className="flex items-start gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4"
-                  checked={externalAuditPrep.internalAuditComplete}
-                  onChange={(e) =>
-                    updateExternalPrepSequence({ internalAuditComplete: e.target.checked })
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="font-medium text-slate-700">1. 內部稽核完成</span>
-                  <p className="mt-1 text-xs text-slate-600">
-                    查檢資料：
-                    {derivedInternalComplete
-                      ? '計畫與查檢已覆蓋'
-                      : `尚有 ${internalGapCount} 項缺口`}
-                    <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('dashboard')}>
-                      至稽核總覽
-                    </a>
-                  </p>
-                  {externalAuditPrep.internalAuditComplete && !derivedInternalComplete && (
-                    <p className="mt-1 text-xs font-medium text-amber-800" role="status">
-                      已勾選，但查檢資料尚未齊全
-                    </p>
-                  )}
-                  {!externalAuditPrep.internalAuditComplete && derivedInternalComplete && (
-                    <p className="mt-1 text-xs text-green-800" role="status">
-                      查檢資料已齊，可勾選完成
-                    </p>
-                  )}
-                </div>
-              </label>
+            <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
+              <span className="font-medium text-slate-700">1. 內部稽核完成</span>
+              <p className="mt-1 text-xs text-slate-600">
+                兩證覆蓋（唯讀）：
+                {derivedInternalComplete
+                  ? '計畫與查檢已覆蓋'
+                  : `尚有 ${internalGapCount} 項缺口`}
+                <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('dashboard')}>
+                  至稽核總覽
+                </a>
+              </p>
             </div>
             <div>
               <label className="flex items-start gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">

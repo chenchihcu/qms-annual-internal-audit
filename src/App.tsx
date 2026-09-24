@@ -56,7 +56,7 @@ class TabErrorBoundary extends Component<
 function App() {
   const store = useAuditStore()
   const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
-  const { tab, auditKey } = hashState
+  const { tab, auditKey, section, recordId } = hashState
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarNavRef = useRef<HTMLElement>(null)
@@ -66,13 +66,14 @@ function App() {
     ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
     : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
   const setTab = (next: TabId, options?: NavigateOptions | string) => {
-    const auditKeyForTab =
-      next === 'audit'
-        ? typeof options === 'string'
-          ? options
-          : options?.auditKey
-        : undefined
-    setHashState({ tab: next, auditKey: auditKeyForTab })
+    const resolved: NavigateOptions | undefined =
+      typeof options === 'string' ? { auditKey: options } : options
+    setHashState({
+      tab: next,
+      auditKey: next === 'audit' ? resolved?.auditKey : undefined,
+      section: next === 'observations' ? resolved?.section : undefined,
+      recordId: resolved?.recordId,
+    })
     syncHash(next, options)
     setMobileMenuOpen(false)
   }
@@ -104,9 +105,9 @@ function App() {
   const activeEntry = ALL_TABS.find((item) => item.id === tab)
   const renderSidebar = () => (
     <div className="flex h-full flex-col">
-      <button type="button" onClick={() => setTab('dashboard')} className="m-3 rounded-xl bg-blue-800 p-3 text-left text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label="回到稽核總覽">
+      <div className="m-3 rounded-xl bg-blue-800 p-3 text-white">
         <span className="block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
-      </button>
+      </div>
       <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
         {ALL_TABS.map((item) => (
           <button
@@ -218,22 +219,22 @@ function App() {
             )}
             {tab === 'followups' && (
               <TabErrorBoundary tabLabel="待改善追蹤">
-                <FollowupsPage store={store} onNavigate={(next) => setTab(next)} />
+                <FollowupsPage store={store} onNavigate={setTab} />
               </TabErrorBoundary>
             )}
             {tab === 'ncr' && (
               <TabErrorBoundary tabLabel="不符合">
-                <NCRList store={store} />
+                <NCRList store={store} highlightRecordId={recordId} />
               </TabErrorBoundary>
             )}
             {tab === 'observations' && (
               <TabErrorBoundary tabLabel="觀察事項">
-                <Observations store={store} />
+                <Observations store={store} section={section} highlightRecordId={recordId} />
               </TabErrorBoundary>
             )}
             {tab === 'suggestions' && (
               <TabErrorBoundary tabLabel="第三方建議">
-                <Suggestions store={store} />
+                <Suggestions store={store} highlightRecordId={recordId} />
               </TabErrorBoundary>
             )}
             {tab === 'prep' && (

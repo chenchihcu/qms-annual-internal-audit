@@ -93,6 +93,7 @@ export function Input({
   hint,
   error,
   required,
+  disabled,
 }: {
   label?: string
   value: string | number
@@ -108,6 +109,7 @@ export function Input({
   hint?: string
   error?: string
   required?: boolean
+  disabled?: boolean
 }) {
   const generatedId = useId()
   const inputId = id ?? `input-${generatedId}`
@@ -130,7 +132,8 @@ export function Input({
         aria-describedby={describedBy}
         aria-invalid={error ? true : undefined}
         required={required}
-        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
+        disabled={disabled}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
       />
       {hint && <p id={hintId} className="mt-1 text-xs text-muted">{hint}</p>}
       {error && <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{error}</p>}

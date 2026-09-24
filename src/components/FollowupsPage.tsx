@@ -7,7 +7,9 @@ import {
   FOLLOWUP_KIND_LABELS,
 } from '../lib/followupQueue'
 import type { FollowupFilter } from '../lib/followupQueue'
+import type { NavigateOptions } from '../lib/navigation'
 import type { TabId } from '../types'
+import { companySettingsFor } from '../types'
 import { FOLLOWUP_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
@@ -17,12 +19,13 @@ import { ScrollRegion } from './ui/ScrollRegion'
 
 interface FollowupsPageProps {
   store: AuditStore
-  onNavigate: (tab: TabId) => void
+  onNavigate: (tab: TabId, options?: NavigateOptions) => void
 }
 
 export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
   const { state } = store
   const { company } = state
+  const auditYear = companySettingsFor(state, state.activeCompanyId).auditYear
   const rows = useMemo(() => buildFollowupQueue(company), [company])
   const [filter, setFilter] = useState<FollowupFilter>('all')
   const visibleRows = useMemo(() => filterFollowupRows(rows, filter), [rows, filter])
@@ -68,7 +71,17 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                       <button
                         type="button"
                         className="text-left font-medium text-blue-800 underline-offset-2 hover:underline"
-                        onClick={() => onNavigate(row.tab)}
+                        onClick={() =>
+                          onNavigate(row.tab, {
+                            recordId: row.id,
+                            section:
+                              row.kind === 'observation'
+                                ? row.year < auditYear
+                                  ? 'prior'
+                                  : 'current'
+                                : undefined,
+                          })
+                        }
                       >
                         {row.label}
                       </button>

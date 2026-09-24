@@ -19,7 +19,8 @@ describe('workflowStatus', () => {
     const state = createDemoState()
     state.companyAuditProfiles.jiurun.applicableStandards[0].confirmationStatus = 'pending'
     expect(canProceedToNextTab(state, 'standard')).toBe(false)
-    expect(getTabWorkflowStatus(state, 'standard').gaps.length).toBeGreaterThan(0)
+    expect(getTabWorkflowStatus(state, 'standard').ready).toBe(false)
+    expect(getTabWorkflowStatus(state, 'standard').gaps).toHaveLength(0)
   })
 
   it('orders risk before plan in workflow chain', () => {
@@ -95,6 +96,39 @@ describe('workflowStatus', () => {
       expect(carryAdvisory.message).toMatch(/跨年待帶入 \d+ 件，至觀察事項帶入/)
       expect(carryAdvisory.tab).toBe('observations')
     }
+  })
+
+  it('links plan lead auditor gap to personnel tab', () => {
+    const state = createDemoState()
+    state.annualPersonnelAssignments = state.annualPersonnelAssignments.filter(
+      (item) => item.role !== 'internal_lead_auditor',
+    )
+    const status = getTabWorkflowStatus(state, 'plan')
+    const leadGap = status.gaps.find((gap) => gap.message === '主任稽核員任命未完成')
+    expect(leadGap?.tab).toBe('personnel')
+  })
+
+  it('uses unified lead auditor message on personnel tab', () => {
+    const state = createDemoState()
+    state.annualPersonnelAssignments = state.annualPersonnelAssignments.filter(
+      (item) => item.role !== 'internal_lead_auditor',
+    )
+    const status = getTabWorkflowStatus(state, 'personnel')
+    expect(status.gaps.some((gap) => gap.message === '主任稽核員任命未完成')).toBe(true)
+  })
+
+  it('does not duplicate open-list advisories on ncr tab', () => {
+    const state = createDemoState()
+    const status = getTabWorkflowStatus(state, 'ncr')
+    expect(status.gaps).toHaveLength(0)
+    expect(status.advisories.some((item) => item.message.includes('未結案 NCR'))).toBe(false)
+  })
+
+  it('does not duplicate open-list advisories on observations tab', () => {
+    const state = createDemoState()
+    const status = getTabWorkflowStatus(state, 'observations')
+    expect(status.gaps).toHaveLength(0)
+    expect(status.advisories.some((item) => item.message.includes('待追蹤觀察'))).toBe(false)
   })
 
   it('detects standard readiness with evidence', () => {

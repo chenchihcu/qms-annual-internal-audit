@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportSuggestionsExcel } from '../lib/formExport'
 import type { SuggestionStatus, ThirdPartySuggestion } from '../types'
@@ -9,11 +9,18 @@ import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 
-export function Suggestions({ store }: { store: AuditStore }) {
+export function Suggestions({
+  store,
+  highlightRecordId,
+}: {
+  store: AuditStore
+  highlightRecordId?: string
+}) {
   const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
   const { company, settings } = state
   const currentYear = settings.auditYear
   const [showForm, setShowForm] = useState(false)
+  const [saveMessage, setSaveMessage] = useState(false)
   const [form, setForm] = useState({
     procedure: company.planRows[0]?.qpCode ?? '',
     departmentId: company.planRows[0]?.departmentId ?? '',
@@ -22,6 +29,15 @@ export function Suggestions({ store }: { store: AuditStore }) {
     responsibleUnit: '',
   })
   const [carryDept, setCarryDept] = useState<Record<string, string>>({})
+  const [highlightedId, setHighlightedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!highlightRecordId) return
+    setHighlightedId(highlightRecordId)
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-suggestion-id="${highlightRecordId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [highlightRecordId])
 
   const statusLabel: Record<SuggestionStatus, string> = {
     open: '待追蹤',
@@ -96,6 +112,9 @@ export function Suggestions({ store }: { store: AuditStore }) {
             </>
           )}
         />
+        {saveMessage && !showForm && (
+          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+        )}
 
         {allSuggestions.length === 0 ? (
           <EmptyState message="目前沒有建議事項。" />
@@ -115,7 +134,11 @@ export function Suggestions({ store }: { store: AuditStore }) {
               </thead>
               <tbody>
                 {listedSuggestions.map((sug) => (
-                  <tr key={sug.id} data-suggestion-id={sug.id} className={sug.status === 'open' ? 'bg-amber-50/30' : ''}>
+                  <tr
+                    key={sug.id}
+                    data-suggestion-id={sug.id}
+                    className={`${sug.status === 'open' ? 'bg-amber-50/30' : ''} ${highlightedId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
+                  >
                     <td className="border p-2">{sug.year}</td>
                     <td className="border p-2 font-medium">{sug.procedure}</td>
                     <td className="border p-2">{sug.issue}</td>
@@ -191,6 +214,7 @@ export function Suggestions({ store }: { store: AuditStore }) {
                 })
                 setForm({ procedure: form.procedure, departmentId: form.departmentId, issue: '', progress: '', responsibleUnit: '' })
                 setShowForm(false)
+                setSaveMessage(true)
               }}
             >
               儲存

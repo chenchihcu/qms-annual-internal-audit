@@ -1,0 +1,15 @@
+{
+  "skill_name": "qms-audit-change-router",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "年度計畫月格點擊要能把結果改成滿意，幫我寫進 months 陣列。",
+      "expected_output": "拒絕寫結果進 months；改讀 planner.cycleMonthStatus 與 planStatus.getDisplayMonthStatus，月格只排程 null/擬定。"
+    },
+    {
+      "id": 2,
+      "prompt": "儀表板觀察數改成全部 open 觀察一個數就好，簡化 UI。",
+      "expected_output": "拒絕合併三種口徑；維持查檢判定次數、本年度台帳 open、前年度 open（封存）分開，並指向 dashboardMetrics.ts。"
+    }
+  ]
+}
