@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { createDemoState } from '../../data/demoData'
 import { companySettingsFor } from '../../types'
 import { Dashboard } from '../Dashboard'
@@ -28,46 +28,45 @@ describe('Dashboard attention list', () => {
     window.location.hash = ''
   })
 
-  it('shows annual metrics and score tables', async () => {
+  it('shows compact annual summary and keeps observation counts separate', async () => {
     renderDashboard()
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '年度指標' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '稽核總覽' })).toBeTruthy()
     })
 
-    expect(screen.getByRole('heading', { name: '各程序稽核得分' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: '稽核重點標示（QR-28-01 概覽）' })).toBeNull()
-    const metricsTable = screen.getByRole('region', { name: '年度指標統計表' })
-    expect(within(metricsTable).getByText('系統稽核')).toBeTruthy()
-    expect(within(metricsTable).getByText('製程稽核')).toBeTruthy()
-    expect(within(metricsTable).getByText('型態稽核')).toBeTruthy()
-    expect(within(metricsTable).queryByText('計畫程序列數')).toBeNull()
-    const systemRow = within(metricsTable).getByText('系統稽核').closest('tr')
-    expect(systemRow).toBeTruthy()
-    expect(within(systemRow as HTMLElement).getByText('—')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '追蹤清單' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '前往：查檢判定觀察' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '前往：本年度待追蹤觀察' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '前往：前年度未結觀察' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '前往：待追蹤建議' })).toBeTruthy()
+
+    expect(screen.queryByText(/各程序稽核得分/)).toBeNull()
+    expect(screen.queryByText(/雙證查檢未判定/)).toBeNull()
+    expect(screen.queryByRole('region', { name: '各程序稽核得分統計表' })).toBeNull()
   })
 
-  it('renders scored procedure rows with navigation handler', async () => {
-    let tab: string | undefined
-    renderDashboard((next) => {
-      tab = next
-    })
+  it('does not send dashboard data to a local debug collector', () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '開啟 QP-16 · 品保部' })).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: '開啟 QP-16 · 品保部' }))
-    expect(tab).toBe('audit')
+    try {
+      renderDashboard()
+      expect(fetchMock).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
-  it('lists incomplete procedures with status column in score table', async () => {
-    renderDashboard()
+  it('keeps each tracking metric linked to its own operational page', async () => {
+    const onNavigate = vi.fn()
+    renderDashboard(onNavigate)
 
-    const scoreTable = await screen.findByRole('region', { name: '各程序稽核得分統計表' })
     await waitFor(() => {
-      expect(within(scoreTable).getAllByText('未完成').length).toBeGreaterThan(0)
-      expect(within(scoreTable).getAllByText('已評').length).toBeGreaterThan(0)
+      expect(screen.getByRole('button', { name: '前往：前年度未結觀察' })).toBeTruthy()
     })
+
+    fireEvent.click(screen.getByRole('button', { name: '前往：前年度未結觀察' }))
+    expect(onNavigate).toHaveBeenCalledWith('observations', { section: 'prior' })
   })
 })

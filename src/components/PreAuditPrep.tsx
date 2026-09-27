@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import type { CompanyRelationship, ExternalAuditPrepItemState, ExternalAuditPrepState } from '../types'
-import { COMPANY_LABELS, relationshipCheckKey } from '../types'
-import type { PrepScopeMode } from '../lib/externalAuditPrep'
+import type { ExternalAuditPrepItemState } from '../types'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
   countPrepProgress,
+  evaluatePrepSequence,
+  getManagementReviewCompletionBlockers,
   getPrepTemplateForState,
-  isItemDone,
+  isLegacyCompanySpecificPrepText,
   itemHasCallout,
-  relationshipsForPrepItem,
+  workspacePrepNotes,
+  workspacePrepText,
 } from '../lib/externalAuditPrep'
 import { buildMergedCertificateCoverage } from '../lib/coverage'
 import { exportPrepExcel } from '../lib/formExport'
@@ -21,12 +22,8 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
-
-const SCOPE_LABELS: Record<PrepScopeMode, string> = {
-  both_separate: '◎◎',
-  merged: '合併',
-  site_scope: '稽核廠區範圍',
-}
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 'satisfaction' }) {
   const config = {
@@ -40,7 +37,7 @@ function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 
     },
     satisfaction: {
       className: 'border-rose-200 bg-rose-50 text-rose-900',
-      text: '正隆興須對主要客戶（九潤精密科技）做客戶滿意度調查；兩公司分開調查。',
+      text: '保留適用客戶、調查期間、結果分析及必要改善的佐證。',
     },
   }[type]
 
@@ -51,159 +48,26 @@ function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 
   )
 }
 
-function ScopeCells({
-  mode,
-  item,
-  prepItemNo,
-  itemTitle,
-  onUpdate,
-}: {
-  mode: PrepScopeMode
-  item: ExternalAuditPrepItemState
-  prepItemNo: number
-  itemTitle: string
-  onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
-}) {
-  if (mode === 'both_separate') {
-    return (
-      <>
-        <td className="border p-2 text-center align-top">
-          <label className="inline-flex flex-col items-center gap-1">
-            <input
-              type="checkbox"
-              className="no-print h-4 w-4"
-              checked={item.jiurunDone}
-              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.jiurun} 已完成`}
-              onChange={(e) => onUpdate({ jiurunDone: e.target.checked })}
-            />
-            <span className="print-only text-xs">{item.jiurunDone ? '■' : '□'}</span>
-            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
-          </label>
-        </td>
-        <td className="border p-2 text-center align-top">
-          <label className="inline-flex flex-col items-center gap-1">
-            <input
-              type="checkbox"
-              className="no-print h-4 w-4"
-              checked={item.zhenglongxingDone}
-              aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${COMPANY_LABELS.zhenglongxing} 已完成`}
-              onChange={(e) => onUpdate({ zhenglongxingDone: e.target.checked })}
-            />
-            <span className="print-only text-xs">{item.zhenglongxingDone ? '■' : '□'}</span>
-            <span className="text-xs text-slate-400 no-print" aria-hidden="true">◎</span>
-          </label>
-        </td>
-      </>
-    )
-  }
-
-  if (mode === 'merged') {
-    return (
-      <td colSpan={2} className="border p-2 text-center align-top">
-        <label className="inline-flex flex-col items-center gap-1">
-          <input
-            type="checkbox"
-            className="no-print h-4 w-4"
-            checked={item.mergedDone}
-            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 合併共用證據已完成`}
-            onChange={(e) => onUpdate({ mergedDone: e.target.checked })}
-          />
-          <span className="print-only text-xs">{item.mergedDone ? '■' : '□'}</span>
-          <span className="text-xs font-medium text-slate-600">合併</span>
-        </label>
-      </td>
-    )
-  }
-
-  return (
-    <>
-      <td colSpan={2} className="border p-2 text-center align-top">
-        <span className="inline-block rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
-          稽核廠區範圍
-        </span>
-      </td>
-    </>
-  )
-}
-
 function DoneCell({
-  mode,
   item,
-  prepItemNo,
+  displayNo,
   itemTitle,
-  done,
   onUpdate,
 }: {
-  mode: PrepScopeMode
   item: ExternalAuditPrepItemState
-  prepItemNo: number
+  displayNo: number
   itemTitle: string
-  done: boolean
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
 }) {
-  if (mode === 'site_scope') {
-    return (
-      <td className="border p-2 text-center align-top">
-        <label className="inline-flex flex-col items-center gap-1">
-          <input
-            type="checkbox"
-            className="no-print h-4 w-4"
-            checked={item.completed}
-            aria-label={`第 ${prepItemNo} 項 ${itemTitle} · 依稽核廠區範圍已完成`}
-            onChange={(e) => onUpdate({ completed: e.target.checked })}
-          />
-          <span className="print-only text-xs">{item.completed ? '■' : '□'}</span>
-        </label>
-      </td>
-    )
-  }
-
   return (
     <td className="border p-2 text-center align-top">
-      <span
-        className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-          done ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-400'
-        }`}
-        role="status"
-        aria-label={`第 ${prepItemNo} 項 ${itemTitle} · ${done ? '已完成' : '未完成'}`}
-        title={done ? '已完成' : '未完成'}
-      >
-        {done ? '✓' : '—'}
-      </span>
+      <label className="inline-flex items-center gap-2">
+        <input type="checkbox" className="no-print h-4 w-4" checked={item.completed}
+          aria-label={`第 ${displayNo} 項 ${itemTitle} 已完成`}
+          onChange={(event) => onUpdate({ completed: event.target.checked })} />
+        <span className="print-only text-xs">{item.completed ? '■' : '□'}</span>
+      </label>
     </td>
-  )
-}
-
-function RelationshipChecks({
-  prepItemNo,
-  prep,
-  relationships,
-  onToggle,
-}: {
-  prepItemNo: number
-  prep: ExternalAuditPrepState
-  relationships: CompanyRelationship[]
-  onToggle: (key: string, checked: boolean) => void
-}) {
-  const gates = relationshipsForPrepItem(prepItemNo, relationships)
-  if (gates.length === 0) return null
-  return (
-    <div className="mt-2 space-y-1">
-      {gates.map((gate) => {
-        const key = relationshipCheckKey(gate.from, gate.to, gate.relation)
-        return (
-          <label key={gate.id} className="flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-xs text-rose-900">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 no-print"
-              checked={Boolean(prep.relationshipChecks[key])}
-              onChange={(e) => onToggle(key, e.target.checked)}
-            />
-            <span>{gate.label}</span>
-          </label>
-        )
-      })}
-    </div>
   )
 }
 
@@ -212,11 +76,11 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     state,
     updateExternalPrepItem,
     updateExternalPrepSequence,
-    updateExternalPrepRelationship,
     switchPrepYear,
   } = store
-  const { settings, externalAuditPrep, companyRelationships } = state
-  const { done, total } = countPrepProgress(externalAuditPrep, companyRelationships)
+  const { settings, externalAuditPrep } = state
+  const pagination = useTablePagination(externalAuditPrep.items.length, 10, undefined, String(externalAuditPrep.year))
+  const { done, total } = countPrepProgress(externalAuditPrep)
   const seed = EXTERNAL_AUDIT_PREP_SEED
   const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
   const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
@@ -257,6 +121,19 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
   const derivedInternalComplete = mergedCoverage.allInternalAuditComplete
   const internalGapCount = mergedCoverage.gaps.length + mergedCoverage.dualPendingItems.length
   const managementReviewDate = settings.managementReviewDate?.trim() ?? ''
+  const sequenceWarnings = evaluatePrepSequence({
+    prep: externalAuditPrep,
+    workspace: activeCompany,
+    settings,
+    yearArchives: state.yearArchives,
+  })
+  const effectiveExternalAuditDate =
+    externalAuditPrep.externalAuditDate?.trim() || settings.externalAuditDate?.trim()
+  const managementReviewCompletionBlockers = getManagementReviewCompletionBlockers({
+    internalAuditComplete: sequenceWarnings.internalAuditComplete,
+    managementReviewDate,
+    externalAuditDate: effectiveExternalAuditDate,
+  })
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -332,7 +209,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
               <span className="font-medium text-slate-700">1. 內部稽核完成</span>
               <p className="mt-1 text-xs text-slate-600">
-                兩證覆蓋（唯讀）：
+                目前年度進度（唯讀）：
                 {derivedInternalComplete
                   ? '計畫與查檢已覆蓋'
                   : `尚有 ${internalGapCount} 項缺口`}
@@ -347,6 +224,12 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                   type="checkbox"
                   className="mt-0.5 h-4 w-4"
                   checked={externalAuditPrep.managementReviewComplete}
+                  disabled={!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0}
+                  aria-describedby={
+                    !externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0
+                      ? 'management-review-completion-help'
+                      : undefined
+                  }
                   onChange={(e) =>
                     updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
                   }
@@ -365,6 +248,15 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       已勾選，但年度計畫尚未填管審日期
                     </p>
                   )}
+                  {!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0 && (
+                    <p
+                      id="management-review-completion-help"
+                      className="no-print mt-1 text-xs text-amber-800"
+                      role="status"
+                    >
+                      尚缺：{managementReviewCompletionBlockers.join('；')}。
+                    </p>
+                  )}
                 </div>
               </label>
             </div>
@@ -372,76 +264,63 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               <span className="font-medium">3. 外部稽核</span>
             </div>
           </div>
+          {sequenceWarnings.sequenceMessages.length > 0 && (
+            <div
+              className="no-print mt-3 space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+              role="alert"
+            >
+              {sequenceWarnings.sequenceMessages.map((message) => <p key={message}>{message}</p>)}
+            </div>
+          )}
         </div>
 
-        {/* 範圍圖例 */}
-        <p className="mb-4 text-xs text-slate-500 no-print">
-          ◎◎ 兩公司各自準備 · 合併 共用證據 · 稽核廠區範圍 依現場
-        </p>
-
         <PrintDocHeader
-          companyName={seed.companies.join(' / ')}
+          companyName="年度內部稽核工作區"
           auditYear={externalAuditPrep.year}
-          formTitle={seed.title}
-          subtitle={seed.source}
+          formTitle={workspacePrepText(seed.title)}
         />
 
         <ScrollRegion ariaLabel="外部稽核前準備清單">
-          <table className="qr-checklist w-full min-w-[900px] border-collapse text-sm">
+          <table className="qr-checklist w-full min-w-[980px] border-collapse text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
                 <th className="border p-2 w-12">項次</th>
                 <th className="border p-2">稽核前準備事項</th>
-                <th className="border p-2 w-28">負責人</th>
-                <th className="border p-2 w-20 text-center">九潤</th>
-                <th className="border p-2 w-20 text-center">正隆興</th>
+                <th className="border p-2 w-40">負責人</th>
                 <th className="border p-2 w-16 text-center">完成</th>
-                <th className="border p-2 w-48">備註/表單</th>
+                <th className="border p-2 w-56">備註/表單</th>
               </tr>
             </thead>
             <tbody>
-              {externalAuditPrep.items.map((itemState) => {
+              {externalAuditPrep.items.map((itemState, index) => {
                 const template = getPrepTemplateForState(itemState)
                 if (!template) return null
-                const mode = template.scope.mode
-                const done = isItemDone(template, itemState, externalAuditPrep, companyRelationships)
+                const displayNo = index + 1
+                const done = itemState.completed
                 const callout = itemHasCallout(template.no)
-                const formsText = template.forms.length ? template.forms.join('、') : ''
+                const title = workspacePrepText(template.title)
+                const formsText = template.forms
+                  .map(workspacePrepText)
+                  .filter((form) => form && !title.includes(form))
+                  .join('、')
                 const remarkDisplay = [formsText, itemState.remark].filter(Boolean).join(' · ')
+                const notes = workspacePrepNotes(template.notes)
 
                 return (
-                  <tr key={itemState.id} className={done ? 'bg-green-50/30' : undefined}>
-                    <td className="border p-2 text-center align-top font-medium">{template.no}</td>
+                  <tr key={itemState.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${done ? 'bg-green-50/30' : ''}`}>
+                    <td className="border p-2 text-center align-top font-medium">{displayNo}</td>
                     <td className="border p-2 align-top">
-                      <div className="font-medium">{template.title}</div>
-                      {template.notes && (
-                        <p className="mt-1 text-xs text-slate-500">{template.notes}</p>
+                      <div className="font-medium">{title}</div>
+                      {notes && (
+                        <p className="mt-1 text-xs text-slate-500">{notes}</p>
                       )}
                       {callout && <CalloutBadge type={callout} />}
-                      <RelationshipChecks
-                        prepItemNo={template.no}
-                        prep={externalAuditPrep}
-                        relationships={companyRelationships}
-                        onToggle={updateExternalPrepRelationship}
-                      />
-                      <span className="mt-1 inline-block text-xs text-slate-400">
-                        {SCOPE_LABELS[mode]}
-                      </span>
                     </td>
                     <td className="border p-2 align-top text-xs">{template.owner}</td>
-                    <ScopeCells
-                      mode={mode}
-                      item={itemState}
-                      prepItemNo={template.no}
-                      itemTitle={template.title}
-                      onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
-                    />
                     <DoneCell
-                      mode={mode}
                       item={itemState}
-                      prepItemNo={template.no}
-                      itemTitle={template.title}
-                      done={done}
+                      displayNo={displayNo}
+                      itemTitle={title}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <td className="border p-2 align-top">
@@ -450,7 +329,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       )}
                       <input
                         className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
-                        aria-label={`第 ${template.no} 項備註／表單`}
+                        aria-label={`第 ${displayNo} 項備註／表單`}
                         placeholder="備註"
                         value={itemState.remark}
                         onChange={(e) =>
@@ -465,13 +344,14 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
+        <TablePagination pagination={pagination} label="外稽準備" />
 
         {/* 序位規則摘要 */}
         <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
           <summary className="cursor-pointer text-xs font-semibold text-slate-600">稽核要點</summary>
           <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
-            {seed.sequenceRules.map((rule) => (
-              <li key={rule}>{rule}</li>
+            {seed.sequenceRules.filter((rule) => !isLegacyCompanySpecificPrepText(rule)).map((rule) => (
+              <li key={rule}>{workspacePrepText(rule)}</li>
             ))}
           </ul>
         </details>
@@ -480,8 +360,8 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         <details className="mt-4 border-t border-slate-200 pt-4">
           <summary className="cursor-pointer text-xs font-semibold text-slate-600">其他注意事項</summary>
           <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
-            {seed.otherNotes.map((note) => (
-              <li key={note}>{note}</li>
+            {seed.otherNotes.filter((note) => !isLegacyCompanySpecificPrepText(note)).map((note) => (
+              <li key={note}>{workspacePrepText(note)}</li>
             ))}
           </ul>
         </details>
@@ -490,7 +370,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         <ConfirmDialog
           open
           title={`切換外稽準備至 ${pendingPrepYear} 年？`}
-          description={`外稽準備表為雙公司共用；切換後將載入 ${pendingPrepYear} 年準備進度，不會改動各公司年度台帳（目前台帳年度 ${settings.auditYear}）。`}
+          description={`切換後將載入 ${pendingPrepYear} 年準備進度；目前稽核台帳為 ${settings.auditYear} 年。`}
           confirmLabel="確認切換"
           onConfirm={confirmPrepYearSwitch}
           onCancel={cancelPrepYearSwitch}

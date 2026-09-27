@@ -63,7 +63,6 @@ export function standardReady(state: AppState, companyId: CompanyId = state.acti
   const profile = profileFor(state, companyId)
   const confirmed = profile.applicableStandards.filter((s) => s.confirmationStatus === 'confirmed')
   if (confirmed.length === 0) return false
-  if (!confirmed.every((s) => s.evidenceReference.trim())) return false
   if (!profile.certificateScope.trim()) return false
   if (!profile.certificateReference.trim()) return false
   return true
@@ -111,12 +110,12 @@ export function auditStarted(state: AppState, companyId: CompanyId = state.activ
 }
 
 export function prepComplete(state: AppState): boolean {
-  const progress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
+  const progress = countPrepProgress(state.externalAuditPrep)
   if (progress.done < progress.total) return false
   const warnings = evaluatePrepSequence({
     prep: state.externalAuditPrep,
-    companies: state.companies,
-    companySettings: state.companySettings,
+    workspace: state.companies[state.activeCompanyId],
+    settings: state.companySettings[state.activeCompanyId],
     yearArchives: state.yearArchives,
   })
   return !warnings.sequenceWarning
@@ -140,8 +139,8 @@ export function canCompleteAuditReport(
 export function getPdcaOverview(state: AppState, companyId: CompanyId = state.activeCompanyId): PdcaOverview {
   const co = companyFor(state, companyId)
   const planGaps: WorkflowGap[] = []
-  if (!standardReady(state, companyId)) planGaps.push({ message: '適用標準與證書依據未完整', tab: 'standard' })
-  if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '程序來源三欄未齊全', tab: 'procedure' })
+  if (!standardReady(state, companyId)) planGaps.push({ message: '適用標準與證書依據未完整', tab: 'system-settings' })
+  if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '程序來源三欄未齊全', tab: 'system-settings' })
   if (!stakeholdersReady(state, companyId)) planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'stakeholders' })
   if (!riskPersistedForAllRows(state, companyId)) planGaps.push({ message: '方案風險尚未全部存檔', tab: 'risk' })
   if (!leadAuditorAppointed(state, companyId)) planGaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
@@ -153,10 +152,10 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
     (a) => (!a.status || a.status === '規劃中') && isAuditScheduledInPlan(co, a),
   )
   const reported = co.audits.filter((a) => a.status === '已回報')
-  if (started.length === 0) doGaps.push({ message: '尚無已開始的稽核事件', tab: 'schedule' })
+  if (started.length === 0) doGaps.push({ message: '尚無已開始的稽核事件', tab: 'audit' })
   const inProgress = co.audits.filter((a) => a.status === '執行中')
   if (inProgress.length > 0) {
-    doGaps.push({ message: `${inProgress.length} 件執行中待回報`, tab: 'schedule' })
+    doGaps.push({ message: `${inProgress.length} 件執行中待回報`, tab: 'audit' })
   }
 
   const checkGaps: WorkflowGap[] = []
@@ -166,27 +165,27 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   }
 
   const actGaps: WorkflowGap[] = []
-  const prepProgress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
+  const prepProgress = countPrepProgress(state.externalAuditPrep)
   if (prepProgress.done < prepProgress.total) {
     actGaps.push({ message: `外部稽核前準備 ${prepProgress.done}/${prepProgress.total}`, tab: 'prep' })
   }
   const prepWarnings = evaluatePrepSequence({
     prep: state.externalAuditPrep,
-    companies: state.companies,
-    companySettings: state.companySettings,
+    workspace: state.companies[state.activeCompanyId],
+    settings: state.companySettings[state.activeCompanyId],
     yearArchives: state.yearArchives,
   })
   if (prepWarnings.sequenceWarning) {
-    actGaps.push({ message: '管審／內稽序位異常', tab: 'prep' })
+    actGaps.push({ message: '內稽／管審／外稽順序或日期異常', tab: 'prep' })
   }
 
   const annualCloseGaps: WorkflowGap[] = []
   if (planGaps.length > 0) annualCloseGaps.push(...planGaps)
-  if (started.length === 0) annualCloseGaps.push({ message: '年度內部稽核尚未開始', tab: 'schedule' })
+  if (started.length === 0) annualCloseGaps.push({ message: '年度內部稽核尚未開始', tab: 'audit' })
   if (planning.length > 0) {
-    annualCloseGaps.push({ message: `${planning.length} 件已排程事件尚未開始`, tab: 'schedule' })
+    annualCloseGaps.push({ message: `${planning.length} 件已排程事件尚未開始`, tab: 'audit' })
   }
-  if (inProgress.length > 0) annualCloseGaps.push({ message: `${inProgress.length} 件尚未完成回報`, tab: 'schedule' })
+  if (inProgress.length > 0) annualCloseGaps.push({ message: `${inProgress.length} 件尚未完成回報`, tab: 'audit' })
   if (openFollowups > 0) {
     annualCloseGaps.push({ message: '尚有未結改善追蹤項目', tab: 'followups' })
   }
@@ -205,14 +204,11 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
 function pdcaPhaseForTab(tab: TabId): PdcaPhase {
   switch (tab) {
     case 'dashboard': return 'overview'
-    case 'standard':
-    case 'procedure':
     case 'stakeholders':
     case 'risk':
     case 'plan':
     case 'personnel':
       return 'P'
-    case 'schedule':
     case 'audit':
       return 'D'
     case 'followups':
@@ -221,7 +217,6 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
     case 'suggestions':
       return 'C'
     case 'prep':
-    case 'onsite':
       return 'A'
     case 'system-settings':
       return 'system'
@@ -248,14 +243,6 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       }
       break
     }
-
-    case 'standard':
-      ready = standardReady(state, companyId)
-      break
-
-    case 'procedure':
-      ready = procedureSourceReady(state, companyId)
-      break
 
     case 'stakeholders': {
       const total = co.departments.length
@@ -302,10 +289,6 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = gaps.length === 0
       break
 
-    case 'schedule':
-      ready = co.audits.length > 0
-      break
-
     case 'audit':
       if (!auditStarted(state, companyId)) {
         gaps.push({ message: '至少須有一筆稽核事件已開始（執行中或已回報）' })
@@ -333,20 +316,19 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       ready = true
       break
 
-    case 'onsite':
-      ready = true
-      break
-
     case 'prep': {
       const warnings = evaluatePrepSequence({
         prep: state.externalAuditPrep,
-        companies: state.companies,
-        companySettings: state.companySettings,
+        workspace: state.companies[state.activeCompanyId],
+        settings: state.companySettings[state.activeCompanyId],
         yearArchives: state.yearArchives,
       })
-      if (warnings.sequenceWarning) gaps.push({ message: '管審／內稽序位異常' })
+      if (warnings.sequenceWarning) gaps.push({ message: '內稽／管審／外稽順序或日期異常' })
       if (warnings.ncrWarning) advisories.push({ message: warnings.messages[0] ?? '尚有未結案 NCR' })
-      const yearMismatch = formatPrepYearMismatch(state.externalAuditPrep.year, state.companySettings)
+      const yearMismatch = formatPrepYearMismatch(
+        state.externalAuditPrep.year,
+        state.companySettings[state.activeCompanyId].auditYear,
+      )
       if (yearMismatch) advisories.push({ message: yearMismatch })
       ready = gaps.length === 0
       break

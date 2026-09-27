@@ -1,8 +1,5 @@
-import {
-  defaultNcrCompanyScopeForItem,
-  ncrCompanyScopeForDualSide,
-} from './certificateScope'
-import type { ChecklistItem, CompanyId, NCR, NCRStatus, Observation, ProcedureAudit } from '../types'
+import { defaultNcrCompanyScopeForItem } from './certificateScope'
+import type { ChecklistItem, NCR, NCRStatus, Observation, ProcedureAudit } from '../types'
 
 export interface NcrCloseGateResult {
   ok: boolean
@@ -13,6 +10,26 @@ const EMPTY_NCR_CLOSEOUT = {
   rootCause: '',
   correctiveAction: '',
   verificationEvidence: '',
+}
+
+export function ncrNumberLabel(ncrNumber: string): string {
+  return ncrNumber.replace(/-(?:jiurun|zhenglongxing|zlx)$/iu, '')
+}
+
+export function ncrNumberLabels(ncrs: Array<Pick<NCR, 'id' | 'ncrNumber'>>): Map<string, string> {
+  const labels = ncrs.map((ncr) => ncrNumberLabel(ncr.ncrNumber))
+  const totals = new Map<string, number>()
+  for (const label of labels) totals.set(label, (totals.get(label) ?? 0) + 1)
+
+  const occurrences = new Map<string, number>()
+  const result = new Map<string, string>()
+  ncrs.forEach((ncr, index) => {
+    const label = labels[index]
+    const occurrence = (occurrences.get(label) ?? 0) + 1
+    occurrences.set(label, occurrence)
+    result.set(ncr.id, totals.get(label)! > 1 ? `${label} (${occurrence})` : label)
+  })
+  return result
 }
 
 export function normalizeNCRList(ncrs: Array<Partial<NCR> & Pick<NCR, 'id' | 'ncrNumber'>>): NCR[] {
@@ -51,17 +68,7 @@ export function findChecklistItem(
   return undefined
 }
 
-function isNonConformForNcr(item: ChecklistItem, ncr: NCR): boolean {
-  const scope = item.certificateScope ?? 'shared'
-  const ncrScope = ncr.companyScope ?? 'both'
-  if (scope === 'dual' && item.judgmentByCompany) {
-    if (ncrScope === 'jiurun') return item.judgmentByCompany.jiurun === '不符'
-    if (ncrScope === 'zhenglongxing') return item.judgmentByCompany.zhenglongxing === '不符'
-    return false
-  }
-  if (ncrScope === 'jiurun' || ncrScope === 'zhenglongxing') {
-    return item.judgment === '不符' && (item.certificateScope ?? 'shared') === ncrScope
-  }
+function isNonConformForNcr(item: ChecklistItem, _ncr: NCR): boolean {
   return item.judgment === '不符'
 }
 
@@ -80,10 +87,7 @@ export function isNcrStale(ncr: NCR, audits: ProcedureAudit[]): boolean {
   return !isNonConformForNcr(item, ncr)
 }
 
-function ncrIdForItem(item: ChecklistItem, side?: CompanyId): string {
-  if (item.certificateScope === 'dual' && side) {
-    return `ncr-${item.id}-${side}`
-  }
+function ncrIdForItem(item: ChecklistItem): string {
   return `ncr-${item.id}`
 }
 
@@ -128,29 +132,6 @@ export function collectNCRsFromAudits(
 
   for (const audit of audits) {
     for (const item of audit.items) {
-      const scope = item.certificateScope ?? 'shared'
-
-      if (scope === 'dual' && item.judgmentByCompany) {
-        for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
-          if (item.judgmentByCompany[side] !== '不符') continue
-          const id = ncrIdForItem(item, side)
-          if (existingById.has(id)) continue
-          const ncr = buildNcrFromItem(
-            audit,
-            item,
-            year,
-            nextIndex,
-            ncrCompanyScopeForDualSide(side),
-            item.id,
-            id,
-          )
-          result.push(ncr)
-          existingById.set(id, ncr)
-          nextIndex++
-        }
-        continue
-      }
-
       if (item.judgment !== '不符') continue
       const id = ncrIdForItem(item)
       if (existingById.has(id)) continue

@@ -24,6 +24,7 @@ import { hydrateSharedPlan } from '../lib/sharedPlan'
 import { createChecklistForProcedure } from './checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from './procedurePlan'
 import { getProcedureTitle } from './checklistLoader'
+import { isTrashEntry } from '../lib/trash'
 
 const departments = [
   {
@@ -239,8 +240,8 @@ function createAuditProfiles(): Record<CompanyId, CompanyAuditProfile> {
     {
       companyId,
       applicableStandards: [
-        { name: 'ISO 9001', version: '2015/Amd 1:2024', confirmationStatus: 'pending', evidenceReference: '' },
-        { name: 'AS9100', version: '2016 (Rev D)', confirmationStatus: 'pending', evidenceReference: '' },
+        { name: 'ISO 9001', version: '2026', confirmationStatus: 'pending' },
+        { name: 'AS9100', version: '2016 (Rev D)', confirmationStatus: 'pending' },
       ],
       certificateScope: '',
       certificateReference: '',
@@ -469,7 +470,9 @@ export function createDemoState(): AppState {
     yearArchives: {},
     prepArchives: {},
     dataSource: 'demo',
-    version: 7,
+    trash: [],
+    permanentlyDeletedGeneratedRecords: [],
+    version: 8,
   }
 
   state = hydrateSharedPlan(state)
@@ -512,7 +515,9 @@ export function createBlankState(): AppState {
   return state
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v7'
+export const STORAGE_KEY = 'qms-annual-internal-audit-v14'
+export const LEGACY_STORAGE_KEY_V8 = 'qms-annual-internal-audit-v8'
+export const LEGACY_STORAGE_KEY_V7 = 'qms-annual-internal-audit-v7'
 export const LEGACY_STORAGE_KEY_V6 = 'qms-annual-internal-audit-v6'
 
 function stripExternalAuditDate(settings: AuditSettings): AuditSettings {
@@ -693,6 +698,36 @@ export function migrateToV7(raw: AppState): AppState {
   }
 }
 
+export function migrateToV8(raw: AppState): AppState {
+  if (raw.version >= 8 && !Array.isArray(raw.trash)) {
+    throw new Error('v8 回收區資料結構不完整')
+  }
+  const permanentlyDeletedGeneratedRecords = raw.version >= 8
+    ? raw.permanentlyDeletedGeneratedRecords
+    : []
+  if (!Array.isArray(permanentlyDeletedGeneratedRecords) || permanentlyDeletedGeneratedRecords.some((entry) => (
+    !entry
+    || (entry.kind !== 'ncr' && entry.kind !== 'observation')
+    || typeof entry.recordId !== 'string'
+    || (entry.companyId !== 'jiurun' && entry.companyId !== 'zhenglongxing')
+    || typeof entry.year !== 'number'
+    || !Number.isInteger(entry.year)
+  ))) {
+    throw new Error('v8 自動產生紀錄刪除索引結構不完整')
+  }
+  const v7 = migrateToV7(raw)
+  const trash = raw.version >= 8 ? raw.trash : []
+  if (!Array.isArray(trash) || !trash.every(isTrashEntry)) {
+    throw new Error('回收區資料結構不完整')
+  }
+  return {
+    ...v7,
+    trash,
+    permanentlyDeletedGeneratedRecords,
+    version: 8,
+  }
+}
+
 /** 舊版 v1 遷移（若存在） */
 export function migrateV1State(raw: unknown): AppState | null {
   if (!raw || typeof raw !== 'object') return null
@@ -700,8 +735,22 @@ export function migrateV1State(raw: unknown): AppState | null {
   if (old.version === 2 && old.companies) return raw as AppState
   if (!old.departments || !old.settings) return null
 
-  const demo = createDemoState()
+  const demo = createBlankState()
+  // A v1 payload represents imported user data; never let demo refresh replace or add records.
+  demo.dataSource = 'user'
   demo.activeCompanyId = 'jiurun'
+  demo.companies.zhenglongxing = {
+    ...demo.companies.zhenglongxing,
+    name: '',
+    keyCustomerName: '',
+    departments: [],
+    planRows: [],
+    audits: [],
+    ncrs: [],
+    observations: [],
+    suggestions: [],
+    procedureRisks: [],
+  }
   const legacySettings = old.settings as Partial<AuditSettings> & { externalAuditDate?: string }
   const merged = {
     ...demo.companySettings.jiurun,
@@ -716,8 +765,8 @@ export function migrateV1State(raw: unknown): AppState | null {
   ) as Record<CompanyId, AuditSettings>
   const company = demo.companies.jiurun
   company.departments = old.departments as CompanyData['departments']
-  if (old.planRows) company.planRows = old.planRows as CompanyData['planRows']
-  if (old.audits) {
+  company.planRows = Array.isArray(old.planRows) ? old.planRows as CompanyData['planRows'] : []
+  if (Array.isArray(old.audits)) {
     company.audits = (old.audits as Array<Record<string, unknown>>).map((a) => ({
       ...a,
       qpCode: (a.qpCode as string) ?? 'QP-01',
@@ -728,8 +777,8 @@ export function migrateV1State(raw: unknown): AppState | null {
       })),
     })) as CompanyData['audits']
   }
-  if (old.ncrs) company.ncrs = old.ncrs as CompanyData['ncrs']
-  if (old.observations) company.observations = old.observations as CompanyData['observations']
+  company.ncrs = Array.isArray(old.ncrs) ? old.ncrs as CompanyData['ncrs'] : []
+  company.observations = Array.isArray(old.observations) ? old.observations as CompanyData['observations'] : []
   return demo
 }
 

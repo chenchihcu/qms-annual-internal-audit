@@ -7,7 +7,7 @@ import {
   TAB_ICONS,
   badgeIconFor,
 } from '../uiIcons'
-import { PATHS } from '../../components/ui/Icon'
+import { PATHS } from '../iconPaths'
 
 describe('uiIcons', () => {
   it('defines icons for every tab and group', () => {

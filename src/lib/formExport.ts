@@ -1,4 +1,4 @@
-import { EXTERNAL_AUDIT_PREP_SEED } from './externalAuditPrep'
+import { EXTERNAL_AUDIT_PREP_SEED, workspacePrepText } from './externalAuditPrep'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
 import { calculateProcedurePriority, inherentScaleFromSeed } from './risk'
@@ -9,9 +9,11 @@ import type {
   CompanyAuditProfile,
   CompanyData,
   CompanyId,
+  ExternalAuditPrepItemState,
   ProcedureAudit,
 } from '../types'
 import { COMPANY_LABELS, companySettingsFor } from '../types'
+import { ncrNumberLabels } from './ncr'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -173,8 +175,9 @@ export function exportAllAuditsExcel(state: AppState, companyId: CompanyId): voi
 export function buildNcrSheet(co: CompanyData, settings: AuditSettings): SpreadsheetSheet {
   const title = [[`${co.name} · ${settings.auditYear} 不符合事項清單 QR-28-03`]]
   const header = ['NCR#', '來源事件', 'QP', '部門', '流程', '要求快照', '證據快照', '發現快照', '日期', '狀態', '矯正措施', '效果確認', '確認人', '確認日']
+  const ncrLabels = ncrNumberLabels(co.ncrs)
   const rows = co.ncrs.map((ncr) => [
-    ncr.ncrNumber,
+    ncrLabels.get(ncr.id) ?? ncr.ncrNumber,
     ncr.sourceAuditId ?? '',
     ncr.qpCode,
     ncr.department,
@@ -255,7 +258,7 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
 }
 
 export function buildPersonnelSheet(state: AppState, companyId: CompanyId): SpreadsheetSheet {
-  const headers = ['姓名', '編號', '類型', '公司或機構', '責任單位', '角色', '狀態', '適用範圍', '有效日期']
+  const headers = ['姓名', '編號', '類型', '所屬單位', '責任單位', '角色', '狀態', '適用範圍', '有效日期']
   const today = new Date().toISOString().slice(0, 10)
   const auditYear = companySettingsFor(state, companyId).auditYear
   const rows = state.people.filter((person) => person.active).map((person) => {
@@ -266,7 +269,7 @@ export function buildPersonnelSheet(state: AppState, companyId: CompanyId): Spre
       person.name,
       person.employeeNumber,
       person.type === 'internal' ? '內部' : '外部',
-      person.affiliations.map((a) => a.companyId ? COMPANY_LABELS[a.companyId] : a.externalOrganization).filter(Boolean).join('、'),
+      person.affiliations.map((a) => a.externalOrganization || (person.type === 'internal' ? '公司內部' : '')).filter(Boolean).join('、'),
       person.affiliations.map((a) => a.departmentId).filter(Boolean).join('、'),
       roles.map((role) => PERSONNEL_ROLE_LABELS[role]).join('、'),
       status,
@@ -278,16 +281,22 @@ export function buildPersonnelSheet(state: AppState, companyId: CompanyId): Spre
 }
 
 export function buildStandardSheet(profile: CompanyAuditProfile, companyName: string): SpreadsheetSheet {
-  const header = ['標準', '版本', '適用性', '依據引用', '證書範圍', '證書編號']
+  const header = ['標準', '版本', '適用性', '適用依據引用']
   const rows = profile.applicableStandards.map((standard) => [
     standard.name,
     standard.version,
     standard.confirmationStatus === 'confirmed' ? '已確認' : '待確認',
     standard.evidenceReference,
-    profile.certificateScope,
-    profile.certificateReference,
   ])
-  return createSheet([[`${companyName} · 適用標準與證書`], [], header, ...rows])
+  return createSheet([
+    [`${companyName} · 適用標準與證書`],
+    [],
+    header,
+    ...rows,
+    [],
+    ['共用管理系統認證證書'],
+    ['證書範圍', profile.certificateScope, '證書編號／引用', profile.certificateReference],
+  ])
 }
 
 export function exportPersonnelExcel(state: AppState, companyId: CompanyId): void {
@@ -339,70 +348,37 @@ export function buildObservationsSheet(co: CompanyData): SpreadsheetSheet {
   return createSheet([['觀察事項紀錄台帳'], [], header, ...rows])
 }
 
-/** 外稽當日行程（雙公司共用） */
-export function buildOnsiteSheet(state: AppState): SpreadsheetSheet {
-  const header = ['日期', '開始', '結束', '廠區', '受稽單位', 'QP', '產品／型號', '陪同人員', '備註']
-  const deptName = (departmentId?: string) => {
-    if (!departmentId) return ''
-    for (const company of Object.values(state.companies)) {
-      const dept = company.departments.find((item) => item.id === departmentId)
-      if (dept) return dept.name
-    }
-    return departmentId
-  }
-  const escortNames = (ids: string[]) => ids
-    .map((id) => state.people.find((person) => person.id === id)?.name ?? id)
-    .join('、')
-  const siteLabel = (site: string) => {
-    if (site === 'both') return '兩公司合併'
-    if (site === 'jiurun') return '九潤精密'
-    if (site === 'zhenglongxing') return '正隆興精密'
-    return site
-  }
-  const rows = (state.externalAuditPrep.onsiteSlots ?? []).map((slot) => [
-    slot.date,
-    slot.startTime,
-    slot.endTime,
-    siteLabel(slot.site),
-    deptName(slot.departmentId),
-    slot.qpCodes.join('、'),
-    slot.productModels.join('、'),
-    escortNames(slot.escortPersonIds),
-    slot.note,
-  ])
-  return createSheet([
-    ['外部稽核當日行程'],
-    [`年度：${state.externalAuditPrep.year}`, `外稽日期：${state.externalAuditPrep.externalAuditDate ?? ''}`],
-    [],
-    header,
-    ...rows,
-  ])
-}
-
-export function exportOnsiteExcel(state: AppState): void {
-  const wb = createWorkbook()
-  appendSheet(wb, buildOnsiteSheet(state), sheetName('外稽當日行程'))
-  writeWorkbook(wb, safeFilename(['外稽當日行程', String(state.externalAuditPrep.year)]) + '.xlsx')
-}
-
 /** 稽核前準備（optional sheet） */
 export function buildPrepSheet(state: AppState): SpreadsheetSheet {
-  const header = ['項次', '稽核前準備事項', '負責人', '九潤', '正隆興', '合併', '完成', '備註']
-  const rows = EXTERNAL_AUDIT_PREP_SEED.items.map((tpl) => {
-    const item = state.externalAuditPrep.items.find((i) => i.no === tpl.no)
+  const header = ['項次', '稽核前準備事項', '負責人', '完成', '備註']
+  const statesById = new Map(state.externalAuditPrep.items.map((item) => [item.id, item]))
+  const statesByNo = new Map<number, ExternalAuditPrepItemState[]>()
+  for (const item of state.externalAuditPrep.items) {
+    const matches = statesByNo.get(item.no) ?? []
+    matches.push(item)
+    statesByNo.set(item.no, matches)
+  }
+  const templateCountsByNo = new Map<number, number>()
+  for (const template of EXTERNAL_AUDIT_PREP_SEED.items) {
+    templateCountsByNo.set(template.no, (templateCountsByNo.get(template.no) ?? 0) + 1)
+  }
+
+  const rows = EXTERNAL_AUDIT_PREP_SEED.items.map((tpl, index) => {
+    let item = tpl.id ? statesById.get(tpl.id) : undefined
+    if (!item && templateCountsByNo.get(tpl.no) === 1) {
+      const numberMatches = statesByNo.get(tpl.no) ?? []
+      if (numberMatches.length === 1) item = numberMatches[0]
+    }
     return [
-      tpl.no,
-      tpl.title,
+      index + 1,
+      workspacePrepText(tpl.title),
       tpl.owner,
-      item?.jiurunDone ? '是' : '',
-      item?.zhenglongxingDone ? '是' : '',
-      item?.mergedDone ? '是' : '',
       item?.completed ? '是' : '',
       item?.remark ?? '',
     ]
   })
   return createSheet([
-    [EXTERNAL_AUDIT_PREP_SEED.title],
+    [workspacePrepText(EXTERNAL_AUDIT_PREP_SEED.title)],
     [`年度：${state.externalAuditPrep.year}`],
     [],
     header,
@@ -410,7 +386,7 @@ export function buildPrepSheet(state: AppState): SpreadsheetSheet {
   ])
 }
 
-/** Combined workbook — all QR forms for one company + shared prep */
+/** Combined workbook — all QR forms for the active audit workspace */
 export function exportAllFormsExcel(state: AppState, companyId: CompanyId): void {
   const wb = buildAllFormsWorkbook(state, companyId)
   const fn = safeFilename([
@@ -439,7 +415,6 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
   appendSheet(wb, buildPrepSheet(state), sheetName('稽核前準備'))
-  appendSheet(wb, buildOnsiteSheet(state), sheetName('外稽當日行程'))
   return wb
 }
 

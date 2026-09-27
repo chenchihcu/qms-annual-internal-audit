@@ -1,11 +1,10 @@
 import { Fragment, useEffect, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { FOCUS_RING } from '../lib/focusRing'
-import { isNcrStale } from '../lib/ncr'
+import { isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import { planRowSelectOptions } from '../lib/planRowOptions'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import type { NCRClassification, NCRStatus, NcrCompanyScope } from '../types'
-import { NCR_COMPANY_SCOPE_LABELS } from '../types'
+import type { NCRClassification, NCRStatus } from '../types'
 import { departmentMemberCandidates, verifierCandidates } from '../lib/personnel'
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { PersonNameSelect } from './ui/PersonNameSelect'
@@ -13,9 +12,11 @@ import { EmptyState } from './ui/EmptyState'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
-const COMPANY_SCOPES: NcrCompanyScope[] = ['jiurun', 'zhenglongxing', 'both']
 const CLASSIFICATIONS: NCRClassification[] = ['重大', '輕微']
 
 export function NCRList({
@@ -25,19 +26,39 @@ export function NCRList({
   store: AuditStore
   highlightRecordId?: string
 }) {
-  const { state, updateNCR, addManualNCR } = store
+  const { state, updateNCR, addManualNCR, moveNCRToTrash } = store
   const { company, settings } = state
 
   const [showForm, setShowForm] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedState, setExpandedState] = useState<{ highlightRecordId?: string; id: string | null }>(() => ({
+    highlightRecordId,
+    id: highlightRecordId ?? null,
+  }))
+  if (expandedState.highlightRecordId !== highlightRecordId) {
+    setExpandedState({ highlightRecordId, id: highlightRecordId ?? null })
+  }
+  const expandedId = expandedState.highlightRecordId === highlightRecordId
+    ? expandedState.id
+    : highlightRecordId ?? null
+  const setExpandedId = (id: string | null) => setExpandedState({ highlightRecordId, id })
   const [closeErrors, setCloseErrors] = useState<Record<string, string>>({})
   const [newNcr, setNewNcr] = useState({
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
     departmentId: company.planRows[0]?.departmentId ?? '',
     description: '',
-    companyScope: 'both' as NcrCompanyScope,
   })
   const [descriptionError, setDescriptionError] = useState<string | undefined>()
+  const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
+  const highlightIndex = highlightRecordId
+    ? company.ncrs.findIndex((ncr) => ncr.id === highlightRecordId)
+    : -1
+  const displayNumbers = ncrNumberLabels(company.ncrs)
+  const pagination = useTablePagination(
+    company.ncrs.length,
+    10,
+    highlightRecordId && highlightIndex >= 0 ? { key: highlightRecordId, index: highlightIndex } : undefined,
+    String(settings.auditYear),
+  )
 
   const planRowOptions = planRowSelectOptions(company.planRows)
 
@@ -53,7 +74,6 @@ export function NCRList({
 
   useEffect(() => {
     if (!highlightRecordId) return
-    setExpandedId(highlightRecordId)
     requestAnimationFrame(() => {
       document.getElementById(`ncr-${highlightRecordId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
@@ -99,6 +119,7 @@ export function NCRList({
           title="不符合"
           actions={(
             <Button
+              variant="secondary"
               icon={showForm ? undefined : ACTION_ICONS.add}
               onClick={() => setShowForm((value) => !value)}
             >
@@ -121,15 +142,6 @@ export function NCRList({
                   setNewNcr((s) => ({ ...s, qpCode: qp, departmentId: dept }))
                 }}
                 options={planRowOptions}
-              />
-              <Select
-                label="證書"
-                value={newNcr.companyScope}
-                onChange={(v) => setNewNcr((s) => ({ ...s, companyScope: v as NcrCompanyScope }))}
-                options={COMPANY_SCOPES.map((s) => ({
-                  value: s,
-                  label: NCR_COMPANY_SCOPE_LABELS[s],
-                }))}
               />
               <div>
                 <Input
@@ -156,49 +168,33 @@ export function NCRList({
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />
         ) : (
+          <>
           <ScrollRegion ariaLabel="不符合事項清單">
             <table className="qr-checklist w-full border-collapse text-sm">
               <thead>
                 <tr className="bg-page text-left text-muted">
                   <th className="border border-line p-2">NCR#</th>
-                  <th className="border border-line p-2">證書</th>
                   <th className="border border-line p-2">QP</th>
                   <th className="border border-line p-2">部門</th>
                   <th className="border border-line p-2">描述</th>
                   <th className="border border-line p-2">日期</th>
                   <th className="border border-line p-2">狀態</th>
-                  <th className="border border-line p-2 no-print">詳細</th>
+                  <th className="border border-line p-2 no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {company.ncrs.map((ncr) => {
+                {company.ncrs.map((ncr, index) => {
                   const stale = isNcrStale(ncr, company.audits)
-                  const scope = ncr.companyScope ?? 'both'
                   const expanded = expandedId === ncr.id
+                  const displayNumber = displayNumbers.get(ncr.id) ?? ncr.ncrNumber
                   return (
                     <Fragment key={ncr.id}>
                       <tr
                         id={`ncr-${ncr.id}`}
                         data-ncr-id={ncr.id}
-                        className={stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}
+                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
                       >
-                        <td className="border border-line p-2 font-mono text-xs">{ncr.ncrNumber}</td>
-                        <td className="border border-line p-2">
-                          <div className="no-print">
-                            <Select
-                              value={scope}
-                              onChange={(v) =>
-                                updateNCR(ncr.id, { companyScope: v as NcrCompanyScope })
-                              }
-                              ariaLabel={`${ncr.ncrNumber} 證書範圍`}
-                              options={COMPANY_SCOPES.map((s) => ({
-                                value: s,
-                                label: NCR_COMPANY_SCOPE_LABELS[s],
-                              }))}
-                            />
-                          </div>
-                          <span className="print-only">{NCR_COMPANY_SCOPE_LABELS[scope]}</span>
-                        </td>
+                        <td className="border border-line p-2 font-mono text-xs">{displayNumber}</td>
                         <td className="border border-line p-2">{ncr.qpCode}</td>
                         <td className="border border-line p-2">{ncr.department}</td>
                         <td className="border border-line p-2">
@@ -212,7 +208,7 @@ export function NCRList({
                             rows={2}
                             value={ncr.description}
                             onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
-                            aria-label={`${ncr.ncrNumber} 描述`}
+                            aria-label={`${displayNumber} 描述`}
                           />
                           <span className="print-only">{ncr.description}</span>
                         </td>
@@ -222,7 +218,7 @@ export function NCRList({
                             className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
                             value={ncr.date}
                             onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
-                            aria-label={`${ncr.ncrNumber} 日期`}
+                            aria-label={`${displayNumber} 日期`}
                           />
                           <span className="print-only">{ncr.date}</span>
                         </td>
@@ -231,7 +227,7 @@ export function NCRList({
                             <Select
                               value={ncr.status}
                               onChange={(v) => handleStatusChange(ncr.id, v as NCRStatus)}
-                              ariaLabel={`${ncr.ncrNumber} 狀態`}
+                              ariaLabel={`${displayNumber} 狀態`}
                               options={STATUSES.map((s) => ({ value: s, label: s }))}
                             />
                           </div>
@@ -241,17 +237,28 @@ export function NCRList({
                           )}
                         </td>
                         <td className="border border-line p-2 no-print">
-                          <button
-                            type="button"
-                            className={`text-xs text-link hover:underline ${FOCUS_RING}`}
-                            onClick={() => setExpandedId(expanded ? null : ncr.id)}
-                          >
-                            {expanded ? '收合' : '展開'}
-                          </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button
+                              type="button"
+                              className={`text-xs text-link hover:underline ${FOCUS_RING}`}
+                              onClick={() => setExpandedId(expanded ? null : ncr.id)}
+                            >
+                              {expanded ? '收合' : '展開'}
+                            </button>
+                            <Button
+                              variant="ghost"
+                              icon={ACTION_ICONS.delete}
+                              className="text-red-700"
+                              aria-label={`移至回收區：${displayNumber}`}
+                              onClick={() => setDeleteTarget({ id: ncr.id, label: `${displayNumber} · ${ncr.department} · ${ncr.description}` })}
+                            >
+                              移至回收區
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                       {expanded && (
-                        <tr key={`${ncr.id}-detail`} className="no-print bg-slate-50/80">
+                        <tr key={`${ncr.id}-detail`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}no-print bg-slate-50/80`}>
                           <td colSpan={8} className="border border-line p-4">
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                               <Input label="根本原因" value={ncr.rootCause} onChange={(v) => updateNCR(ncr.id, { rootCause: v })} />
@@ -296,10 +303,20 @@ export function NCRList({
                   )
                 })}
               </tbody>
-            </table>
-          </ScrollRegion>
+          </table>
+        </ScrollRegion>
+        <TablePagination pagination={pagination} label="不符合" />
+          </>
         )}
       </div>
+      <MoveToTrashDialog
+        target={deleteTarget}
+        onConfirm={() => {
+          if (deleteTarget) moveNCRToTrash(deleteTarget.id)
+          setDeleteTarget(null)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

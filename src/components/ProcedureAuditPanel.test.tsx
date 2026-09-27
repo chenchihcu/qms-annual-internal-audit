@@ -1,20 +1,27 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createDemoState } from '../data/demoData'
+import { createDemoState, migrateToV8, STORAGE_KEY } from '../data/demoData'
+import { createChecklistForProcedure } from '../data/checklistLoader'
 import { useAuditStore } from '../hooks/useAuditStore'
+import { migrateState } from '../lib/migrate'
+import { migrateToSingleWorkspace } from '../lib/singleWorkspaceMigration'
 import { ProcedureAuditPanel } from './ProcedureAuditPanel'
 
 beforeEach(() => localStorage.clear())
 
-function AuditPage() {
+function AuditPage({ selectedKey = 'QP-05|dept-qa' }: { selectedKey?: string }) {
   const store = useAuditStore()
-  return <ProcedureAuditPanel store={store} selectedKey="QP-05|dept-qa" />
+  return <ProcedureAuditPanel store={store} selectedKey={selectedKey} />
+}
+
+function createCurrentDemoState() {
+  return migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
 }
 
 describe('ProcedureAuditPanel', () => {
   it('renders checklist selector and header fields for demo audit', async () => {
     const state = createDemoState()
-    localStorage.setItem('qms-annual-internal-audit-v7', JSON.stringify(state))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     render(<AuditPage />)
 
     await waitFor(() => {
@@ -24,6 +31,134 @@ describe('ProcedureAuditPanel', () => {
       expect(screen.getByRole('region', { name: '查檢判定計數統計表' })).toBeTruthy()
       expect(screen.getByText('程序得分')).toBeTruthy()
       expect(screen.getByRole('columnheader', { name: '未判定' })).toBeTruthy()
+    })
+  })
+
+  it('shows legacy QP-03 seed wording as one shared audit question', async () => {
+    const state = createDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const sourceAudit = company.audits[0]
+    company.audits = [
+      {
+        ...sourceAudit,
+        id: 'audit-qp03-single-workspace',
+        qpCode: 'QP-03',
+        department: '品保部',
+        departmentId: 'dept-qa',
+        items: createChecklistForProcedure('QP-03', '品保部'),
+      },
+    ]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey="QP-03|dept-qa" />)
+
+    await waitFor(() => {
+      expect(screen.getAllByText('管理審查紀錄').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('組織是否保存管理審查會議紀錄，並涵蓋管理審查輸入事項與決議？').length).toBeGreaterThan(0)
+      expect(screen.queryByText(/九潤精密、正隆興精密是否各有一份管理審查會議紀錄/)).toBeNull()
+    })
+  })
+
+  it.each([
+    { status: '規劃中', setupEditable: true, canJudge: false },
+    { status: '執行中', setupEditable: false, canJudge: true },
+    { status: '已回報', setupEditable: false, canJudge: false },
+  ] as const)('enforces editable fields for $status audits', async ({ status, setupEditable, canJudge }) => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    audit.id = 'audit-QP-28-dept-qa'
+    company.audits = [audit]
+    audit.status = status
+    audit.notifyDate = '2026-07-30'
+    audit.auditDate = '2026-08-14'
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
+
+    const notifyDate = await screen.findByLabelText('通知日期') as HTMLInputElement
+    const auditDate = screen.getByLabelText('實施日期') as HTMLInputElement
+    await waitFor(() => {
+      expect(notifyDate.value).toBe(audit.notifyDate)
+      expect(auditDate.value).toBe(audit.auditDate)
+      expect(screen.getByText(status)).toBeTruthy()
+    })
+    expect(notifyDate.disabled).toBe(!setupEditable)
+    expect(auditDate.disabled).toBe(!setupEditable)
+
+    const judgments = screen.getAllByLabelText('判定') as HTMLSelectElement[]
+    expect(judgments.length).toBeGreaterThan(0)
+    expect(judgments.every((input) => input.disabled === !canJudge)).toBe(true)
+
+    expect(screen.queryByRole('button', { name: '開始稽核' }) !== null).toBe(status === '規劃中')
+    expect(screen.queryByRole('button', { name: '完成回報' }) !== null).toBe(status === '執行中')
+
+    const impartialityCheckbox = screen.queryByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement | null
+    const impartialityNote = screen.queryByLabelText('客觀性控制措施／依據') as HTMLInputElement | null
+    if (status === '已回報') {
+      expect(impartialityCheckbox).toBeNull()
+      expect(impartialityNote).toBeNull()
+    } else {
+      expect(impartialityCheckbox?.disabled).toBe(!setupEditable)
+      expect(impartialityNote?.disabled).toBe(!setupEditable)
+    }
+
+    expect(screen.queryByLabelText('稽核人員') !== null).toBe(setupEditable)
+    if (status === '執行中') {
+      expect(screen.getByText(/日期、稽核人員與客觀性設定已固定/)).toBeTruthy()
+    }
+  })
+
+  it('prevents starting an audit without an implementation date', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    audit.id = 'audit-QP-28-dept-qa'
+    company.audits = [audit]
+    audit.status = '規劃中'
+    audit.auditDate = ''
+    audit.notifyDate = '2026-07-30'
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
+    await waitFor(() => {
+      expect((screen.getByLabelText('通知日期') as HTMLInputElement).value).toBe(audit.notifyDate)
+      expect(screen.getByText('規劃中')).toBeTruthy()
+    })
+    fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))
+
+    expect((await screen.findByRole('alert')).textContent).toContain('開始稽核前須填寫實施日期')
+    expect(screen.getByText('規劃中')).toBeTruthy()
+  })
+
+  it('resets unsaved report references when changing audit records', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    const otherPlan = company.planRows.find((row) => row.qpCode !== audit.qpCode || row.departmentId !== audit.departmentId)!
+    audit.id = `audit-${audit.qpCode}-${audit.departmentId}`
+    audit.status = '執行中'
+    audit.reportReference = ''
+    const otherAudit = {
+      ...audit,
+      id: `audit-${otherPlan.qpCode}-${otherPlan.departmentId}`,
+      qpCode: otherPlan.qpCode,
+      department: otherPlan.department,
+      departmentId: otherPlan.departmentId,
+      reportReference: 'REC-B',
+      items: createChecklistForProcedure(otherPlan.qpCode, otherPlan.department),
+    }
+    company.audits = [audit, otherAudit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    const { rerender } = render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
+    const reportReference = await screen.findByLabelText('正式紀錄編號') as HTMLInputElement
+    fireEvent.change(reportReference, { target: { value: 'UNSAVED-A' } })
+    expect(reportReference.value).toBe('UNSAVED-A')
+
+    rerender(<AuditPage selectedKey={`${otherAudit.qpCode}|${otherAudit.departmentId}`} />)
+    await waitFor(() => {
+      expect((screen.getByLabelText('正式紀錄編號') as HTMLInputElement).value).toBe('REC-B')
     })
   })
 })

@@ -1,102 +1,48 @@
-import type { CertificateScope, ChecklistItem, CompanyId, ProcedureAudit } from '../types'
+import type { ChecklistItem, ProcedureAudit } from '../types'
 import { isSeedChecklistItem } from './checklistItem'
 
-/** qpCode + department + no → 證書判定範圍（種子對照，不修改 checklists.seed.json） */
-const DUAL_CERTIFICATE_ITEMS: Array<{
-  qpCode: string
-  department: string
-  no: number
-  scope: CertificateScope
-}> = [
-  { qpCode: 'QP-01', department: '品保部', no: 4, scope: 'dual' },
-  { qpCode: 'QP-03', department: '品保部', no: 10, scope: 'dual' },
-  { qpCode: 'QP-16', department: '業務部', no: 5, scope: 'dual' },
-  { qpCode: 'QP-16', department: '業務部', no: 6, scope: 'zhenglongxing' },
-  { qpCode: 'QP-16', department: '品保部', no: 3, scope: 'dual' },
-  { qpCode: 'QP-17', department: '管理部', no: 1, scope: 'dual' },
-]
-
-function scopeKey(qpCode: string, department: string, no: number): string {
-  return `${qpCode}|${department}|${no}`
-}
-
-const SCOPE_BY_KEY = new Map(
-  DUAL_CERTIFICATE_ITEMS.map((e) => [scopeKey(e.qpCode, e.department, e.no), e.scope]),
-)
-
+/** 新查檢題目在單一工作區只保留一個判定。 */
 export function resolveCertificateScope(
-  qpCode: string,
-  department: string | undefined,
-  no: number,
-): CertificateScope {
-  if (!department) return 'shared'
-  return SCOPE_BY_KEY.get(scopeKey(qpCode, department, no)) ?? 'shared'
+  _qpCode: string,
+  _department: string | undefined,
+  _no: number,
+): 'shared' {
+  return 'shared'
 }
 
 export function applyCertificateScopeToItem(
   item: ChecklistItem,
-  qpCode: string,
-  department?: string,
+  _qpCode: string,
+  _department?: string,
 ): ChecklistItem {
-  const scope = item.certificateScope ?? resolveCertificateScope(qpCode, department, item.no)
-  if (scope === 'dual') {
-    const byCo = item.judgmentByCompany ?? {
-      jiurun: item.judgment,
-      zhenglongxing: item.judgment,
-    }
-    return {
-      ...item,
-      certificateScope: 'dual',
-      judgmentByCompany: byCo,
-      judgment: null,
-    }
-  }
-  if (scope === 'jiurun' || scope === 'zhenglongxing') {
-    return { ...item, certificateScope: scope }
-  }
-  return { ...item, certificateScope: 'shared' }
+  const { judgmentByCompany: _legacyJudgments, ...singleJudgmentItem } = item
+  return { ...singleJudgmentItem, certificateScope: 'shared' }
 }
 
-export function defaultNcrCompanyScopeForItem(item: ChecklistItem): import('../types').NcrCompanyScope {
-  const scope = item.certificateScope ?? 'shared'
-  if (scope === 'jiurun') return 'jiurun'
-  if (scope === 'zhenglongxing') return 'zhenglongxing'
+/** Kept for legacy callers; the one-workspace ledger has no company-specific NCR scope. */
+export function defaultNcrCompanyScopeForItem(_item: ChecklistItem): 'both' {
   return 'both'
 }
 
-export function ncrCompanyScopeForDualSide(side: CompanyId): import('../types').NcrCompanyScope {
-  return side
+export function ncrCompanyScopeForDualSide(_side: 'jiurun' | 'zhenglongxing'): 'both' {
+  return 'both'
 }
 
 export function listDualCertificateItemKeys(): string[] {
-  return DUAL_CERTIFICATE_ITEMS.filter((e) => e.scope === 'dual').map((e) =>
-    scopeKey(e.qpCode, e.department, e.no),
-  )
+  return []
 }
 
-function scopesMatch(item: ChecklistItem, expected: CertificateScope): boolean {
-  const current = item.certificateScope ?? 'shared'
-  if (current !== expected) return false
-  if (expected === 'dual') return item.judgmentByCompany != null
-  return true
-}
-
-/** 既有種子列回填 certificateScope（自訂／跨年列不動） */
 export function backfillCertificateScopeForItem(
   item: ChecklistItem,
   qpCode: string,
   department: string,
 ): ChecklistItem {
-  if (!isSeedChecklistItem(item)) return item
-  const expected = resolveCertificateScope(qpCode, department, item.no)
-  if (scopesMatch(item, expected)) return item
+  if (!isSeedChecklistItem(item)) return applyCertificateScopeToItem(item, qpCode, department)
+  if (item.certificateScope === 'shared' && item.judgmentByCompany == null) return item
   return applyCertificateScopeToItem(item, qpCode, department)
 }
 
 export function backfillCertificateScopeForAudit(audit: ProcedureAudit): ProcedureAudit {
-  const items = audit.items.map((item) =>
-    backfillCertificateScopeForItem(item, audit.qpCode, audit.department),
-  )
-  const changed = items.some((item, i) => item !== audit.items[i])
-  return changed ? { ...audit, items } : audit
+  const items = audit.items.map((item) => backfillCertificateScopeForItem(item, audit.qpCode, audit.department))
+  return items.some((item, index) => item !== audit.items[index]) ? { ...audit, items } : audit
 }

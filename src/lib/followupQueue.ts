@@ -1,5 +1,6 @@
 import type { AppState, CompanyData, CompanyId, TabId } from '../types'
 import { companySettingsFor } from '../types'
+import { ncrNumberLabels } from './ncr'
 
 export type FollowupKind = 'ncr' | 'observation' | 'suggestion'
 export type FollowupFilter = 'all' | FollowupKind
@@ -24,19 +25,20 @@ export interface CarryForwardSummary {
 }
 
 export function buildFollowupQueue(company: CompanyData): FollowupQueueRow[] {
+  const ncrLabels = ncrNumberLabels(company.ncrs)
   const ncrRows: FollowupQueueRow[] = company.ncrs
     .filter((item) => item.status !== '結案')
     .map((item) => ({
       id: item.id,
       kind: 'ncr',
       tab: 'ncr',
-      label: item.ncrNumber || item.id,
+      label: ncrLabels.get(item.id) ?? (item.ncrNumber || item.id),
       department: item.department,
       qpCode: item.qpCode,
       status: item.status,
-      dueDate: item.date,
+      dueDate: item.dueDate,
       year: item.sourceYear ?? (Number(item.date.slice(0, 4)) || new Date().getFullYear()),
-      sortKey: item.date,
+      sortKey: item.dueDate ?? item.date,
     }))
 
   const observationRows: FollowupQueueRow[] = company.observations
@@ -74,6 +76,13 @@ export function buildFollowupQueue(company: CompanyData): FollowupQueueRow[] {
 export function filterFollowupRows(rows: FollowupQueueRow[], filter: FollowupFilter): FollowupQueueRow[] {
   if (filter === 'all') return rows
   return rows.filter((row) => row.kind === filter)
+}
+
+export function isFollowupOverdue(dueDate: string | undefined, today: string): boolean {
+  if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return false
+  const parsed = new Date(`${dueDate}T00:00:00`)
+  const normalized = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`
+  return !Number.isNaN(parsed.getTime()) && normalized === dueDate && dueDate < today
 }
 
 export function countOpenFollowups(company: CompanyData): number {

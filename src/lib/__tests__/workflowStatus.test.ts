@@ -15,17 +15,12 @@ describe('workflowStatus', () => {
     expect(canProceedToNextTab(state, 'dashboard')).toBe(true)
   })
 
-  it('blocks procedure next when standard incomplete', () => {
+  it('routes standard and procedure readiness gaps to system settings', () => {
     const state = createDemoState()
     state.companyAuditProfiles.jiurun.applicableStandards[0].confirmationStatus = 'pending'
-    expect(canProceedToNextTab(state, 'standard')).toBe(false)
-    expect(getTabWorkflowStatus(state, 'standard').ready).toBe(false)
-    expect(getTabWorkflowStatus(state, 'standard').gaps).toHaveLength(0)
-  })
-
-  it('orders risk before plan in workflow chain', () => {
-    const state = createDemoState()
-    expect(getTabWorkflowStatus(state, 'procedure').ready).toBeDefined()
+    const overview = getPdcaOverview(state, 'jiurun')
+    expect(overview.plan.gaps.filter((gap) => /適用標準|程序來源/.test(gap.message)).every((gap) => gap.tab === 'system-settings')).toBe(true)
+    expect(getTabWorkflowStatus(state, 'system-settings').ready).toBe(true)
     expect(canProceedToNextTab(state, 'ncr')).toBe(true)
     expect(canProceedToNextTab(state, 'observations')).toBe(true)
     expect(canProceedToNextTab(state, 'suggestions')).toBe(true)
@@ -131,11 +126,11 @@ describe('workflowStatus', () => {
     expect(status.advisories.some((item) => item.message.includes('待追蹤觀察'))).toBe(false)
   })
 
-  it('detects standard readiness with evidence', () => {
+  it('detects standard readiness from one shared certificate reference', () => {
     const state = createDemoState()
     const profile = state.companyAuditProfiles.jiurun
     profile.applicableStandards[0].confirmationStatus = 'confirmed'
-    profile.applicableStandards[0].evidenceReference = 'CERT-ISO-001'
+    profile.applicableStandards[1].confirmationStatus = 'confirmed'
     profile.certificateScope = '精密零件製造'
     profile.certificateReference = 'REF-001'
     expect(standardReady(state, 'jiurun')).toBe(true)

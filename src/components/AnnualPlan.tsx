@@ -17,6 +17,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
 
@@ -38,7 +40,8 @@ function statusShort(status: MonthStatus): string {
 export function AnnualPlan({ store }: { store: AuditStore }) {
   const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus } = store
   const { settings, company } = state
-  const dateWarnings = evaluateDateSequence(settings)
+  const effectiveExternalAuditDate = state.externalAuditPrep.externalAuditDate?.trim() || settings.externalAuditDate
+  const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: effectiveExternalAuditDate })
 
   const [regenConfirm, setRegenConfirm] = useState(false)
   const ownerConfirm = useDepartmentOwnerConfirm(store)
@@ -67,6 +70,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
   )
 
   const referenceDate = settings.planWindowEnd || `${settings.auditYear}-12-31`
+  const pagination = useTablePagination(company.planRows.length, 10, undefined, String(settings.auditYear))
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -167,29 +171,40 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         </div>
 
         <ScrollRegion ariaLabel="年度稽核計畫月格表">
-          <table className="qr-plan-table w-max border-collapse text-sm">
+          <table className="qr-plan-table w-max min-w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              <col style={{ width: '2.25rem' }} />
+              <col style={{ width: '2.75rem' }} />
+              <col style={{ width: '4.25rem' }} />
+              <col style={{ width: '4.5rem' }} />
+              <col style={{ width: '8rem' }} />
+              <col style={{ width: '6rem' }} />
+              <col style={{ width: '4rem' }} />
+              <col style={{ width: '4.5rem' }} />
+              {MONTHS.map((month) => <col key={month} style={{ width: '2.75rem' }} />)}
+            </colgroup>
             <thead>
               <tr className="whitespace-nowrap bg-page text-left text-muted">
-                <th className="border border-line p-2">項次</th>
-                <th className="border border-line p-2">風險</th>
-                <th className="border border-line p-2">QP</th>
-                <th className="border border-line p-2">被稽核部門</th>
-                <th className="border border-line p-2">稽核流程/文件</th>
-                <th className="border border-line p-2">負責人</th>
-                <th className="border border-line p-2">類型</th>
-                <th className="border border-line p-2">稽核人員</th>
+                <th className="border border-line px-1.5 py-2">項次</th>
+                <th className="border border-line px-1.5 py-2">風險</th>
+                <th className="min-w-[5.5rem] border border-line px-1.5 py-2 whitespace-nowrap">QP</th>
+                <th className="border border-line px-1.5 py-2">被稽核部門</th>
+                <th className="border border-line px-1.5 py-2 whitespace-normal">稽核流程/文件</th>
+                <th className="border border-line px-1.5 py-2">負責人</th>
+                <th className="border border-line px-1.5 py-2">類型</th>
+                <th className="border border-line px-1.5 py-2">稽核人員</th>
                 {MONTHS.map((m) => (
                   <th key={m} className="border border-line p-1 text-center w-11">{m}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {company.planRows.map((row) => {
+              {company.planRows.map((row, rowIndex) => {
                 const unscheduled = !row.months.some(Boolean)
                 return (
                 <tr
                   key={row.id}
-                  className={`whitespace-nowrap ${
+                  className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${
                     unscheduled
                       ? 'bg-rose-50/60 dark:bg-rose-950/20'
                       : row.manualOverride
@@ -197,11 +212,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         : ''
                   }`}
                 >
-                  <td className="border border-line p-2">{row.sequence}</td>
-                  <td className="border border-line p-2"><Badge label={row.riskLevel} /></td>
-                  <td className="border border-line p-2 font-medium">
+                  <td className="border border-line px-1.5 py-2 tabular-nums">{row.sequence}</td>
+                  <td className="border border-line px-1.5 py-2"><Badge label={row.riskLevel} /></td>
+                  <td className="min-w-[5.5rem] border border-line px-1.5 py-2 font-medium">
                     <div className="flex flex-wrap items-center gap-1">
-                      <span>{row.qpCode}</span>
+                      <span className="whitespace-nowrap">{row.qpCode}</span>
                       {unscheduled && (
                         <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
                           未排月格
@@ -214,12 +229,12 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                       )}
                     </div>
                   </td>
-                  <td className="border border-line p-2">{row.department}</td>
-                  <td className="border border-line p-2">
+                  <td className="border border-line px-1.5 py-2 break-words">{row.department}</td>
+                  <td className="border border-line px-1.5 py-2 break-words">
                     <div>{row.process}</div>
                     <div className="text-xs text-muted">{row.documents}</div>
                   </td>
-                  <td className="border border-line p-2">
+                  <td className="border border-line px-1.5 py-2">
                     <DepartmentOwnerField
                       departmentId={row.departmentId}
                       savedOwner={deptOwner(row.departmentId)}
@@ -233,10 +248,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         referenceDate,
                       )}
                       inputClassName="px-1 py-0.5"
+                      selectClassName="!min-w-0 !w-24 !px-1.5 !py-1"
                     />
                   </td>
-                  <td className="border border-line p-2 text-xs">{row.auditCategory}</td>
-                  <td className="border border-line p-2">
+                  <td className="border border-line px-1.5 py-2 text-xs break-words">{row.auditCategory}</td>
+                  <td className="border border-line px-1.5 py-2 break-words">
                     <AuditorMultiSelect
                       value={row.auditors}
                       onChange={(auditors) => updatePlanRow(row.id, { auditors })}
@@ -278,6 +294,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
+        <TablePagination pagination={pagination} label="年度稽核計畫" />
       </div>
     </div>
   )

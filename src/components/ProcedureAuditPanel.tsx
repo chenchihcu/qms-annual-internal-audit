@@ -4,17 +4,20 @@ import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
 import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { markAuditNotified } from '../lib/auditNotice'
-import { isSeedChecklistItem } from '../lib/checklistItem'
+import {
+  getChecklistDisplayCategory,
+  getChecklistDisplayContent,
+  isSeedChecklistItem,
+} from '../lib/checklistItem'
 import { FOCUS_RING } from '../lib/focusRing'
 import { checkImpartiality } from '../lib/impartiality'
-import { findNcrsForChecklistItem, isNcrStale } from '../lib/ncr'
+import { findNcrsForChecklistItem, isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import type { NavigateOptions } from '../lib/navigation'
 import { isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
-import type { ChecklistItem, CompanyId, Judgment, TabId } from '../types'
-import { COMPANY_LABELS } from '../types'
+import type { ChecklistItem, Judgment, TabId } from '../types'
 import { auditorCandidates, departmentMemberCandidates } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { Badge, Button, Input, Select } from './ui/Badge'
@@ -22,6 +25,8 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -71,10 +76,6 @@ export function ProcedureAuditPanel({
   const [deleteTarget, setDeleteTarget] = useState<{ itemId: string; isNonConform: boolean } | null>(
     null,
   )
-  const [startErrors, setStartErrors] = useState<string[]>([])
-  const [startSuccess, setStartSuccess] = useState(false)
-  const [reportErrors, setReportErrors] = useState<string[]>([])
-  const [reportReferenceDraft, setReportReferenceDraft] = useState('')
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const [qpCode, departmentId] = selectedKey.split('|')
@@ -82,22 +83,63 @@ export function ProcedureAuditPanel({
     qpCode && departmentId
       ? company.audits.find((a) => a.qpCode === qpCode && a.departmentId === departmentId)
       : undefined
+  const persistedReportReference = persistedAudit?.reportReference ?? ''
+  const auditStateKey = persistedAudit?.id ?? selectedKey
+  const [startFeedback, setStartFeedback] = useState({
+    key: auditStateKey,
+    errors: [] as string[],
+    success: false,
+    reportErrors: [] as string[],
+  })
+  if (startFeedback.key !== auditStateKey) {
+    setStartFeedback({ key: auditStateKey, errors: [], success: false, reportErrors: [] })
+  }
+  const feedbackForAudit = startFeedback.key === auditStateKey
+    ? startFeedback
+    : { key: auditStateKey, errors: [], success: false, reportErrors: [] }
+  const updateAuditFeedback = (patch: Partial<Omit<typeof feedbackForAudit, 'key'>>) => {
+    setStartFeedback((current) => ({
+      ...(current.key === auditStateKey
+        ? current
+        : { key: auditStateKey, errors: [], success: false, reportErrors: [] }),
+      ...patch,
+      key: auditStateKey,
+    }))
+  }
+  const startErrors = feedbackForAudit.errors
+  const startSuccess = feedbackForAudit.success
+  const reportErrors = feedbackForAudit.reportErrors
+  const setStartErrors = (errors: string[]) => updateAuditFeedback({ errors })
+  const setStartSuccess = (success: boolean) => updateAuditFeedback({ success })
+  const setReportErrors = (errors: string[]) => updateAuditFeedback({ reportErrors: errors })
+
+  const [reportDraft, setReportDraft] = useState({
+    key: auditStateKey,
+    persistedReference: persistedReportReference,
+    value: persistedReportReference,
+  })
+  if (reportDraft.key !== auditStateKey || reportDraft.persistedReference !== persistedReportReference) {
+    setReportDraft({
+      key: auditStateKey,
+      persistedReference: persistedReportReference,
+      value: persistedReportReference,
+    })
+  }
+  const reportReferenceDraft = reportDraft.key === auditStateKey
+    && reportDraft.persistedReference === persistedReportReference
+    ? reportDraft.value
+    : persistedReportReference
+  const setReportReferenceDraft = (value: string) => setReportDraft({
+    key: auditStateKey,
+    persistedReference: persistedReportReference,
+    value,
+  })
 
   useEffect(() => {
     if (!qpCode || !departmentId) return
     const audit = getOrCreateAudit(qpCode, departmentId)
     if (audit !== persistedAudit) updateAudit(audit)
   }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
-
-  useEffect(() => {
-    if (!persistedAudit) return
-    setReportReferenceDraft(persistedAudit.reportReference ?? '')
-  }, [persistedAudit?.id, persistedAudit?.reportReference])
-
-  useEffect(() => {
-    setStartSuccess(false)
-    setStartErrors([])
-  }, [persistedAudit?.id])
 
   const requiredStandards = useMemo(
     () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards
@@ -133,16 +175,23 @@ export function ProcedureAuditPanel({
     [state.people, state.activeCompanyId, departmentId, referenceDate],
   )
 
+  const auditForPage = qpCode && departmentId
+    ? persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
+    : undefined
+  const pagination = useTablePagination(auditForPage?.items.length ?? 0, 10, undefined, auditForPage?.id ?? '')
+
   if (!qpCode || !departmentId) {
     return <p className="text-muted">請先於年度稽核計畫建立查檢項目</p>
   }
 
-  const audit = persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
+  const audit = auditForPage!
   const dept = company.departments.find((d) => d.id === departmentId)
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
-  const categories = [...new Set(audit.items.map((i) => i.category))]
+  const categories = [...new Set(audit.items.map(getChecklistDisplayCategory))]
+  const itemIndexById = new Map(audit.items.map((item, index) => [item.id, index]))
   const auditStatus = audit.status ?? '規劃中'
+  const auditSetupEditable = auditStatus === '規劃中'
   const auditLocked = auditStatus === '已回報'
   const canJudge = auditStatus === '執行中' && !auditLocked
   const managerMismatch =
@@ -209,15 +258,7 @@ export function ProcedureAuditPanel({
     updateAudit({ ...audit, [field]: value })
   }
 
-  const isItemNonConform = (item: (typeof audit.items)[0]) => {
-    if (item.certificateScope === 'dual' && item.judgmentByCompany) {
-      return (
-        item.judgmentByCompany.jiurun === '不符' ||
-        item.judgmentByCompany.zhenglongxing === '不符'
-      )
-    }
-    return item.judgment === '不符'
-  }
+  const isItemNonConform = (item: (typeof audit.items)[0]) => item.judgment === '不符'
 
   const handleRemove = (itemId: string, isNonConform: boolean) => {
     setDeleteTarget({ itemId, isNonConform })
@@ -227,7 +268,8 @@ export function ProcedureAuditPanel({
     const linked = findNcrsForChecklistItem(company.ncrs, item.id)
     if (linked.length === 0 || !onNavigate) return null
     const stale = linked.some((n) => isNcrStale(n, company.audits))
-    const numbers = linked.map((n) => n.ncrNumber).join('、')
+    const numberLabels = ncrNumberLabels(linked)
+    const numbers = linked.map((n) => numberLabels.get(n.id) ?? n.ncrNumber).join('、')
     return (
       <div className="mt-1 text-xs no-print">
         <button
@@ -272,14 +314,14 @@ export function ProcedureAuditPanel({
       <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
       <ConfirmDialog
         open={deleteTarget !== null}
-        title="刪除稽核項目"
+        title="移至回收區？"
         description={
           deleteTarget?.isNonConform
-            ? '此項目判定為「不符」，對應 NCR 仍會保留。確定刪除此查檢項？'
-            : '確定刪除此自訂／追蹤查檢項？此操作無法復原。'
+            ? '此項目判定為「不符」，對應 NCR 仍會保留。查檢項可在系統設定的回收區還原。'
+            : '自訂／追蹤查檢項將移至系統設定的回收區，之後可還原。'
         }
         variant="danger"
-        confirmLabel="刪除"
+        confirmLabel="移入回收區"
         onConfirm={() => {
           if (deleteTarget) removeChecklistItem(audit.id, deleteTarget.itemId)
           setDeleteTarget(null)
@@ -326,6 +368,11 @@ export function ProcedureAuditPanel({
               已開始。適用標準、程序代碼、版本與保存位置已固定。
             </p>
           )}
+          {auditStatus === '執行中' && (
+            <p className="text-xs text-muted">
+              日期、稽核人員與客觀性設定已固定；查檢內容、判定與證據可編輯至回報。部門主管主檔異動仍須確認。
+            </p>
+          )}
           {reportErrors.length > 0 && (
             <ul className="list-disc space-y-0.5 pl-5 text-sm text-red-700" role="alert">
               {reportErrors.map((msg) => <li key={msg}>{msg}</li>)}
@@ -359,6 +406,7 @@ export function ProcedureAuditPanel({
                   type="checkbox"
                   className="mt-1"
                   checked={audit.team?.impartialityConfirmed ?? false}
+                  disabled={!auditSetupEditable}
                   onChange={(e) => updateTeam({ impartialityConfirmed: e.target.checked })}
                 />
                 <span>客觀性風險已確認（同單位稽核等）</span>
@@ -367,6 +415,7 @@ export function ProcedureAuditPanel({
                 label="客觀性控制措施／依據"
                 value={audit.team?.impartialityNote ?? ''}
                 onChange={(value) => updateTeam({ impartialityNote: value })}
+                disabled={!auditSetupEditable}
               />
             </div>
           )}
@@ -400,6 +449,7 @@ export function ProcedureAuditPanel({
                     onChange={(v) => handleHeaderChange('notifyDate', v)}
                     className="no-print"
                     ariaLabel="通知日期"
+                    disabled={!auditSetupEditable}
                   />
                   <span className="print-only">{audit.notifyDate}</span>
                 </td>
@@ -415,6 +465,7 @@ export function ProcedureAuditPanel({
                     onChange={(v) => handleHeaderChange('auditDate', v)}
                     className="no-print"
                     ariaLabel="實施日期"
+                    disabled={!auditSetupEditable}
                   />
                   <span className="print-only">{audit.auditDate}</span>
                 </td>
@@ -474,7 +525,7 @@ export function ProcedureAuditPanel({
                     candidates={auditorPickerCandidates}
                     people={state.people}
                     excludePersonId={audit.team?.leadAuditorPersonId}
-                    disabled={auditLocked}
+                    disabled={!auditSetupEditable}
                     ariaLabel="稽核人員"
                   />
                 </td>
@@ -533,20 +584,29 @@ export function ProcedureAuditPanel({
             </thead>
             <tbody>
               {categories.map((cat) => {
-                const catItems = audit.items.filter((i) => i.category === cat)
-                return catItems.map((item, idx) => (
+                const catItems = audit.items.filter((i) => getChecklistDisplayCategory(i) === cat)
+                const visibleCatItems = catItems.filter((item) => pagination.isVisible(itemIndexById.get(item.id) ?? -1))
+                const firstVisibleId = visibleCatItems[0]?.id
+                return catItems.map((item, idx) => {
+                  const visible = pagination.isVisible(itemIndexById.get(item.id) ?? -1)
+                  return (
                   <tr
                     key={item.id}
-                    className={
+                    className={`${!visible ? 'pagination-hidden-row ' : ''}${
                       isChecklistItemPending(item)
                         ? 'bg-rose-50/40 dark:bg-rose-950/20'
                         : item.sourceYear
                           ? 'bg-amber-50/40 dark:bg-amber-950/20'
                           : ''
-                    }
+                    }`}
                   >
+                    {item.id === firstVisibleId && visibleCatItems.length > 0 && (
+                      <td className="no-print border border-line p-2 align-top font-medium" rowSpan={visibleCatItems.length}>
+                        {cat}
+                      </td>
+                    )}
                     {idx === 0 && (
-                      <td className="border border-line p-2 align-top font-medium" rowSpan={catItems.length}>
+                      <td className="pagination-print-cell border border-line p-2 align-top font-medium" rowSpan={catItems.length}>
                         {cat}
                       </td>
                     )}
@@ -558,7 +618,7 @@ export function ProcedureAuditPanel({
                         </span>
                       )}
                       {isSeedChecklistItem(item) ? (
-                        <span className="text-ink">{item.content}</span>
+                        <span className="text-ink">{getChecklistDisplayContent(item)}</span>
                       ) : (
                         <input
                           className={`w-full rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
@@ -570,7 +630,7 @@ export function ProcedureAuditPanel({
                           aria-label={`${audit.qpCode} NO ${item.no} 稽核內容`}
                         />
                       )}
-                      <span className="print-only">{item.content}</span>
+                      <span className="print-only">{getChecklistDisplayContent(item)}</span>
                       {item.as9100Clause && (
                         <span className="mt-1 block text-xs text-slate-500 no-print">
                           AS9100 {item.as9100Clause}
@@ -581,36 +641,13 @@ export function ProcedureAuditPanel({
                       )}
                     </td>
                     <td className="border border-line p-2 align-top">
-                      {item.certificateScope === 'dual' ? (
-                        <div className="flex flex-col gap-2">
-                          {(['jiurun', 'zhenglongxing'] as CompanyId[]).map((side) =>
-                            renderJudgmentSelect(
-                              item.judgmentByCompany?.[side],
-                              (j) =>
-                                updateChecklistItem(audit.id, item.id, {
-                                  judgmentByCompany: {
-                                    jiurun: item.judgmentByCompany?.jiurun ?? null,
-                                    zhenglongxing: item.judgmentByCompany?.zhenglongxing ?? null,
-                                    [side]: j,
-                                  },
-                                }),
-                              COMPANY_LABELS[side],
-                              !canJudge,
-                            ),
-                          )}
-                          {renderNcrHint(item)}
-                        </div>
-                      ) : (
-                        <>
-                          {renderJudgmentSelect(
-                            item.judgment,
-                            (j) => updateChecklistItem(audit.id, item.id, { judgment: j }),
-                            undefined,
-                            !canJudge,
-                          )}
-                          {renderNcrHint(item)}
-                        </>
+                      {renderJudgmentSelect(
+                        item.judgment,
+                        (j) => updateChecklistItem(audit.id, item.id, { judgment: j }),
+                        undefined,
+                        !canJudge,
                       )}
+                      {renderNcrHint(item)}
                     </td>
                     <td className="border border-line p-2 align-top">
                       <div className="space-y-2">
@@ -671,16 +708,18 @@ export function ProcedureAuditPanel({
                           className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
                           onClick={() => handleRemove(item.id, isItemNonConform(item))}
                         >
-                          刪除
+                          移至回收區
                         </button>
                       ) : null}
                     </td>
                   </tr>
-                ))
+                  )
+                })
               })}
             </tbody>
           </table>
         </ScrollRegion>
+        <TablePagination pagination={pagination} label="查檢表" />
       </div>
     </div>
   )

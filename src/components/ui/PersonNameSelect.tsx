@@ -13,6 +13,7 @@ export interface PersonNameSelectProps {
   candidates: Person[]
   ariaLabel?: string
   className?: string
+  selectClassName?: string
   disabled?: boolean
 }
 
@@ -23,6 +24,7 @@ export function PersonNameSelect({
   candidates,
   ariaLabel,
   className = '',
+  selectClassName = '',
   disabled = false,
 }: PersonNameSelectProps) {
   const candidateNames = useMemo(() => new Set(candidates.map((person) => person.name)), [candidates])
@@ -72,6 +74,7 @@ export function PersonNameSelect({
       options={options}
       ariaLabel={ariaLabel}
       disabled={disabled}
+      className={selectClassName}
     />
   )
 }

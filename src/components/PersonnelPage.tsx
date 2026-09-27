@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { AnnualPersonnelAssignment, Person, PersonnelRole, QualificationRecord, RoleAppointment, ValidityMode } from '../types'
-import { COMPANY_LABELS } from '../types'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import {
   formatQualificationScopeSummary,
@@ -18,10 +17,13 @@ import { Badge, Button, Card, Input, Select } from './ui/Badge'
 import { PersonNameSelect } from './ui/PersonNameSelect'
 import { CheckboxList } from './ui/CheckboxList'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { EmptyState } from './ui/EmptyState'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 const ROLES = Object.keys(PERSONNEL_ROLE_LABELS) as PersonnelRole[]
 
@@ -133,17 +135,17 @@ function ScopeCheckboxGroup({
 }
 
 export function PersonnelPage({ store }: { store: AuditStore }) {
-  const { state, addPerson, updatePerson, deactivatePerson, upsertAnnualPersonnelAssignment } = store
+  const { state, addPerson, updatePerson, deactivatePerson, movePersonToTrash, upsertAnnualPersonnelAssignment } = store
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<'all' | PersonnelRole>('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [companyFilter, setCompanyFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
   const [scopeFilter, setScopeFilter] = useState('')
   const [editing, setEditing] = useState<FormState | null>(null)
   const [dirty, setDirty] = useState(false)
   const [pendingCancel, setPendingCancel] = useState(false)
   const [pendingDeactivate, setPendingDeactivate] = useState<Person | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
   const [saveMessage, setSaveMessage] = useState(false)
   const editCardRef = useRef<HTMLDivElement>(null)
   const today = new Date().toISOString().slice(0, 10)
@@ -175,24 +177,24 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     return () => window.removeEventListener('beforeunload', warn)
   }, [dirty])
 
+  const editingId = editing?.id
   useEffect(() => {
-    if (editing && editCardRef.current) {
+    if (editingId && editCardRef.current) {
       editCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [editing?.id])
+  }, [editingId])
 
   const rows = useMemo(() => state.people.filter((person) => {
     const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
-    const affiliationText = person.affiliations.map((item) => [item.externalOrganization, item.companyId, item.departmentId].filter(Boolean).join(' ')).join(' ')
+    const affiliationText = person.affiliations.map((item) => [item.externalOrganization, item.departmentId].filter(Boolean).join(' ')).join(' ')
     const matchesSearch = `${person.name} ${person.employeeNumber} ${affiliationText}`.toLowerCase().includes(search.toLowerCase())
     const matchesRole = roleFilter === 'all' || roles.includes(roleFilter)
     const status = primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)
-    const matchesCompany = companyFilter === 'all' || person.affiliations.some((item) => item.companyId === companyFilter)
     const matchesDepartment = departmentFilter === 'all' || person.affiliations.some((item) => item.departmentId === departmentFilter)
     const scopeText = person.qualifications.map((qualification) => formatQualificationScopeSummary(qualification)).join(' ')
     const matchesScope = scopeText.toLowerCase().includes(scopeFilter.toLowerCase())
-    return matchesSearch && matchesRole && matchesCompany && matchesDepartment && matchesScope && (statusFilter === 'all' || status === statusFilter)
-  }), [state.people, state.settings.auditYear, state.annualPersonnelAssignments, search, roleFilter, statusFilter, companyFilter, departmentFilter, scopeFilter, today])
+    return matchesSearch && matchesRole && matchesDepartment && matchesScope && (statusFilter === 'all' || status === statusFilter)
+  }), [state.people, state.settings.auditYear, state.annualPersonnelAssignments, search, roleFilter, statusFilter, departmentFilter, scopeFilter, today])
 
   const patchForm = (patch: Partial<FormState>) => {
     setEditing((current) => current ? { ...current, ...patch } : current)
@@ -380,8 +382,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   }
 
   const showExternalOrg = editing?.type === 'external'
-  const showCompanyFields = editing && !isThirdPartyRole(editing.role)
-  const showDepartment = editing && (showCompanyFields || isEscortRole(editing.role))
+  const showDepartment = editing && (editing.type === 'internal' || isEscortRole(editing.role))
   const showAuditorScopes = editing && isAuditorRole(editing.role)
   const showAuditorValidity = editing && isAuditorRole(editing.role)
   const showAppointmentDocs = editing && (isAuditorRole(editing.role) || isManagementRepRole(editing.role))
@@ -402,10 +403,15 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       <Input label="搜尋姓名／編號／機構" value={search} onChange={setSearch} />
       <Select label="角色" value={roleFilter} onChange={(v) => setRoleFilter(v as typeof roleFilter)} options={[{ value: 'all', label: '全部角色' }, ...ROLES.map((role) => ({ value: role, label: PERSONNEL_ROLE_LABELS[role] }))]} />
       <Select label="資格狀態" value={statusFilter} onChange={setStatusFilter} options={['all', '有效', '待確認', '未生效', '已逾期', '已暫停', '已終止', '已停用'].map((value) => ({ value, label: value === 'all' ? '全部狀態' : value }))} />
-      <Select label="所屬公司" value={companyFilter} onChange={setCompanyFilter} options={[{ value: 'all', label: '全部公司' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
       <Select label="責任單位" value={departmentFilter} onChange={setDepartmentFilter} options={[{ value: 'all', label: '全部責任單位' }, ...state.company.departments.map((department) => ({ value: department.id, label: department.name }))]} />
       <Input label="可稽核程序／範圍" value={scopeFilter} onChange={setScopeFilter} />
     </>
+  )
+  const pagination = useTablePagination(
+    rows.length,
+    10,
+    undefined,
+    JSON.stringify([search, roleFilter, statusFilter, departmentFilter, scopeFilter, state.settings.auditYear]),
   )
 
   return (
@@ -448,9 +454,6 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
           <Input label="姓名 *" value={editing.name} onChange={(v) => patchForm({ name: v })} />
           <Select label="人員類型" value={editing.type} onChange={(v) => patchForm({ type: v as FormState['type'] })} options={[{ value: 'internal', label: '內部人員' }, { value: 'external', label: '外部人員' }]} />
           {showExternalOrg && <Input label="外部機構" value={editing.externalOrganization} onChange={(v) => patchForm({ externalOrganization: v })} />}
-          {showCompanyFields && (
-            <Select label="公司" value={editing.companyId} onChange={(v) => patchForm({ companyId: v as FormState['companyId'] })} options={[{ value: '', label: '不適用／待確認' }, ...Object.entries(COMPANY_LABELS).map(([value, label]) => ({ value, label }))]} />
-          )}
           {showDepartment && (
             <Select label="責任單位" value={editing.departmentId} onChange={(v) => patchForm({ departmentId: v })} options={[{ value: '', label: '待確認' }, ...state.company.departments.map((d) => ({ value: d.id, label: d.name }))]} />
           )}
@@ -459,7 +462,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
             <>
               <ScopeCheckboxGroup
                 label="標準與版本"
-                allLabel="本公司全部已確認標準"
+                allLabel="全部已確認標準"
                 options={standardOptions}
                 value={editing.standards}
                 onChange={(standards) => patchForm({ standards })}
@@ -512,12 +515,13 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         {rows.length === 0 ? (
           <EmptyState message="目前沒有人員。" />
         ) : (
+          <>
           <ScrollRegion ariaLabel="人員合格名單工作表">
             <table className="w-full min-w-[960px] border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-50 text-left">
                   <th className="border p-2">姓名／編號</th>
-                  <th className="border p-2">公司或機構</th>
+                  <th className="border p-2">所屬單位</th>
                   <th className="border p-2">責任單位</th>
                   <th className="border p-2">角色</th>
                   <th className="border p-2">狀態</th>
@@ -527,17 +531,17 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((person) => {
+                {rows.map((person, index) => {
                   const affiliation = person.affiliations[0]
                   const qualification = currentQualification(person, undefined, today)
                   return (
-                    <tr key={person.id}>
+                    <tr key={person.id} className={!pagination.isVisible(index) ? 'pagination-hidden-row' : undefined}>
                       <td className="border p-2 font-medium">
                         {person.name}
                         <span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span>
                       </td>
                       <td className="border p-2">
-                        {affiliation?.companyId ? COMPANY_LABELS[affiliation.companyId] : affiliation?.externalOrganization || '待確認'}
+                        {affiliation?.externalOrganization || (person.type === 'internal' ? '公司內部' : '待確認')}
                       </td>
                       <td className="border p-2">
                         {state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}
@@ -560,6 +564,15 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                           {person.active && (
                             <Button variant="ghost" icon="minusCircle" onClick={() => setPendingDeactivate(person)}>停用</Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            icon={ACTION_ICONS.delete}
+                            className="text-red-700"
+                            aria-label={`移至回收區：${person.name}`}
+                            onClick={() => setDeleteTarget({ id: person.id, label: `${person.name}${person.employeeNumber ? ` · ${person.employeeNumber}` : ''}` })}
+                          >
+                            移至回收區
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -568,6 +581,8 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
               </tbody>
             </table>
           </ScrollRegion>
+          <TablePagination pagination={pagination} label="人員合格名單" />
+          </>
         )}
       </div>
       {pendingCancel && (
@@ -595,6 +610,14 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
           onCancel={() => setPendingDeactivate(null)}
         />
       )}
+      <MoveToTrashDialog
+        target={deleteTarget}
+        onConfirm={() => {
+          if (deleteTarget) movePersonToTrash(deleteTarget.id)
+          setDeleteTarget(null)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

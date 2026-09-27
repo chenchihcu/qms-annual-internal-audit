@@ -85,39 +85,27 @@ describe('scoreChecklistItems', () => {
     expect(formatScoreDisplay(result)).toBe('不適用')
   })
 
-  it('counts dual items as two scoring units', () => {
-    const dual: ChecklistItem = {
-      id: 'dual-1',
-      category: '雙證',
-      no: 4,
-      content: '雙證',
-      judgment: null,
-      description: '',
-      certificateScope: 'dual',
-      judgmentByCompany: { jiurun: '符合', zhenglongxing: '符合' },
-      objectiveEvidence: '雙證佐證',
+  it('scores one shared checklist item once', () => {
+    const shared: ChecklistItem = {
+      ...item('符合'),
+      certificateScope: 'shared',
     }
-    const result = scoreChecklistItems([dual])
-    expect(result.applicableItems).toBe(2)
+    const result = scoreChecklistItems([shared])
+    expect(result.totalItems).toBe(1)
+    expect(result.applicableItems).toBe(1)
     expect(result.score).toBe(100)
   })
 
-  it('scores judged dual side while other side remains pending', () => {
-    const dual: ChecklistItem = {
-      id: 'dual-partial',
-      category: '雙證',
-      no: 4,
-      content: '雙證',
-      judgment: null,
-      description: '',
-      certificateScope: 'dual',
-      judgmentByCompany: { jiurun: '符合', zhenglongxing: null },
-      objectiveEvidence: '九潤佐證',
+  it('does not infer a judgment from legacy per-company values', () => {
+    const legacy: ChecklistItem = {
+      ...item(null),
+      certificateScope: 'shared',
+      judgmentByCompany: { jiurun: '符合', zhenglongxing: '符合' },
     }
-    const result = scoreChecklistItems([dual])
+    const result = scoreChecklistItems([legacy])
     expect(result.breakdown.pending).toBe(1)
-    expect(result.applicableItems).toBe(1)
-    expect(result.status).toBe('incomplete')
+    expect(result.applicableItems).toBe(0)
+    expect(result.status).toBe('unevaluated')
   })
 })
 

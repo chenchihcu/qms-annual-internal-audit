@@ -1,5 +1,5 @@
 import { itemHasObjectiveEvidence, itemNeedsObjectiveEvidence } from './checklistEvidence'
-import type { ChecklistItem, CompanyId, Judgment, ProcedureAudit, ScoringRules } from '../types'
+import type { ChecklistItem, Judgment, ProcedureAudit, ScoringRules } from '../types'
 import { DEFAULT_SCORING_RULES } from '../types'
 
 export type ScoreStatus = 'scored' | 'incomplete' | 'unevaluated' | 'not_applicable'
@@ -31,14 +31,6 @@ function isJudgmentSidePending(judgment: Judgment | null | undefined, item: Chec
 
 /** 未判定、缺客觀證據，或不適用但未填理由 */
 export function isChecklistItemPending(item: ChecklistItem): boolean {
-  const scope = item.certificateScope ?? 'shared'
-  if (scope === 'dual') {
-    const byCo = item.judgmentByCompany ?? { jiurun: null, zhenglongxing: null }
-    return (
-      isJudgmentSidePending(byCo.jiurun, item) ||
-      isJudgmentSidePending(byCo.zhenglongxing, item)
-    )
-  }
   return isJudgmentSidePending(item.judgment, item)
 }
 
@@ -108,27 +100,6 @@ export function scoreChecklistItems(
   let scoringUnits = 0
 
   for (const item of items) {
-    const scope = item.certificateScope ?? 'shared'
-
-    if (scope === 'dual') {
-      const byCo = item.judgmentByCompany ?? { jiurun: null, zhenglongxing: null }
-      for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
-        const j = byCo[side]
-        scoringUnits++
-        if (j) judgedCount++
-        if (isJudgmentSidePending(j, item)) {
-          breakdown.pending++
-          continue
-        }
-        if (j) {
-          const r = applyJudgmentToBreakdown(j, breakdown, rules)
-          numerator += r.numerator
-          applicable += r.applicable
-        }
-      }
-      continue
-    }
-
     scoringUnits++
     if (item.judgment) judgedCount++
 
@@ -183,35 +154,14 @@ export function isAuditComplete(audit: ProcedureAudit, rules?: ScoringRules): bo
 }
 
 export function hasAnyJudgment(audits: ProcedureAudit[]): boolean {
-  return audits.some((a) =>
-    a.items.some((i) => {
-      if (i.certificateScope === 'dual' && i.judgmentByCompany) {
-        return i.judgmentByCompany.jiurun != null || i.judgmentByCompany.zhenglongxing != null
-      }
-      return i.judgment !== null && i.judgment !== undefined
-    }),
-  )
+  return audits.some((audit) => audit.items.some((item) => item.judgment != null))
 }
 
 export function countNonConformJudgments(item: ChecklistItem): number {
-  const scope = item.certificateScope ?? 'shared'
-  if (scope === 'dual' && item.judgmentByCompany) {
-    let n = 0
-    if (item.judgmentByCompany.jiurun === '不符') n++
-    if (item.judgmentByCompany.zhenglongxing === '不符') n++
-    return n
-  }
   return item.judgment === '不符' ? 1 : 0
 }
 
 export function countObservationJudgments(item: ChecklistItem): number {
-  const scope = item.certificateScope ?? 'shared'
-  if (scope === 'dual' && item.judgmentByCompany) {
-    let n = 0
-    if (item.judgmentByCompany.jiurun === '觀察') n++
-    if (item.judgmentByCompany.zhenglongxing === '觀察') n++
-    return n
-  }
   return item.judgment === '觀察' ? 1 : 0
 }
 

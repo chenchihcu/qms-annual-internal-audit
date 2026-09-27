@@ -152,6 +152,7 @@ export function Select({
   error,
   required,
   disabled,
+  className = '',
 }: {
   label?: string
   value: string
@@ -163,6 +164,7 @@ export function Select({
   error?: string
   required?: boolean
   disabled?: boolean
+  className?: string
 }) {
   const generatedId = useId()
   const selectId = id ?? `select-${generatedId}`
@@ -181,7 +183,7 @@ export function Select({
         aria-invalid={error ? true : undefined}
         required={required}
         disabled={disabled}
-        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING} ${className}`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

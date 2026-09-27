@@ -20,7 +20,7 @@ for (const id of ['jiurun','zhenglongxing'] as const) {
     try {
       const items = createChecklistForProcedure(row.qpCode, row.department)
       if (!items.length) issues.push(`${id} empty checklist ${row.qpCode}`)
-    } catch (e) { issues.push(`${id} checklist throw ${row.qpCode}`) }
+    } catch { issues.push(`${id} checklist throw ${row.qpCode}`) }
   }
   for (const a of co.audits) {
     const entry = PROCEDURE_PLAN_TEMPLATE.find(e => e.qpCode===a.qpCode && e.departmentId===a.departmentId)

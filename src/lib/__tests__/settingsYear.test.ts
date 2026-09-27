@@ -5,22 +5,22 @@ import { applyAuditYearChange } from '../settingsYear'
 describe('applyAuditYearChange', () => {
   it('preserves external prep items when resetExternalPrep is false', () => {
     const state = createDemoState()
-    state.externalAuditPrep.items[0].jiurunDone = true
+    state.externalAuditPrep.items[0].completed = true
     state.externalAuditPrep.items[0].remark = '已準備'
 
     const next = applyAuditYearChange(state, 'jiurun', 2027, false)
     expect(next.companySettings.jiurun.auditYear).toBe(2027)
     expect(next.externalAuditPrep.year).toBe(2026)
-    expect(next.externalAuditPrep.items[0].jiurunDone).toBe(true)
+    expect(next.externalAuditPrep.items[0].completed).toBe(true)
     expect(next.externalAuditPrep.items[0].remark).toBe('已準備')
   })
 
   it('resets external prep when resetExternalPrep is true', () => {
     const state = createDemoState()
-    state.externalAuditPrep.items[0].jiurunDone = true
+    state.externalAuditPrep.items[0].completed = true
 
     const next = applyAuditYearChange(state, 'jiurun', 2027, true)
     expect(next.externalAuditPrep.year).toBe(2027)
-    expect(next.externalAuditPrep.items[0].jiurunDone).toBe(false)
+    expect(next.externalAuditPrep.items[0].completed).toBe(false)
   })
 })

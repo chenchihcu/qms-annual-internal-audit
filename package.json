@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 43123 --host 127.0.0.1",
+    "dev": "vite --port 43124 --host 127.0.0.1 --strictPort",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "preview": "vite preview --port 43124 --host 127.0.0.1 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "oxlint"
@@ -15,8 +15,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "xlsx": "^0.18.5"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

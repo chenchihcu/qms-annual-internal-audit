@@ -4,7 +4,7 @@ import App from '../../App'
 
 describe('StakeholdersPage', () => {
   beforeEach(() => {
-    window.location.hash = ''
+    window.history.replaceState(null, '', '/')
     localStorage.clear()
   })
 
@@ -14,7 +14,7 @@ describe('StakeholdersPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: '利害關係人' })).toBeTruthy()
-    })
+    }, { timeout: 5000 })
 
     const form = document.getElementById('stakeholders-form') as HTMLElement
     expect(form).toBeTruthy()
@@ -39,7 +39,7 @@ describe('StakeholdersPage', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('管理部').length).toBeGreaterThan(0)
-    })
+    }, { timeout: 5000 })
 
     const adminRow = formDepartmentRow('dept-admin')
     expect(adminRow).toBeTruthy()

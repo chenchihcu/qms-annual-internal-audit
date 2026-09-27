@@ -8,6 +8,9 @@ import { EmptyState } from './ui/EmptyState'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 export function Suggestions({
   store,
@@ -16,7 +19,7 @@ export function Suggestions({
   store: AuditStore
   highlightRecordId?: string
 }) {
-  const { state, updateSuggestion, carryForwardSuggestion, addSuggestion } = store
+  const { state, updateSuggestion, carryForwardSuggestion, addSuggestion, moveSuggestionToTrash } = store
   const { company, settings } = state
   const currentYear = settings.auditYear
   const [showForm, setShowForm] = useState(false)
@@ -29,15 +32,7 @@ export function Suggestions({
     responsibleUnit: '',
   })
   const [carryDept, setCarryDept] = useState<Record<string, string>>({})
-  const [highlightedId, setHighlightedId] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!highlightRecordId) return
-    setHighlightedId(highlightRecordId)
-    requestAnimationFrame(() => {
-      document.querySelector(`[data-suggestion-id="${highlightRecordId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    })
-  }, [highlightRecordId])
+  const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
 
   const statusLabel: Record<SuggestionStatus, string> = {
     open: '待追蹤',
@@ -54,6 +49,22 @@ export function Suggestions({
   const prior = allSuggestions.filter((s) => s.year < currentYear)
   const current = allSuggestions.filter((s) => s.year >= currentYear)
   const listedSuggestions = [...prior, ...current]
+  const highlightIndex = highlightRecordId
+    ? listedSuggestions.findIndex((suggestion) => suggestion.id === highlightRecordId)
+    : -1
+  const pagination = useTablePagination(
+    listedSuggestions.length,
+    10,
+    highlightRecordId && highlightIndex >= 0 ? { key: highlightRecordId, index: highlightIndex } : undefined,
+    String(currentYear),
+  )
+
+  useEffect(() => {
+    if (!highlightRecordId) return
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-suggestion-id="${highlightRecordId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }, [highlightRecordId])
 
   const planRowsForProcedure = (qp: string) =>
     company.planRows.filter((row) => row.qpCode === qp)
@@ -71,12 +82,11 @@ export function Suggestions({
   const renderCarryActions = (sug: ThirdPartySuggestion) => {
     const rows = planRowsForProcedure(sug.procedure)
     const deptId = carryDept[sug.id] ?? sug.departmentId ?? rows[0]?.departmentId ?? ''
-    if (sug.status !== 'open' || sug.carriedToYear || rows.length === 0) {
-      return sug.carriedToYear ? <span className="text-xs text-blue-600">已帶入 {sug.carriedToYear}</span> : null
-    }
+    const canCarry = sug.status === 'open' && !sug.carriedToYear && rows.length > 0
     return (
       <div className="flex flex-col gap-2">
-        {rows.length > 1 && (
+        {sug.carriedToYear && <span className="text-xs text-blue-600">已帶入 {sug.carriedToYear}</span>}
+        {canCarry && rows.length > 1 && (
           <Select
             label="帶入部門"
             value={deptId}
@@ -84,12 +94,23 @@ export function Suggestions({
             options={rows.map((row) => ({ value: row.departmentId, label: row.department }))}
           />
         )}
+        {canCarry && (
+          <Button
+            variant="secondary"
+            disabled={!deptId}
+            onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
+          >
+            帶入 {currentYear} 年
+          </Button>
+        )}
         <Button
-          variant="secondary"
-          disabled={!deptId}
-          onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
+          variant="ghost"
+          icon={ACTION_ICONS.delete}
+          className="text-red-700"
+          aria-label={`移至回收區：${sug.year} ${sug.procedure}`}
+          onClick={() => setDeleteTarget({ id: sug.id, label: `${sug.year} · ${sug.procedure} · ${sug.issue}` })}
         >
-          帶入 {currentYear} 年
+          移至回收區
         </Button>
       </div>
     )
@@ -119,6 +140,7 @@ export function Suggestions({
         {allSuggestions.length === 0 ? (
           <EmptyState message="目前沒有建議事項。" />
         ) : (
+          <>
           <ScrollRegion ariaLabel="第三方稽核建議事項一覽表">
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <thead>
@@ -133,11 +155,11 @@ export function Suggestions({
                 </tr>
               </thead>
               <tbody>
-                {listedSuggestions.map((sug) => (
+                {listedSuggestions.map((sug, index) => (
                   <tr
                     key={sug.id}
                     data-suggestion-id={sug.id}
-                    className={`${sug.status === 'open' ? 'bg-amber-50/30' : ''} ${highlightedId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
+                    className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${sug.status === 'open' ? 'bg-amber-50/30 ' : ''}${highlightRecordId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
                   >
                     <td className="border p-2">{sug.year}</td>
                     <td className="border p-2 font-medium">{sug.procedure}</td>
@@ -173,6 +195,8 @@ export function Suggestions({
               </tbody>
             </table>
           </ScrollRegion>
+          <TablePagination pagination={pagination} label="第三方建議" />
+          </>
         )}
       </div>
 
@@ -223,6 +247,14 @@ export function Suggestions({
           </div>
         </Card>
       )}
+      <MoveToTrashDialog
+        target={deleteTarget}
+        onConfirm={() => {
+          if (deleteTarget) moveSuggestionToTrash(deleteTarget.id)
+          setDeleteTarget(null)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

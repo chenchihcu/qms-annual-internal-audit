@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { exportObservationsExcel } from '../lib/formExport'
 import { MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
+import { ncrNumberLabel, ncrNumberLabels } from '../lib/ncr'
 import type { ObservationSection } from '../lib/navigation'
 import type { ObservationStatus } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
@@ -15,6 +16,9 @@ import { FilterChips } from './ui/FilterChips'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 type YearFilter = 'all' | string
 type SourceFilter = 'all' | 'internal_audit' | 'third_party_audit' | 'checklist_unsynced'
@@ -38,13 +42,44 @@ export function Observations({
     carryForwardObservation,
     carryForwardNCR,
     regeneratePlan,
+    moveObservationToTrash,
   } = store
   const { company, settings } = state
   const currentYear = settings.auditYear
   const [showForm, setShowForm] = useState(false)
-  const [yearFilter, setYearFilter] = useState<YearFilter>('all')
+  const routeFilterKey = `${section ?? ''}:${currentYear}`
+  const [filterState, setFilterState] = useState<{ key: string; year: YearFilter; status: StatusFilter }>(() => ({
+    key: routeFilterKey,
+    year: section === 'current' ? String(currentYear) : 'all',
+    status: section === 'current' ? 'open' : 'all',
+  }))
+  if (filterState.key !== routeFilterKey) {
+    setFilterState({
+      key: routeFilterKey,
+      year: section === 'current' ? String(currentYear) : filterState.year,
+      status: section === 'current' ? 'open' : filterState.status,
+    })
+  }
+  const filtersForRoute = filterState.key === routeFilterKey
+    ? filterState
+    : {
+        key: routeFilterKey,
+        year: section === 'current' ? String(currentYear) : filterState.year,
+        status: section === 'current' ? 'open' as const : filterState.status,
+      }
+  const yearFilter = filtersForRoute.year
+  const statusFilter = filtersForRoute.status
+  const setYearFilter = (year: YearFilter) => setFilterState((previous) => ({
+    ... (previous.key === routeFilterKey ? previous : filtersForRoute),
+    key: routeFilterKey,
+    year,
+  }))
+  const setStatusFilter = (status: StatusFilter) => setFilterState((previous) => ({
+    ... (previous.key === routeFilterKey ? previous : filtersForRoute),
+    key: routeFilterKey,
+    status,
+  }))
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [followDraft, setFollowDraft] = useState<Record<string, string>>({})
   const [followDate, setFollowDate] = useState<Record<string, string>>({})
   const [todayLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10))
@@ -53,26 +88,42 @@ export function Observations({
   const [form, setForm] = useState({ sourceType: 'third_party_audit' as 'internal_audit' | 'third_party_audit', sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', departmentId: company.departments[0]?.id ?? '', content: '', description: '', owner: '', dueDate: '' })
   const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [priorDetailsOpen, setPriorDetailsOpen] = useState(section === 'prior')
+  const [expandedState, setExpandedState] = useState<{ highlightRecordId?: string; id: string | null }>(() => ({
+    highlightRecordId,
+    id: highlightRecordId ?? null,
+  }))
+  if (expandedState.highlightRecordId !== highlightRecordId) {
+    setExpandedState({ highlightRecordId, id: highlightRecordId ?? null })
+  }
+  const expandedId = expandedState.highlightRecordId === highlightRecordId
+    ? expandedState.id
+    : highlightRecordId ?? null
+  const setExpandedId = (id: string | null) => setExpandedState({ highlightRecordId, id })
+  const [priorDetailsState, setPriorDetailsState] = useState(() => ({
+    section,
+    open: section === 'prior',
+  }))
+  if (priorDetailsState.section !== section) {
+    setPriorDetailsState({ section, open: section === 'prior' ? true : priorDetailsState.open })
+  }
+  const priorDetailsOpen = priorDetailsState.section === section
+    ? priorDetailsState.open
+    : section === 'prior' || priorDetailsState.open
+  const setPriorDetailsOpen = (open: boolean) => setPriorDetailsState({ section, open })
   const [saveMessage, setSaveMessage] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
   const priorSectionRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (section === 'prior') {
-      setPriorDetailsOpen(true)
       requestAnimationFrame(() => {
         priorSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       })
-    } else if (section === 'current') {
-      setYearFilter(String(currentYear))
-      setStatusFilter('open')
     }
   }, [section, currentYear])
 
   useEffect(() => {
     if (!highlightRecordId) return
-    setExpandedId(highlightRecordId)
     requestAnimationFrame(() => {
       document.getElementById(`observation-${highlightRecordId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     })
@@ -81,11 +132,13 @@ export function Observations({
     ...company.observations,
     ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.observations ?? []),
   ], [company.observations, state.yearArchives, state.activeCompanyId, currentYear])
+  const currentNcrDisplayNumbers = useMemo(() => ncrNumberLabels(company.ncrs), [company.ncrs])
   const priorObs = allObservations.filter((o) => o.year < currentYear && o.status === 'open')
   const openPriorNCR = Object.entries(state.yearArchives)
     .filter(([year]) => year !== String(currentYear))
     .flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.ncrs ?? [])
     .filter((n) => n.status !== '結案')
+  const priorNcrDisplayNumbers = ncrNumberLabels(openPriorNCR)
   const years = [...new Set(allObservations.map((item) => item.year))].sort((a, b) => b - a)
   const auditEvents = useMemo(() => [
     ...company.audits,
@@ -163,6 +216,16 @@ export function Observations({
   const listTitle = showingUnsynced
     ? `查檢未同步（${auditObservations.length}）`
     : `觀察事項紀錄（${records.length}）`
+  const targetRecordId = editId ?? highlightRecordId
+  const highlightedIndex = targetRecordId ? records.findIndex((item) => item.id === targetRecordId) : -1
+  const pagination = useTablePagination(
+    listCount,
+    10,
+    !showingUnsynced && targetRecordId && highlightedIndex >= 0
+      ? { key: targetRecordId, index: highlightedIndex }
+      : undefined,
+    `${yearFilter}|${sourceFilter}|${statusFilter}`,
+  )
 
   const importAllOpen = () => {
     for (const obs of importableObs) {
@@ -229,7 +292,7 @@ export function Observations({
                   <ul className="space-y-2 text-sm">
                     {openPriorNCR.map((ncr) => (
                       <li key={ncr.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3">
-                        <span>{ncr.ncrNumber} · {ncr.qpCode} · {ncr.description}</span>
+                        <span>{priorNcrDisplayNumbers.get(ncr.id) ?? ncrNumberLabel(ncr.ncrNumber)} · {ncr.qpCode} · {ncr.description}</span>
                         <Button
                           variant="secondary"
                           disabled={company.audits.some((audit) => audit.items.some((item) => item.sourceNcrId === ncr.id))}
@@ -257,7 +320,7 @@ export function Observations({
           title="觀察事項"
           actions={(
             <>
-              <Button icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((value) => !value)}>{showForm ? '收起登錄' : '登錄觀察事項'}</Button>
+              <Button variant="secondary" icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((value) => !value)}>{showForm ? '收起登錄' : '登錄觀察事項'}</Button>
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
             </>
           )}
@@ -309,8 +372,8 @@ export function Observations({
           <ScrollRegion ariaLabel="觀察事項紀錄台帳">
             {showingUnsynced ? (
               <ul className="space-y-2 text-sm">
-                {auditObservations.map((obs) => (
-                  <li key={obs.id} className="rounded border border-slate-100 p-3">
+                {auditObservations.map((obs, index) => (
+                  <li key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-item ' : ''}rounded border border-slate-100 p-3`}>
                     <span className="font-medium">{obs.label}：</span>{obs.content}
                     {obs.sourceYear && (
                       <span className="ml-2 text-xs text-amber-600">（源自 {obs.sourceYear} 年）</span>
@@ -320,11 +383,11 @@ export function Observations({
               </ul>
             ) : (
               <div className="space-y-1">
-                {records.map((item) => {
+                {records.map((item, index) => {
                   const expanded = expandedId === item.id || editId === item.id
                   const sourceLabel = (item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'
                   return (
-                    <div key={item.id} id={`observation-${item.id}`} className="rounded-lg border border-slate-200">
+                    <div key={item.id} id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-item ' : ''}rounded-lg border border-slate-200`}>
                       <div
                         className={`flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between ${expanded ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}
                       >
@@ -339,7 +402,7 @@ export function Observations({
                             <Badge label={statusLabel[item.status]} />
                             <span className="font-medium text-slate-800">{item.qpCode} · {item.department}</span>
                           </div>
-                          <p className="mt-1 truncate text-sm text-slate-700">{item.content}</p>
+                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{item.content}</p>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {item.occurrenceDate || '日期待確認'} · 責任 {item.owner || '待指定'} · 到期 {item.dueDate || '待確認'}
                           </p>
@@ -370,6 +433,15 @@ export function Observations({
                           {item.status === 'closed' && (
                             <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
                           )}
+                          <Button
+                            variant="ghost"
+                            icon={ACTION_ICONS.delete}
+                            className="text-red-700"
+                            aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
+                            onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
+                          >
+                            移至回收區
+                          </Button>
                         </div>
                       </div>
                       {expanded && (
@@ -436,7 +508,7 @@ export function Observations({
                             </div>
                           ) : null}
                           {item.status === 'closed' && <p className="mt-2 text-xs text-green-700">結案：{item.closedAt} · {item.closeEvidence}</p>}
-                          {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{company.ncrs.find((n) => n.id === item.convertedNcrId)?.ncrNumber ?? item.convertedNcrId}</p>}
+                          {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{currentNcrDisplayNumbers.get(item.convertedNcrId) ?? item.convertedNcrId}</p>}
                           {item.carriedToYear && <p className="mt-2 text-xs text-blue-700">已帶入 {item.carriedToYear} 年查檢表</p>}
                         </div>
                       )}
@@ -447,6 +519,7 @@ export function Observations({
             )}
           </ScrollRegion>
         )}
+        <TablePagination pagination={pagination} label="觀察事項" />
       </div>
 
       {showForm && (
@@ -502,6 +575,14 @@ export function Observations({
           onCancel={() => setShowImportDialog(false)}
         />
       )}
+      <MoveToTrashDialog
+        target={deleteTarget}
+        onConfirm={() => {
+          if (deleteTarget) moveObservationToTrash(deleteTarget.id)
+          setDeleteTarget(null)
+        }}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   )
 }

@@ -43,7 +43,7 @@ function GapLine({
 }
 
 export function WorkflowGuide({ tab, state, onNavigate }: WorkflowGuideProps) {
-  if (!getTabWorkflow(tab)) return null
+  if (tab === 'dashboard' || !getTabWorkflow(tab)) return null
 
   const status = getTabWorkflowStatus(state, tab)
   if (status.gaps.length === 0 && status.advisories.length === 0) return null

@@ -1,5 +1,5 @@
 import { getDisplayMonthStatus } from './planStatus'
-import { isNcrOpen } from './ncr'
+import { isNcrOpen, ncrNumberLabels } from './ncr'
 import type { CompanyData, MonthStatus, NCR, PlanRow } from '../types'
 
 const DONE_STATUSES: MonthStatus[] = ['滿意', '矯正圓滿']
@@ -59,9 +59,10 @@ export function buildTodayWork(
     }
   }
 
+  const ncrLabels = ncrNumberLabels(company.ncrs)
   const openNcrs: TodayWorkNcr[] = company.ncrs.filter(isNcrOpen).map((ncr: NCR) => ({
     id: ncr.id,
-    ncrNumber: ncr.ncrNumber,
+    ncrNumber: ncrLabels.get(ncr.id) ?? ncr.ncrNumber,
     qpCode: ncr.qpCode,
     ...(ncr.dueDate ? { dueDate: ncr.dueDate } : {}),
   }))
