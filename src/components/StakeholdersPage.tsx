@@ -9,7 +9,6 @@ import {
   osBandToScale,
   scaleToOsBand,
   SEVERITY_BAND_GUIDE,
-  STAKEHOLDER_WEIGHTS,
   type OsBand,
 } from '../lib/planner'
 import { calculateRiskLevel } from '../lib/risk'
@@ -82,9 +81,6 @@ function OsBandRadios({
           )
         })}
       </div>
-      <p className="text-xs leading-snug text-slate-500">
-        {OS_BAND_LABELS[selectedBand]}：{guide[selectedBand]}
-      </p>
     </div>
   )
 }
@@ -92,34 +88,17 @@ function OsBandRadios({
 function ArrangementImpactSummary({
   dept,
   level,
-  expandable = false,
 }: {
   dept: DepartmentProfile
   level: '高' | '中' | '低'
-  expandable?: boolean
 }) {
   const impact = describeArrangementImpact(dept, level)
   const title = [impact.sortLine, impact.frequencyLine, impact.timingLine].join('\n')
 
-  if (!expandable) {
-    return (
-      <p className="text-xs font-medium text-slate-800" title={title}>
-        {impact.summary}
-      </p>
-    )
-  }
-
   return (
-    <details className="text-xs">
-      <summary className="cursor-pointer font-medium text-slate-800" title={title}>
-        {impact.summary}
-      </summary>
-      <div className="mt-1 space-y-0.5 text-xs leading-snug text-slate-500">
-        <p>{impact.sortLine}</p>
-        <p>{impact.frequencyLine}</p>
-        <p>{impact.timingLine}</p>
-      </div>
-    </details>
+    <p className="text-xs font-medium text-slate-800" title={title}>
+      {impact.summary}
+    </p>
   )
 }
 
@@ -161,7 +140,6 @@ function DepartmentRow({
         <div className="flex flex-wrap gap-1.5">
           {STAKEHOLDER_TAGS.map((tag) => {
             const active = dept.stakeholders.includes(tag)
-            const weight = STAKEHOLDER_WEIGHTS[tag] ?? 0
             return (
               <button
                 key={tag}
@@ -174,7 +152,7 @@ function DepartmentRow({
                 }`}
                 onClick={() => toggleTag(tag)}
               >
-                {tag} · {weight}
+                {tag}
               </button>
             )
           })}
@@ -202,7 +180,7 @@ function DepartmentRow({
         <p className="font-medium">RPN {index} · {level} · 優先 {priority}</p>
       </td>
       <td className="p-3 align-top">
-        <ArrangementImpactSummary dept={dept} level={level} expandable />
+        <ArrangementImpactSummary dept={dept} level={level} />
       </td>
     </tr>
   )

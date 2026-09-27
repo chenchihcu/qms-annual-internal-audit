@@ -23,7 +23,7 @@ describe('StakeholdersPage', () => {
     expect(rulesPanel?.hasAttribute('open')).toBe(false)
     expect(within(form).getByText(/優先分數 = Σ\(標籤權重\)×2 \+ O×S/)).toBeTruthy()
     expect(within(form).getByText(/編排影響（預覽自動編排時）/)).toBeTruthy()
-    expect(within(form).getByText(/QP-28/)).toBeTruthy()
+    expect(within(form).queryByText(/QP-28/)).toBeNull()
     expect(within(form).getAllByText(/本部門 QP · 優先/).length).toBeGreaterThan(0)
     const guide = document.querySelector('[data-workflow-guide="top"]')
     if (guide) {
@@ -44,7 +44,7 @@ describe('StakeholdersPage', () => {
     const adminRow = formDepartmentRow('dept-admin')
     expect(adminRow).toBeTruthy()
 
-    const supplierChip = within(adminRow!).getByRole('button', { name: /供應商 · 5/ })
+    const supplierChip = within(adminRow!).getByRole('button', { name: '供應商' })
     const pressedBefore = supplierChip.getAttribute('aria-pressed')
     fireEvent.click(supplierChip)
 

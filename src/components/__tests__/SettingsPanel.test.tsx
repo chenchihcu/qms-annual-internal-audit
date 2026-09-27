@@ -37,7 +37,7 @@ describe('SettingsPanel profile feedback', () => {
 
     expect(screen.queryByLabelText(/依據引用.*ISO 9001/)).toBeNull()
     expect(screen.queryByLabelText(/依據引用.*AS9100/)).toBeNull()
-    expect(screen.getByText('AS9100 證書同時涵蓋 ISO 9001；證書範圍與引用共用一次。各標準版本及適用性仍分別確認。')).toBeTruthy()
+    expect(screen.getByText('本案一張證書，兩項標準的版本與適用性分別確認。')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('適用性 — ISO 9001'), { target: { value: 'confirmed' } })
     fireEvent.change(screen.getByLabelText('證書範圍'), { target: { value: '精密零件製造' } })
     fireEvent.change(screen.getByLabelText('證書編號／引用'), { target: { value: 'CERT-001' } })

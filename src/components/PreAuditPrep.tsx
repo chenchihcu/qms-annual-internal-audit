@@ -22,8 +22,6 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
-import { useTablePagination } from '../hooks/useTablePagination'
-import { TablePagination } from './ui/TablePagination'
 
 function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 'satisfaction' }) {
   const config = {
@@ -79,14 +77,15 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     switchPrepYear,
   } = store
   const { settings, externalAuditPrep } = state
-  const pagination = useTablePagination(externalAuditPrep.items.length, 10, undefined, String(externalAuditPrep.year))
   const { done, total } = countPrepProgress(externalAuditPrep)
   const seed = EXTERNAL_AUDIT_PREP_SEED
   const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
   const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
   const [prepYearDraft, setPrepYearDraft] = useState<string | null>(null)
   const [pendingPrepYear, setPendingPrepYear] = useState<number | null>(null)
+  const [showPrepYearEditor, setShowPrepYearEditor] = useState(false)
   const prepYearInput = prepYearDraft ?? String(externalAuditPrep.year)
+  const prepYearMatchesLedger = externalAuditPrep.year === settings.auditYear
 
   const handlePrepYearDraftChange = (value: string) => {
     setPrepYearDraft(value)
@@ -105,6 +104,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     switchPrepYear(pendingPrepYear)
     setPendingPrepYear(null)
     setPrepYearDraft(null)
+    setShowPrepYearEditor(false)
   }
 
   const cancelPrepYearSwitch = () => {
@@ -134,6 +134,11 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     managementReviewDate,
     externalAuditDate: effectiveExternalAuditDate,
   })
+  const sequenceHasDetail =
+    !derivedInternalComplete
+    || managementReviewCompletionBlockers.length > 0
+    || sequenceWarnings.sequenceMessages.length > 0
+    || (externalAuditPrep.managementReviewComplete && !managementReviewDate)
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -186,14 +191,20 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           )}
         />
 
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 no-print">
-          <Input
-            label="準備表年度"
-            type="number"
-            value={prepYearInput}
-            onChange={(value) => handlePrepYearDraftChange(value)}
-            ariaLabel="外稽準備表年度"
-          />
+        <div className="mb-4 flex flex-wrap items-end gap-3 no-print">
+          {prepYearMatchesLedger && !showPrepYearEditor ? (
+            <Button variant="secondary" onClick={() => setShowPrepYearEditor(true)}>
+              改準備表年度
+            </Button>
+          ) : (
+            <Input
+              label="準備表年度"
+              type="number"
+              value={prepYearInput}
+              onChange={(value) => handlePrepYearDraftChange(value)}
+              ariaLabel="外稽準備表年度"
+            />
+          )}
           <Input
             label="外部稽核日期"
             type="date"
@@ -202,74 +213,72 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           />
         </div>
 
-        {/* 序位橫幅 */}
-        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <p className="mb-3 text-sm font-semibold text-slate-700">稽核序位</p>
-          <div className="space-y-3 text-sm">
-            <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
-              <span className="font-medium text-slate-700">1. 內部稽核完成</span>
-              <p className="mt-1 text-xs text-slate-600">
-                目前年度進度（唯讀）：
-                {derivedInternalComplete
-                  ? '計畫與查檢已覆蓋'
-                  : `尚有 ${internalGapCount} 項缺口`}
-                <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('dashboard')}>
-                  至稽核總覽
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 no-print">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-800">
+            <span className="font-semibold text-slate-700">稽核序位</span>
+            <span>
+              1 內稽
+              {derivedInternalComplete ? '已覆蓋' : `缺口 ${internalGapCount}`}
+            </span>
+            <label className="inline-flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={externalAuditPrep.managementReviewComplete}
+                disabled={!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0}
+                aria-describedby={
+                  !externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0
+                    ? 'management-review-completion-help'
+                    : undefined
+                }
+                onChange={(e) =>
+                  updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
+                }
+              />
+              <span>2 管審</span>
+            </label>
+            <span>
+              3 外稽
+              {effectiveExternalAuditDate || '日期待填'}
+            </span>
+          </div>
+          {sequenceHasDetail && (
+            <div className="mt-2 space-y-1 text-xs text-slate-600">
+              {!derivedInternalComplete && (
+                <p>
+                  內部稽核進度（唯讀）：
+                  {`尚有 ${internalGapCount} 項缺口`}
+                  <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('dashboard')}>
+                    至稽核總覽
+                  </a>
+                </p>
+              )}
+              <p>
+                管審日期：
+                {managementReviewDate || '尚未填寫'}
+                <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('plan')}>
+                  至年度稽核計畫
                 </a>
               </p>
-            </div>
-            <div>
-              <label className="flex items-start gap-2 rounded-md border border-slate-300 bg-white px-3 py-2">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4"
-                  checked={externalAuditPrep.managementReviewComplete}
-                  disabled={!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0}
-                  aria-describedby={
-                    !externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0
-                      ? 'management-review-completion-help'
-                      : undefined
-                  }
-                  onChange={(e) =>
-                    updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
-                  }
-                />
-                <div className="min-w-0 flex-1">
-                  <span className="font-medium text-slate-700">2. 管理審查完成</span>
-                  <p className="mt-1 text-xs text-slate-600">
-                    管審日期：
-                    {managementReviewDate || '尚未填寫'}
-                    <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('plan')}>
-                      至年度稽核計畫
-                    </a>
-                  </p>
-                  {externalAuditPrep.managementReviewComplete && !managementReviewDate && (
-                    <p className="mt-1 text-xs font-medium text-amber-800" role="status">
-                      已勾選，但年度計畫尚未填管審日期
-                    </p>
-                  )}
-                  {!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0 && (
-                    <p
-                      id="management-review-completion-help"
-                      className="no-print mt-1 text-xs text-amber-800"
-                      role="status"
-                    >
-                      尚缺：{managementReviewCompletionBlockers.join('；')}。
-                    </p>
-                  )}
+              {externalAuditPrep.managementReviewComplete && !managementReviewDate && (
+                <p className="font-medium text-amber-800" role="status">
+                  已勾選管審，但年度計畫尚未填管審日期
+                </p>
+              )}
+              {!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0 && (
+                <p
+                  id="management-review-completion-help"
+                  className="text-amber-800"
+                  role="status"
+                >
+                  尚缺：{managementReviewCompletionBlockers.join('；')}。
+                </p>
+              )}
+              {sequenceWarnings.sequenceMessages.length > 0 && (
+                <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-900" role="alert">
+                  {sequenceWarnings.sequenceMessages.map((message) => <p key={message}>{message}</p>)}
                 </div>
-              </label>
-            </div>
-            <div className="rounded-md border border-slate-300 bg-white px-3 py-2">
-              <span className="font-medium">3. 外部稽核</span>
-            </div>
-          </div>
-          {sequenceWarnings.sequenceMessages.length > 0 && (
-            <div
-              className="no-print mt-3 space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-              role="alert"
-            >
-              {sequenceWarnings.sequenceMessages.map((message) => <p key={message}>{message}</p>)}
+              )}
             </div>
           )}
         </div>
@@ -307,10 +316,13 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 const notes = workspacePrepNotes(template.notes)
 
                 return (
-                  <tr key={itemState.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${done ? 'bg-green-50/30' : ''}`}>
+                  <tr key={itemState.id} className={done ? 'bg-green-50/30' : ''}>
                     <td className="border p-2 text-center align-top font-medium">{displayNo}</td>
                     <td className="border p-2 align-top">
                       <div className="font-medium">{title}</div>
+                      {formsText && (
+                        <p className="mt-1 text-xs text-slate-600">{formsText}</p>
+                      )}
                       {notes && (
                         <p className="mt-1 text-xs text-slate-500">{notes}</p>
                       )}
@@ -324,12 +336,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
                     <td className="border p-2 align-top">
-                      {formsText && (
-                        <p className="mb-1 text-xs text-slate-600">{formsText}</p>
-                      )}
                       <input
                         className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
-                        aria-label={`第 ${displayNo} 項備註／表單`}
+                        aria-label={`第 ${displayNo} 項備註`}
                         placeholder="備註"
                         value={itemState.remark}
                         onChange={(e) =>
@@ -344,7 +353,6 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
-        <TablePagination pagination={pagination} label="外稽準備" />
 
         {/* 序位規則摘要 */}
         <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">

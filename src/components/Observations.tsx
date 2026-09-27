@@ -21,7 +21,7 @@ import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
 
 type YearFilter = 'all' | string
-type SourceFilter = 'all' | 'internal_audit' | 'third_party_audit' | 'checklist_unsynced'
+type LedgerSourceFilter = 'all' | 'internal_audit' | 'third_party_audit'
 type StatusFilter = 'all' | ObservationStatus
 
 export function Observations({
@@ -69,17 +69,24 @@ export function Observations({
       }
   const yearFilter = filtersForRoute.year
   const statusFilter = filtersForRoute.status
-  const setYearFilter = (year: YearFilter) => setFilterState((previous) => ({
-    ... (previous.key === routeFilterKey ? previous : filtersForRoute),
-    key: routeFilterKey,
-    year,
-  }))
-  const setStatusFilter = (status: StatusFilter) => setFilterState((previous) => ({
-    ... (previous.key === routeFilterKey ? previous : filtersForRoute),
-    key: routeFilterKey,
-    status,
-  }))
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const setYearFilter = (year: YearFilter) => {
+    setShowUnsyncedView(false)
+    setFilterState((previous) => ({
+      ...(previous.key === routeFilterKey ? previous : filtersForRoute),
+      key: routeFilterKey,
+      year,
+    }))
+  }
+  const setStatusFilter = (status: StatusFilter) => {
+    setShowUnsyncedView(false)
+    setFilterState((previous) => ({
+      ...(previous.key === routeFilterKey ? previous : filtersForRoute),
+      key: routeFilterKey,
+      status,
+    }))
+  }
+  const [sourceFilter, setSourceFilter] = useState<LedgerSourceFilter>('all')
+  const [showUnsyncedView, setShowUnsyncedView] = useState(false)
   const [followDraft, setFollowDraft] = useState<Record<string, string>>({})
   const [followDate, setFollowDate] = useState<Record<string, string>>({})
   const [todayLocal] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10))
@@ -158,7 +165,7 @@ export function Observations({
   )
   const records = useMemo(() => allObservations.filter((item) =>
     (yearFilter === 'all' || item.year === Number(yearFilter)) &&
-    (sourceFilter === 'all' || sourceFilter === 'checklist_unsynced' || (item.sourceType ?? 'internal_audit') === sourceFilter) &&
+    (sourceFilter === 'all' || (item.sourceType ?? 'internal_audit') === sourceFilter) &&
     (statusFilter === 'all' || item.status === statusFilter),
   ).sort((a, b) => (b.occurrenceDate ?? `${b.year}`).localeCompare(a.occurrenceDate ?? `${a.year}`)), [allObservations, yearFilter, sourceFilter, statusFilter])
 
@@ -190,17 +197,16 @@ export function Observations({
     { id: 'all' as YearFilter, label: '全部年度' },
     ...years.map((year) => ({ id: String(year) as YearFilter, label: `${year} 年` })),
   ]
-  const sourceFilterOptions = [
-    { id: 'all' as SourceFilter, label: '全部來源' },
-    { id: 'internal_audit' as SourceFilter, label: '內部稽核' },
-    { id: 'third_party_audit' as SourceFilter, label: '第三方稽核' },
-    { id: 'checklist_unsynced' as SourceFilter, label: '查檢未同步' },
+  const ledgerSourceFilterOptions = [
+    { id: 'all' as LedgerSourceFilter, label: '全部來源' },
+    { id: 'internal_audit' as LedgerSourceFilter, label: '內部稽核' },
+    { id: 'third_party_audit' as LedgerSourceFilter, label: '第三方稽核' },
   ]
   const statusFilterOptions = [
-    { id: 'all' as StatusFilter, label: '全部狀態' },
     { id: 'open' as StatusFilter, label: '待追蹤' },
     { id: 'closed' as StatusFilter, label: '已結案' },
     { id: 'became_ncr' as StatusFilter, label: '已轉 NCR' },
+    { id: 'all' as StatusFilter, label: '全部' },
   ]
 
   const importableObs = priorObs.filter(
@@ -211,7 +217,7 @@ export function Observations({
   )
   const pendingNcrObs = pendingNcrId ? allObservations.find((o) => o.id === pendingNcrId) : undefined
 
-  const showingUnsynced = sourceFilter === 'checklist_unsynced'
+  const showingUnsynced = showUnsyncedView
   const listCount = showingUnsynced ? auditObservations.length : records.length
   const listTitle = showingUnsynced
     ? `查檢未同步（${auditObservations.length}）`
@@ -224,7 +230,7 @@ export function Observations({
     !showingUnsynced && targetRecordId && highlightedIndex >= 0
       ? { key: targetRecordId, index: highlightedIndex }
       : undefined,
-    `${yearFilter}|${sourceFilter}|${statusFilter}`,
+    `${yearFilter}|${sourceFilter}|${statusFilter}|${showUnsyncedView}`,
   )
 
   const importAllOpen = () => {
@@ -329,36 +335,58 @@ export function Observations({
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
 
-        <FilterChips
-          options={yearFilterOptions}
-          value={yearFilter}
-          onChange={setYearFilter}
-          ariaLabel="觀察事項年度篩選"
-          tone="slate"
-        />
-        <FilterChips
-          options={sourceFilterOptions}
-          value={sourceFilter}
-          onChange={setSourceFilter}
-          ariaLabel="觀察事項來源篩選"
-        />
-        <FilterChips
-          options={statusFilterOptions}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          ariaLabel="觀察事項狀態篩選"
-          tone="slate"
-        />
+        <div className="mb-3 flex flex-wrap items-center gap-2 no-print">
+          {!showUnsyncedView && (
+            <FilterChips
+              options={statusFilterOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              ariaLabel="觀察事項狀態篩選"
+              tone="slate"
+            />
+          )}
+          <Button
+            variant={showUnsyncedView ? 'primary' : 'secondary'}
+            onClick={() => setShowUnsyncedView((value) => !value)}
+            aria-pressed={showUnsyncedView}
+          >
+            查檢未同步 {auditObservations.length}
+          </Button>
+        </div>
+        {!showUnsyncedView && (
+          <details className="mb-3 no-print">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700">更多篩選</summary>
+            <div className="mt-2 space-y-2">
+              <FilterChips
+                options={yearFilterOptions}
+                value={yearFilter}
+                onChange={setYearFilter}
+                ariaLabel="觀察事項年度篩選"
+                tone="slate"
+              />
+              <FilterChips
+                options={ledgerSourceFilterOptions}
+                value={sourceFilter}
+                onChange={(value) => {
+                  setShowUnsyncedView(false)
+                  setSourceFilter(value)
+                }}
+                ariaLabel="觀察事項來源篩選"
+              />
+            </div>
+          </details>
+        )}
 
         <h3 className="mb-3 font-semibold">{listTitle}</h3>
 
         {listCount === 0 ? (
           <EmptyState
             message={showingUnsynced ? '目前沒有查檢未同步項目。' : '目前沒有紀錄。'}
-            action={!showingUnsynced && (yearFilter !== 'all' || statusFilter !== 'all') ? (
+            action={!showingUnsynced && (yearFilter !== 'all' || statusFilter !== 'all' || sourceFilter !== 'all') ? (
               <Button
                 variant="secondary"
                 onClick={() => {
+                  setShowUnsyncedView(false)
                   setYearFilter('all')
                   setStatusFilter('all')
                   setSourceFilter('all')

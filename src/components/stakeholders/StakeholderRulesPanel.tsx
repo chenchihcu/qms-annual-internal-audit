@@ -6,9 +6,7 @@ import {
   osBandToScale,
   SEVERITY_BAND_GUIDE,
   STAKEHOLDER_WEIGHTS,
-  STAKEHOLDER_WORKFLOW_REFERENCES,
 } from '../../lib/planner'
-import { buildAppHash, tabLabel } from '../../lib/navigation'
 import { STAKEHOLDER_TAGS } from '../../types'
 
 export function StakeholderRulesPanel() {
@@ -59,57 +57,6 @@ export function StakeholderRulesPanel() {
             <li><span className="font-medium">不含：</span>{ARRANGEMENT_IMPACT_RULES.excludes}</li>
             <li><span className="font-medium">本欄：</span>{ARRANGEMENT_IMPACT_RULES.columnNote}</li>
           </ul>
-        </div>
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-3">
-          <p className="font-semibold text-slate-800">對應程序／章節／使用表單</p>
-          <table className="mt-2 w-full min-w-[640px] border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-left">
-                <th className="border border-slate-200 p-2">類別</th>
-                <th className="border border-slate-200 p-2">代碼</th>
-                <th className="border border-slate-200 p-2">名稱／條文</th>
-                <th className="border border-slate-200 p-2">與本頁關係</th>
-              </tr>
-            </thead>
-            <tbody>
-              {STAKEHOLDER_WORKFLOW_REFERENCES.procedures.map((row) => (
-                <tr key={row.code}>
-                  <td className="border border-slate-200 p-2">程序</td>
-                  <td className="border border-slate-200 p-2 font-medium">{row.code}</td>
-                  <td className="border border-slate-200 p-2">{row.name}</td>
-                  <td className="border border-slate-200 p-2">{row.note}</td>
-                </tr>
-              ))}
-              {STAKEHOLDER_WORKFLOW_REFERENCES.clauses.map((row) => (
-                <tr key={`${row.standard}-${row.clause}`}>
-                  <td className="border border-slate-200 p-2">章節</td>
-                  <td className="border border-slate-200 p-2 font-medium">{row.standard} {row.clause}</td>
-                  <td className="border border-slate-200 p-2">{row.label}</td>
-                  <td className="border border-slate-200 p-2">方案規劃輸入</td>
-                </tr>
-              ))}
-              {STAKEHOLDER_WORKFLOW_REFERENCES.forms.map((row) => (
-                <tr key={row.code}>
-                  <td className="border border-slate-200 p-2">表單</td>
-                  <td className="border border-slate-200 p-2 font-medium">{row.code}</td>
-                  <td className="border border-slate-200 p-2">{row.name}</td>
-                  <td className="border border-slate-200 p-2">
-                    {row.role}
-                    {'storage' in row ? (
-                      <span className="text-slate-500"> · {row.storage}</span>
-                    ) : (
-                      <>
-                        {' · '}
-                        <a className="font-medium text-blue-700 underline" href={buildAppHash(row.tab)}>
-                          {tabLabel(row.tab)}
-                        </a>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </div>
     </details>

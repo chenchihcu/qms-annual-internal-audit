@@ -311,8 +311,9 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '外稽準備' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('外稽準備表年度')).toBeTruthy()
+      expect(screen.getByRole('button', { name: '改準備表年度' })).toBeTruthy()
     })
+    fireEvent.click(screen.getByRole('button', { name: '改準備表年度' }))
     const yearInput = screen.getByLabelText('外稽準備表年度') as HTMLInputElement
     expect(yearInput.value).toBe('2026')
     fireEvent.change(yearInput, { target: { value: '2027' } })

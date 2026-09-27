@@ -174,62 +174,71 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
             <p className="mb-5 text-sm text-slate-600">稽核開始時會保存適用依據快照。欄位變更即時儲存於目前瀏覽器。</p>
             <section aria-labelledby="audit-standards-heading">
               <h3 id="audit-standards-heading" className="mb-3 text-sm font-semibold">適用標準</h3>
-              <p className="mb-3 text-xs text-slate-600">版本與適用性分別確認；證書資料只登錄一次。</p>
-              <div className="space-y-3">
-                {profile.applicableStandards.map((standard, index) => (
-                  <div key={standard.name} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-medium text-slate-700">標準</span>
-                      <span className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{standard.name}</span>
-                    </label>
-                    <div className="space-y-2">
-                      <Input
-                        label={`版本 — ${standard.name}`}
-                        value={standard.version}
-                        onChange={(value) => {
-                          const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
-                          standards[index] = { ...standard, version: value }
-                          updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
-                        }}
-                      />
-                      {standard.name === 'ISO 9001' && !standard.version.includes('2026') && (
-                        <p className="text-xs text-amber-700">
-                          ISO 9001:2026 已發布；請依有效證書與認證機構轉版安排確認本年度適用版本。
-                        </p>
-                      )}
-                    </div>
-                    <Select
-                      label={`適用性 — ${standard.name}`}
-                      value={standard.confirmationStatus}
-                      onChange={(value) => {
-                        const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
-                        standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }
-                        updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
-                      }}
-                      options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]}
-                    />
-                  </div>
-                ))}
-                {standardErrors?.confirmation && (
-                    <p className="text-xs text-amber-700 dark:text-amber-300" role="status">{standardErrors.confirmation}</p>
-                )}
-              </div>
-              <h4 className="mt-4 text-sm font-semibold">管理系統認證證書</h4>
-              <p className="mt-1 text-xs text-slate-600">AS9100 證書同時涵蓋 ISO 9001；證書範圍與引用共用一次。各標準版本及適用性仍分別確認。</p>
+              <p className="mb-4 text-xs text-slate-600">本案一張證書，兩項標準的版本與適用性分別確認。</p>
+              <h4 className="text-sm font-semibold text-slate-900">管理系統認證證書</h4>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <Input
                   label="證書範圍"
                   value={profile.certificateScope}
-                    hint={standardErrors?.certificateScope}
+                  hint={standardErrors?.certificateScope}
                   onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateScope: value })}
                 />
                 <Input
                   label="證書編號／引用"
                   value={profile.certificateReference}
-                    hint={standardErrors?.certificateReference}
+                  hint={standardErrors?.certificateReference}
                   onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateReference: value })}
                 />
               </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[520px] border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                      <th className="border border-slate-200 p-2">標準</th>
+                      <th className="border border-slate-200 p-2">版本</th>
+                      <th className="border border-slate-200 p-2">適用性</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profile.applicableStandards.map((standard, index) => (
+                      <tr key={standard.name}>
+                        <td className="border border-slate-200 p-2 align-top font-medium text-slate-800">{standard.name}</td>
+                        <td className="border border-slate-200 p-2 align-top">
+                          <Input
+                            label={`版本 — ${standard.name}`}
+                            value={standard.version}
+                            onChange={(value) => {
+                              const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
+                              standards[index] = { ...standard, version: value }
+                              updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
+                            }}
+                          />
+                          {standard.name === 'ISO 9001' && !standard.version.includes('2026') && (
+                            <p className="mt-1 text-xs text-amber-700">
+                              ISO 9001:2026 已發布；請依有效證書與認證機構轉版安排確認本年度適用版本。
+                            </p>
+                          )}
+                        </td>
+                        <td className="border border-slate-200 p-2 align-top">
+                          <Select
+                            label={`適用性 — ${standard.name}`}
+                            value={standard.confirmationStatus}
+                            onChange={(value) => {
+                              const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
+                              standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }
+                              updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
+                            }}
+                            options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {standardErrors?.confirmation && (
+                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300" role="status">{standardErrors.confirmation}</p>
+              )}
             </section>
 
             <section aria-labelledby="audit-source-heading" className="mt-6 border-t border-slate-200 pt-5">

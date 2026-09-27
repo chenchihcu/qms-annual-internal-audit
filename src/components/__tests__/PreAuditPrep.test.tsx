@@ -69,28 +69,26 @@ describe('PreAuditPrep', () => {
 
     expect(screen.queryByText(/兩份抬頭/)).toBeNull()
     expect(screen.getByText(/材質證明與採購文件核對/)).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: '外稽準備第 2 頁' }))
     expect(screen.getByText(/年度校正項目別勿漏校/)).toBeTruthy()
     expect(screen.getByText(/進料／出貨檢驗放行見項 21 分開備查/)).toBeTruthy()
     expect(screen.queryByText(/校驗帳可合併/)).toBeNull()
   })
 
-  it('uses one continuous display sequence across pages and accessible controls', () => {
+  it('uses one continuous display sequence and accessible controls', () => {
     const store = makeStore()
     render(<PreAuditPrep store={store} />)
 
-    const visibleNumbers = () => screen.getAllByRole('row')
-      .filter((row) => !row.classList.contains('pagination-hidden-row'))
+    const itemNumbers = screen.getAllByRole('row')
       .slice(1)
       .map((row) => row.querySelector('td')?.textContent?.trim())
+      .filter(Boolean)
 
-    expect(visibleNumbers()).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'])
+    expect(itemNumbers.length).toBe(store.state.externalAuditPrep.items.length)
+    expect(itemNumbers[0]).toBe('1')
+    expect(itemNumbers.at(-1)).toBe(String(itemNumbers.length))
     expect(screen.getByRole('checkbox', { name: '第 3 項 QR-28-03 稽核矯正報告 已完成' })).toBeTruthy()
     expect(screen.getByRole('checkbox', { name: '第 4 項 QR-28-07 內外部稽核報告書 已完成' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: '外稽準備第 2 頁' }))
-    expect(visibleNumbers()).toEqual(['11', '12', '13', '14', '15', '16', '17', '18', '19', '20'])
+    expect(screen.queryByRole('button', { name: /外稽準備第 \d+ 頁/ })).toBeNull()
   })
 
   it('shows external audit team reminder when assignments are missing', () => {
@@ -113,7 +111,7 @@ describe('PreAuditPrep', () => {
 
     expect(screen.getByRole('alert').textContent).toContain('管理審查日期應早於外部稽核日期')
     expect(screen.getByRole('alert').textContent).toContain('年度計畫窗口結束月（11 月）')
-    expect(screen.getByRole('checkbox', { name: /2\. 管理審查完成/ }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('checkbox', { name: /2 管審/ }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByText('尚缺：完成當年度內部稽核；將管審日期調整至外稽日期前。')).toBeTruthy()
     expect(store.state.externalAuditPrep.externalAuditDate).toBe('2026-09-15')
     expect(store.state.settings.managementReviewDate).toBe('2026-12-10')
@@ -128,7 +126,7 @@ describe('PreAuditPrep', () => {
     })
     render(<PreAuditPrep store={store} />)
 
-    const checkbox = screen.getByRole('checkbox', { name: /2\. 管理審查完成/ })
+    const checkbox = screen.getByRole('checkbox', { name: /2 管審/ })
     expect(checkbox.hasAttribute('disabled')).toBe(false)
     fireEvent.click(checkbox)
     expect(store.updateExternalPrepSequence).toHaveBeenCalledWith({ managementReviewComplete: false })

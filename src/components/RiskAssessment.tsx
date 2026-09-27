@@ -8,7 +8,6 @@ import {
   formatFactorLabel,
   inherentScaleFromSeed,
   parseRiskInputValue,
-  PROCEDURE_RISK_WEIGHTS,
 } from '../lib/risk'
 import type { ProcedurePriorityInput } from '../lib/risk'
 import type { PlanRow, ProcedureRiskRecord } from '../types'
@@ -185,7 +184,6 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 <th className="border border-line p-2">固有風險</th>
                 <th className="border border-line p-2">優先分</th>
                 <th className="border border-line p-2">等級</th>
-                <th className="border border-line p-2">暫定</th>
                 <th className="border border-line p-2">證據引用</th>
                 <th className="border border-line p-2 no-print">操作</th>
               </tr>
@@ -193,7 +191,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="border border-line p-4 text-center text-muted">
+                  <td colSpan={6} className="border border-line p-4 text-center text-muted">
                     尚無年度計畫列
                   </td>
                 </tr>
@@ -241,7 +239,6 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                           {formatFactorLabel('inherentRisk', inherent ?? undefined)}
                         </button>
                         <span className="print-only">{formatFactorLabel('inherentRisk', inherent ?? undefined)}</span>
-                        <span className="text-xs text-muted">({draft.inherentRisk || '—'})</span>
                       </div>
                       <details className="mt-2 no-print">
                         <summary className="cursor-pointer text-xs text-link">其他因素（可暫定）</summary>
@@ -256,9 +253,6 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                               >
                                 {formatFactorLabel(field, parseRiskInputValue(draft.optional[field] ?? '') ?? undefined)}
                               </button>
-                              <span className="text-muted">
-                                {PROCEDURE_RISK_WEIGHTS[field]}%
-                              </span>
                             </li>
                           ))}
                         </ul>
@@ -266,12 +260,12 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                     </td>
                     <td data-label="優先分" className="border border-line p-2 align-top font-semibold">
                       {priority.score}
+                      {priority.provisional && (
+                        <span className="ml-1.5 text-xs font-normal text-muted">暫定</span>
+                      )}
                     </td>
                     <td data-label="等級" className="border border-line p-2 align-top">
                       <Badge label={priority.level} />
-                    </td>
-                    <td data-label="暫定" className="border border-line p-2 align-top text-xs">
-                      {priority.provisional ? '是' : '否'}
                     </td>
                     <td data-label="證據引用" className="border border-line p-2 align-top">
                       <Input
