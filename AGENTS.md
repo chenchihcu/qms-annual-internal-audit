@@ -43,11 +43,11 @@
 - 純視覺調整不得改變稽核判定、評分公式、狀態或資料意義。
 - 精簡完成度逐項對照核准計畫：年度計畫套用 `stacked-table`／`data-label` 不等於完成低頻欄位詳細區，共用 class 不等於操作與回饋位置已一致；替代方案、未實作與未驗證項目分開回報。
 
-<!-- 精簡驗收依據：2026-09-24「002#可精簡 UI/UX 設計盤點與分階段精簡計畫」；2026-09-24「刪除多餘畫面框與常駐說明」（Guide 缺口-only、工作表去 Card、年度計畫去重複 meta／頁尾小卡）；2026-09-24「刪除重複畫面裝飾」（頁尾標語、設定關於、外稽 meta／色條、NCR 常駐說明、儀表板三類稽核補充）；2026-09-24「移除重複說明與第二回家」（藍卡不可點、plan／risk／stakeholders 去 PageToolbar meta 與風險頁尾計數卡）；2026-09-27 五頁低效益簡化（觀察主列只留狀態、查檢未同步獨立按鈕、利害關係人標籤不顯示權重、外稽序位一行且清單不分頁、證書一區兩列、方案風險無暫定欄）；2026-09-27 查檢列依判定顯示證據欄並移除「標不適用」。見 `.cursor/rules/ui-information-hierarchy.mdc`。 -->
+<!-- 精簡驗收依據：2026-09-24「002#可精簡 UI/UX 設計盤點與分階段精簡計畫」；2026-09-24「刪除多餘畫面框與常駐說明」（Guide 缺口-only、工作表去 Card、年度計畫去重複 meta／頁尾小卡）；2026-09-24「刪除重複畫面裝飾」（頁尾標語、設定關於、外稽 meta／色條、NCR 常駐說明、儀表板三類稽核補充）；2026-09-24「移除重複說明與第二回家」（藍卡不可點、plan／risk／stakeholders 去 PageToolbar meta 與風險頁尾計數卡）；2026-09-27 五頁低效益簡化（觀察主列只留狀態、查檢未同步獨立按鈕、利害關係人標籤不顯示權重、外稽序位一行且清單不分頁、證書一區兩欄網格只編輯 AS9100、方案風險無暫定欄）；2026-09-27 查檢列依判定顯示證據欄並移除「標不適用」。見 `.cursor/rules/ui-information-hierarchy.mdc`。 -->
 
 ## 驗證與 Git
 
-- 唯一本機服務為 `http://127.0.0.1:43124/`；啟動、瀏覽器檢查與 smoke 固定使用此位置，不輪流檢查其他埠。（2026-09-27）
+- 唯一本機服務為 `http://127.0.0.1:43124/`；啟動、瀏覽器檢查與 smoke 固定使用此位置，不輪流檢查其他埠。手動開頁 hash 為 `#tab=<TabId>`（`parseAppHash`／`buildAppHash`），非 `#<tabId>`。43124 已被佔用代表 dev 已在跑，勿另判為必須重啟的失敗。（2026-09-27）
 - 文件／技能修改使用內容、引用及治理檢查；只重跑本次修改會影響的 gate，不為取得 Harness marker 重跑無關產品全套測試。命令被啟動前拒絕、產品檢查失敗、Harness 事件未登錄須分開回報，無新證據不重複重試。
 - Harness 識別：從 `functions.exec` 執行固定驗證器時，直接輸出 `exec_command` 的 stdout 原文，不用 `JSON.stringify` 包裝；完成後確認 `C:\Users\user\.codex\data\harness\events.jsonl` 有 `event=verification`、`result=ok`、`verification_marker=true`。若只看到終端 marker 而事件未入帳，視為 Harness 尚未驗證。（2026-09-26）
 - 完整驗證使用固定入口 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1`，依序執行 lint、tests、build 及僅連到 43124 的隔離瀏覽器 smoke；全數成功才輸出 `event=verification result=ok verification_marker=true`。單一檢查使用同一入口加 `-Mode lint`、`-Mode tests`、`-Mode build` 或 `-Mode browser-smoke`；成功時輸出範圍明確的 Harness marker，測試可再限縮 `-TestFile`／`-TestName`。`-Mode local-backup` 只檢查最近 30 分鐘內設定頁完整 JSON 備份（`QMS備份_*.json`）的格式／版本／雜湊；`-Mode migration-backup` 只檢查遷移閘門專用 JSON（`QMS遷移前備份_*.json`）；兩者均可用 `-BackupPath` 指定其他實際路徑，不輸出紀錄內容，也不代表完整程式驗證成功。避免臨時 PowerShell `-Command` 驗證，因本機執行政策會在啟動前拒絕不透明命令；拒絕代表命令未啟動，應改用已檢視的固定 `-File` 入口，不可把拒絕算成測試失敗或成功。

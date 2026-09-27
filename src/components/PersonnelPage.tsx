@@ -512,12 +512,24 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       </div>)}
 
       <div>
+        <h3 className="mb-3 font-semibold">人員合格名單一覽（{rows.length}）</h3>
+
         {rows.length === 0 ? (
           <EmptyState message="目前沒有人員。" />
         ) : (
           <>
-          <ScrollRegion ariaLabel="人員合格名單工作表">
-            <table className="w-full min-w-[960px] border-collapse text-sm">
+          <ScrollRegion ariaLabel="人員合格名單一覽">
+            <table className="worksheet-table min-w-[61rem]">
+              <colgroup>
+                <col className="col-name" />
+                <col className="col-name" />
+                <col className="col-name" />
+                <col />
+                <col className="col-status" />
+                <col />
+                <col className="col-date" />
+                <col className="col-action no-print" />
+              </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-left">
                   <th className="border p-2">姓名／編號</th>
@@ -535,7 +547,10 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                   const affiliation = person.affiliations[0]
                   const qualification = currentQualification(person, undefined, today)
                   return (
-                    <tr key={person.id} className={!pagination.isVisible(index) ? 'pagination-hidden-row' : undefined}>
+                    <tr
+                      key={person.id}
+                      className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50`}
+                    >
                       <td className="border p-2 font-medium">
                         {person.name}
                         <span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span>

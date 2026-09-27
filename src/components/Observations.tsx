@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
+import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
+import { FOCUS_RING } from '../lib/focusRing'
 import { exportObservationsExcel } from '../lib/formExport'
 import { MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
 import { ncrNumberLabel, ncrNumberLabels } from '../lib/ncr'
@@ -47,6 +50,7 @@ export function Observations({
   const { company, settings } = state
   const currentYear = settings.auditYear
   const [showForm, setShowForm] = useState(false)
+  const { triggerRef, formRef } = useInlineFormFocus(showForm)
   const routeFilterKey = `${section ?? ''}:${currentYear}`
   const [filterState, setFilterState] = useState<{ key: string; year: YearFilter; status: StatusFilter }>(() => ({
     key: routeFilterKey,
@@ -95,17 +99,7 @@ export function Observations({
   const [form, setForm] = useState({ sourceType: 'third_party_audit' as 'internal_audit' | 'third_party_audit', sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', departmentId: company.departments[0]?.id ?? '', content: '', description: '', owner: '', dueDate: '' })
   const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [expandedState, setExpandedState] = useState<{ highlightRecordId?: string; id: string | null }>(() => ({
-    highlightRecordId,
-    id: highlightRecordId ?? null,
-  }))
-  if (expandedState.highlightRecordId !== highlightRecordId) {
-    setExpandedState({ highlightRecordId, id: highlightRecordId ?? null })
-  }
-  const expandedId = expandedState.highlightRecordId === highlightRecordId
-    ? expandedState.id
-    : highlightRecordId ?? null
-  const setExpandedId = (id: string | null) => setExpandedState({ highlightRecordId, id })
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${currentYear}`, highlightRecordId)
   const [priorDetailsState, setPriorDetailsState] = useState(() => ({
     section,
     open: section === 'prior',
@@ -220,8 +214,9 @@ export function Observations({
   const showingUnsynced = showUnsyncedView
   const listCount = showingUnsynced ? auditObservations.length : records.length
   const listTitle = showingUnsynced
-    ? `查檢未同步（${auditObservations.length}）`
-    : `觀察事項紀錄（${records.length}）`
+    ? `查檢未同步一覽（${auditObservations.length}）`
+    : `觀察事項紀錄一覽（${records.length}）`
+  const listRegionLabel = showingUnsynced ? '查檢未同步一覽' : '觀察事項紀錄一覽'
   const targetRecordId = editId ?? highlightRecordId
   const highlightedIndex = targetRecordId ? records.findIndex((item) => item.id === targetRecordId) : -1
   const pagination = useTablePagination(
@@ -326,11 +321,40 @@ export function Observations({
           title="觀察事項"
           actions={(
             <>
-              <Button variant="secondary" icon={showForm ? undefined : ACTION_ICONS.add} onClick={() => setShowForm((value) => !value)}>{showForm ? '收起登錄' : '登錄觀察事項'}</Button>
+              {!showForm && <Button ref={triggerRef} variant="secondary" icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄觀察事項</Button>}
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
             </>
           )}
         />
+      {showForm && (
+        <div ref={formRef} className="mb-4">
+        <Card className="border-blue-200 no-print">
+          <h3 className="mb-4 font-semibold">登錄稽核活動觀察事項</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <Select label="來源活動" value={form.sourceType} onChange={(value) => setForm({ ...form, sourceType: value as typeof form.sourceType, sourceAuditId: '' })} options={[{ value: 'internal_audit', label: '內部稽核' }, { value: 'third_party_audit', label: '第三方稽核' }]} />
+            {form.sourceType === 'internal_audit' && <Select label="內部稽核事件" value={form.sourceAuditId} onChange={(value) => { const audit = auditEvents.find((item) => item.id === value); setForm({ ...form, sourceAuditId: value, sourceReference: audit?.reportReference || value, occurrenceDate: audit?.auditDate || audit?.plannedDate || '', qpCode: audit?.qpCode || '', departmentId: audit?.departmentId || form.departmentId }) }} options={[{ value: '', label: '請選擇事件' }, ...auditEvents.map((audit) => ({ value: audit.id, label: `${audit.year ?? currentYear} · ${audit.qpCode} · ${audit.department} · ${audit.auditDate || audit.plannedDate || '日期待確認'}` }))]} />}
+            <Input label="來源事件／報告編號" value={form.sourceReference} onChange={(value) => setForm({ ...form, sourceReference: value })} />
+            <Input label="發生日" type="date" value={form.occurrenceDate} onChange={(value) => setForm({ ...form, occurrenceDate: value })} />
+            <Select label="程序 QP" value={form.qpCode} onChange={(value) => setForm({ ...form, qpCode: value })} options={procedureOptions} />
+            <Select label="責任單位" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={company.departments.map((department) => ({ value: department.id, label: department.name }))} />
+            <PersonNameSelect
+              label="責任人"
+              value={form.owner}
+              onChange={(value) => setForm({ ...form, owner: value })}
+              candidates={formOwnerCandidates}
+            />
+            <Input label="觀察事項" value={form.content} onChange={(value) => setForm({ ...form, content: value })} />
+            <Input label="處理要求／說明" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
+            <Input label="預定完成日" type="date" value={form.dueDate} onChange={(value) => setForm({ ...form, dueDate: value })} />
+          </div>
+          {form.occurrenceDate && Number(form.occurrenceDate.slice(0, 4)) !== currentYear && <p className="mt-2 text-sm text-amber-700">請先切換至 {form.occurrenceDate.slice(0, 4)} 年度，再登錄該年度紀錄。</p>}
+          <div className="mt-4 flex gap-2">
+            <Button disabled={!form.content.trim() || !form.sourceReference.trim() || !form.occurrenceDate || Number(form.occurrenceDate.slice(0, 4)) !== currentYear || (form.sourceType === 'internal_audit' && !form.sourceAuditId)} onClick={() => { const department = company.departments.find((item) => item.id === form.departmentId); addObservation({ year: currentYear, qpCode: form.qpCode || '待確認', departmentId: form.departmentId, department: department?.name ?? '待確認', process: '', content: form.content, description: form.description, status: 'open', sourceType: form.sourceType, sourceAuditId: form.sourceAuditId || undefined, sourceReference: form.sourceReference, occurrenceDate: form.occurrenceDate, owner: form.owner, dueDate: form.dueDate, followUps: [] }); setShowForm(false); setSaveMessage(true); setForm({ ...form, sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', content: '', description: '', owner: '', dueDate: '' }) }}>儲存紀錄</Button>
+            <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
+          </div>
+        </Card>
+        </div>
+      )}
         {saveMessage && !showForm && (
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
@@ -397,45 +421,84 @@ export function Observations({
             ) : undefined}
           />
         ) : (
-          <ScrollRegion ariaLabel="觀察事項紀錄台帳">
+          <ScrollRegion ariaLabel={listRegionLabel}>
             {showingUnsynced ? (
-              <ul className="space-y-2 text-sm">
-                {auditObservations.map((obs, index) => (
-                  <li key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-item ' : ''}rounded border border-slate-100 p-3`}>
-                    <span className="font-medium">{obs.label}：</span>{obs.content}
-                    {obs.sourceYear && (
-                      <span className="ml-2 text-xs text-amber-600">（源自 {obs.sourceYear} 年）</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <table className="worksheet-table min-w-[20.5rem]">
+                <colgroup>
+                  <col className="col-name" />
+                  <col />
+                  <col className="col-year" />
+                </colgroup>
+                <thead>
+                  <tr className="bg-slate-50 text-left">
+                    <th className="border p-2">QP／部門</th>
+                    <th className="border p-2">摘要</th>
+                    <th className="border p-2">來源年</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditObservations.map((obs, index) => (
+                    <tr key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50`}>
+                      <td className="border p-2 text-xs">{obs.label}</td>
+                      <td className="border p-2">{obs.content}</td>
+                      <td className="border p-2 text-xs">{obs.sourceYear ? `${obs.sourceYear} 年` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
-              <div className="space-y-1">
+              <table className="worksheet-table min-w-[62rem]">
+                <colgroup>
+                  <col className="col-year" />
+                  <col className="col-status" />
+                  <col />
+                  <col className="col-code" />
+                  <col className="col-name" />
+                  <col className="col-name" />
+                  <col className="col-status" />
+                  <col className="col-date" />
+                  <col className="col-action no-print" />
+                </colgroup>
+                <thead>
+                  <tr className="bg-slate-50 text-left">
+                    <th className="border p-2">年度</th>
+                    <th className="border p-2">來源</th>
+                    <th className="border p-2">摘要</th>
+                    <th className="border p-2">QP</th>
+                    <th className="border p-2">部門</th>
+                    <th className="border p-2">責任</th>
+                    <th className="border p-2">狀態</th>
+                    <th className="border p-2">到期</th>
+                    <th className="border p-2 no-print">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
                 {records.map((item, index) => {
                   const expanded = expandedId === item.id || editId === item.id
                   const sourceLabel = (item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'
                   return (
-                    <div key={item.id} id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-item ' : ''}rounded-lg border border-slate-200`}>
-                      <div
-                        className={`flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between ${expanded ? 'bg-slate-50' : 'hover:bg-slate-50/60'}`}
-                      >
+                    <Fragment key={item.id}>
+                    <tr id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50 ${highlightRecordId === item.id ? 'ring-2 ring-primary ring-inset' : ''}`}>
+                      <td className="border p-2 text-xs">{item.year}</td>
+                      <td className="border p-2"><Badge label={sourceLabel} /></td>
+                      <td className="border p-2">
                         <button
                           type="button"
-                          className="min-w-0 flex-1 text-left"
+                          className={`text-left font-medium text-blue-800 underline-offset-2 hover:underline ${FOCUS_RING}`}
+                          aria-expanded={expanded}
+                          aria-controls={`observation-detail-${item.id}`}
                           onClick={() => setExpandedId(expanded && editId !== item.id ? null : item.id)}
                         >
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge label={`${item.year}年`} />
-                            <Badge label={sourceLabel} />
-                            <Badge label={statusLabel[item.status]} />
-                            <span className="font-medium text-slate-800">{item.qpCode} · {item.department}</span>
-                          </div>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700">{item.content}</p>
-                          <p className="mt-0.5 text-xs text-slate-500">
-                            {item.occurrenceDate || '日期待確認'} · 責任 {item.owner || '待指定'} · 到期 {item.dueDate || '待確認'}
-                          </p>
+                          {item.content}
                         </button>
-                        <div className="flex flex-wrap gap-2 no-print" onClick={(e) => e.stopPropagation()}>
+                      </td>
+                      <td className="border p-2 text-xs">{item.qpCode}</td>
+                      <td className="border p-2 text-xs">{item.department}</td>
+                      <td className="border p-2 text-xs">{item.owner || '—'}</td>
+                      <td className="border p-2 text-xs"><Badge label={statusLabel[item.status]} /></td>
+                      <td className="border p-2 text-xs">{item.dueDate || '—'}</td>
+                      <td className="border p-2 no-print">
+                        <div className="flex flex-wrap gap-2">
                           <Button
                             variant="secondary"
                             icon={ACTION_ICONS.edit}
@@ -461,19 +524,12 @@ export function Observations({
                           {item.status === 'closed' && (
                             <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
                           )}
-                          <Button
-                            variant="ghost"
-                            icon={ACTION_ICONS.delete}
-                            className="text-red-700"
-                            aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
-                            onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
-                          >
-                            移至回收區
-                          </Button>
                         </div>
-                      </div>
+                      </td>
+                    </tr>
                       {expanded && (
-                        <div className="border-t border-slate-100 p-3">
+                        <tr id={`observation-detail-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}no-print`}>
+                        <td colSpan={9} className="border p-3">
                           <p className="text-sm text-slate-600">{item.description}</p>
                           {(item.followUps ?? []).length > 0 && (
                             <div className="mt-3 space-y-1 border-l-2 border-slate-200 pl-3">
@@ -538,45 +594,28 @@ export function Observations({
                           {item.status === 'closed' && <p className="mt-2 text-xs text-green-700">結案：{item.closedAt} · {item.closeEvidence}</p>}
                           {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{currentNcrDisplayNumbers.get(item.convertedNcrId) ?? item.convertedNcrId}</p>}
                           {item.carriedToYear && <p className="mt-2 text-xs text-blue-700">已帶入 {item.carriedToYear} 年查檢表</p>}
-                        </div>
+                          <Button
+                            variant="ghost"
+                            icon={ACTION_ICONS.delete}
+                            className="mt-3 text-red-700 no-print"
+                            aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
+                            onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
+                          >移至回收區</Button>
+                        </td>
+                        </tr>
                       )}
-                    </div>
+                    </Fragment>
                   )
                 })}
-              </div>
+                </tbody>
+              </table>
             )}
           </ScrollRegion>
         )}
         <TablePagination pagination={pagination} label="觀察事項" />
       </div>
 
-      {showForm && (
-        <Card className="border-blue-200 no-print">
-          <h3 className="mb-4 font-semibold">登錄稽核活動觀察事項</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Select label="來源活動" value={form.sourceType} onChange={(value) => setForm({ ...form, sourceType: value as typeof form.sourceType, sourceAuditId: '' })} options={[{ value: 'internal_audit', label: '內部稽核' }, { value: 'third_party_audit', label: '第三方稽核' }]} />
-            {form.sourceType === 'internal_audit' && <Select label="內部稽核事件" value={form.sourceAuditId} onChange={(value) => { const audit = auditEvents.find((item) => item.id === value); setForm({ ...form, sourceAuditId: value, sourceReference: audit?.reportReference || value, occurrenceDate: audit?.auditDate || audit?.plannedDate || '', qpCode: audit?.qpCode || '', departmentId: audit?.departmentId || form.departmentId }) }} options={[{ value: '', label: '請選擇事件' }, ...auditEvents.map((audit) => ({ value: audit.id, label: `${audit.year ?? currentYear} · ${audit.qpCode} · ${audit.department} · ${audit.auditDate || audit.plannedDate || '日期待確認'}` }))]} />}
-            <Input label="來源事件／報告編號" value={form.sourceReference} onChange={(value) => setForm({ ...form, sourceReference: value })} />
-            <Input label="發生日" type="date" value={form.occurrenceDate} onChange={(value) => setForm({ ...form, occurrenceDate: value })} />
-            <Select label="程序 QP" value={form.qpCode} onChange={(value) => setForm({ ...form, qpCode: value })} options={procedureOptions} />
-            <Select label="責任單位" value={form.departmentId} onChange={(value) => setForm({ ...form, departmentId: value })} options={company.departments.map((department) => ({ value: department.id, label: department.name }))} />
-            <PersonNameSelect
-              label="責任人"
-              value={form.owner}
-              onChange={(value) => setForm({ ...form, owner: value })}
-              candidates={formOwnerCandidates}
-            />
-            <Input label="觀察事項" value={form.content} onChange={(value) => setForm({ ...form, content: value })} />
-            <Input label="處理要求／說明" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
-            <Input label="預定完成日" type="date" value={form.dueDate} onChange={(value) => setForm({ ...form, dueDate: value })} />
-          </div>
-          {form.occurrenceDate && Number(form.occurrenceDate.slice(0, 4)) !== currentYear && <p className="mt-2 text-sm text-amber-700">請先切換至 {form.occurrenceDate.slice(0, 4)} 年度，再登錄該年度紀錄。</p>}
-          <div className="mt-4 flex gap-2">
-            <Button disabled={!form.content.trim() || !form.sourceReference.trim() || !form.occurrenceDate || Number(form.occurrenceDate.slice(0, 4)) !== currentYear || (form.sourceType === 'internal_audit' && !form.sourceAuditId)} onClick={() => { const department = company.departments.find((item) => item.id === form.departmentId); addObservation({ year: currentYear, qpCode: form.qpCode || '待確認', departmentId: form.departmentId, department: department?.name ?? '待確認', process: '', content: form.content, description: form.description, status: 'open', sourceType: form.sourceType, sourceAuditId: form.sourceAuditId || undefined, sourceReference: form.sourceReference, occurrenceDate: form.occurrenceDate, owner: form.owner, dueDate: form.dueDate, followUps: [] }); setShowForm(false); setSaveMessage(true); setForm({ ...form, sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', content: '', description: '', owner: '', dueDate: '' }) }}>儲存紀錄</Button>
-            <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
-          </div>
-        </Card>
-      )}
+
 
       {pendingNcrObs && (
         <ConfirmDialog

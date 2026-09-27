@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
@@ -28,7 +28,6 @@ import { auditorCandidates, departmentMemberCandidates } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
@@ -194,6 +193,24 @@ export function ProcedureAuditPanel({
     ? persistedAudit ?? getOrCreateAudit(qpCode, departmentId)
     : undefined
   const pagination = useTablePagination(auditForPage?.items.length ?? 0, 10, undefined, auditForPage?.id ?? '')
+  const setupScope = `${settings.auditYear}:${auditForPage?.id ?? selectedKey}:${auditForPage?.status ?? '規劃中'}`
+  const defaultSetupOpen = (auditForPage?.status ?? '規劃中') === '規劃中'
+  const [setupState, setSetupState] = useState({ scope: setupScope, open: defaultSetupOpen })
+  if (setupState.scope !== setupScope) setSetupState({ scope: setupScope, open: defaultSetupOpen })
+  const setupOpen = setupState.scope === setupScope ? setupState.open : defaultSetupOpen
+  const setupPanelRef = useRef<HTMLDivElement>(null)
+  const [setupFocus, setSetupFocus] = useState({ request: 0, date: false })
+  useEffect(() => {
+    if (!setupFocus.request) return
+    const target = setupFocus.date
+      ? setupPanelRef.current?.querySelector<HTMLElement>('#audit-date')
+      : setupPanelRef.current
+    target?.focus()
+  }, [setupFocus])
+  const revealSetupError = (date = false) => {
+    setSetupState({ scope: setupScope, open: true })
+    setSetupFocus((previous) => ({ request: previous.request + 1, date }))
+  }
 
   if (!qpCode || !departmentId) {
     return <p className="text-muted">請先於年度稽核計畫建立查檢項目</p>
@@ -223,16 +240,19 @@ export function ProcedureAuditPanel({
   const handleStartAudit = () => {
     if (!audit.auditDate?.trim()) {
       setStartErrors(['開始稽核前須填寫實施日期'])
+      revealSetupError(true)
       return
     }
     const preview = validateAuditStart(audit)
     if (!preview.canStart) {
       setStartErrors(preview.errors)
+      revealSetupError()
       return
     }
     const result = startAudit(audit.id)
     if (!result.canStart) {
       setStartErrors(result.errors)
+      revealSetupError()
       return
     }
     setStartErrors([])
@@ -393,18 +413,6 @@ export function ProcedureAuditPanel({
       />
 
       <div>
-        <PageToolbar
-          title="查檢表"
-          actions={(
-            <Select
-              label="查檢表"
-              value={selectedKey}
-              onChange={setSelectedKey}
-              options={auditOptions}
-            />
-          )}
-        />
-
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
@@ -412,13 +420,43 @@ export function ProcedureAuditPanel({
           subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
         />
 
-        <div className="mb-4 no-print space-y-3 rounded-lg border border-line bg-surface p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge label={auditStatus} />
-            {audit.notifySent && <span className="text-xs text-muted">已標記通知</span>}
-            {audit.reportReference && (
-              <span className="text-xs text-muted">正式紀錄：{audit.reportReference}</span>
-            )}
+        <div className="mb-4 no-print space-y-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex min-w-[16rem] flex-1 items-center gap-2">
+              <label htmlFor="procedure-audit-select" className="shrink-0 text-sm font-medium text-ink">查檢表</label>
+              <div className="min-w-0 flex-1">
+                <Select
+                  id="procedure-audit-select"
+                  value={selectedKey}
+                  onChange={setSelectedKey}
+                  options={auditOptions}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge label={auditStatus} />
+              {audit.notifySent && <span className="text-xs text-muted">已標記通知</span>}
+              {audit.reportReference && <span className="text-sm">正式紀錄：{audit.reportReference}</span>}
+              {auditStatus === '規劃中' && <Button onClick={handleStartAudit}>開始稽核</Button>}
+              {auditStatus === '執行中' && (
+                <>
+                  <Input label="正式紀錄編號" value={reportReferenceDraft} onChange={setReportReferenceDraft} />
+                  <Button onClick={handleCompleteReport}>完成回報</Button>
+                </>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+              <Button
+                variant="secondary"
+                aria-label={`${audit.qpCode} ${audit.department} 稽核設定`}
+                aria-expanded={setupOpen}
+                aria-controls={`audit-setup-${audit.id}`}
+                onClick={() => setSetupState({ scope: setupScope, open: !setupOpen })}
+              >稽核設定</Button>
+              <p className="min-w-0 break-words text-sm text-muted">
+                {audit.qpCode} · {audit.department} · {audit.auditDate || '未填實施日期'} · {audit.auditors || '未選稽核人員'}
+              </p>
+            </div>
           </div>
           <ImpartialityBanner warning={impartialityWarning} />
           {startErrors.length > 0 && (
@@ -426,222 +464,143 @@ export function ProcedureAuditPanel({
               {startErrors.map((msg) => <li key={msg}>{msg}</li>)}
             </ul>
           )}
-          {startSuccess && auditStatus === '執行中' && (
-            <p className="text-sm text-green-700" role="status">
-              已開始。適用標準、程序代碼、版本與保存位置已固定。
-            </p>
-          )}
-          {auditStatus === '執行中' && (
-            <p className="text-xs text-muted">
-              日期、稽核人員與客觀性設定已固定；查檢內容、判定與證據可編輯至回報。部門主管主檔異動仍須確認。
-            </p>
-          )}
           {reportErrors.length > 0 && (
             <ul className="list-disc space-y-0.5 pl-5 text-sm text-red-700" role="alert">
               {reportErrors.map((msg) => <li key={msg}>{msg}</li>)}
             </ul>
           )}
-          {!auditLocked && (
-            <div className="flex flex-wrap gap-2">
-              {auditStatus === '規劃中' && (
-                <>
-                  <Button onClick={handleStartAudit}>開始稽核</Button>
-                  <Button variant="secondary" onClick={handleMarkNotified}>標記已通知</Button>
-                </>
-              )}
-              {auditStatus === '執行中' && (
-                <>
-                  <Input
-                    label="正式紀錄編號"
-                    value={reportReferenceDraft}
-                    onChange={setReportReferenceDraft}
-                    className="min-w-[12rem]"
-                  />
-                  <Button onClick={handleCompleteReport}>完成回報</Button>
-                </>
-              )}
-            </div>
-          )}
-          {!auditLocked && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={audit.team?.impartialityConfirmed ?? false}
-                  disabled={!auditSetupEditable}
-                  onChange={(e) => updateTeam({ impartialityConfirmed: e.target.checked })}
-                />
-                <span>客觀性風險已確認（同單位稽核等）</span>
-              </label>
-              <Input
-                label="客觀性控制措施／依據"
-                value={audit.team?.impartialityNote ?? ''}
-                onChange={(value) => updateTeam({ impartialityNote: value })}
-                disabled={!auditSetupEditable}
-              />
-            </div>
+          {auditStatus === '執行中' && (
+            <p className="text-sm text-muted" role={startSuccess ? 'status' : undefined}>
+              日期、人員與客觀性設定已固定；完成回報前可編輯查檢內容。
+            </p>
           )}
           {auditLocked && (
             <p className="text-sm text-muted">本表已回報鎖定；後續主檔變更不會改寫歷史紀錄。</p>
           )}
-          {auditStatus === '規劃中' && (
-            <p className="text-xs text-muted">開始稽核後才可判定查檢項；符合／不符須填客觀證據，不適用須填理由。</p>
-          )}
         </div>
 
-        <ScrollRegion ariaLabel="查檢表表頭資訊">
-          <table className="qr-header-table mb-6 w-full min-w-[640px] border-collapse text-sm">
+        <div className="no-print">
+          <div
+            id={`audit-setup-${audit.id}`}
+            ref={setupPanelRef}
+            hidden={!setupOpen}
+            tabIndex={-1}
+            role="group"
+            aria-label="稽核設定"
+            className={`mt-3 space-y-3 ${FOCUS_RING}`}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="min-w-0 break-words"><span className="block text-sm font-medium">稽核流程 (QP)</span>{audit.qpCode} {audit.process}</div>
+              <div className="min-w-0 break-words"><span className="block text-sm font-medium">對應文件</span>{audit.documents}</div>
+              <Input
+                id="audit-notify-date" label="通知日期" type="date" value={audit.notifyDate}
+                onChange={(value) => handleHeaderChange('notifyDate', value)} disabled={!auditSetupEditable}
+              />
+              <Input
+                id="audit-date" label="實施日期" type="date" value={audit.auditDate}
+                onChange={(value) => handleHeaderChange('auditDate', value)} disabled={!auditSetupEditable}
+              />
+              <div>
+                <span className="mb-1 block text-sm font-medium">被稽核部門主管</span>
+                {auditLocked ? (
+                  <>
+                    <span>{audit.departmentManager}</span>
+                    {managerMismatch && (
+                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                        已評分，本表凍結為「{audit.departmentManager}」；部門負責人已改為「{dept?.owner}」
+                      </p>
+                    )}
+                  </>
+                ) : dept ? (
+                  <DepartmentOwnerField
+                    departmentId={departmentId} savedOwner={dept.owner} displayOwner={audit.departmentManager}
+                    ariaLabel="被稽核部門主管" onSaveRequest={ownerConfirm.requestChange} candidates={ownerCandidates}
+                  />
+                ) : (
+                  <Input value={audit.departmentManager} onChange={(value) => handleHeaderChange('departmentManager', value)} ariaLabel="被稽核部門主管" />
+                )}
+              </div>
+              <div>
+                <span className="mb-1 block text-sm font-medium">稽核人員</span>
+                <AuditorMultiSelect
+                  value={audit.auditors}
+                  onChange={(auditors, personIds) => updateAudit({
+                    ...audit,
+                    auditors,
+                    team: {
+                      leadAuditorPersonId: audit.team?.leadAuditorPersonId,
+                      auditorPersonIds: personIds ?? [],
+                      escortPersonIds: audit.team?.escortPersonIds ?? [],
+                      impartialityConfirmed: audit.team?.impartialityConfirmed ?? false,
+                      impartialityNote: audit.team?.impartialityNote ?? '',
+                    },
+                  })}
+                  candidates={auditorPickerCandidates} people={state.people}
+                  excludePersonId={audit.team?.leadAuditorPersonId}
+                  disabled={!auditSetupEditable} ariaLabel="稽核人員"
+                />
+              </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" className={`mt-1 ${FOCUS_RING}`}
+                  checked={audit.team?.impartialityConfirmed ?? false} disabled={!auditSetupEditable}
+                  onChange={(event) => updateTeam({ impartialityConfirmed: event.target.checked })}
+                />
+                <span>客觀性風險已確認（同單位稽核等）</span>
+              </label>
+              <Input label="客觀性控制措施／依據" value={audit.team?.impartialityNote ?? ''}
+                onChange={(value) => updateTeam({ impartialityNote: value })} disabled={!auditSetupEditable}
+                className="sm:col-span-2"
+              />
+            </div>
+            {auditStatus === '規劃中' && <Button variant="secondary" onClick={handleMarkNotified}>標記已通知</Button>}
+          </div>
+        </div>
+
+        <div className="print-only">
+          <table className="qr-header-table mb-4 w-full table-fixed border-collapse text-sm">
+            <colgroup>
+              <col className="col-name" />
+              <col />
+              <col className="col-name" />
+              <col />
+            </colgroup>
             <tbody>
-              <tr>
-                <td className="qr-label border border-line p-2">被稽核部門</td>
-                <td className="border border-line p-2">{audit.department}</td>
-                <td className="qr-label border border-line p-2">稽核流程 (QP)</td>
-                <td className="border border-line p-2">{audit.qpCode} {audit.process}</td>
-              </tr>
-              <tr>
-                <td className="qr-label border border-line p-2">對應文件</td>
-                <td className="border border-line p-2">{audit.documents}</td>
-                <td className="qr-label border border-line p-2">
-                  <label htmlFor="audit-notify-date">通知日期</label>
-                </td>
-                <td className="border border-line p-2">
-                  <Input
-                    type="date"
-                    value={audit.notifyDate}
-                    onChange={(v) => handleHeaderChange('notifyDate', v)}
-                    className="no-print"
-                    ariaLabel="通知日期"
-                    disabled={!auditSetupEditable}
-                  />
-                  <span className="print-only">{audit.notifyDate}</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="qr-label border border-line p-2">
-                  <label htmlFor="audit-date">實施日期</label>
-                </td>
-                <td className="border border-line p-2">
-                  <Input
-                    type="date"
-                    value={audit.auditDate}
-                    onChange={(v) => handleHeaderChange('auditDate', v)}
-                    className="no-print"
-                    ariaLabel="實施日期"
-                    disabled={!auditSetupEditable}
-                  />
-                  <span className="print-only">{audit.auditDate}</span>
-                </td>
-                <td className="qr-label border border-line p-2">
-                  <label htmlFor="audit-manager">被稽核部門主管</label>
-                </td>
-                <td className="border border-line p-2">
-                  {auditLocked ? (
-                    <>
-                      <span className="no-print text-ink">{audit.departmentManager}</span>
-                      {managerMismatch && (
-                        <p className="mt-1 text-xs text-amber-800 dark:text-amber-200 no-print">
-                          已評分，本表凍結為「{audit.departmentManager}」；部門負責人已改為「{dept?.owner}」
-                        </p>
-                      )}
-                    </>
-                  ) : dept ? (
-                    <DepartmentOwnerField
-                      departmentId={departmentId}
-                      savedOwner={dept.owner}
-                      displayOwner={audit.departmentManager}
-                      ariaLabel="被稽核部門主管"
-                      onSaveRequest={ownerConfirm.requestChange}
-                      candidates={ownerCandidates}
-                    />
-                  ) : (
-                    <Input
-                      value={audit.departmentManager}
-                      onChange={(v) => handleHeaderChange('departmentManager', v)}
-                      className="no-print"
-                      ariaLabel="被稽核部門主管"
-                    />
-                  )}
-                  <span className="print-only">{audit.departmentManager}</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="qr-label border border-line p-2">
-                  <label htmlFor="audit-auditors">稽核人員</label>
-                </td>
-                <td className="border border-line p-2" colSpan={3}>
-                  <AuditorMultiSelect
-                    value={audit.auditors}
-                    onChange={(auditors, personIds) => {
-                      updateAudit({
-                        ...audit,
-                        auditors,
-                        team: {
-                          leadAuditorPersonId: audit.team?.leadAuditorPersonId,
-                          auditorPersonIds: personIds ?? [],
-                          escortPersonIds: audit.team?.escortPersonIds ?? [],
-                          impartialityConfirmed: audit.team?.impartialityConfirmed ?? false,
-                          impartialityNote: audit.team?.impartialityNote ?? '',
-                        },
-                      })
-                    }}
-                    candidates={auditorPickerCandidates}
-                    people={state.people}
-                    excludePersonId={audit.team?.leadAuditorPersonId}
-                    disabled={!auditSetupEditable}
-                    ariaLabel="稽核人員"
-                  />
-                </td>
-              </tr>
+              <tr><td className="qr-label border border-line p-2">被稽核部門</td><td className="border border-line p-2">{audit.department}</td><td className="qr-label border border-line p-2">稽核流程 (QP)</td><td className="border border-line p-2">{audit.qpCode} {audit.process}</td></tr>
+              <tr><td className="qr-label border border-line p-2">對應文件</td><td className="border border-line p-2">{audit.documents}</td><td className="qr-label border border-line p-2">通知日期</td><td className="border border-line p-2">{audit.notifyDate}</td></tr>
+              <tr><td className="qr-label border border-line p-2">實施日期</td><td className="border border-line p-2">{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td className="border border-line p-2">{audit.departmentManager}</td></tr>
+              <tr><td className="qr-label border border-line p-2">稽核人員</td><td className="border border-line p-2" colSpan={3}>{audit.auditors}</td></tr>
             </tbody>
           </table>
-        </ScrollRegion>
+        </div>
 
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-          <ScrollRegion ariaLabel="查檢判定計數統計表" className="min-w-0 flex-1">
-            <table className="stacked-table w-full min-w-[480px] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-line bg-page text-left text-muted">
-                  <th className="p-2">程序得分</th>
-                  <th className="p-2">共幾項</th>
-                  <th className="p-2">符合</th>
-                  <th className="p-2">不符</th>
-                  <th className="p-2">觀察</th>
-                  <th className="p-2">不適用</th>
-                  <th className="p-2">未判定</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td data-label="程序得分" className="border border-line p-2 font-semibold text-primary">
-                    {formatScoreDisplay(score)}
-                  </td>
-                  <td data-label="共幾項" className="border border-line p-2">{score.totalItems}</td>
-                  <td data-label="符合" className="border border-line p-2">{score.breakdown.conform}</td>
-                  <td data-label="不符" className="border border-line p-2">{score.breakdown.nonConform}</td>
-                  <td data-label="觀察" className="border border-line p-2">{score.breakdown.observation}</td>
-                  <td data-label="不適用" className="border border-line p-2">{score.breakdown.notApplicable}</td>
-                  <td data-label="未判定" className="border border-line p-2">{score.breakdown.pending}</td>
-                </tr>
-              </tbody>
-            </table>
-          </ScrollRegion>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <dl aria-label="查檢判定統計" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {[
+              ['程序得分', formatScoreDisplay(score)],
+              ['總項數', score.totalItems],
+              ['符合', score.breakdown.conform],
+              ['不符', score.breakdown.nonConform],
+              ['觀察', score.breakdown.observation],
+              ['不適用', score.breakdown.notApplicable],
+              ['未判定', score.breakdown.pending],
+            ].map(([label, value]) => (
+              <div key={label} className="flex gap-1"><dt className="text-muted">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>
+            ))}
+          </dl>
           {canJudge && (
-            <Button variant="secondary" className="no-print shrink-0" onClick={() => addChecklistItem(audit.id)}>
-              新增稽核項目
-            </Button>
+            <Button variant="secondary" className="no-print shrink-0" onClick={() => addChecklistItem(audit.id)}>新增稽核項目</Button>
           )}
         </div>
 
         <ScrollRegion ariaLabel="查檢表項目清單">
-          <table className="qr-checklist w-full min-w-[64rem] table-fixed border-collapse text-sm">
+          <table className="qr-checklist worksheet-table min-w-[42rem]">
             <colgroup>
-              <col style={{ width: '9rem' }} />
-              <col style={{ width: '3rem' }} />
+              <col className="col-name" />
+              <col className="col-seq" />
               <col />
-              <col style={{ width: '7rem' }} />
-              <col style={{ width: '14rem' }} />
-              <col className="no-print" style={{ width: '6rem' }} />
+              <col className="col-judge" />
+              <col />
+              <col className="col-action no-print" />
             </colgroup>
             <thead>
               <tr className="bg-page text-left text-muted">

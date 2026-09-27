@@ -54,7 +54,14 @@ export function TrashPanel({ store }: { store: AuditStore }) {
       ) : (
         <>
         <ScrollRegion ariaLabel="回收區資料清單">
-          <table className="w-full min-w-[760px] border-collapse text-sm">
+          <table className="worksheet-table min-w-[40.5rem]">
+            <colgroup>
+              <col className="col-status" />
+              <col />
+              <col />
+              <col className="col-datetime" />
+              <col className="col-action no-print" />
+            </colgroup>
             <thead>
               <tr className="bg-page text-left text-muted">
                 <th className="border border-line p-2">類型</th>
@@ -69,10 +76,10 @@ export function TrashPanel({ store }: { store: AuditStore }) {
                 const summary = trashEntrySummary(entry)
                 return (
                   <tr key={entry.id} className={!pagination.isVisible(index) ? 'pagination-hidden-row' : undefined}>
-                    <td className="border border-line p-2 whitespace-nowrap">{TRASH_KIND_LABELS[entry.kind]}</td>
-                    <td className="border border-line p-2 break-words">{summary || '—'}</td>
-                    <td className="border border-line p-2 whitespace-nowrap">{trashContext(entry)}</td>
-                    <td className="border border-line p-2 whitespace-nowrap text-xs">{deletedAtLabel(entry.deletedAt)}</td>
+                    <td className="border border-line p-2">{TRASH_KIND_LABELS[entry.kind]}</td>
+                    <td className="border border-line p-2">{summary || '—'}</td>
+                    <td className="border border-line p-2">{trashContext(entry)}</td>
+                    <td className="border border-line p-2 text-xs">{deletedAtLabel(entry.deletedAt)}</td>
                     <td className="border border-line p-2 no-print">
                       <div className="flex flex-wrap gap-1">
                         <Button variant="secondary" onClick={() => handleRestore(entry)} aria-label={`還原：${summary}`}>

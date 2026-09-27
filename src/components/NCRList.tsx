@@ -1,10 +1,12 @@
 import { Fragment, useEffect, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
+import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
 import { isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import { planRowSelectOptions } from '../lib/planRowOptions'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import type { NCRClassification, NCRStatus } from '../types'
+import { NCR_COMPANY_SCOPE_LABELS, type NCRClassification, type NCRStatus } from '../types'
 import { departmentMemberCandidates, verifierCandidates } from '../lib/personnel'
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { PersonNameSelect } from './ui/PersonNameSelect'
@@ -30,17 +32,8 @@ export function NCRList({
   const { company, settings } = state
 
   const [showForm, setShowForm] = useState(false)
-  const [expandedState, setExpandedState] = useState<{ highlightRecordId?: string; id: string | null }>(() => ({
-    highlightRecordId,
-    id: highlightRecordId ?? null,
-  }))
-  if (expandedState.highlightRecordId !== highlightRecordId) {
-    setExpandedState({ highlightRecordId, id: highlightRecordId ?? null })
-  }
-  const expandedId = expandedState.highlightRecordId === highlightRecordId
-    ? expandedState.id
-    : highlightRecordId ?? null
-  const setExpandedId = (id: string | null) => setExpandedState({ highlightRecordId, id })
+  const { triggerRef, formRef } = useInlineFormFocus(showForm)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${settings.auditYear}`, highlightRecordId)
   const [closeErrors, setCloseErrors] = useState<Record<string, string>>({})
   const [newNcr, setNewNcr] = useState({
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
@@ -117,19 +110,20 @@ export function NCRList({
 
         <PageToolbar
           title="不符合"
-          actions={(
+          actions={!showForm && (
             <Button
+              ref={triggerRef}
               variant="secondary"
-              icon={showForm ? undefined : ACTION_ICONS.add}
-              onClick={() => setShowForm((value) => !value)}
+              icon={ACTION_ICONS.add}
+              onClick={() => setShowForm(true)}
             >
-              {showForm ? '收起登錄' : '手動新增 NCR'}
+              手動新增 NCR
             </Button>
           )}
         />
 
         {showForm && (
-          <div className="mb-6 no-print">
+          <div ref={formRef} className="mb-6 no-print">
             <p className="mb-3 text-sm text-muted">
               查檢表判定「不符」時自動匯入；發現快照會隨查檢更新，描述欄供矯正說明，不會被查檢覆寫。此處可登錄會議或現場發現。
             </p>
@@ -156,30 +150,46 @@ export function NCRList({
                   <p className="mt-1 text-xs text-red-600" role="alert">{descriptionError}</p>
                 )}
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <Button onClick={handleAddNcr} disabled={!newNcr.description.trim()}>
                   新增 NCR
                 </Button>
+                <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
               </div>
             </div>
           </div>
         )}
 
+        <h3 className="mb-3 font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
+
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />
         ) : (
           <>
-          <ScrollRegion ariaLabel="不符合事項清單">
-            <table className="qr-checklist w-full border-collapse text-sm">
+          <ScrollRegion ariaLabel="不符合事項一覽">
+            <table className="worksheet-table min-w-[61.5rem]">
+              <colgroup>
+                <col className="col-code" />
+                <col className="col-code" />
+                <col className="col-name" />
+                <col className="col-status" />
+                <col />
+                <col className="col-status" />
+                <col className="col-date" />
+                <col className="col-date" />
+                <col className="col-action no-print" />
+              </colgroup>
               <thead>
-                <tr className="bg-page text-left text-muted">
-                  <th className="border border-line p-2">NCR#</th>
-                  <th className="border border-line p-2">QP</th>
-                  <th className="border border-line p-2">部門</th>
-                  <th className="border border-line p-2">描述</th>
-                  <th className="border border-line p-2">日期</th>
-                  <th className="border border-line p-2">狀態</th>
-                  <th className="border border-line p-2 no-print">操作</th>
+                <tr className="bg-slate-50 text-left">
+                  <th className="border p-2">NCR#</th>
+                  <th className="border p-2">QP</th>
+                  <th className="border p-2">部門</th>
+                  <th className="border p-2">公司</th>
+                  <th className="border p-2">摘要</th>
+                  <th className="border p-2">狀態</th>
+                  <th className="border p-2">日期</th>
+                  <th className="border p-2">到期</th>
+                  <th className="border p-2 no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -192,19 +202,20 @@ export function NCRList({
                       <tr
                         id={`ncr-${ncr.id}`}
                         data-ncr-id={ncr.id}
-                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
+                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50 ${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
                       >
-                        <td className="border border-line p-2 font-mono text-xs">{displayNumber}</td>
-                        <td className="border border-line p-2">{ncr.qpCode}</td>
-                        <td className="border border-line p-2">{ncr.department}</td>
-                        <td className="border border-line p-2">
+                        <td className="border p-2 font-mono text-xs">{displayNumber}</td>
+                        <td className="border p-2 text-xs">{ncr.qpCode}</td>
+                        <td className="border p-2 text-xs break-words">{ncr.department}</td>
+                        <td className="border p-2 text-xs break-words">{ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '—'}</td>
+                        <td className="border p-2">
                           {stale && (
                             <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                               查檢已非不符，建議結案
                             </p>
                           )}
                           <textarea
-                            className={`w-full min-w-[200px] rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                            className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                             rows={2}
                             value={ncr.description}
                             onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
@@ -212,17 +223,7 @@ export function NCRList({
                           />
                           <span className="print-only">{ncr.description}</span>
                         </td>
-                        <td className="border border-line p-2">
-                          <input
-                            type="date"
-                            className={`rounded border border-line bg-surface px-1 no-print ${FOCUS_RING}`}
-                            value={ncr.date}
-                            onChange={(e) => updateNCR(ncr.id, { date: e.target.value })}
-                            aria-label={`${displayNumber} 日期`}
-                          />
-                          <span className="print-only">{ncr.date}</span>
-                        </td>
-                        <td className="border border-line p-2">
+                        <td className="border p-2">
                           <div className="no-print">
                             <Select
                               value={ncr.status}
@@ -236,31 +237,28 @@ export function NCRList({
                             <p className="mt-1 text-xs text-red-700" role="alert">{closeErrors[ncr.id]}</p>
                           )}
                         </td>
-                        <td className="border border-line p-2 no-print">
+                        <td className="border p-2 text-xs">{ncr.date || '—'}</td>
+                        <td className="border p-2 text-xs">{ncr.dueDate || '—'}</td>
+                        <td className="border p-2 no-print">
                           <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
-                              className={`text-xs text-link hover:underline ${FOCUS_RING}`}
+                              className={`min-h-11 text-sm text-link hover:underline ${FOCUS_RING}`}
+                              aria-label={`${displayNumber} 明細`}
+                              aria-expanded={expanded}
+                              aria-controls={`ncr-detail-${ncr.id}`}
                               onClick={() => setExpandedId(expanded ? null : ncr.id)}
                             >
-                              {expanded ? '收合' : '展開'}
+                              {expanded ? '收合' : '明細'}
                             </button>
-                            <Button
-                              variant="ghost"
-                              icon={ACTION_ICONS.delete}
-                              className="text-red-700"
-                              aria-label={`移至回收區：${displayNumber}`}
-                              onClick={() => setDeleteTarget({ id: ncr.id, label: `${displayNumber} · ${ncr.department} · ${ncr.description}` })}
-                            >
-                              移至回收區
-                            </Button>
                           </div>
                         </td>
                       </tr>
-                      {expanded && (
-                        <tr key={`${ncr.id}-detail`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}no-print bg-slate-50/80`}>
-                          <td colSpan={8} className="border border-line p-4">
+                        <tr id={`ncr-detail-${ncr.id}`} hidden={!expanded || !pagination.isVisible(index)} className="no-print bg-page">
+                          <td colSpan={9} className="border p-3">
+                            {expanded && <>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                              <Input label="日期" ariaLabel={`${displayNumber} 日期`} type="date" value={ncr.date} onChange={(v) => updateNCR(ncr.id, { date: v })} />
                               <Input label="根本原因" value={ncr.rootCause} onChange={(v) => updateNCR(ncr.id, { rootCause: v })} />
                               <Input label="矯正措施" value={ncr.correctiveAction} onChange={(v) => updateNCR(ncr.id, { correctiveAction: v })} />
                               <Input label="遏制措施" value={ncr.containment ?? ''} onChange={(v) => updateNCR(ncr.id, { containment: v })} />
@@ -296,9 +294,16 @@ export function NCRList({
                               <Input label="效果確認日" type="date" value={ncr.effectivenessVerifiedAt ?? ''} onChange={(v) => updateNCR(ncr.id, { effectivenessVerifiedAt: v })} />
                               <Input label="驗證佐證" value={ncr.verificationEvidence} onChange={(v) => updateNCR(ncr.id, { verificationEvidence: v })} />
                             </div>
+                            <Button
+                              variant="ghost"
+                              icon={ACTION_ICONS.delete}
+                              className="mt-3 text-red-700"
+                              aria-label={`移至回收區：${displayNumber}`}
+                              onClick={() => setDeleteTarget({ id: ncr.id, label: `${displayNumber} · ${ncr.department} · ${ncr.description}` })}
+                            >移至回收區</Button>
+                            </>}
                           </td>
                         </tr>
-                      )}
                     </Fragment>
                   )
                 })}

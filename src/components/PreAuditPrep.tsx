@@ -14,14 +14,12 @@ import {
 } from '../lib/externalAuditPrep'
 import { buildMergedCertificateCoverage } from '../lib/coverage'
 import { exportPrepExcel } from '../lib/formExport'
-import { buildAppHash, tabLabel } from '../lib/navigation'
+import { buildAppHash } from '../lib/navigation'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Button, Input } from './ui/Badge'
-import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { ScrollRegion } from './ui/ScrollRegion'
-import { PERSONNEL_ROLE_LABELS, personRoles } from '../lib/personnel'
 
 function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 'satisfaction' }) {
   const config = {
@@ -79,8 +77,6 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
   const { settings, externalAuditPrep } = state
   const { done, total } = countPrepProgress(externalAuditPrep)
   const seed = EXTERNAL_AUDIT_PREP_SEED
-  const externalTeam = state.people.filter((person) => personRoles(person, settings.auditYear, state.annualPersonnelAssignments).some((role) => role === 'third_party_lead_auditor' || role === 'third_party_auditor'))
-  const escorts = state.people.filter((person) => state.annualPersonnelAssignments.some((item) => item.year === settings.auditYear && item.role === 'annual_escort' && item.personId === person.id))
   const [prepYearDraft, setPrepYearDraft] = useState<string | null>(null)
   const [pendingPrepYear, setPendingPrepYear] = useState<number | null>(null)
   const [showPrepYearEditor, setShowPrepYearEditor] = useState(false)
@@ -142,56 +138,11 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
   return (
     <div className="space-y-6 print-area qr-form">
-      <details className="rounded-lg border border-slate-200 bg-white no-print">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">外部稽核團隊與陪稽安排</summary>
-        <div className="border-t border-slate-100 px-4 pb-4">
-        <div className="grid gap-4 sm:grid-cols-2 pt-3">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700">第三方稽核團隊</h3>
-            {externalTeam.length ? (
-              <ul className="mt-2 space-y-1 text-sm">
-                {externalTeam.map((person) => (
-                  <li key={person.id}>
-                    {person.name} · {personRoles(person, settings.auditYear, state.annualPersonnelAssignments).filter((role) => role.startsWith('third_party')).map((role) => PERSONNEL_ROLE_LABELS[role]).join('、')}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-amber-800">尚未確認第三方團隊</p>
-            )}
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-700">受稽方陪同／協調人員</h3>
-            {escorts.length ? (
-              <ul className="mt-2 space-y-1 text-sm">
-                {escorts.map((person) => <li key={person.id}>{person.name}</li>)}
-              </ul>
-            ) : (
-              <p className="mt-2 text-sm text-amber-800">尚未安排本年度陪稽人員</p>
-            )}
-          </div>
-        </div>
-        {(externalTeam.length === 0 || escorts.length === 0) && (
-          <p className="mt-3 text-sm text-amber-800">
-            請至
-            <a className="mx-1 font-medium text-blue-700 underline" href={buildAppHash('personnel')}>{tabLabel('personnel')}</a>
-            確認團隊與陪稽安排
-          </p>
-        )}
-        </div>
-      </details>
       <div>
-        <PageToolbar
-          title="外稽準備"
-          actions={(
-            <>
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
-            </>
-          )}
-        />
-
-        <div className="mb-4 flex flex-wrap items-end gap-3 no-print">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="text-sm font-semibold">外稽準備</h2>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3 no-print">
           {prepYearMatchesLedger && !showPrepYearEditor ? (
             <Button variant="secondary" onClick={() => setShowPrepYearEditor(true)}>
               改準備表年度
@@ -211,6 +162,12 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             value={externalAuditPrep.externalAuditDate ?? ''}
             onChange={(value) => updateExternalPrepSequence({ externalAuditDate: value })}
           />
+            </div>
+            <div className="flex items-center gap-2 no-print">
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
+              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
+            </div>
+          </div>
         </div>
 
         <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 no-print">
@@ -290,14 +247,21 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         />
 
         <ScrollRegion ariaLabel="外部稽核前準備清單">
-          <table className="qr-checklist w-full min-w-[980px] border-collapse text-sm">
+          <table className="qr-checklist worksheet-table min-w-[31rem]">
+            <colgroup>
+              <col className="col-seq" />
+              <col />
+              <col className="col-name" />
+              <col className="col-done" />
+              <col />
+            </colgroup>
             <thead>
               <tr className="bg-slate-50 text-left">
-                <th className="border p-2 w-12">項次</th>
+                <th className="border p-2">項次</th>
                 <th className="border p-2">稽核前準備事項</th>
-                <th className="border p-2 w-40">負責人</th>
-                <th className="border p-2 w-16 text-center">完成</th>
-                <th className="border p-2 w-56">備註/表單</th>
+                <th className="border p-2">負責人</th>
+                <th className="border p-2 text-center">完成</th>
+                <th className="border p-2">備註/表單</th>
               </tr>
             </thead>
             <tbody>

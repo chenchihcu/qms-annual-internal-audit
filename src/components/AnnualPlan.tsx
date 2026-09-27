@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
+import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
@@ -44,6 +45,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
   const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: effectiveExternalAuditDate })
 
   const [regenConfirm, setRegenConfirm] = useState(false)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${settings.auditYear}`)
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptOwner = (departmentId: string) =>
@@ -171,27 +173,27 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
         </div>
 
         <ScrollRegion ariaLabel="年度稽核計畫月格表">
-          <table className="qr-plan-table w-max min-w-full table-fixed border-collapse text-sm">
+          <table className="qr-plan-table worksheet-table min-w-[69.5rem]">
             <colgroup>
-              <col style={{ width: '2.25rem' }} />
-              <col style={{ width: '2.75rem' }} />
-              <col style={{ width: '4.25rem' }} />
-              <col style={{ width: '4.5rem' }} />
-              <col style={{ width: '8rem' }} />
-              <col style={{ width: '6rem' }} />
-              <col style={{ width: '4rem' }} />
-              <col style={{ width: '4.5rem' }} />
-              {MONTHS.map((month) => <col key={month} style={{ width: '2.75rem' }} />)}
+              <col className="col-seq" />
+              <col className="col-status" />
+              <col />
+              <col className="col-name" />
+              <col className="print-table-column" />
+              <col className="print-table-column" />
+              <col className="print-table-column" />
+              <col className="col-name" />
+              {MONTHS.map((month) => <col key={month} className="col-month" />)}
             </colgroup>
             <thead>
-              <tr className="whitespace-nowrap bg-page text-left text-muted">
+              <tr className="bg-page text-left text-muted">
                 <th className="border border-line px-1.5 py-2">項次</th>
                 <th className="border border-line px-1.5 py-2">風險</th>
-                <th className="min-w-[5.5rem] border border-line px-1.5 py-2 whitespace-nowrap">QP</th>
+                <th className="border border-line px-1.5 py-2">QP<span className="no-print">／流程</span></th>
                 <th className="border border-line px-1.5 py-2">被稽核部門</th>
-                <th className="border border-line px-1.5 py-2 whitespace-normal">稽核流程/文件</th>
-                <th className="border border-line px-1.5 py-2">負責人</th>
-                <th className="border border-line px-1.5 py-2">類型</th>
+                <th className="print-table-cell border border-line px-1.5 py-2 whitespace-normal">稽核流程/文件</th>
+                <th className="print-table-cell border border-line px-1.5 py-2">負責人</th>
+                <th className="print-table-cell border border-line px-1.5 py-2">類型</th>
                 <th className="border border-line px-1.5 py-2">稽核人員</th>
                 {MONTHS.map((m) => (
                   <th key={m} className="border border-line p-1 text-center w-11">{m}</th>
@@ -201,9 +203,11 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
             <tbody>
               {company.planRows.map((row, rowIndex) => {
                 const unscheduled = !row.months.some(Boolean)
+                const expanded = expandedId === row.id
                 return (
+                <Fragment key={row.id}>
                 <tr
-                  key={row.id}
+                  data-plan-row-id={row.id}
                   className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${
                     unscheduled
                       ? 'bg-rose-50/60 dark:bg-rose-950/20'
@@ -214,9 +218,13 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                 >
                   <td className="border border-line px-1.5 py-2 tabular-nums">{row.sequence}</td>
                   <td className="border border-line px-1.5 py-2"><Badge label={row.riskLevel} /></td>
-                  <td className="min-w-[5.5rem] border border-line px-1.5 py-2 font-medium">
+                  <td className="border border-line px-1.5 py-2 font-medium break-words">
                     <div className="flex flex-wrap items-center gap-1">
-                      <span className="whitespace-nowrap">{row.qpCode}</span>
+                      <a
+                        href={buildAppHash('audit', { auditKey: `${row.qpCode}|${row.departmentId}` })}
+                        aria-label={`${row.qpCode} ${row.department} 查檢表`}
+                        className={`inline-flex min-h-11 items-center whitespace-nowrap text-link hover:underline ${FOCUS_RING}`}
+                      >{row.qpCode}</a>
                       {unscheduled && (
                         <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
                           未排月格
@@ -228,30 +236,23 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         </span>
                       )}
                     </div>
+                    <div className="no-print text-xs text-muted">{row.process}</div>
+                    <button
+                      type="button"
+                      className={`no-print mt-1 min-h-11 text-sm text-link hover:underline ${FOCUS_RING}`}
+                      aria-label={`${row.qpCode} ${row.department} 明細`}
+                      aria-expanded={expanded}
+                      aria-controls={`plan-detail-${row.id}`}
+                      onClick={() => setExpandedId(expanded ? null : row.id)}
+                    >{expanded ? '收合' : '明細'}</button>
                   </td>
                   <td className="border border-line px-1.5 py-2 break-words">{row.department}</td>
-                  <td className="border border-line px-1.5 py-2 break-words">
+                  <td className="print-table-cell border border-line px-1.5 py-2 break-words">
                     <div>{row.process}</div>
                     <div className="text-xs text-muted">{row.documents}</div>
                   </td>
-                  <td className="border border-line px-1.5 py-2">
-                    <DepartmentOwnerField
-                      departmentId={row.departmentId}
-                      savedOwner={deptOwner(row.departmentId)}
-                      displayOwner={row.owner}
-                      ariaLabel={`${row.qpCode} 負責人`}
-                      onSaveRequest={ownerConfirm.requestChange}
-                      candidates={departmentMemberCandidates(
-                        state.people,
-                        state.activeCompanyId,
-                        row.departmentId,
-                        referenceDate,
-                      )}
-                      inputClassName="px-1 py-0.5"
-                      selectClassName="!min-w-0 !w-24 !px-1.5 !py-1"
-                    />
-                  </td>
-                  <td className="border border-line px-1.5 py-2 text-xs break-words">{row.auditCategory}</td>
+                  <td className="print-table-cell border border-line px-1.5 py-2 break-words">{row.owner}</td>
+                  <td className="print-table-cell border border-line px-1.5 py-2 text-xs break-words">{row.auditCategory}</td>
                   <td className="border border-line px-1.5 py-2 break-words">
                     <AuditorMultiSelect
                       value={row.auditors}
@@ -284,12 +285,34 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                       >
                         {statusShort(displayStatus)}
                       </button>
-                      <span className={`print-only inline-block h-6 w-6 text-xs leading-6 ${statusClass(displayStatus)}`}>
+                      <span className={`print-only text-xs ${statusClass(displayStatus)}`}>
                         {statusShort(displayStatus)}
                       </span>
                     </td>
                   )})}
                 </tr>
+                <tr id={`plan-detail-${row.id}`} hidden={!expanded || !pagination.isVisible(rowIndex)} className="no-print bg-page">
+                  <td colSpan={17} className="border border-line p-3">
+                    {expanded && (
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <div className="min-w-0 break-words"><span className="block text-xs text-muted">對應文件</span>{row.documents || '—'}</div>
+                        <div>
+                          <span className="mb-1 block text-sm">負責人</span>
+                          <DepartmentOwnerField
+                            departmentId={row.departmentId}
+                            savedOwner={deptOwner(row.departmentId)}
+                            displayOwner={row.owner}
+                            ariaLabel={`${row.qpCode} ${row.department} 負責人`}
+                            onSaveRequest={ownerConfirm.requestChange}
+                            candidates={departmentMemberCandidates(state.people, state.activeCompanyId, row.departmentId, referenceDate)}
+                          />
+                        </div>
+                        <div><span className="block text-xs text-muted">稽核類型</span>{row.auditCategory}</div>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+                </Fragment>
               )})}
             </tbody>
           </table>

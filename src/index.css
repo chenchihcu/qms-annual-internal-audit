@@ -67,6 +67,74 @@ html.dark {
   .record-create-feedback {
     @apply sm:col-span-2;
   }
+
+  @media screen {
+    col.col-seq {
+      width: 3rem;
+    }
+
+    col.col-code {
+      width: 5.5rem;
+    }
+
+    col.col-year {
+      width: 4.5rem;
+    }
+
+    col.col-date {
+      width: 7rem;
+    }
+
+    col.col-datetime {
+      width: 10.5rem;
+    }
+
+    col.col-status {
+      width: 6.5rem;
+    }
+
+    col.col-name {
+      width: 8rem;
+    }
+
+    col.col-judge {
+      width: 7.5rem;
+    }
+
+    col.col-scale {
+      width: 8.5rem;
+    }
+
+    col.col-action {
+      width: 7.5rem;
+    }
+
+    col.col-month {
+      width: 3rem;
+    }
+
+    col.col-done {
+      width: 4rem;
+    }
+
+    col.print-table-column {
+      width: 0;
+      max-width: 0;
+    }
+
+    .worksheet-table {
+      @apply w-full table-fixed border-collapse text-sm;
+    }
+
+    .worksheet-table th,
+    .worksheet-table td {
+      @apply min-w-0 break-words;
+    }
+
+    .worksheet-cell {
+      @apply min-w-0 break-words;
+    }
+  }
 }
 
 @media screen and (max-width: 767px) {
@@ -162,6 +230,18 @@ html.dark {
 
   .print-only {
     display: block !important;
+  }
+
+  .print-table-cell {
+    display: table-cell !important;
+  }
+
+  .print-table-column {
+    display: table-column !important;
+  }
+
+  .qr-plan-table col {
+    width: auto !important;
   }
 
   body {
@@ -262,5 +342,10 @@ html.dark {
 }
 
 .print-only {
+  display: none;
+}
+
+.print-table-cell,
+.print-table-column {
   display: none;
 }

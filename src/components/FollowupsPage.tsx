@@ -53,12 +53,22 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
           ariaLabel="追蹤類型篩選"
         />
 
+        <h3 className="mb-3 font-semibold">待改善追蹤一覽（{visibleRows.length}）</h3>
+
         {visibleRows.length === 0 ? (
           <EmptyState message="目前沒有待追蹤項目。" />
         ) : (
           <>
-          <ScrollRegion ariaLabel="待改善追蹤工作表">
-            <table className="w-full min-w-[760px] border-collapse text-sm">
+          <ScrollRegion ariaLabel="待改善追蹤一覽">
+            <table className="worksheet-table min-w-[41.5rem]">
+              <colgroup>
+                <col className="col-status" />
+                <col />
+                <col className="col-code" />
+                <col className="col-name" />
+                <col className="col-status" />
+                <col className="col-date" />
+              </colgroup>
               <thead>
                 <tr className="bg-slate-50 text-left">
                   <th className="border p-2">類型</th>
