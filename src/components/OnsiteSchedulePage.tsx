@@ -41,6 +41,7 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
   const { externalAuditPrep, people } = state
   const slots = externalAuditPrep.onsiteSlots ?? []
   const [draft, setDraft] = useState<OnsiteAuditSlot | null>(null)
+  const [saveMessage, setSaveMessage] = useState(false)
 
   const escortOptions = useMemo(
     () => people.filter((person) => person.active).map((person) => ({ value: person.id, label: person.name })),
@@ -68,6 +69,7 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
   const startEdit = (slot?: OnsiteAuditSlot) => {
     const next = slot ? { ...slot } : blankSlot()
     setDraft(next)
+    setSaveMessage(false)
   }
 
   const saveDraft = () => {
@@ -78,6 +80,7 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
       addOnsiteSlot(draft)
     }
     setDraft(null)
+    setSaveMessage(true)
   }
 
   const siteLabel = (site: OnsiteSite) => SITE_OPTIONS.find((item) => item.value === site)?.label ?? site
@@ -100,6 +103,10 @@ export function OnsiteSchedulePage({ store }: { store: AuditStore }) {
             </>
           )}
         />
+
+        {saveMessage && !draft && (
+          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+        )}
 
         {draft && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 no-print">

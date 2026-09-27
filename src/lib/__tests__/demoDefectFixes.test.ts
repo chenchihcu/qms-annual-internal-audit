@@ -22,7 +22,7 @@ describe('demo defect fixes', () => {
       if (!i.judgment) i.judgment = '符合'
     })
     expect(isProcedureComplete(audit!)).toBe(false)
-    expect(scoreProcedureAudit(audit!).score).toBe(100)
+    expect(scoreProcedureAudit(audit!).score).toBeNull()
   })
 
   it('zhenglongxing QP-05 checklist dates align with plan first scheduled month', () => {

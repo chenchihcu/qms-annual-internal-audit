@@ -23,7 +23,7 @@ describe('ProcedureAuditPanel', () => {
       expect(screen.getByRole('heading', { name: '查檢表' })).toBeTruthy()
       expect(screen.getByRole('region', { name: '查檢判定計數統計表' })).toBeTruthy()
       expect(screen.getByText('程序得分')).toBeTruthy()
-      expect(screen.getByText('未判定')).toBeTruthy()
+      expect(screen.getByRole('columnheader', { name: '未判定' })).toBeTruthy()
     })
   })
 })

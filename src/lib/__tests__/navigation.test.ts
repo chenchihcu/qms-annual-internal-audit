@@ -59,6 +59,19 @@ describe('workflow navigation/form mapping', () => {
     expect(buildAppHash('audit', 'event-1')).toBe('#tab=audit&audit=event-1')
   })
 
+  it('parses and builds record deep-link hash for follow-up pages', () => {
+    expect(parseAppHash('#tab=ncr&record=ncr-1')).toEqual({
+      tab: 'ncr',
+      recordId: 'ncr-1',
+    })
+    expect(
+      buildAppHash('observations', { section: 'prior', recordId: 'obs-9' }),
+    ).toBe('#tab=observations&section=prior&record=obs-9')
+    expect(buildAppHash('suggestions', { recordId: 'sug-2' })).toBe(
+      '#tab=suggestions&record=sug-2',
+    )
+  })
+
   it('defines workflow metadata for every tab in PDCA order', () => {
     expect(TAB_WORKFLOW).toHaveLength(16)
     expect(TAB_WORKFLOW.map((entry) => entry.id)).toEqual(ALL_TABS.map((entry) => entry.id))

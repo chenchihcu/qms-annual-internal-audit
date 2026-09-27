@@ -10,10 +10,12 @@ import {
   QUALIFICATION_STATE_LABELS,
   personRoles,
   qualificationState,
+  verifierCandidates,
 } from '../lib/personnel'
 import { exportPersonnelExcel } from '../lib/formExport'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { PersonNameSelect } from './ui/PersonNameSelect'
 import { CheckboxList } from './ui/CheckboxList'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
@@ -142,6 +144,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const [dirty, setDirty] = useState(false)
   const [pendingCancel, setPendingCancel] = useState(false)
   const [pendingDeactivate, setPendingDeactivate] = useState<Person | null>(null)
+  const [saveMessage, setSaveMessage] = useState(false)
   const editCardRef = useRef<HTMLDivElement>(null)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -369,6 +372,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     }
     setEditing(null)
     setDirty(false)
+    setSaveMessage(true)
   }
 
   const exportExcel = () => {
@@ -381,6 +385,17 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const showAuditorScopes = editing && isAuditorRole(editing.role)
   const showAuditorValidity = editing && isAuditorRole(editing.role)
   const showAppointmentDocs = editing && (isAuditorRole(editing.role) || isManagementRepRole(editing.role))
+
+  const verifierPeople = useMemo(
+    () => verifierCandidates(
+      state.people,
+      state.activeCompanyId,
+      state.settings.auditYear,
+      state.annualPersonnelAssignments,
+      editing?.effectiveFrom || `${state.settings.auditYear}-12-31`,
+    ),
+    [state.people, state.activeCompanyId, state.settings.auditYear, state.annualPersonnelAssignments, editing?.effectiveFrom],
+  )
 
   const filterFields = (
     <>
@@ -405,11 +420,14 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
           title="人員合格名單"
           actions={(
             <>
-              <Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false) }}>新增人員</Button>
+              <Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false); setSaveMessage(false) }}>新增人員</Button>
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
             </>
           )}
         />
+        {saveMessage && !editing && (
+          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+        )}
         <details className="mt-2 no-print">
           <summary className="cursor-pointer text-sm font-medium text-slate-700">篩選條件</summary>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filterFields}</div>
@@ -469,7 +487,12 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
             </>
           )}
           {showAuditorScopes && (
-            <Input label="評定／確認人" value={editing.assessedBy} onChange={(v) => patchForm({ assessedBy: v })} />
+            <PersonNameSelect
+              label="評定／確認人"
+              value={editing.assessedBy}
+              onChange={(v) => patchForm({ assessedBy: v })}
+              candidates={verifierPeople}
+            />
           )}
           {(showAppointmentDocs || showAuditorScopes) && (
             <Input label="生效日期" type="date" value={editing.effectiveFrom} onChange={(v) => patchForm({ effectiveFrom: v })} />

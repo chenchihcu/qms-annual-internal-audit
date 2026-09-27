@@ -9,7 +9,16 @@ import {
 import type { ChecklistItem, PlanRow, ProcedureAudit } from '../../types'
 
 function item(judgment: ChecklistItem['judgment']): ChecklistItem {
-  return { id: Math.random().toString(), category: '測試', no: 1, content: 'test', judgment, description: '' }
+  const needsEvidence = judgment === '符合' || judgment === '不符'
+  return {
+    id: Math.random().toString(),
+    category: '測試',
+    no: 1,
+    content: 'test',
+    judgment,
+    description: '',
+    objectiveEvidence: needsEvidence ? '佐證紀錄' : '',
+  }
 }
 
 function planRow(overrides: Partial<PlanRow> & Pick<PlanRow, 'qpCode' | 'department'>): PlanRow {

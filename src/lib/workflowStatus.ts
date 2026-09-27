@@ -2,8 +2,19 @@ import { countPrepProgress, evaluatePrepSequence, formatPrepYearMismatch } from 
 import { buildCarryForwardSummary, countOpenFollowups } from './followupQueue'
 import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
-import type { AppState, CompanyId, TabId } from '../types'
+import type { AppState, CompanyData, CompanyId, ProcedureAudit, TabId } from '../types'
 import { companySettingsFor, DEFAULT_SCORING_RULES } from '../types'
+
+export function isPlanRowScheduled(row: { months: Array<unknown> }): boolean {
+  return row.months.some(Boolean)
+}
+
+export function isAuditScheduledInPlan(co: CompanyData, audit: ProcedureAudit): boolean {
+  const row = co.planRows.find(
+    (item) => item.qpCode === audit.qpCode && item.departmentId === audit.departmentId,
+  )
+  return row ? isPlanRowScheduled(row) : false
+}
 
 export type PdcaPhase = 'P' | 'D' | 'C' | 'A' | 'overview' | 'system'
 
@@ -77,7 +88,7 @@ export function planScheduled(state: AppState, companyId: CompanyId = state.acti
   const co = companyFor(state, companyId)
   const settings = companySettingsFor(state, companyId)
   if (!settings.planWindowStart?.trim() || !settings.planWindowEnd?.trim()) return false
-  if (!settings.leadAuditor?.trim()) return false
+  if (!leadAuditorAppointed(state, companyId)) return false
   const hasMonth = co.planRows.some((row) => row.months.some(Boolean))
   return hasMonth
 }
@@ -138,7 +149,9 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
 
   const doGaps: WorkflowGap[] = []
   const started = co.audits.filter((a) => a.status === '執行中' || a.status === '已回報')
-  const planning = co.audits.filter((a) => !a.status || a.status === '規劃中')
+  const planning = co.audits.filter(
+    (a) => (!a.status || a.status === '規劃中') && isAuditScheduledInPlan(co, a),
+  )
   const reported = co.audits.filter((a) => a.status === '已回報')
   if (started.length === 0) doGaps.push({ message: '尚無已開始的稽核事件', tab: 'schedule' })
   const inProgress = co.audits.filter((a) => a.status === '執行中')
@@ -170,8 +183,8 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   const annualCloseGaps: WorkflowGap[] = []
   if (planGaps.length > 0) annualCloseGaps.push(...planGaps)
   if (started.length === 0) annualCloseGaps.push({ message: '年度內部稽核尚未開始', tab: 'schedule' })
-  if (planning.length > 0 && co.planRows.some((r) => r.months.some(Boolean))) {
-    annualCloseGaps.push({ message: `${planning.length} 件計畫事件尚未開始`, tab: 'schedule' })
+  if (planning.length > 0) {
+    annualCloseGaps.push({ message: `${planning.length} 件已排程事件尚未開始`, tab: 'schedule' })
   }
   if (inProgress.length > 0) annualCloseGaps.push({ message: `${inProgress.length} 件尚未完成回報`, tab: 'schedule' })
   if (openFollowups > 0) {
@@ -220,7 +233,6 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
 export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowStatus {
   const companyId = state.activeCompanyId
   const co = companyFor(state, companyId)
-  const profile = profileFor(state, companyId)
   const gaps: WorkflowGap[] = []
   const advisories: WorkflowGap[] = []
   let ready = true
@@ -238,25 +250,11 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
     }
 
     case 'standard':
-      if (!profile.applicableStandards.some((s) => s.confirmationStatus === 'confirmed')) {
-        gaps.push({ message: '至少一項適用標準須標為已確認' })
-      }
-      const confirmed = profile.applicableStandards.filter((s) => s.confirmationStatus === 'confirmed')
-      if (confirmed.some((s) => !s.evidenceReference.trim())) {
-        gaps.push({ message: '已確認標準須填寫依據引用' })
-      }
-      if (!profile.certificateScope.trim()) gaps.push({ message: '證書範圍尚未填寫' })
-      if (!profile.certificateReference.trim()) gaps.push({ message: '證書／依據編號尚未填寫' })
-      ready = gaps.length === 0
+      ready = standardReady(state, companyId)
       break
 
     case 'procedure':
-      if (!profile.auditProcedureCode.trim()) gaps.push({ message: '稽核程序代碼尚未填寫' })
-      if (!profile.auditProcedureVersion.trim() || profile.auditProcedureVersion === '待確認') {
-        gaps.push({ message: '稽核程序版本尚未確認' })
-      }
-      if (!profile.formalRecordLocation.trim()) gaps.push({ message: '正式紀錄保存位置尚未填寫' })
-      ready = gaps.length === 0
+      ready = procedureSourceReady(state, companyId)
       break
 
     case 'stakeholders': {
@@ -287,7 +285,9 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       const planSettings = companySettingsFor(state, companyId)
       if (!planSettings.planWindowStart?.trim()) gaps.push({ message: '計畫窗口起始日尚未設定' })
       if (!planSettings.planWindowEnd?.trim()) gaps.push({ message: '計畫窗口結束日尚未設定' })
-      if (!planSettings.leadAuditor?.trim()) gaps.push({ message: '主任稽核員尚未設定' })
+      if (!leadAuditorAppointed(state, companyId)) {
+        gaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
+      }
       if (!co.planRows.some((row) => row.months.some(Boolean))) {
         gaps.push({ message: '至少須排定一個程序月格' })
       }
@@ -297,18 +297,14 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
 
     case 'personnel':
       if (!leadAuditorAppointed(state, companyId)) {
-        gaps.push({ message: '現行公司尚無有效主任稽核員任命' })
+        gaps.push({ message: '主任稽核員任命未完成' })
       }
       ready = gaps.length === 0
       break
 
-    case 'schedule': {
-      if (co.audits.length === 0) {
-        gaps.push({ message: '尚無可排程的稽核事件' })
-      }
-      ready = gaps.length === 0
+    case 'schedule':
+      ready = co.audits.length > 0
       break
-    }
 
     case 'audit':
       if (!auditStarted(state, companyId)) {
@@ -335,26 +331,13 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
     case 'observations':
     case 'suggestions':
       ready = true
-      const openNcr = co.ncrs.filter((n) => n.status !== '結案').length
-      const openObs = co.observations.filter((o) => o.status === 'open').length
-      const openSug = co.suggestions.filter((s) => s.status === 'open').length
-      if (tab === 'ncr' && openNcr > 0) advisories.push({ message: `尚有 ${openNcr} 件未結案 NCR` })
-      if (tab === 'observations' && openObs > 0) advisories.push({ message: `尚有 ${openObs} 件待追蹤觀察` })
-      if (tab === 'suggestions' && openSug > 0) advisories.push({ message: `尚有 ${openSug} 件待追蹤建議` })
       break
 
     case 'onsite':
       ready = true
-      if ((state.externalAuditPrep.onsiteSlots?.length ?? 0) === 0) {
-        advisories.push({ message: '尚未排定外稽當日時段' })
-      }
       break
 
     case 'prep': {
-      const progress = countPrepProgress(state.externalAuditPrep, state.companyRelationships)
-      if (progress.done < progress.total) {
-        gaps.push({ message: `準備清單 ${progress.done}/${progress.total} 項完成` })
-      }
       const warnings = evaluatePrepSequence({
         prep: state.externalAuditPrep,
         companies: state.companies,

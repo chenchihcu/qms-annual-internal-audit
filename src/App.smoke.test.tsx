@@ -33,6 +33,7 @@ const SIDEBAR_GROUP_LABELS = [
 describe('App tab smoke', () => {
   beforeEach(() => {
     window.location.hash = ''
+    localStorage.clear()
   })
 
   it('renders all sixteen tabs without crashing', async () => {
@@ -73,7 +74,7 @@ describe('App tab smoke', () => {
     expect(guide!.textContent).not.toMatch(/掌握年度 PDCA/)
     expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
     const metricsTable = await screen.findByRole('region', { name: '年度指標統計表' })
-    const priorObsRow = within(metricsTable).getByText('跨年待追蹤').closest('tr')
+    const priorObsRow = within(metricsTable).getByText('前年度未結').closest('tr')
     expect(priorObsRow).toBeTruthy()
     fireEvent.click(within(priorObsRow as HTMLElement).getByRole('button', { name: '前往' }))
     await waitFor(() => {
@@ -99,6 +100,39 @@ describe('App tab smoke', () => {
     expect(screen.queryByText('ISO 9001 / AS9100D 內部稽核')).toBeNull()
   })
 
+  it('does not use sidebar brand card as second home control', () => {
+    render(<App />)
+    expect(screen.queryByRole('button', { name: '回到稽核總覽' })).toBeNull()
+    expect(screen.getAllByText('QMS 年度內部稽核').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
+    expect(window.location.hash).not.toBe('#tab=dashboard')
+    fireEvent.click(screen.getByRole('button', { name: '稽核總覽' }))
+    expect(window.location.hash).toBe('#tab=dashboard')
+  })
+
+  it('omits duplicate toolbar meta on plan, risk, and stakeholders', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '年度稽核計畫' })).toBeTruthy()
+    })
+    expect(screen.queryByText(/內稽年度請用頁首切換/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
+    })
+    expect(screen.queryByText(/不取代程序固有風險/)).toBeNull()
+    expect(screen.queryByText(/至利害關係人編輯部門 O／S/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '利害關係人' })).toBeTruthy()
+    })
+    expect(screen.queryByText(/兩者不可互代/)).toBeNull()
+  })
+
   it('shows NCR import guidance only when manual form is expanded', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '不符合' }))
@@ -108,8 +142,33 @@ describe('App tab smoke', () => {
     expect(screen.queryByText(/查檢表判定「不符」時自動匯入/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '手動新增 NCR' }))
     expect(
-      screen.getByText(/查檢表判定「不符」時自動匯入，描述為矯正說明且不會被查檢表覆寫；此處可登錄會議或現場發現。/),
+      screen.getByText(/查檢表判定「不符」時自動匯入；發現快照會隨查檢更新，描述欄供矯正說明，不會被查檢覆寫。此處可登錄會議或現場發現。/),
     ).toBeTruthy()
+  })
+
+  it('hides open-count workflow guide on ncr and observations tabs', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '不符合' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '不符合' })).toBeTruthy()
+    })
+    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '觀察事項' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '觀察事項' })).toBeTruthy()
+    })
+    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
+  })
+
+  it('shows procedure field errors without top workflow guide', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '程序' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('程序版本')).toBeTruthy()
+    })
+    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
+    expect(screen.getByText('仍為待確認')).toBeTruthy()
   })
 
   it('asks before clearing all data and keeps data when cancelled', async () => {
@@ -170,7 +229,16 @@ describe('App tab smoke', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
     })
-
+    const select = screen.getByLabelText('查檢表') as HTMLSelectElement
+    const qaOption = Array.from(select.options).find(
+      (option) => option.text.includes('QP-16') && option.text.includes('品保'),
+    )
+    expect(qaOption).toBeTruthy()
+    fireEvent.change(select, { target: { value: qaOption!.value } })
+    await waitFor(() => {
+      expect(screen.getByText(/不合格品隔離/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: '新增稽核項目' })).toBeTruthy()
+    })
     fireEvent.click(screen.getByRole('button', { name: '新增稽核項目' }))
     const deleteBtn = screen.getAllByRole('button', { name: /刪除/ }).at(-1)
     expect(deleteBtn).toBeTruthy()

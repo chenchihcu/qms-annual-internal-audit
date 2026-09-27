@@ -1,3 +1,4 @@
+import { itemHasObjectiveEvidence, itemNeedsObjectiveEvidence } from './checklistEvidence'
 import type { ChecklistItem, CompanyId, Judgment, ProcedureAudit, ScoringRules } from '../types'
 import { DEFAULT_SCORING_RULES } from '../types'
 
@@ -17,23 +18,28 @@ export interface ScoreResult {
   }
 }
 
-function isJudgmentPending(judgment: Judgment | null | undefined, description: string): boolean {
+function isJudgmentSidePending(judgment: Judgment | null | undefined, item: ChecklistItem): boolean {
   if (!judgment) return true
-  if (judgment === '不適用' && !description?.trim()) return true
+  if (judgment === '不適用') {
+    return !item.notApplicableReason?.trim() && !item.description?.trim()
+  }
+  if (itemNeedsObjectiveEvidence({ ...item, judgment })) {
+    return !itemHasObjectiveEvidence(item)
+  }
   return false
 }
 
-/** 未判定，或不適用但未填說明 */
+/** 未判定、缺客觀證據，或不適用但未填理由 */
 export function isChecklistItemPending(item: ChecklistItem): boolean {
   const scope = item.certificateScope ?? 'shared'
   if (scope === 'dual') {
     const byCo = item.judgmentByCompany ?? { jiurun: null, zhenglongxing: null }
     return (
-      isJudgmentPending(byCo.jiurun, item.description) ||
-      isJudgmentPending(byCo.zhenglongxing, item.description)
+      isJudgmentSidePending(byCo.jiurun, item) ||
+      isJudgmentSidePending(byCo.zhenglongxing, item)
     )
   }
-  return isJudgmentPending(item.judgment, item.description)
+  return isJudgmentSidePending(item.judgment, item)
 }
 
 function applyJudgmentToBreakdown(
@@ -110,7 +116,7 @@ export function scoreChecklistItems(
         const j = byCo[side]
         scoringUnits++
         if (j) judgedCount++
-        if (isJudgmentPending(j, item.description)) {
+        if (isJudgmentSidePending(j, item)) {
           breakdown.pending++
           continue
         }

@@ -55,9 +55,10 @@ describe('isProcedureComplete', () => {
     expect(result.score).toBeNull()
   })
 
-  it('can still compute score when evidence is missing but judgments are complete', () => {
+  it('does not score when conform items lack objective evidence', () => {
     const result = scoreProcedureAudit(baseAudit([item('符合'), item('符合', 'QR-01')]))
-    expect(result.score).toBe(100)
+    expect(result.score).toBeNull()
+    expect(result.status).toBe('incomplete')
     expect(isProcedureComplete(baseAudit([item('符合'), item('符合', 'QR-01')]))).toBe(false)
   })
 })

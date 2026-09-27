@@ -22,13 +22,13 @@ gaps.push({ message: `固有風險已存檔 ${saved}/${total}` })
 
 N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 **單表 + `ScrollRegion`**，禁止桌面表＋`lg:hidden` 手機 `<article>` 雙 DOM。
 
-殼層：頂欄只顯示範圍／年度／公司；頁名只在側欄與頁內 H2。進度 `a/b` 只在 Guide，頁內勿重複。窄螢幕頂欄只留「選單」，不另加「首頁」；回家由側欄藍卡或「稽核總覽」負責。側欄保留「資料儲存於本機 · v7」；**無**內容欄頁尾標語（如 ISO 9001／AS9100D）；系統設定**無**「關於」段落。`Card` 不加 `shadow-sm`；sticky 頂欄不用 `backdrop-blur`，以 `bg-surface` + 底線分區。同一 `Card` 內並列清單不加內層 `rounded-lg border`，用間距或 `border-t` 分隔。
+殼層：頂欄只顯示範圍／年度／公司；頁名只在側欄與頁內 H2。進度 `a/b` 只在 Guide，頁內勿重複。窄螢幕頂欄只留「選單」，不另加「首頁」；回家由側欄「稽核總覽」負責，藍卡不可點。側欄保留「資料儲存於本機 · v7」；**無**內容欄頁尾標語（如 ISO 9001／AS9100D）；系統設定**無**「關於」段落。`Card` 不加 `shadow-sm`；sticky 頂欄不用 `backdrop-blur`，以 `bg-surface` + 底線分區。同一 `Card` 內並列清單不加內層 `rounded-lg border`，用間距或 `border-t` 分隔。
 
-利害關係人 WorkflowGuide 缺口用 `利害關係人已標註 a/b`；`StakeholderRulesPanel` 預設收合，勿 `open`。工作表單表 + `data-stakeholder-dept` 掛列。
+利害關係人（`stakeholders`）：`PageToolbar` **無** `meta`（不重複與方案風險互代說明）；WorkflowGuide 缺口用 `利害關係人已標註 a/b`；`StakeholderRulesPanel` 預設收合，勿 `open`。工作表單表 + `data-stakeholder-dept` 掛列。
 
 儀表板總覽：年度指標、稽核類型、程序得分、兩證缺口摘要為四個內容區塊（`stacked-table` + `ScrollRegion`），不必 `Card` 外框；**不含**稽核重點標示表（同批列在年度計畫）。系統／製程／型態三列補充用「—」，**不**重複「計畫程序列數」。逐筆缺口清單仍留在兩證區。程序得分表列入列印；兩證缺口區 `no-print`。待追蹤導向 `followups`（紙本表仍側欄直達）。
 
-年度計畫（`plan`）：月格圖例與「點擊月格循環切換狀態」保留；不在 `PageToolbar meta` 重複圖例說明；不在頁尾重複「利害關係人已標註」（該摘要只在利害關係人頁 Guide）。
+年度計畫（`plan`）：月格圖例與「點擊月格循環切換狀態」保留；`PageToolbar` **無** `meta`（不重複頁首年度切換、主任稽核員任命或圖例說明）；不在頁尾重複「利害關係人已標註」（該摘要只在利害關係人頁 Guide）。
 
 稽核日程（`schedule`）：Guide 摘要；工作面單表 + chips；點列進 `#tab=audit&audit=`。`score == null` 顯示「未計分」。
 
@@ -44,7 +44,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 不符合（`ncr`）：自動匯入說明只在展開手動登錄區顯示，**不在** `PageToolbar meta` 常駐。
 
-方案風險（`risk`）：工具列只留風險公式與高中低區間圖例，**不**加「時程與稽核人員由年度計畫共用」。
+方案風險（`risk`）：`PageToolbar` **無** `meta`（不重複利害關係人互代說明、已存檔計數或頁尾計數卡）；缺口條 `固有風險已存檔 a/b` 與列上「存檔」按鈕保留。
 
 人員資格編輯：QP／標準／單位用緊湊 checkbox 群（`max-h-36` 內捲）；免責 `<details>`；名單單表 + `ScrollRegion`。
 

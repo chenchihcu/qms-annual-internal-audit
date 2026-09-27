@@ -14,6 +14,10 @@ import {
   listPrepGaps,
   summarizePrepGaps,
 } from '../lib/externalAuditPrep'
+import {
+  countCurrentYearOpenObservations,
+  countPriorOpenObservations,
+} from '../lib/dashboardMetrics'
 import type { NavigateOptions } from '../lib/navigation'
 import { buildPlanRowKey } from '../lib/planRowOptions'
 import { FOCUS_RING } from '../lib/focusRing'
@@ -70,7 +74,8 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     settings.scoringRules,
   )
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
-  const openObs = company.observations.filter((o) => o.status === 'open').length
+  const currentYearOpenObs = countCurrentYearOpenObservations(state)
+  const priorOpenObs = countPriorOpenObservations(state)
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
   const plannedMonths = company.planRows.reduce(
     (sum, r) => sum + r.months.filter(Boolean).length,
@@ -131,10 +136,18 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       section: 'current' as const,
     },
     {
+      key: 'current-year-obs',
+      label: '本年度待追蹤',
+      value: String(currentYearOpenObs),
+      hint: '台帳 open',
+      tab: 'observations' as TabId,
+      section: 'current' as const,
+    },
+    {
       key: 'prior-obs',
-      label: '跨年待追蹤',
-      value: String(openObs),
-      hint: '前年度觀察 open',
+      label: '前年度未結',
+      value: String(priorOpenObs),
+      hint: '含封存',
       tab: 'observations' as TabId,
       section: 'prior' as const,
     },
@@ -167,49 +180,63 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     { key: 'config', label: '型態稽核', value: String(byCategory.型態稽核), hint: '—' },
   ]
 
-  const coverageSummaryRows = [
+  const coverageSummaryRows: Array<{
+    key: string
+    label: string
+    value: string
+    hint?: string
+    tab?: TabId | null
+  }> = [
     {
       key: 'internal-complete',
       label: '內部稽核完成',
       value: mergedCoverage.allInternalAuditComplete ? '是' : '否',
+      tab: mergedCoverage.allInternalAuditComplete ? null : 'plan',
     },
     {
       key: 'open-ncr-total',
       label: '未結 NCR 合計',
       value: String(mergedCoverage.totalOpenNcr),
+      tab: mergedCoverage.totalOpenNcr > 0 ? 'ncr' : null,
     },
     {
       key: 'ncr-jiurun',
       label: '未結 NCR（九潤）',
       value: String(mergedCoverage.openNcrByScope.jiurun),
+      tab: mergedCoverage.openNcrByScope.jiurun > 0 ? 'ncr' : null,
     },
     {
       key: 'ncr-zlx',
       label: '未結 NCR（正隆興）',
       value: String(mergedCoverage.openNcrByScope.zhenglongxing),
+      tab: mergedCoverage.openNcrByScope.zhenglongxing > 0 ? 'ncr' : null,
     },
     {
       key: 'ncr-both',
       label: '未結 NCR（兩證）',
       value: String(mergedCoverage.openNcrByScope.both),
+      tab: mergedCoverage.openNcrByScope.both > 0 ? 'ncr' : null,
     },
     {
       key: 'plan-gaps',
       label: '共用計畫缺口',
       value: String(mergedCoverage.gaps.length),
       hint: '件',
+      tab: mergedCoverage.gaps.length > 0 ? 'plan' : null,
     },
     {
       key: 'dual-pending',
       label: '雙證未判定',
       value: String(mergedCoverage.dualPendingItems.length),
       hint: '項',
+      tab: mergedCoverage.dualPendingItems.length > 0 ? 'audit' : null,
     },
     {
       key: 'prep-gaps',
       label: '外稽準備漏口',
       value: String(prepGapTotal),
       hint: '項',
+      tab: prepGapTotal > 0 ? 'prep' : null,
     },
   ]
 
@@ -289,6 +316,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                 <th className="p-2">項目</th>
                 <th className="p-2 w-28">數值</th>
                 <th className="p-2 w-16">單位</th>
+                <th className="p-2 w-24 no-print">前往</th>
               </tr>
             </thead>
             <tbody>
@@ -297,6 +325,19 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                   <td data-label="項目" className="p-2 text-ink">{row.label}</td>
                   <td data-label="數值" className="p-2 font-semibold text-ink">{row.value}</td>
                   <td data-label="單位" className="p-2 text-muted">{row.hint ?? '—'}</td>
+                  <td data-label="前往" className="p-2 no-print">
+                    {row.tab ? (
+                      <button
+                        type="button"
+                        className={`text-sm text-link hover:underline ${FOCUS_RING}`}
+                        onClick={() => onNavigate(row.tab!)}
+                      >
+                        前往
+                      </button>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -325,7 +366,15 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                   </li>
                 ))}
                 {mergedCoverage.gaps.length > 12 && (
-                  <li>…另有 {mergedCoverage.gaps.length - 12} 項</li>
+                  <li>
+                    <button
+                      type="button"
+                      className={`text-left font-medium text-primary hover:underline ${linkButtonClass}`}
+                      onClick={() => onNavigate('plan')}
+                    >
+                      …另有 {mergedCoverage.gaps.length - 12} 項
+                    </button>
+                  </li>
                 )}
               </ul>
             )}
@@ -357,7 +406,15 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
                   </li>
                 ))}
                 {mergedCoverage.dualPendingItems.length > 12 && (
-                  <li>…另有 {mergedCoverage.dualPendingItems.length - 12} 項</li>
+                  <li>
+                    <button
+                      type="button"
+                      className={`text-left font-medium text-primary hover:underline ${linkButtonClass}`}
+                      onClick={() => onNavigate('audit')}
+                    >
+                      …另有 {mergedCoverage.dualPendingItems.length - 12} 項
+                    </button>
+                  </li>
                 )}
               </ul>
             )}
@@ -368,13 +425,22 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
           <div className="mt-4 border-t border-line pt-4">
             <p className="mb-2 text-sm font-medium text-ink">外稽準備抬頭漏口（年度共用）</p>
             <ul className="space-y-1 text-xs text-muted">
-              {prepGapLines.map((line) => (
-                <li key={`${line.no}-${line.text}`}>
+              {prepGapLines.map((line, index) => {
+                const reactKey = `${line.no}-${line.text}`
+                // #region agent log
+                if (index === 0) {
+                  const keys = prepGapLines.map((item) => `${item.no}-${item.text}`)
+                  fetch('http://127.0.0.1:7321/ingest/123e2b23-b370-4bb6-9a82-27ec3a248c96',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f0bcf7'},body:JSON.stringify({sessionId:'f0bcf7',runId:'pre-fix',hypothesisId:'D',location:'Dashboard.tsx:prepGapLines',message:'dashboard prep list render',data:{count:prepGapLines.length,keys,unique:new Set(keys).size},timestamp:Date.now()})}).catch(()=>{});
+                }
+                // #endregion
+                return (
+                <li key={reactKey}>
                   <button type="button" className={linkButtonClass} onClick={() => onNavigate('prep')}>
                     {line.text}
                   </button>
                 </li>
-              ))}
+                )
+              })}
               {prepGapTotal > prepGapLines.length && (
                 <li>
                   <button
@@ -394,7 +460,7 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       <div>
         <h2 className="mb-4 text-sm font-semibold text-ink">各程序稽核得分</h2>
         {!anyJudgment && scoredDepts.length === 0 ? (
-          <EmptyState message="尚無稽核判定，請至「程序稽核」填寫查檢表。" />
+          <EmptyState message="尚無稽核判定，請至「查檢表」填寫。" />
         ) : (
           <ScrollRegion ariaLabel="各程序稽核得分統計表">
             <table className="stacked-table w-full min-w-[640px] border-collapse text-sm">

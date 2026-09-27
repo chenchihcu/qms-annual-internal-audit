@@ -249,7 +249,7 @@ describe('audit event records', () => {
     act(() => { result.current.updateCompanyAuditProfile('jiurun', { auditProcedureCode: '', formalRecordLocation: '' }) })
     const incompleteStart = result.current.startAudit(sourceAudit.id)
     expect(incompleteStart.canStart).toBe(false)
-    expect(incompleteStart.errors).toEqual(expect.arrayContaining(['稽核程序代碼尚未確認', '正式紀錄保存位置尚未確認']))
+    expect(incompleteStart.errors).toEqual(expect.arrayContaining(['稽核程序代碼尚未填寫', '正式紀錄保存位置尚未填寫']))
 
     let leadId = ''
     let escortId = ''

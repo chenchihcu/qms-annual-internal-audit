@@ -212,6 +212,10 @@ describe('validateNcrClose', () => {
       rootCause: '原因',
       correctiveAction: '措施',
       verificationEvidence: '複查合格',
+      correctiveActionReference: 'QR-28-03-001',
+      effectivenessReference: 'QR-28-03-002',
+      effectivenessVerifiedBy: '品保主管',
+      effectivenessVerifiedAt: '2026-04-01',
     }
     expect(canTransitionNcrStatus(ncr, '結案').ok).toBe(true)
   })

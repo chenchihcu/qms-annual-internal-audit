@@ -157,8 +157,7 @@ describe('evaluatePrepSequence', () => {
 
   it('no sequence warning when order is correct', () => {
     const prep = createDefaultPrepState(2026)
-    prep.internalAuditComplete = true
-    prep.managementReviewComplete = true
+    prep.managementReviewComplete = false
     const result = evaluatePrepSequence({
       prep,
       companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },

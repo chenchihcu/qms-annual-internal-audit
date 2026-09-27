@@ -44,7 +44,15 @@ describe('departmentOwner', () => {
 
   it('apply updates department, plan rows, and open audits only', () => {
     const state = createDemoState()
-    const scoredItem = { id: 'i1', category: 'c', no: 1, content: 'x', judgment: '符合' as const, description: '' }
+    const scoredItem = {
+      id: 'i1',
+      category: 'c',
+      no: 1,
+      content: 'x',
+      judgment: '符合' as const,
+      description: '',
+      objectiveEvidence: 'QR-01',
+    }
     const openItem = { id: 'i2', category: 'c', no: 1, content: 'y', judgment: null, description: '' }
 
     state.companies.jiurun.audits.push(

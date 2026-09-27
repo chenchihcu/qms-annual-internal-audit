@@ -192,7 +192,6 @@ export function syncNCRDescriptions(
     const evidence = item.evidenceReference ?? item.description
     return {
       ...ncr,
-      description: finding,
       requirementSnapshot: ncr.requirementSnapshot ?? item.content,
       evidenceSnapshot: ncr.evidenceSnapshot ?? evidence,
       findingSnapshot: ncr.findingSnapshot ?? finding,
@@ -286,9 +285,10 @@ export function ensureNcrFromObservation(
 }
 
 const CLOSE_REQUIRED_LABELS: Array<{ key: keyof NCR; label: string }> = [
-  { key: 'rootCause', label: '根本原因' },
-  { key: 'correctiveAction', label: '矯正措施' },
-  { key: 'verificationEvidence', label: '驗證／結案佐證' },
+  { key: 'correctiveActionReference', label: '矯正措施引用' },
+  { key: 'effectivenessReference', label: '效果確認引用' },
+  { key: 'effectivenessVerifiedBy', label: '效果確認人' },
+  { key: 'effectivenessVerifiedAt', label: '效果確認日' },
 ]
 
 export function validateNcrClose(ncr: NCR): NcrCloseGateResult {
