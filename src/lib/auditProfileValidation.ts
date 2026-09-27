@@ -27,20 +27,12 @@ export function procedureFieldErrors(profile: CompanyAuditProfile): {
 
 export function standardFieldErrors(profile: CompanyAuditProfile): {
   confirmation?: string
-  evidenceByIndex: Record<number, string>
   certificateScope?: string
   certificateReference?: string
 } {
   const confirmed = profile.applicableStandards.filter((s) => s.confirmationStatus === 'confirmed')
-  const evidenceByIndex: Record<number, string> = {}
-  profile.applicableStandards.forEach((standard, index) => {
-    if (standard.confirmationStatus === 'confirmed' && !standard.evidenceReference.trim()) {
-      evidenceByIndex[index] = '尚未填寫'
-    }
-  })
   return {
     confirmation: confirmed.length === 0 ? '至少一項適用標準須標為已確認' : undefined,
-    evidenceByIndex,
     certificateScope: !profile.certificateScope.trim() ? '尚未填寫' : undefined,
     certificateReference: !profile.certificateReference.trim() ? '尚未填寫' : undefined,
   }

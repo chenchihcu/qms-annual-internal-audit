@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { FOCUS_RING } from '../lib/focusRing'
 import type { Person } from '../types'
@@ -15,6 +15,7 @@ export interface DepartmentOwnerFieldProps {
   candidates?: Person[]
   className?: string
   inputClassName?: string
+  selectClassName?: string
 }
 
 export function DepartmentOwnerField({
@@ -26,15 +27,21 @@ export function DepartmentOwnerField({
   candidates = [],
   className = '',
   inputClassName = '',
+  selectClassName = '',
 }: DepartmentOwnerFieldProps) {
-  const [draft, setDraft] = useState<string | null>(null)
   const shown = displayOwner ?? savedOwner
+  const sourceKey = JSON.stringify([departmentId, savedOwner, shown])
+  const [draftState, setDraftState] = useState<{ sourceKey: string; value: string | null }>(() => ({
+    sourceKey,
+    value: null,
+  }))
+  if (draftState.sourceKey !== sourceKey) {
+    setDraftState({ sourceKey, value: null })
+  }
+  const draft = draftState.sourceKey === sourceKey ? draftState.value : null
+  const setDraft = (value: string | null) => setDraftState({ sourceKey, value })
   const value = draft ?? shown
   const dirty = value.trim() !== savedOwner.trim()
-
-  useEffect(() => {
-    setDraft(null)
-  }, [savedOwner, departmentId, shown])
 
   const handleSave = () => {
     onSaveRequest(departmentId, value)
@@ -57,12 +64,13 @@ export function DepartmentOwnerField({
               candidates={candidates}
               ariaLabel={ariaLabel}
               className={inputClassName}
+              selectClassName={selectClassName}
             />
           </div>
         ) : (
           <input
             type="text"
-            className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400 dark:border-amber-600' : ''} ${inputClassName}`}
+            className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400 dark:border-amber-600' : ''} ${inputClassName} ${selectClassName}`}
             value={value}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {

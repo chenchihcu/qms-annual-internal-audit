@@ -13,11 +13,19 @@ describe('createDemoState smoke', () => {
     expect(() => createDemoState()).not.toThrow()
   })
 
-  it('uses v7 storage key and version', () => {
+  it('keeps the v8 seed behind the current v14 storage key', () => {
     const state = createDemoState()
-    expect(state.version).toBe(7)
-    expect(state.companySettings.jiurun.auditYear).toBe(state.companySettings.zhenglongxing.auditYear)
-    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v7')
+    expect(state.version).toBe(8)
+    expect(state.trash).toEqual([])
+    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v14')
+  })
+
+  it('defaults ISO 9001 to the current edition without confirming applicability', () => {
+    const state = createDemoState()
+    const iso9001 = state.companyAuditProfiles.jiurun.applicableStandards.find((item) => item.name === 'ISO 9001')
+
+    expect(iso9001).toMatchObject({ version: '2026', confirmationStatus: 'pending' })
+    expect(iso9001).not.toHaveProperty('evidenceReference')
   })
 
   it('demo audits align to PROCEDURE_PLAN_TEMPLATE', () => {

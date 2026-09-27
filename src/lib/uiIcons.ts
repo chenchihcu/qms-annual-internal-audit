@@ -54,22 +54,19 @@ export type IconName =
   | 'filter'
   | 'star'
 
+
 export const TAB_ICONS: Record<TabId, IconName> = {
   dashboard: 'layoutDashboard',
-  standard: 'bookOpen',
-  procedure: 'fileText',
   stakeholders: 'users',
   risk: 'alertTriangle',
   plan: 'calendar',
   personnel: 'idCard',
-  schedule: 'clock',
   audit: 'clipboardCheck',
   followups: 'listTodo',
   ncr: 'xCircle',
   observations: 'eye',
   suggestions: 'lightbulb',
   prep: 'listChecks',
-  onsite: 'mapPin',
   'system-settings': 'settings',
 }
 

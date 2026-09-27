@@ -9,6 +9,8 @@ import {
   isNcrStale,
   findChecklistItem,
   normalizeNCR,
+  ncrNumberLabel,
+  ncrNumberLabels,
   validateNcrClose,
 } from '../ncr'
 import type { ChecklistItem, NCR, Observation, ProcedureAudit } from '../../types'
@@ -26,6 +28,24 @@ const baseAudit = (items: ChecklistItem[]): ProcedureAudit => ({
   auditors: '稽核員',
   auditCategory: '系統稽核',
   items,
+})
+
+describe('ncrNumberLabel', () => {
+  it('hides legacy company suffixes without mutating stored values', () => {
+    const records = [
+      { id: 'one', ncrNumber: 'NCR-2026-001-jiurun' },
+      { id: 'two', ncrNumber: 'NCR-2026-001-zlx' },
+      { id: 'three', ncrNumber: 'NCR-2026-002' },
+    ]
+
+    expect(ncrNumberLabel('NCR-2026-001-zhenglongxing')).toBe('NCR-2026-001')
+    expect(ncrNumberLabels(records)).toEqual(new Map([
+      ['one', 'NCR-2026-001 (1)'],
+      ['two', 'NCR-2026-001 (2)'],
+      ['three', 'NCR-2026-002'],
+    ]))
+    expect(records[0].ncrNumber).toBe('NCR-2026-001-jiurun')
+  })
 })
 
 describe('collectNCRsFromAudits', () => {

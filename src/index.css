@@ -148,6 +148,18 @@ html.dark {
     display: none !important;
   }
 
+  .pagination-hidden-row {
+    display: table-row !important;
+  }
+
+  .pagination-hidden-item {
+    display: revert !important;
+  }
+
+  .pagination-print-cell {
+    display: table-cell !important;
+  }
+
   .print-only {
     display: block !important;
   }
@@ -235,6 +247,18 @@ html.dark {
   tr {
     page-break-inside: avoid;
   }
+}
+
+.pagination-hidden-row {
+  display: none;
+}
+
+.pagination-hidden-item {
+  display: none;
+}
+
+.pagination-print-cell {
+  display: none;
 }
 
 .print-only {

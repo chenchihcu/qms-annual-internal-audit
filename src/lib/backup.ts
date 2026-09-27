@@ -2,11 +2,19 @@ import {
   createDemoState,
   migrateToV6,
   migrateToV7,
+  migrateToV8,
   migrateV1State,
   STORAGE_KEY,
 } from '../data/demoData'
-import type { AppState, CompanyId } from '../types'
-import { COMPANY_IDS, COMPANY_LABELS, companySettingsFor } from '../types'
+import type { AppState } from '../types'
+import { COMPANY_IDS, companySettingsFor } from '../types'
+import { migrateState } from './migrate'
+import {
+  migrateToSingleWorkspace,
+  SINGLE_WORKSPACE_STORAGE_VERSION,
+  validateSingleWorkspaceState,
+  WORKSPACE_COMPANY_ID,
+} from './singleWorkspaceMigration'
 
 export const BACKUP_FORMAT = 'qms-annual-internal-audit-backup' as const
 export const MIN_BACKUP_VERSION = 1
@@ -26,6 +34,8 @@ function isObject(v: unknown): v is Record<string, unknown> {
 export function validateAppState(raw: unknown): raw is AppState {
   if (!isObject(raw)) return false
   if (typeof raw.version !== 'number' || raw.version < MIN_BACKUP_VERSION) return false
+  if (raw.version > SINGLE_WORKSPACE_STORAGE_VERSION) return false
+  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION) return validateSingleWorkspaceState(raw)
   if (!isObject(raw.companies)) return false
   for (const id of COMPANY_IDS) {
     const co = raw.companies[id]
@@ -40,6 +50,7 @@ export function validateAppState(raw: unknown): raw is AppState {
       const settings = raw.companySettings[id]
       if (!isObject(settings) || typeof settings.auditYear !== 'number') return false
     }
+    if (raw.version >= 8 && !Array.isArray(raw.trash)) return false
     return true
   }
   if (!isObject(raw.settings) || typeof raw.settings.auditYear !== 'number') return false
@@ -47,18 +58,26 @@ export function validateAppState(raw: unknown): raw is AppState {
 }
 
 export function migrateImportedState(raw: AppState): AppState {
-  if (raw.version > 7) throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
-  if (raw.version >= 7 && raw.companySettings) {
-    return migrateToV7(raw)
+  if (raw.version > SINGLE_WORKSPACE_STORAGE_VERSION) throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
+  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION) {
+    if (!validateSingleWorkspaceState(raw)) throw new Error('單一工作區備份結構不完整')
+    return raw
   }
-  if (raw.version >= 6 && raw.externalAuditPrep) {
-    return migrateToV7(migrateToV6(raw))
-  }
-  if (raw.version === 1) {
+  let v8: AppState
+  if (raw.version >= 8 && raw.companySettings) {
+    v8 = migrateToV8(raw)
+  } else if (raw.version >= 7 && raw.companySettings) {
+    v8 = migrateToV8(migrateToV7(raw))
+  } else if (raw.version >= 6 && raw.externalAuditPrep) {
+    v8 = migrateToV8(migrateToV7(migrateToV6(raw)))
+  } else if (raw.version === 1) {
     const migrated = migrateV1State(raw)
-    if (migrated) return migrateToV7(migrateToV6(migrated))
+    if (!migrated) throw new Error('備份內容不完整或版本不支援')
+    v8 = migrateToV8(migrateToV7(migrateToV6(migrated)))
+  } else {
+    v8 = migrateToV8(migrateToV7(migrateToV6(raw)))
   }
-  return migrateToV7(migrateToV6(raw))
+  return migrateToSingleWorkspace(migrateState(v8))
 }
 
 export function parseBackupJson(json: string): AppState {
@@ -74,10 +93,18 @@ export function parseBackupJson(json: string): AppState {
       ? (parsed as unknown as BackupEnvelope).state
       : parsed
 
+  if (
+    isObject(stateRaw) &&
+    typeof stateRaw.version === 'number' &&
+    stateRaw.version > SINGLE_WORKSPACE_STORAGE_VERSION
+  ) {
+    throw new Error(`備份版本 v${stateRaw.version} 較目前系統新，已拒絕降版還原`)
+  }
+
   if (isObject(stateRaw) && stateRaw.version === 1) {
     const migrated = migrateV1State(stateRaw)
     if (!migrated) throw new Error('備份內容不完整或版本不支援')
-    return migrateToV7(migrateToV6(migrated))
+    return migrateToSingleWorkspace(migrateState(migrateToV8(migrateToV7(migrateToV6(migrated)))))
   }
 
   if (!validateAppState(stateRaw)) {
@@ -100,7 +127,8 @@ export function serializeBackup(state: AppState): string {
 
 export function backupFilename(state: AppState): string {
   const year = companySettingsFor(state).auditYear
-  return `QMS備份_${year}_${new Date().toISOString().slice(0, 10)}.json`
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+  return `QMS備份_${year}_${timestamp}.json`
 }
 
 /** Round-trip helper for tests — returns normalized migrated state. */
@@ -109,15 +137,10 @@ export function backupRoundTrip(state: AppState): AppState {
 }
 
 export function describeBackup(state: AppState): string {
-  const companies = (COMPANY_IDS as CompanyId[])
-    .map((id) => `${COMPANY_LABELS[id]}(${state.companies[id].audits.length}稽核)`)
-    .join('、')
-  const jiurunYear = state.companySettings.jiurun.auditYear
-  const zlxYear = state.companySettings.zhenglongxing.auditYear
-  const yearLabel = jiurunYear === zlxYear
-    ? `${jiurunYear} 年度`
-    : `九潤 ${jiurunYear}／正隆興 ${zlxYear}`
-  return `${yearLabel} · ${companies} · v${state.version}`
+  const workspace = state.companies[WORKSPACE_COMPANY_ID]
+  const year = companySettingsFor(state).auditYear
+  const unresolved = state.workspaceMigrationConflicts?.length ?? 0
+  return `${year} 年度 · ${workspace.audits.length} 筆查檢 · ${unresolved} 項待覆核 · v${state.version}`
 }
 
 /** Demo fallback must remain valid after failed parse in loadState. */

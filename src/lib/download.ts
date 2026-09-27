@@ -4,8 +4,13 @@ export function downloadBlob(blob: Blob, filename: string): void {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
+  document.body.appendChild(a)
+  try {
+    a.click()
+  } finally {
+    a.remove()
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 /** Sanitize filename segments while keeping Chinese characters. */

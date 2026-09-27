@@ -1,23 +1,19 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from './App'
 
 const TAB_LABELS = [
   '稽核總覽',
-  '標準',
-  '程序',
   '利害關係人',
   '方案風險',
   '人員合格名單',
   '年度稽核計畫',
-  '稽核日程',
   '查檢表',
   '觀察事項',
   '不符合',
   '第三方建議',
   '待改善追蹤',
   '外稽準備',
-  '外稽當日行程',
   '系統設定',
 ]
 
@@ -32,11 +28,14 @@ const SIDEBAR_GROUP_LABELS = [
 
 describe('App tab smoke', () => {
   beforeEach(() => {
-    window.location.hash = ''
+    vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    window.history.replaceState(null, '', '/')
     localStorage.clear()
   })
 
-  it('renders all sixteen tabs without crashing', async () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('renders all twelve remaining pages without crashing', async () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
@@ -48,7 +47,7 @@ describe('App tab smoke', () => {
     }
   }, 30000)
 
-  it('lists sixteen tabs without PDCA group headings', () => {
+  it('lists twelve tabs without PDCA group headings', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
     for (const heading of SIDEBAR_GROUP_LABELS) {
@@ -59,44 +58,84 @@ describe('App tab smoke', () => {
     }
   })
 
-  it('switches company without crashing', () => {
+  it('exposes mobile navigation state and lets the menu button close the drawer', () => {
     render(<App />)
-    const companySwitch = screen.getByRole('group', { name: '切換公司' })
-    const zlx = within(companySwitch).getByRole('button', { name: '正隆興精密' })
-    fireEvent.click(zlx)
+    const menu = screen.getByRole('button', { name: '開啟導覽' })
+
+    fireEvent.click(menu)
+    expect(menu.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: '關閉導覽' })).toBe(menu)
+
+    fireEvent.click(menu)
+    expect(menu.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('button', { name: '開啟導覽' })).toBe(menu)
+  })
+
+  it('keeps a single audit workspace without a company switcher', () => {
+    render(<App />)
+    expect(screen.queryByRole('group', { name: '切換公司' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
 
-  it('shows workflow guide gaps without purpose text and dashboard drill-down controls', async () => {
+  it('keeps dashboard concise and preserves tracking drill-down controls', async () => {
     render(<App />)
     const guide = document.querySelector('[data-workflow-guide="top"]')
-    expect(guide).toBeTruthy()
-    expect(guide!.textContent).not.toMatch(/掌握年度 PDCA/)
+    expect(guide).toBeNull()
     expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
-    const metricsTable = await screen.findByRole('region', { name: '年度指標統計表' })
-    const priorObsRow = within(metricsTable).getByText('前年度未結').closest('tr')
-    expect(priorObsRow).toBeTruthy()
-    fireEvent.click(within(priorObsRow as HTMLElement).getByRole('button', { name: '前往' }))
+    expect(screen.getByRole('heading', { name: '稽核總覽' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '追蹤清單' })).toBeTruthy()
+    await screen.findByRole('button', { name: '前往：前年度未結觀察' })
+    fireEvent.click(screen.getByRole('button', { name: '前往：前年度未結觀察' }))
     await waitFor(() => {
       expect(screen.getByText(/前年度觀察事項/)).toBeTruthy()
+    }, { timeout: 5000 })
+  })
+
+  it('keeps the selected page when the skip link focuses main content', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
     })
+
+    const main = document.querySelector('main#main')
+    fireEvent.click(screen.getByRole('link', { name: '跳至主要內容' }))
+
+    expect(document.activeElement).toBe(main)
+    expect(window.location.hash).toBe('#tab=system-settings')
+    expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+  })
+
+  it('returns to the top when switching workflow pages', async () => {
+    const scrollTo = vi.mocked(window.scrollTo)
+    render(<App />)
+    const initialCalls = scrollTo.mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+    })
+
+    expect(scrollTo).toHaveBeenCalledTimes(initialCalls + 1)
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 0)
   })
 
   it('hides workflow guide on system settings when there are no gaps', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '評分與備份' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
     })
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
     expect(screen.queryByText('關於')).toBeNull()
-    expect(screen.queryByText(/QMS 年度內部稽核系統 v7/)).toBeNull()
+    expect(screen.queryByText(/QMS 年度內部稽核系統 v14/)).toBeNull()
   })
 
   it('keeps sidebar local storage notice without footer tagline', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
-    expect(within(nav.closest('aside') as HTMLElement).getByText('資料儲存於本機 · v7')).toBeTruthy()
+    expect(within(nav.closest('aside') as HTMLElement).getByText('資料儲存於本機 · v14')).toBeTruthy()
     expect(screen.queryByText('ISO 9001 / AS9100D 內部稽核')).toBeNull()
   })
 
@@ -161,28 +200,25 @@ describe('App tab smoke', () => {
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 
-  it('shows procedure field errors without top workflow guide', async () => {
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '程序' }))
-    await waitFor(() => {
-      expect(screen.getByLabelText('程序版本')).toBeTruthy()
-    })
-    expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
-    expect(screen.getByText('仍為待確認')).toBeTruthy()
-  })
-
-  it('asks before clearing all data and keeps data when cancelled', async () => {
+  it('shows standard and procedure field errors on system settings', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '清除全部資料' })).toBeTruthy()
+      expect(screen.getByLabelText('程序版本')).toBeTruthy()
     })
-    fireEvent.click(screen.getByRole('button', { name: '清除全部資料' }))
-    const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('清除全部資料')
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
-    expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
+    expect(screen.getByText('仍為待確認')).toBeTruthy()
+  })
+
+  it('does not expose whole-workspace clearing in system settings', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+    })
+    expect(screen.queryByRole('button', { name: '清除全部資料' })).toBeNull()
+    expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '備份與匯出' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '回收區' })).toBeTruthy()
   })
 
   it('asks before switching audit year and keeps year when cancelled', async () => {
@@ -240,15 +276,15 @@ describe('App tab smoke', () => {
       expect(screen.getByRole('button', { name: '新增稽核項目' })).toBeTruthy()
     })
     fireEvent.click(screen.getByRole('button', { name: '新增稽核項目' }))
-    const deleteBtn = screen.getAllByRole('button', { name: /刪除/ }).at(-1)
+    const deleteBtn = screen.getAllByRole('button', { name: /移至回收區/ }).at(-1)
     expect(deleteBtn).toBeTruthy()
     fireEvent.click(deleteBtn!)
 
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('刪除稽核項目')
+    expect(dialog.textContent).toContain('移至回收區？')
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.getAllByRole('button', { name: /刪除/ }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /移至回收區/ }).length).toBeGreaterThan(0)
   })
 
   it('exposes skip link to main content', () => {

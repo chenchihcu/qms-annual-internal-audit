@@ -16,6 +16,8 @@ import { Badge, Button, Input } from './ui/Badge'
 import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
@@ -162,6 +164,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
   }
 
   const rows = useMemo(() => company.planRows, [company.planRows])
+  const pagination = useTablePagination(rows.length)
 
   return (
     <div className="space-y-6 print-area">
@@ -195,7 +198,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                   </td>
                 </tr>
               )}
-              {rows.map((row) => {
+              {rows.map((row, rowIndex) => {
                 const key = rowKey(row)
                 const draft = getDraft(row)
                 const saved = savedRecord(company, row)
@@ -217,7 +220,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                   : true
 
                 return (
-                  <tr key={key} className={!persisted ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}>
+                  <tr key={key} className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${!persisted ? 'bg-amber-50/40 dark:bg-amber-950/20' : ''}`}>
                     <td data-label="QP · 部門" className="border border-line p-2 align-top">
                       <div className="font-medium text-ink">{row.qpCode}</div>
                       <div className="text-xs text-muted">{row.department}</div>
@@ -296,6 +299,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
             </tbody>
           </table>
         </ScrollRegion>
+        <TablePagination pagination={pagination} label="方案風險" />
       </div>
     </div>
   )

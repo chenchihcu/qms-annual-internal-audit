@@ -165,7 +165,8 @@ export interface CompanyAuditProfile {
     name: 'ISO 9001' | 'AS9100'
     version: string
     confirmationStatus: 'pending' | 'confirmed'
-    evidenceReference: string
+    /** @deprecated Legacy field retained when reading older local data; use the shared certificateReference on CompanyAuditProfile. */
+    evidenceReference?: string
   }>
   certificateScope: string
   certificateReference: string
@@ -372,9 +373,10 @@ export interface ThirdPartySuggestion {
 export interface ExternalAuditPrepItemState {
   id: string
   no: number
-  jiurunDone: boolean
-  zhenglongxingDone: boolean
-  mergedDone: boolean
+  /** Legacy source flags exist only in pre-v14 backups. */
+  jiurunDone?: boolean
+  zhenglongxingDone?: boolean
+  mergedDone?: boolean
   completed: boolean
   remark: string
 }
@@ -394,6 +396,54 @@ export interface OnsiteAuditSlot {
   escortPersonIds: string[]
   note: string
 }
+
+export type TrashCompanyRecordKind = 'ncr' | 'observation' | 'suggestion'
+
+export interface PermanentlyDeletedGeneratedRecord {
+  kind: 'ncr' | 'observation'
+  recordId: string
+  companyId: CompanyId
+  year: number
+}
+
+interface TrashEntryBase {
+  id: string
+  recordId: string
+  deletedAt: string
+  originalIndex: number
+}
+
+export type TrashEntry =
+  | (TrashEntryBase & {
+      kind: 'ncr'
+      record: NCR
+      location: { companyId: CompanyId; year: number; archiveYear?: string }
+    })
+  | (TrashEntryBase & {
+      kind: 'observation'
+      record: Observation
+      location: { companyId: CompanyId; year: number; archiveYear?: string }
+    })
+  | (TrashEntryBase & {
+      kind: 'suggestion'
+      record: ThirdPartySuggestion
+      location: { companyId: CompanyId; year: number; archiveYear?: string }
+    })
+  | (TrashEntryBase & {
+      kind: 'person'
+      record: Person
+      location: { scope: 'people' }
+    })
+  | (TrashEntryBase & {
+      kind: 'onsite_slot'
+      record: OnsiteAuditSlot
+      location: { prepYear: number }
+    })
+  | (TrashEntryBase & {
+      kind: 'checklist_item'
+      record: ChecklistItem
+      location: { companyId: CompanyId; auditId: string; year: number; archiveYear?: string }
+    })
 
 export interface ExternalAuditScheduleEntry {
   id: string
@@ -463,6 +513,31 @@ export interface ProcedureRiskRecord {
 
 export type DataSource = 'demo' | 'user'
 
+export interface WorkspaceMigrationCandidate {
+  source: string
+  label: string
+  value: unknown
+}
+
+export type WorkspaceMigrationTarget =
+  | { kind: 'plan'; rowId: string; field: string; monthIndex?: number }
+  | { kind: 'department'; departmentId: string; field: string }
+  | { kind: 'checklist'; auditId: string; itemId: string; field: string }
+  | { kind: 'audit'; auditId: string; field: string }
+  | { kind: 'person'; personIds: string[] }
+  | { kind: 'settings'; field: string }
+  | { kind: 'prep'; itemId: string }
+  | { kind: 'manual' }
+
+export interface WorkspaceMigrationConflict {
+  id: string
+  category: 'plan' | 'person' | 'judgment' | 'settings' | 'external_prep' | 'record'
+  title: string
+  summary: string
+  candidates?: WorkspaceMigrationCandidate[]
+  target: WorkspaceMigrationTarget
+}
+
 export interface AppState {
   activeCompanyId: CompanyId
   companySettings: Record<CompanyId, AuditSettings>
@@ -480,8 +555,12 @@ export interface AppState {
   /** 舊計畫有差異時保留兩份原值，供人工核對與 JSON 匯出。 */
   legacyCompanyPlanBackup?: Record<CompanyId, PlanRow[]>
   sharedChecklistTemplates?: Record<string, SharedChecklistQuestion[]>
+  trash?: TrashEntry[]
+  permanentlyDeletedGeneratedRecords?: PermanentlyDeletedGeneratedRecord[]
+  /** Unresolved field conflicts found while consolidating the former company partitions. */
+  workspaceMigrationConflicts?: WorkspaceMigrationConflict[]
   version: number
-  /** v6 legacy — migration only; not persisted in v7 */
+  /** v6 legacy — migration only; not persisted in v8 */
   settings?: AuditSettings
 }
 
@@ -506,19 +585,15 @@ export function otherCompanyId(companyId: CompanyId): CompanyId {
 export type TabId =
   | 'dashboard'
   | 'plan'
-  | 'schedule'
   | 'audit'
   | 'followups'
   | 'ncr'
   | 'observations'
   | 'suggestions'
   | 'prep'
-  | 'onsite'
   | 'risk'
   | 'stakeholders'
   | 'personnel'
-  | 'standard'
-  | 'procedure'
   | 'system-settings'
 
 export const COMPANY_LABELS: Record<CompanyId, string> = {

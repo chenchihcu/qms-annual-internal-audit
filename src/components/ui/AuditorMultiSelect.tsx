@@ -59,6 +59,32 @@ export function AuditorMultiSelect({
   }
 
   const summary = value.trim() || '未指派'
+  const candidatePicker = options.length === 0 ? (
+    <div
+      role="group"
+      aria-label={ariaLabel ?? label ?? '稽核人員'}
+      className="space-y-2 rounded-md border border-line bg-page p-3 text-sm"
+    >
+      <p className="text-muted" role="status">
+        目前沒有符合此次稽核範圍與日期的可指派人員。
+      </p>
+      <p className="text-xs text-muted">請確認人員資格、適用範圍與有效期間。</p>
+      <a
+        href="#tab=personnel"
+        className={`inline-block text-primary underline underline-offset-2 ${FOCUS_RING}`}
+      >
+        前往人員合格名單
+      </a>
+    </div>
+  ) : (
+    <CheckboxList
+      label={label}
+      options={options}
+      selected={checkboxSelected}
+      onChange={handleChange}
+      ariaLabel={ariaLabel ?? label ?? '稽核人員'}
+    />
+  )
 
   if (disabled) {
     return (
@@ -76,13 +102,7 @@ export function AuditorMultiSelect({
           {summary}
         </summary>
         <div className="mt-2 min-w-[12rem]">
-          <CheckboxList
-            label={label}
-            options={options}
-            selected={checkboxSelected}
-            onChange={handleChange}
-            ariaLabel={ariaLabel ?? label ?? '稽核人員'}
-          />
+          {candidatePicker}
         </div>
         <span className="print-only">{summary}</span>
       </details>
@@ -91,15 +111,11 @@ export function AuditorMultiSelect({
 
   return (
     <div className={`no-print ${className}`}>
-      <CheckboxList
-        label={label}
-        options={options}
-        selected={checkboxSelected}
-        onChange={handleChange}
-        ariaLabel={ariaLabel ?? label ?? '稽核人員'}
-      />
+      {candidatePicker}
       {value.trim() && (
-        <p className="mt-1 text-xs text-muted">已選：{summary}</p>
+        <p className="mt-1 text-xs text-muted">
+          {options.length === 0 ? '目前記錄：' : '已選：'}{summary}
+        </p>
       )}
       <span className="print-only">{summary}</span>
     </div>

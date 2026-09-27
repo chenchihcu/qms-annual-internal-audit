@@ -31,15 +31,19 @@ describe('auditProfileValidation', () => {
     expect(standardReady(state, 'jiurun')).toBe(false)
   })
 
-  it('requires evidence on confirmed standards only', () => {
+  it('uses one shared certificate reference for every confirmed standard', () => {
     const state = createDemoState()
     const profile = state.companyAuditProfiles.jiurun
     profile.applicableStandards[0].confirmationStatus = 'confirmed'
-    profile.applicableStandards[0].evidenceReference = ''
+    profile.applicableStandards[1].confirmationStatus = 'confirmed'
     profile.certificateScope = '精密零件'
     profile.certificateReference = 'REF-001'
-    const errors = standardFieldErrors(profile)
-    expect(errors.evidenceByIndex[0]).toBe('尚未填寫')
+    expect(profile.applicableStandards.every((standard) => !standard.evidenceReference)).toBe(true)
+    expect(standardFieldErrors(profile)).toEqual({})
+    expect(standardReady(state, 'jiurun')).toBe(true)
+
+    profile.certificateReference = ''
+    expect(standardFieldErrors(profile).certificateReference).toBe('尚未填寫')
     expect(standardReady(state, 'jiurun')).toBe(false)
   })
 })

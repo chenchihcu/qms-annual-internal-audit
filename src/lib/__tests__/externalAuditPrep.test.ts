@@ -7,14 +7,14 @@ import {
   isItemDone,
   itemHasCallout,
   migratePrepState,
+  workspacePrepNotes,
   EXTERNAL_AUDIT_PREP_SEED,
-  DEFAULT_COMPANY_RELATIONSHIPS,
+  getManagementReviewCompletionBlockers,
 } from '../externalAuditPrep'
-import { relationshipCheckKey } from '../../types'
 import type { CompanyData } from '../../types'
 
-const emptyCompany = (): CompanyData => ({
-  name: '測試',
+const emptyWorkspace = (): CompanyData => ({
+  name: '內部稽核工作區',
   departments: [],
   planRows: [],
   audits: [],
@@ -23,7 +23,7 @@ const emptyCompany = (): CompanyData => ({
   suggestions: [],
 })
 
-const baseSettings = {
+const settings = {
   auditYear: 2026,
   leadAuditor: '王大明',
   yearStart: '2026-01-01',
@@ -33,178 +33,158 @@ const baseSettings = {
 }
 
 describe('EXTERNAL_AUDIT_PREP_SEED', () => {
-  it('has 23 prep items (no item 13) with expected scope modes', () => {
+  it('preserves the source checklist while using one completion state at runtime', () => {
     expect(EXTERNAL_AUDIT_PREP_SEED.items).toHaveLength(23)
-    const modes = EXTERNAL_AUDIT_PREP_SEED.items.map((i) => i.scope.mode)
-    expect(modes.filter((m) => m === 'both_separate').length).toBeGreaterThan(0)
-    expect(modes.filter((m) => m === 'merged').length).toBeGreaterThan(0)
-    expect(modes.filter((m) => m === 'site_scope').length).toBe(2)
-  })
-
-  it('uses verbatim auditor titles without rewriting', () => {
-    const item15 = EXTERNAL_AUDIT_PREP_SEED.items.find((i) => i.no === 15)
-    expect(item15?.title).toContain('客戶滿意度調查統計及分析')
-    expect(item15?.notes).toContain('九潤精密科技')
+    expect(EXTERNAL_AUDIT_PREP_SEED.items.some((item) => item.no === 13)).toBe(false)
+    expect(EXTERNAL_AUDIT_PREP_SEED.items.find((item) => item.no === 15)?.notes).toContain('九潤精密科技')
   })
 })
 
-describe('isItemDone', () => {
-  it('both_separate requires both companies', () => {
+describe('external preparation completion', () => {
+  it('uses only one completion flag for every checklist item', () => {
     const template = getPrepTemplate(1)!
     const prep = createDefaultPrepState(2026)
-    const state = prep.items[0]
-    expect(isItemDone(template, state, prep)).toBe(false)
-    expect(isItemDone(template, { ...state, jiurunDone: true }, prep)).toBe(false)
-    expect(
-      isItemDone(template, { ...state, jiurunDone: true, zhenglongxingDone: true }, prep),
-    ).toBe(true)
+    const item = prep.items[0]
+    expect(isItemDone(template, item)).toBe(false)
+    expect(isItemDone(template, { ...item, completed: true })).toBe(true)
   })
 
-  it('item 15 requires relationship check even when both company columns are checked', () => {
-    const template = getPrepTemplate(15)!
+  it('counts completed items without company or relationship gates', () => {
     const prep = createDefaultPrepState(2026)
-    const state = prep.items.find((item) => item.no === 15)!
-    state.jiurunDone = true
-    state.zhenglongxingDone = true
-    expect(isItemDone(template, state, prep)).toBe(false)
-    const gate = DEFAULT_COMPANY_RELATIONSHIPS[0]
-    prep.relationshipChecks[relationshipCheckKey(gate.from, gate.to, gate.relation)] = true
-    expect(isItemDone(template, state, prep)).toBe(true)
-  })
-
-  it('merged uses mergedDone only', () => {
-    const template = getPrepTemplate(2)!
-    const prep = createDefaultPrepState(2026)
-    const state = prep.items.find((i) => i.no === 2)!
-    expect(isItemDone(template, state, prep)).toBe(false)
-    expect(isItemDone(template, { ...state, mergedDone: true }, prep)).toBe(true)
-  })
-
-  it('site_scope uses completed flag', () => {
-    const template = getPrepTemplate(17)!
-    const prep = createDefaultPrepState(2026)
-    const state = prep.items.find((i) => i.no === 17)!
-    expect(isItemDone(template, state, prep)).toBe(false)
-    expect(isItemDone(template, { ...state, completed: true }, prep)).toBe(true)
-  })
-})
-
-describe('countPrepProgress', () => {
-  it('counts completed items across scope modes', () => {
-    const prep = createDefaultPrepState(2026)
-    prep.items[0].jiurunDone = true
-    prep.items[0].zhenglongxingDone = true
-    prep.items[1].mergedDone = true
-    const { done, total } = countPrepProgress(prep)
-    expect(total).toBe(23)
-    expect(done).toBe(2)
+    prep.items[0].completed = true
+    prep.items[1].completed = true
+    expect(countPrepProgress(prep)).toEqual({ done: 2, total: 23 })
   })
 })
 
 describe('evaluatePrepSequence', () => {
-  it('warns when open NCRs exist with per-company counts', () => {
+  it('shows one workspace-wide open NCR count with generic wording', () => {
     const prep = createDefaultPrepState(2026)
-    const companies = {
-      jiurun: {
-        ...emptyCompany(),
-        ncrs: [
-          {
-            id: 'n1',
-            ncrNumber: 'NCR-1',
-            qpCode: 'QP-01',
-            departmentId: 'd1',
-            department: '品保',
-            process: 'p',
-            description: 'd',
-            date: '2026-01-01',
-            status: '矯正中' as const,
-            rootCause: '',
-            correctiveAction: '',
-            verificationEvidence: '',
-          },
-        ],
-      },
-      zhenglongxing: emptyCompany(),
-    }
-    const result = evaluatePrepSequence({
-      prep,
-      companies,
-      companySettings: {
-        jiurun: baseSettings,
-        zhenglongxing: baseSettings,
-      },
-      yearArchives: {},
-    })
-    expect(result.ncrWarning).toBe(true)
-    expect(result.openNcrCount).toBe(1)
-    expect(result.openNcrByCompany.jiurun).toBe(1)
-    expect(result.messages.some((m) => m.includes('九潤 1'))).toBe(true)
+    const workspace = emptyWorkspace()
+    workspace.ncrs = [{
+      id: 'n1', ncrNumber: 'NCR-1', qpCode: 'QP-01', departmentId: 'd1',
+      department: '品保', process: 'p', description: 'd', date: '2026-01-01',
+      status: '矯正中', rootCause: '', correctiveAction: '', verificationEvidence: '',
+    }]
+    const result = evaluatePrepSequence({ prep, workspace, settings, yearArchives: {} })
+    expect(result).toMatchObject({ ncrWarning: true, openNcrCount: 1 })
+    expect(result.messages[0]).toContain('仍有 1 筆未結 NCR')
+    expect(result.messages.join(' ')).not.toMatch(/九潤|正隆興|另一家公司/)
   })
 
-  it('warns when management review done before internal audit', () => {
+  it('warns when management review is marked complete before the internal audit', () => {
     const prep = createDefaultPrepState(2026)
     prep.managementReviewComplete = true
-    prep.internalAuditComplete = false
-    const result = evaluatePrepSequence({
-      prep,
-      companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
-      companySettings: { jiurun: baseSettings, zhenglongxing: baseSettings },
-      yearArchives: {},
-    })
+    const result = evaluatePrepSequence({ prep, workspace: emptyWorkspace(), settings, yearArchives: {} })
     expect(result.sequenceWarning).toBe(true)
-    expect(result.messages.some((m) => m.includes('管理審查'))).toBe(true)
+    expect(result.messages.some((message) => message.includes('管理審查'))).toBe(true)
   })
 
-  it('no sequence warning when order is correct', () => {
+  it('does not warn about sequence when management review is not marked complete', () => {
     const prep = createDefaultPrepState(2026)
-    prep.managementReviewComplete = false
+    const result = evaluatePrepSequence({ prep, workspace: emptyWorkspace(), settings, yearArchives: {} })
+    expect(result.sequenceWarning).toBe(false)
+  })
+
+  it('warns when the preparation date conflicts with the planned management review and audit window', () => {
+    const prep = createDefaultPrepState(2026)
+    prep.externalAuditDate = '2026-09-15'
     const result = evaluatePrepSequence({
       prep,
-      companies: { jiurun: emptyCompany(), zhenglongxing: emptyCompany() },
-      companySettings: { jiurun: baseSettings, zhenglongxing: baseSettings },
+      workspace: emptyWorkspace(),
+      settings: { ...settings, managementReviewDate: '2026-12-10', externalAuditDate: undefined },
       yearArchives: {},
     })
-    expect(result.sequenceWarning).toBe(false)
+
+    expect(result.sequenceWarning).toBe(true)
+    expect(result.sequenceMessages).toContain('管理審查日期應早於外部稽核日期（內稽 → 管審 → 外稽）。')
+    expect(result.sequenceMessages).toContain('年度計畫窗口結束月（11 月）晚於外部稽核月（9 月），請調整計畫或外稽日期。')
+  })
+})
+
+describe('management review completion guard', () => {
+  it('reports incomplete internal audit and missing or invalid management review dates', () => {
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: false,
+      managementReviewDate: '2026-08-10',
+    })).toEqual(['完成當年度內部稽核'])
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '',
+    })).toEqual(['填寫有效的管審日期'])
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: 'not-a-date',
+    })).toEqual(['填寫有效的管審日期'])
+  })
+
+  it('allows completion before the external audit date is known', () => {
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '2026-08-10',
+    })).toEqual([])
+  })
+
+  it('requires the management review date to precede a known external audit date', () => {
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '2026-08-10',
+      externalAuditDate: '2026-09-15',
+    })).toEqual([])
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '2026-09-15',
+      externalAuditDate: '2026-09-15',
+    })).toEqual(['將管審日期調整至外稽日期前'])
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '2026-12-10',
+      externalAuditDate: '2026-09-15',
+    })).toEqual(['將管審日期調整至外稽日期前'])
+    expect(getManagementReviewCompletionBlockers({
+      internalAuditComplete: true,
+      managementReviewDate: '2026-08-10',
+      externalAuditDate: 'not-a-date',
+    })).toEqual(['填寫有效的外稽日期'])
   })
 })
 
 describe('migratePrepState', () => {
-  it('preserves boolean flags', () => {
+  it('preserves boolean sequence flags and defaults removed schedule data to empty', () => {
     const migrated = migratePrepState({
       year: 2026,
       internalAuditComplete: true,
       managementReviewComplete: false,
-      relationshipChecks: {},
-      items: createDefaultPrepState(2026).items,
     })
     expect(migrated.internalAuditComplete).toBe(true)
     expect(migrated.managementReviewComplete).toBe(false)
-  })
-
-  it('normalizes per-company record to true only when both companies are checked', () => {
-    const migratedBoth = migratePrepState({
-      internalAuditComplete: { jiurun: true, zhenglongxing: true },
-      managementReviewComplete: { jiurun: true, zhenglongxing: true },
-    } as Parameters<typeof migratePrepState>[0])
-    expect(migratedBoth.internalAuditComplete).toBe(true)
-    expect(migratedBoth.managementReviewComplete).toBe(true)
-
-    const migratedMixed = migratePrepState({
-      internalAuditComplete: { jiurun: true, zhenglongxing: false },
-      managementReviewComplete: { jiurun: false, zhenglongxing: false },
-    } as Parameters<typeof migratePrepState>[0])
-    expect(migratedMixed.internalAuditComplete).toBe(false)
-    expect(migratedMixed.managementReviewComplete).toBe(false)
-  })
-
-  it('defaults onsiteSlots to empty array when missing', () => {
-    const migrated = migratePrepState({ year: 2026 })
     expect(migrated.onsiteSlots).toEqual([])
+  })
+
+  it('keeps old split flags complete only when both sources were checked', () => {
+    const complete = migratePrepState({
+      internalAuditComplete: { jiurun: true, zhenglongxing: true },
+      managementReviewComplete: { jiurun: true, zhenglongxing: false },
+    } as Parameters<typeof migratePrepState>[0])
+    expect(complete.internalAuditComplete).toBe(true)
+    expect(complete.managementReviewComplete).toBe(false)
+  })
+})
+
+describe('workspacePrepNotes', () => {
+  it('removes only legacy sentences and keeps neighboring shared guidance', () => {
+    expect(workspacePrepNotes(
+      '年度校正項目別勿漏校；校驗帳可合併；進料／出貨檢驗放行見項 21 分開備查。',
+    )).toBe('年度校正項目別勿漏校；進料／出貨檢驗放行見項 21 分開備查。')
+    expect(workspacePrepNotes('部門紀錄含法人與共用兩類，合併勾選前須確認抬頭規則。')).toBe('')
+    expect(workspacePrepNotes(
+      '氣候變遷要加入風險評估。廠區／氣候風險可合併；產品／客戶相關風險須標適用公司。',
+    )).toBe('氣候變遷要加入風險評估。')
   })
 })
 
 describe('itemHasCallout', () => {
-  it('returns callout types for items 3, 5, 15', () => {
+  it('returns callout types for items 3, 5, and 15', () => {
     expect(itemHasCallout(3)).toBe('quality-objectives')
     expect(itemHasCallout(5)).toBe('risk-climate')
     expect(itemHasCallout(15)).toBe('satisfaction')

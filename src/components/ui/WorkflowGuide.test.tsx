@@ -14,8 +14,15 @@ describe('WorkflowGuide', () => {
   it('links gap tab targets when onNavigate is provided', () => {
     const onNavigate = vi.fn()
     const state = createDemoState()
-    render(<WorkflowGuide tab="dashboard" state={state} onNavigate={onNavigate} />)
-    fireEvent.click(screen.getByRole('button', { name: '至標準' }))
-    expect(onNavigate).toHaveBeenCalledWith('standard')
+    render(<WorkflowGuide tab="plan" state={state} onNavigate={onNavigate} />)
+    fireEvent.click(screen.getByRole('button', { name: '至人員合格名單' }))
+    expect(onNavigate).toHaveBeenCalledWith('personnel')
+  })
+
+  it('keeps workflow gap details off the dashboard', () => {
+    const { container } = render(
+      <WorkflowGuide tab="dashboard" state={createDemoState()} onNavigate={() => {}} />,
+    )
+    expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 })

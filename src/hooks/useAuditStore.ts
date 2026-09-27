@@ -18,15 +18,17 @@ import type {
   CompanyAuditProfile,
   AuditTeamSnapshot,
   ProcedureRiskRecord,
+  TrashCompanyRecordKind,
 } from '../types'
 import { createDefaultPrepState } from '../lib/externalAuditPrep'
 import {
   createDemoState,
   createBlankState,
-  migrateToV6,
-  migrateToV7,
+  migrateToV8,
   migrateV1State,
+  LEGACY_STORAGE_KEY_V7,
   LEGACY_STORAGE_KEY_V6,
+  LEGACY_STORAGE_KEY_V8,
   STORAGE_KEY,
 } from '../data/demoData'
 import {
@@ -36,14 +38,24 @@ import {
   resolveLeadAuditorPersonId,
   validateAuditTeam,
 } from '../lib/personnel'
-import { isSeedChecklistItem } from '../lib/checklistItem'
 import { parseBackupJson, serializeBackup } from '../lib/backup'
+import { migrateState } from '../lib/migrate'
+import {
+  applyWorkspaceConflictChoice,
+  markWorkspaceConflictReviewed,
+  migrateToSingleWorkspace,
+  SINGLE_WORKSPACE_STORAGE_VERSION,
+  validateSingleWorkspaceState,
+  WORKSPACE_COMPANY_ID,
+} from '../lib/singleWorkspaceMigration'
+import { downloadBlob } from '../lib/download'
 import { autoArrangePlan } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
 import {
   canTransitionNcrStatus,
   collectNCRsFromAudits,
   generateNCRNumber,
+  ncrNumberLabel,
   normalizeNCR,
   syncNCRDescriptions,
 } from '../lib/ncr'
@@ -52,22 +64,35 @@ import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
 import { companySettingsFor } from '../types'
 import { applyDepartmentOwnerChange } from '../lib/departmentOwner'
+import {
+  isGeneratedRecordPermanentlyDeleted,
+  isRecordInTrash,
+  moveChecklistItemToTrash,
+  moveCompanyRecordToTrash,
+  moveOnsiteSlotToTrash,
+  movePersonToTrash,
+  permanentlyDeleteTrashRecord,
+  restoreTrashRecord,
+} from '../lib/trash'
 
 interface LoadStateResult {
   state: AppState
   persistenceAllowed: boolean
   storageWarning: string | null
+  migrationRequired?: boolean
+  migrationBackupRaw?: string
+  migrationBackupStorageKey?: string
 }
 
 function loadFailure(message: string): LoadStateResult {
   return {
     state: createBlankState(),
     persistenceAllowed: false,
-    storageWarning: `${message}。原始瀏覽器資料已保留且不會自動覆寫；請由系統設定還原有效備份、重設示範資料或清除全部資料。`,
+    storageWarning: `${message}。原始瀏覽器資料已保留且不會自動覆寫；請由系統設定還原有效備份。`,
   }
 }
 
-function parseStoredState(raw: string, label: string): AppState | LoadStateResult {
+function parseStoredState(raw: string, label: string, storageKey: string): LoadStateResult {
   let parsed: AppState
   try {
     parsed = JSON.parse(raw) as AppState
@@ -75,34 +100,53 @@ function parseStoredState(raw: string, label: string): AppState | LoadStateResul
     return loadFailure(`${label} JSON 已損壞`)
   }
   if (typeof parsed.version !== 'number') return loadFailure(`${label} 缺少資料版本`)
-  if (parsed.version > 7) return loadFailure(`${label} 為較新的 v${parsed.version}，本系統拒絕降版載入`)
-  if (!parsed.companies) return loadFailure(`${label} 結構不完整`)
+  if (parsed.version > SINGLE_WORKSPACE_STORAGE_VERSION) return loadFailure(`${label} 為較新的 v${parsed.version}，本系統拒絕降版載入`)
+  if (parsed.version === SINGLE_WORKSPACE_STORAGE_VERSION) {
+    if (!validateSingleWorkspaceState(parsed)) return loadFailure(`${label} 新版工作區結構不完整`)
+    return { state: parsed, persistenceAllowed: true, storageWarning: null }
+  }
+  if (!parsed.companies && parsed.version !== 1) return loadFailure(`${label} 結構不完整`)
   try {
-    return migrateToV7(migrateToV6(parsed))
+    const v8 = parsed.version >= 8
+      ? migrateToV8(parsed)
+      : parsed.version === 1
+        ? (() => {
+            const migratedV1 = migrateV1State(parsed)
+            if (!migratedV1) throw new Error('v1 結構不完整')
+            return migrateToV8(migratedV1)
+          })()
+        : migrateToV8(parsed)
+    const v13 = migrateState(v8)
+    const migrated = migrateToSingleWorkspace(v13)
+    if (!validateSingleWorkspaceState(migrated)) throw new Error('工作區格式驗證失敗')
+    return {
+      state: migrated,
+      persistenceAllowed: false,
+      storageWarning: null,
+      migrationRequired: true,
+      migrationBackupRaw: raw,
+      migrationBackupStorageKey: storageKey,
+    }
   } catch {
-    return loadFailure(`${label} 無法安全遷移至 v7`)
+    return loadFailure(`${label} 無法安全遷移至單一工作區`)
   }
 }
 
 function loadState(): LoadStateResult {
   const current = localStorage.getItem(STORAGE_KEY)
   if (current) {
-    const loaded = parseStoredState(current, 'v7 資料')
-    return 'state' in loaded
-      ? loaded
-      : { state: loaded, persistenceAllowed: true, storageWarning: null }
+    return parseStoredState(current, '目前資料', STORAGE_KEY)
   }
   for (const [key, label] of [
+    [LEGACY_STORAGE_KEY_V8, 'v8 資料'],
+    [LEGACY_STORAGE_KEY_V7, 'v7 資料'],
     [LEGACY_STORAGE_KEY_V6, 'v6 資料'],
     ['qms-annual-internal-audit-v5', 'v5 資料'],
     ['qms-annual-internal-audit-v4', 'v4 資料'],
   ] as const) {
     const raw = localStorage.getItem(key)
     if (!raw) continue
-    const loaded = parseStoredState(raw, label)
-    return 'state' in loaded
-      ? loaded
-      : { state: loaded, persistenceAllowed: true, storageWarning: null }
+    return parseStoredState(raw, label, key)
   }
   const legacy = localStorage.getItem('qms-annual-internal-audit-v1')
   if (legacy) {
@@ -115,12 +159,21 @@ function loadState(): LoadStateResult {
     try {
       const migrated = migrateV1State(parsed)
       if (!migrated) return loadFailure('v1 資料結構不完整')
-      return { state: migrateToV7(migrateToV6(migrated)), persistenceAllowed: true, storageWarning: null }
+      const state = migrateToSingleWorkspace(migrateState(migrateToV8(migrated)))
+      return {
+        state,
+        persistenceAllowed: false,
+        storageWarning: null,
+        migrationRequired: true,
+        migrationBackupRaw: legacy,
+        migrationBackupStorageKey: 'qms-annual-internal-audit-v1',
+      }
     } catch {
-      return loadFailure('v1 資料無法安全遷移至 v6')
+      return loadFailure('v1 資料無法安全遷移至 v8')
     }
   }
-  return { state: createDemoState(), persistenceAllowed: true, storageWarning: null }
+  const demo = migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  return { state: demo, persistenceAllowed: true, storageWarning: null }
 }
 
 function nextId(prefix: string) {
@@ -275,7 +328,7 @@ function validateAuditStartState(state: AppState, audit: ProcedureAudit) {
   )
   const errors = [...result.errors]
   if (!audit.auditDate) errors.unshift('開始稽核前須填寫實際實施日期')
-  if (standards.length === 0) errors.unshift('公司適用標準與版本尚未確認')
+  if (standards.length === 0) errors.unshift('適用標準與版本尚未確認')
   if (!profile.auditProcedureCode.trim()) errors.unshift('稽核程序代碼尚未填寫')
   if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') {
     errors.unshift('稽核程序版本仍為待確認')
@@ -298,7 +351,6 @@ function syncObservationsFromAudits(audits: ProcedureAudit[], existing: Observat
     result.some((observation) => observation.id === id || observation.sourceChecklistItemId === checklistItemId)
 
   audits.forEach((audit) => audit.items.forEach((item) => {
-    const scope = item.certificateScope ?? 'shared'
     const base = {
       year: audit.year ?? year,
       qpCode: audit.qpCode,
@@ -314,16 +366,6 @@ function syncObservationsFromAudits(audits: ProcedureAudit[], existing: Observat
       sourceReference: audit.reportReference ?? audit.id,
       occurrenceDate: audit.auditDate || audit.plannedDate || '',
       followUps: [] as Observation['followUps'],
-    }
-
-    if (scope === 'dual' && item.judgmentByCompany) {
-      for (const side of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
-        if (item.judgmentByCompany[side] !== '觀察') continue
-        const id = `observation-${item.id}-${side}`
-        if (hasObservation(id, item.id)) continue
-        result.push({ ...base, id, companySide: side })
-      }
-      return
     }
 
     if (item.judgment !== '觀察') return
@@ -396,6 +438,14 @@ function saveState(state: AppState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
 }
 
+function persistenceFailureMessage(error: unknown): string {
+  const quotaExceeded = typeof DOMException !== 'undefined'
+    && error instanceof DOMException
+    && error.name === 'QuotaExceededError'
+  const reason = quotaExceeded ? '瀏覽器本機儲存空間不足' : '瀏覽器拒絕寫入本機資料'
+  return `${reason}。變更只保留在目前頁面；請立即下載完整備份，重新整理前先確認資料已安全保存。`
+}
+
 function patchCompany(
   state: AppState,
   companyId: CompanyId,
@@ -415,9 +465,20 @@ export function useAuditStore() {
   const [state, setState] = useState<AppState>(initial.state)
   const [persistenceAllowed, setPersistenceAllowed] = useState(initial.persistenceAllowed)
   const [storageWarning, setStorageWarning] = useState<string | null>(initial.storageWarning)
+  const [migrationRequired, setMigrationRequired] = useState(Boolean(initial.migrationRequired))
+  const [migrationBackupRequested, setMigrationBackupRequested] = useState(false)
+  const [migrationBackupConfirmed, setMigrationBackupConfirmed] = useState(false)
 
   useEffect(() => {
-    if (persistenceAllowed) saveState(state)
+    if (!persistenceAllowed) return
+    try {
+      saveState(state)
+      // Clear the warning only after the external localStorage write succeeds.
+      // oxlint-disable-next-line react/set-state-in-effect
+      setStorageWarning(null)
+    } catch (error) {
+      setStorageWarning(persistenceFailureMessage(error))
+    }
   }, [state, persistenceAllowed])
 
   const activeCompany = state.companies[state.activeCompanyId]
@@ -457,7 +518,90 @@ export function useAuditStore() {
   }, [])
 
   const switchCompany = useCallback((companyId: CompanyId) => {
-    setState((s) => ({ ...s, activeCompanyId: companyId }))
+    if (companyId !== WORKSPACE_COMPANY_ID) return
+    setState((s) => ({ ...s, activeCompanyId: WORKSPACE_COMPANY_ID }))
+  }, [])
+
+  const downloadMigrationBackup = useCallback(() => {
+    if (!initial.migrationBackupRaw || !initial.migrationBackupStorageKey) {
+      setStorageWarning('找不到遷移前原始資料，未啟動下載或升級。')
+      return false
+    }
+    try {
+      const date = new Date().toISOString().slice(0, 10)
+      downloadBlob(
+        new Blob([initial.migrationBackupRaw], { type: 'application/json' }),
+        `QMS遷移前備份_${date}.json`,
+      )
+      setMigrationBackupRequested(true)
+      setMigrationBackupConfirmed(false)
+      setStorageWarning(null)
+      return true
+    } catch (error) {
+      setStorageWarning(`無法啟動備份下載：${error instanceof Error ? error.message : '瀏覽器下載失敗'}。尚未套用升級。`)
+      return false
+    }
+  }, [initial.migrationBackupRaw, initial.migrationBackupStorageKey])
+
+  const verifyMigrationBackup = useCallback(async (file: File) => {
+    if (!migrationBackupRequested || !initial.migrationBackupRaw) return false
+    try {
+      const selectedContents = await file.text()
+      JSON.parse(selectedContents)
+      if (selectedContents !== initial.migrationBackupRaw) {
+        setMigrationBackupConfirmed(false)
+        setStorageWarning('所選備份與目前瀏覽器原始資料不一致；尚未套用升級。請重新下載並選取該檔案。')
+        return false
+      }
+      setMigrationBackupConfirmed(true)
+      setStorageWarning(null)
+      return true
+    } catch {
+      setMigrationBackupConfirmed(false)
+      setStorageWarning('所選檔案不是有效 JSON；尚未套用升級。請重新下載原始備份。')
+      return false
+    }
+  }, [initial.migrationBackupRaw, migrationBackupRequested])
+
+  const completeMigration = useCallback(() => {
+    if (!migrationRequired || !migrationBackupRequested || !migrationBackupConfirmed) return false
+    try {
+      if (
+        !initial.migrationBackupStorageKey ||
+        !initial.migrationBackupRaw ||
+        localStorage.getItem(initial.migrationBackupStorageKey) !== initial.migrationBackupRaw
+      ) {
+        setStorageWarning('原始資料在備份後已有變動。尚未套用升級；請重新載入並重新備份。')
+        return false
+      }
+      const serialized = JSON.stringify(state)
+      localStorage.setItem(STORAGE_KEY, serialized)
+      const readBack = localStorage.getItem(STORAGE_KEY)
+      if (!readBack || !validateSingleWorkspaceState(JSON.parse(readBack))) {
+        setStorageWarning('新版資料寫入後驗證失敗；舊資料仍保留，請重新下載備份並重試。')
+        return false
+      }
+      setState(JSON.parse(readBack) as AppState)
+      setMigrationRequired(false)
+      setMigrationBackupRequested(false)
+      setMigrationBackupConfirmed(false)
+      setPersistenceAllowed(true)
+      setStorageWarning(null)
+      return true
+    } catch (error) {
+      setStorageWarning(`新版資料尚未套用：${error instanceof Error ? error.message : '本機儲存失敗'}。原始資料未刪除。`)
+      return false
+    }
+  }, [initial.migrationBackupRaw, initial.migrationBackupStorageKey, migrationRequired, migrationBackupRequested, migrationBackupConfirmed, state])
+
+  const resolveWorkspaceConflict = useCallback((conflictId: string, choiceIndex?: number) => {
+    setState((current) => {
+      const conflict = current.workspaceMigrationConflicts?.find((item) => item.id === conflictId)
+      if (!conflict) return current
+      return choiceIndex == null
+        ? markWorkspaceConflictReviewed(current, conflictId)
+        : applyWorkspaceConflictChoice(current, conflict, choiceIndex)
+    })
   }, [])
 
   const updateDepartment = useCallback(
@@ -604,8 +748,9 @@ export function useAuditStore() {
     [activeCompany],
   )
 
+  const currentAuditYear = settingsFor(state).auditYear
   const createAuditEvent = useCallback((qpCode: string, departmentId: string, plannedDate = '') => {
-    const id = nextId(`audit-${settingsFor(state).auditYear}-${qpCode}-${departmentId}`)
+    const id = nextId(`audit-${currentAuditYear}-${qpCode}-${departmentId}`)
     setState((s) => {
       const company = s.companies[s.activeCompanyId]
       const entry = PROCEDURE_PLAN_TEMPLATE.find((item) => item.qpCode === qpCode && item.departmentId === departmentId)
@@ -637,7 +782,7 @@ export function useAuditStore() {
       return patchCompany(s, s.activeCompanyId, { audits: [...company.audits, audit] })
     })
     return id
-  }, [state.companySettings, state.activeCompanyId])
+  }, [currentAuditYear])
 
   const updateAudit = useCallback((audit: ProcedureAudit) => {
     setState((s) => {
@@ -661,8 +806,12 @@ export function useAuditStore() {
 
       let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, co.ncrs)
       ncrs = syncNCRDescriptions(ncrs, audits)
+        .filter((item) => !isRecordInTrash(s.trash, 'ncr', s.activeCompanyId, item.id, settingsFor(s).auditYear)
+          && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', s.activeCompanyId, item.id, item.sourceYear ?? settingsFor(s).auditYear))
 
       const observations = syncObservationsFromAudits(audits, co.observations, settingsFor(s).auditYear)
+        .filter((item) => !isRecordInTrash(s.trash, 'observation', s.activeCompanyId, item.id, settingsFor(s).auditYear)
+          && !isGeneratedRecordPermanentlyDeleted(s, 'observation', s.activeCompanyId, item.id, item.year))
       return patchCompany(s, s.activeCompanyId, { audits, ncrs, observations })
     })
   }, [])
@@ -683,7 +832,11 @@ export function useAuditStore() {
         })
         let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, co.ncrs)
         ncrs = syncNCRDescriptions(ncrs, audits)
+          .filter((item) => !isRecordInTrash(s.trash, 'ncr', s.activeCompanyId, item.id, settingsFor(s).auditYear)
+            && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', s.activeCompanyId, item.id, item.sourceYear ?? settingsFor(s).auditYear))
         const observations = syncObservationsFromAudits(audits, co.observations, settingsFor(s).auditYear)
+          .filter((item) => !isRecordInTrash(s.trash, 'observation', s.activeCompanyId, item.id, settingsFor(s).auditYear)
+            && !isGeneratedRecordPermanentlyDeleted(s, 'observation', s.activeCompanyId, item.id, item.year))
         return patchCompany(s, s.activeCompanyId, { audits, ncrs, observations })
       })
     },
@@ -719,20 +872,9 @@ export function useAuditStore() {
   }, [])
 
   const removeChecklistItem = useCallback((auditId: string, itemId: string) => {
-    setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const audits = co.audits.map((a) => {
-        if (a.id !== auditId) return a
-        if (a.status === '已回報') return a
-        const target = a.items.find((item) => item.id === itemId)
-        if (!target || isSeedChecklistItem(target)) return a
-        const items = a.items
-          .filter((i) => i.id !== itemId)
-          .map((item, idx) => ({ ...item, no: idx + 1 }))
-        return { ...a, items }
-      })
-      return patchCompany(s, s.activeCompanyId, { audits })
-    })
+    const trashId = nextId('trash')
+    const deletedAt = new Date().toISOString()
+    setState((s) => moveChecklistItemToTrash(s, auditId, itemId, trashId, deletedAt))
   }, [])
 
   const markChecklistItemNA = useCallback(
@@ -748,7 +890,7 @@ export function useAuditStore() {
       departmentId: string
       description: string
       process?: string
-      companyScope: NcrCompanyScope
+      companyScope?: NcrCompanyScope
     }) => {
       setState((s) => {
         const co = s.companies[s.activeCompanyId]
@@ -767,7 +909,7 @@ export function useAuditStore() {
           description: input.description,
           date: new Date().toISOString().slice(0, 10),
           status: '開立',
-          companyScope: input.companyScope,
+          companyScope: input.companyScope ?? 'both',
           sourceYear: auditYear,
         })
         return patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] })
@@ -933,6 +1075,28 @@ export function useAuditStore() {
     }))
   }, [])
 
+  const movePersonToTrashAction = useCallback((id: string) => {
+    const trashId = nextId('trash')
+    const deletedAt = new Date().toISOString()
+    setState((s) => movePersonToTrash(s, id, trashId, deletedAt))
+  }, [])
+
+  const moveCompanyRecordToTrashAction = useCallback((kind: TrashCompanyRecordKind, id: string) => {
+    const trashId = nextId('trash')
+    const deletedAt = new Date().toISOString()
+    setState((s) => moveCompanyRecordToTrash(s, kind, id, s.activeCompanyId, trashId, deletedAt))
+  }, [])
+
+  const restoreFromTrash = useCallback((trashId: string) => {
+    const result = restoreTrashRecord(state, trashId)
+    if (result.ok) setState(result.state)
+    return { ok: result.ok, reason: result.reason }
+  }, [state])
+
+  const permanentlyDeleteFromTrash = useCallback((trashId: string) => {
+    setState((s) => permanentlyDeleteTrashRecord(s, trashId))
+  }, [])
+
   const upsertAnnualPersonnelAssignment = useCallback((assignment: Omit<AnnualPersonnelAssignment, 'id'> & { id?: string }) => {
     setState((s) => {
       const match = s.annualPersonnelAssignments.find((item) => (
@@ -1077,14 +1241,10 @@ export function useAuditStore() {
     }))
   }, [])
 
-  const removeOnsiteSlot = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      externalAuditPrep: {
-        ...s.externalAuditPrep,
-        onsiteSlots: (s.externalAuditPrep.onsiteSlots ?? []).filter((slot) => slot.id !== id),
-      },
-    }))
+  const moveOnsiteSlotToTrashAction = useCallback((id: string) => {
+    const trashId = nextId('trash')
+    const deletedAt = new Date().toISOString()
+    setState((s) => moveOnsiteSlotToTrash(s, id, trashId, deletedAt))
   }, [])
 
   const carryForwardObservation = useCallback(
@@ -1194,7 +1354,7 @@ export function useAuditStore() {
         id: newItemId,
         category: '跨年追蹤',
         no: audit.items.length + 1,
-        content: `[${sourceLabel} NCR ${ncr.ncrNumber}] ${ncr.description}`,
+        content: `[${sourceLabel} NCR ${ncrNumberLabel(ncr.ncrNumber)}] ${ncr.description}`,
         judgment: null,
         description: '前年度未結案不符合追蹤',
         sourceYear: ncr.sourceYear,
@@ -1311,26 +1471,48 @@ export function useAuditStore() {
 
   const importJSON = useCallback((json: string) => {
     const migrated = parseBackupJson(json)
+    if (!validateSingleWorkspaceState(migrated)) throw new Error('備份資料轉換後未通過結構驗證，未套用還原')
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+    const readBack = localStorage.getItem(STORAGE_KEY)
+    if (!readBack) throw new Error('還原資料寫入後無法讀回，未套用還原')
+    let verified: unknown
+    try {
+      verified = JSON.parse(readBack)
+    } catch {
+      throw new Error('還原資料讀回後格式錯誤，未套用還原')
+    }
+    if (!validateSingleWorkspaceState(verified)) throw new Error('還原資料讀回後未通過結構驗證，未套用還原')
     setPersistenceAllowed(true)
+    setMigrationRequired(false)
+    setMigrationBackupRequested(false)
+    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
-    setState(migrated)
+    setState(verified)
   }, [])
 
   const resetToDemo = useCallback(() => {
     setPersistenceAllowed(true)
+    setMigrationRequired(false)
+    setMigrationBackupRequested(false)
+    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
-    setState(createDemoState())
+    setState(migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState()))))
   }, [])
 
   const clearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(LEGACY_STORAGE_KEY_V8)
+    localStorage.removeItem(LEGACY_STORAGE_KEY_V7)
     localStorage.removeItem(LEGACY_STORAGE_KEY_V6)
     localStorage.removeItem('qms-annual-internal-audit-v5')
     localStorage.removeItem('qms-annual-internal-audit-v4')
     localStorage.removeItem('qms-annual-internal-audit-v1')
     setPersistenceAllowed(true)
+    setMigrationRequired(false)
+    setMigrationBackupRequested(false)
+    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
-    setState(createBlankState())
+    setState(migrateToSingleWorkspace(migrateState(migrateToV8(createBlankState()))))
   }, [])
 
   const ensureAllAudits = useCallback(() => {
@@ -1374,6 +1556,13 @@ export function useAuditStore() {
   return {
     state: syncedState,
     storageWarning,
+    migrationRequired,
+    migrationBackupRequested,
+    migrationBackupConfirmed,
+    downloadMigrationBackup,
+    verifyMigrationBackup,
+    completeMigration,
+    resolveWorkspaceConflict,
     updateSettings,
     switchAuditYear,
     switchCompany,
@@ -1402,6 +1591,12 @@ export function useAuditStore() {
     addPerson,
     updatePerson,
     deactivatePerson,
+    moveNCRToTrash: (id: string) => moveCompanyRecordToTrashAction('ncr', id),
+    moveObservationToTrash: (id: string) => moveCompanyRecordToTrashAction('observation', id),
+    moveSuggestionToTrash: (id: string) => moveCompanyRecordToTrashAction('suggestion', id),
+    movePersonToTrash: movePersonToTrashAction,
+    restoreFromTrash,
+    permanentlyDeleteFromTrash,
     upsertAnnualPersonnelAssignment,
     updateCompanyAuditProfile,
     validateAuditStart,
@@ -1412,7 +1607,8 @@ export function useAuditStore() {
     switchPrepYear,
     addOnsiteSlot,
     updateOnsiteSlot,
-    removeOnsiteSlot,
+    moveOnsiteSlotToTrash: moveOnsiteSlotToTrashAction,
+    removeOnsiteSlot: moveOnsiteSlotToTrashAction,
     carryForwardObservation,
     carryForwardNCR,
     carryForwardSuggestion,

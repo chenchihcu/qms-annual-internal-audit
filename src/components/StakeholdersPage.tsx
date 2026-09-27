@@ -18,6 +18,8 @@ import { STAKEHOLDER_TAGS } from '../types'
 import { StakeholderRulesPanel } from './stakeholders/StakeholderRulesPanel'
 import { PageToolbar } from './ui/PageToolbar'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { useTablePagination } from '../hooks/useTablePagination'
+import { TablePagination } from './ui/TablePagination'
 
 function OsBandRadios({
   label,
@@ -124,9 +126,11 @@ function ArrangementImpactSummary({
 function DepartmentRow({
   dept,
   onUpdate,
+  hidden,
 }: {
   dept: DepartmentProfile
   onUpdate: (patch: Partial<Pick<DepartmentProfile, 'stakeholders' | 'riskOccurrence' | 'riskSeverity'>>) => void
+  hidden: boolean
 }) {
   const { index, level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
   const priority = calculateDepartmentPriority(dept)
@@ -141,7 +145,7 @@ function DepartmentRow({
   }
 
   return (
-    <tr className={`border-t border-slate-100 ${tagged ? '' : 'bg-amber-50/50'}`} data-stakeholder-dept={dept.id}>
+    <tr className={`${hidden ? 'pagination-hidden-row ' : ''}border-t border-slate-100 ${tagged ? '' : 'bg-amber-50/50'}`} data-stakeholder-dept={dept.id}>
       <td className="p-3 align-top">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium text-slate-900">{dept.name}</p>
@@ -215,6 +219,7 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
       ),
     [company.departments],
   )
+  const pagination = useTablePagination(ranked.length)
 
   return (
     <div className="space-y-6">
@@ -234,16 +239,18 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
               </tr>
             </thead>
             <tbody>
-              {ranked.map((dept) => (
+              {ranked.map((dept, index) => (
                 <DepartmentRow
                   key={dept.id}
                   dept={dept}
+                  hidden={!pagination.isVisible(index)}
                   onUpdate={(patch) => updateDepartment(dept.id, patch)}
                 />
               ))}
             </tbody>
           </table>
         </ScrollRegion>
+        <TablePagination pagination={pagination} label="利害關係人" />
       </div>
     </div>
   )

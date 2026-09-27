@@ -31,8 +31,8 @@ if not exist "package.json" (
 )
 
 if not exist "node_modules\" (
-  echo [1/2] Installing dependencies...
-  call npm install
+  echo [1/2] Installing locked dependencies...
+  call npm ci --include=dev
   if errorlevel 1 (
     echo [ERROR] npm install failed.
     pause
@@ -42,10 +42,14 @@ if not exist "node_modules\" (
   echo [1/2] node_modules exists, skip install.
 )
 
-echo [2/2] Starting dev server...
-echo Browser will open shortly. Close this window to stop the server.
+echo [2/2] Starting local server at http://127.0.0.1:43124/
+echo The browser opens when the server is ready. Close this window to stop the server.
 echo.
 
-start "" cmd /c "timeout /t 3 /nobreak >nul & start http://127.0.0.1:43123/"
-call npm run dev
+call npm run dev -- --open
+if errorlevel 1 (
+  echo [ERROR] The local server stopped or failed to start. Check whether port 43124 is already in use.
+  pause
+  exit /b 1
+)
 pause

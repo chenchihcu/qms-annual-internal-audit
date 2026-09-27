@@ -38,6 +38,21 @@ describe('personnel qualification validation', () => {
     expect(validateAuditTeam([person], team, 'jiurun', 'QP-28', 'dept-qa', '2027-01-01').canStart).toBe(false)
   })
 
+  it('blocks audit start when no qualified person IDs are assigned', () => {
+    const team = {
+      leadAuditorPersonId: undefined,
+      auditorPersonIds: [],
+      escortPersonIds: [],
+      impartialityConfirmed: false,
+      impartialityNote: '',
+    }
+    const result = validateAuditTeam([person], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
+
+    expect(result.canStart).toBe(false)
+    expect(result.errors).toContain('尚未指派主任稽核員')
+    expect(result.errors).toContain('尚未指派合格內部稽核員')
+  })
+
   it('keeps same-department impartiality separate from qualification', () => {
     const sameDepartment = { ...person, affiliations: [{ id: 'a1', companyId: 'jiurun' as const, departmentId: 'dept-qa' }] }
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }

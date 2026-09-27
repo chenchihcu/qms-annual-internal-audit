@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createDemoState } from '../../data/demoData'
-import { buildExportWorkbookSmoke, buildAnnualPlanSheet, buildNcrSheet, buildAllFormsWorkbook, buildOnsiteSheet, buildRiskSheet } from '../formExport'
+import { buildExportWorkbookSmoke, buildAnnualPlanSheet, buildNcrSheet, buildAllFormsWorkbook, buildPrepSheet, buildRiskSheet, buildStandardSheet } from '../formExport'
 import { sheetToCsv, writeWorkbook } from '../simpleXlsx'
 
 describe('form export smoke', () => {
@@ -54,26 +54,41 @@ describe('form export smoke', () => {
     expect(workbook.SheetNames).toContain('QR-02-01')
     expect(workbook.SheetNames).toContain('適用標準')
     expect(workbook.SheetNames).toContain('人員合格名單')
-    expect(workbook.SheetNames).toContain('外稽當日行程')
+    expect(workbook.SheetNames).toContain('稽核前準備')
+    expect(workbook.SheetNames).not.toContain('外稽當日行程')
   })
 
-  it('builds onsite schedule sheet', () => {
+  it('exports one shared certificate record separately from standard applicability', () => {
+    const profile = createDemoState().companyAuditProfiles.jiurun
+    profile.certificateScope = '精密零件設計與製造'
+    profile.certificateReference = 'CERT-001'
+
+    const rows = buildStandardSheet(profile, '稽核工作區').rows
+    const standardHeader = rows.find((row) => row[0] === '標準')
+    const certificate = rows.find((row) => row[0] === '證書範圍')
+
+    expect(standardHeader).toEqual(['標準', '版本', '適用性', '適用依據引用'])
+    expect(certificate).toEqual(['證書範圍', '精密零件設計與製造', '證書編號／引用', 'CERT-001'])
+    expect(rows.filter((row) => row[0] === '證書範圍')).toHaveLength(1)
+    expect(rows.filter((row) => row[0] === '證書編號／引用')).toHaveLength(0)
+  })
+
+  it('exports preparation rows with unique display numbers and matches completion by stable item id', () => {
     const state = createDemoState()
-    state.externalAuditPrep.onsiteSlots = [{
-      id: 'slot-1',
-      date: '2026-11-01',
-      startTime: '09:00',
-      endTime: '12:00',
-      site: 'both',
-      qpCodes: ['QP-01'],
-      productModels: ['型號 A'],
-      escortPersonIds: [],
-      note: '開場',
-    }]
-    const text = sheetToCsv(buildOnsiteSheet(state))
-    expect(text).toContain('外部稽核當日行程')
-    expect(text).toContain('2026-11-01')
-    expect(text).toContain('型號 A')
+    const correctiveReport = state.externalAuditPrep.items.find((item) => item.id === 'prep-2-b')!
+    correctiveReport.completed = true
+    correctiveReport.remark = '矯正報告備註'
+    const auditReport = state.externalAuditPrep.items.find((item) => item.id === 'prep-2-c')!
+    auditReport.completed = false
+    auditReport.remark = '稽核報告備註'
+
+    const rows = buildPrepSheet(state).rows.filter((row) => typeof row[0] === 'number')
+    expect(rows.map((row) => row[0])).toEqual(Array.from({ length: 23 }, (_, index) => index + 1))
+
+    const correctiveRow = rows.find((row) => String(row[1]).includes('QR-28-03'))
+    const auditRow = rows.find((row) => String(row[1]).includes('QR-28-07'))
+    expect(correctiveRow).toEqual([3, 'QR-28-03 稽核矯正報告', '稽核員', '是', '矯正報告備註'])
+    expect(auditRow).toEqual([4, 'QR-28-07 內外部稽核報告書', '稽核員', '', '稽核報告備註'])
   })
 
   it('keeps worksheet names unique for repeated audit events', () => {

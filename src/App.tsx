@@ -1,13 +1,13 @@
 import { Component, Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuditStore } from './hooks/useAuditStore'
-import type { CompanyId, TabId } from './types'
-import { COMPANY_LABELS } from './types'
+import type { TabId } from './types'
 import { AuditYearSwitcher } from './components/AuditYearSwitcher'
 import { Dashboard } from './components/Dashboard'
 import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
 import { ALL_TABS, parseAppHash, syncHash, type NavigateOptions } from './lib/navigation'
 import { Icon } from './components/ui/Icon'
+import { MigrationGate } from './components/MigrationGate'
 
 const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
 const ProcedureAuditPanel = lazy(() => import('./components/ProcedureAuditPanel').then((module) => ({ default: module.ProcedureAuditPanel })))
@@ -19,9 +19,7 @@ const RiskAssessment = lazy(() => import('./components/RiskAssessment').then((mo
 const StakeholdersPage = lazy(() => import('./components/StakeholdersPage').then((module) => ({ default: module.StakeholdersPage })))
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then((module) => ({ default: module.SettingsPanel })))
 const PersonnelPage = lazy(() => import('./components/PersonnelPage').then((module) => ({ default: module.PersonnelPage })))
-const AuditSchedulePage = lazy(() => import('./components/AuditSchedulePage').then((module) => ({ default: module.AuditSchedulePage })))
 const FollowupsPage = lazy(() => import('./components/FollowupsPage').then((module) => ({ default: module.FollowupsPage })))
-const OnsiteSchedulePage = lazy(() => import('./components/OnsiteSchedulePage').then((module) => ({ default: module.OnsiteSchedulePage })))
 
 class TabErrorBoundary extends Component<
   { children: ReactNode; tabLabel: string },
@@ -61,10 +59,10 @@ function App() {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarNavRef = useRef<HTMLElement>(null)
   const mainRef = useRef<HTMLElement>(null)
-  const { settings, activeCompanyId, company, externalAuditPrep } = store.state
-  const headerScope = tab === 'prep' || tab === 'onsite'
-    ? `外稽準備（雙公司共用 · ${externalAuditPrep.year} 年）`
-    : `台帳：${company.name} · 內稽 ${settings.auditYear} 年`
+  const { settings, externalAuditPrep } = store.state
+  const headerScope = tab === 'prep'
+    ? `外稽準備 · ${externalAuditPrep.year} 年`
+    : `年度稽核 · ${settings.auditYear} 年`
   const setTab = (next: TabId, options?: NavigateOptions | string) => {
     const resolved: NavigateOptions | undefined =
       typeof options === 'string' ? { auditKey: options } : options
@@ -88,6 +86,7 @@ function App() {
       ? `${activeEntry.label} · QMS 年度內部稽核`
       : 'QMS 年度內部稽核系統'
     mainRef.current?.focus({ preventScroll: true })
+    window.scrollTo(0, 0)
   }, [tab])
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -123,7 +122,7 @@ function App() {
           </button>
         ))}
       </nav>
-      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v7</p>
+      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v14</p>
     </div>
   )
 
@@ -131,20 +130,24 @@ function App() {
     <div className="min-h-screen bg-page lg:flex">
       <a
         href="#main"
+        onClick={(event) => {
+          event.preventDefault()
+          mainRef.current?.focus()
+        }}
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg"
       >
         跳至主要內容
       </a>
       <aside className="hidden w-max max-w-xs shrink-0 border-r border-line bg-surface no-print lg:block">{renderSidebar()}</aside>
       <aside id="mobile-sidebar" className={`fixed inset-y-0 left-0 z-40 w-max max-w-xs border-r border-line bg-surface transition-transform no-print lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`} aria-hidden={!mobileMenuOpen} inert={!mobileMenuOpen}>{renderSidebar()}</aside>
-      {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
+      {mobileMenuOpen && <button type="button" className="fixed inset-0 z-30 bg-slate-900/30 no-print lg:hidden" aria-label="點擊背景關閉導覽" onClick={() => { setMobileMenuOpen(false); menuButtonRef.current?.focus() }} />}
 
       <div className="min-w-0 flex-1">
       <header className="sticky top-0 z-20 border-b border-line bg-surface no-print">
         <div className="px-4 py-3 sm:px-6 lg:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <button ref={menuButtonRef} type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" onClick={() => setMobileMenuOpen(true)} aria-label="開啟導覽" aria-expanded={mobileMenuOpen} aria-controls="mobile-sidebar">
+              <button ref={menuButtonRef} type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm font-bold text-brand lg:hidden" onClick={() => setMobileMenuOpen((open) => !open)} aria-label={mobileMenuOpen ? '關閉導覽' : '開啟導覽'} aria-expanded={mobileMenuOpen} aria-controls="mobile-sidebar">
                 <Icon name="menu" />
                 選單
               </button>
@@ -154,22 +157,6 @@ function App() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <AuditYearSwitcher store={store} compact />
-              <div className="flex rounded-lg border border-line p-0.5" role="group" aria-label="切換公司">
-                {(Object.keys(COMPANY_LABELS) as CompanyId[]).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => store.switchCompany(id)}
-                    className={`min-h-11 rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                      activeCompanyId === id
-                        ? 'bg-blue-700 text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {COMPANY_LABELS[id]}
-                  </button>
-                ))}
-              </div>
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-slate-50"
@@ -184,6 +171,16 @@ function App() {
       </header>
 
       <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6 outline-none">
+        {store.migrationRequired ? (
+          <MigrationGate
+            downloadRequested={store.migrationBackupRequested}
+            backupConfirmed={store.migrationBackupConfirmed}
+            warning={store.storageWarning}
+            onDownload={store.downloadMigrationBackup}
+            onVerifyBackup={store.verifyMigrationBackup}
+            onContinue={store.completeMigration}
+          />
+        ) : <>
         {store.storageWarning && (
           <div role="alert" className="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <Icon name="warning" className="mt-0.5 text-amber-700" />
@@ -193,6 +190,12 @@ function App() {
             </div>
           </div>
         )}
+        {(store.state.workspaceMigrationConflicts?.length ?? 0) > 0 && (
+          <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <span>有 {store.state.workspaceMigrationConflicts?.length} 項資料待覆核；判定衝突不會計分。</span>
+            <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setTab('system-settings')}>查看待覆核資料</button>
+          </div>
+        )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
         <WorkflowGuide tab={tab} state={store.state} onNavigate={setTab} />
         {activeEntry?.formId ? (
@@ -200,11 +203,6 @@ function App() {
             {tab === 'plan' && (
               <TabErrorBoundary tabLabel="年度稽核計畫">
                 <AnnualPlan store={store} />
-              </TabErrorBoundary>
-            )}
-            {tab === 'schedule' && (
-              <TabErrorBoundary tabLabel="稽核日程">
-                <AuditSchedulePage store={store} onOpenAudit={(id) => setTab('audit', id)} />
               </TabErrorBoundary>
             )}
             {tab === 'audit' && (
@@ -242,11 +240,6 @@ function App() {
                 <PreAuditPrep store={store} />
               </TabErrorBoundary>
             )}
-            {tab === 'onsite' && (
-              <TabErrorBoundary tabLabel="外稽當日行程">
-                <OnsiteSchedulePage store={store} />
-              </TabErrorBoundary>
-            )}
             {tab === 'stakeholders' && (
               <TabErrorBoundary tabLabel="利害關係人">
                 <StakeholdersPage store={store} />
@@ -262,19 +255,9 @@ function App() {
                 <PersonnelPage store={store} />
               </TabErrorBoundary>
             )}
-            {tab === 'standard' && (
-              <TabErrorBoundary tabLabel="標準">
-                <SettingsPanel store={store} section="standard" />
-              </TabErrorBoundary>
-            )}
-            {tab === 'procedure' && (
-              <TabErrorBoundary tabLabel="程序">
-                <SettingsPanel store={store} section="procedure" />
-              </TabErrorBoundary>
-            )}
             {tab === 'system-settings' && (
               <TabErrorBoundary tabLabel="系統設定">
-                <SettingsPanel store={store} section="system" />
+                <SettingsPanel store={store} onNavigate={setTab} />
               </TabErrorBoundary>
             )}
           </ProcessForm>
@@ -287,6 +270,7 @@ function App() {
           </TabErrorBoundary>
         )}
         </Suspense>
+        </>}
       </main>
       </div>
     </div>
