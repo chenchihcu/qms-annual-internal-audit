@@ -161,4 +161,51 @@ describe('ProcedureAuditPanel', () => {
       expect((screen.getByLabelText('正式紀錄編號') as HTMLInputElement).value).toBe('REC-B')
     })
   })
+
+  it('shows evidence fields for the current judgment and keeps saved text', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    audit.id = 'audit-QP-28-dept-qa'
+    audit.status = '執行中'
+    audit.items = [{
+      id: 'item-evidence',
+      category: '一般',
+      no: 1,
+      content: '是否保存紀錄',
+      judgment: null,
+      description: '',
+      sampleSize: '',
+      objectiveEvidence: '',
+      notApplicableReason: '',
+      origin: 'seed',
+    }]
+    company.audits = [audit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey="QP-28|dept-qa" />)
+
+    const judgment = await screen.findByLabelText('判定') as HTMLSelectElement
+    expect(screen.queryByLabelText('客觀證據')).toBeNull()
+    expect(screen.queryByLabelText('發現說明')).toBeNull()
+    expect(screen.queryByRole('button', { name: /標不適用/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /移至回收區/ })).toBeNull()
+
+    fireEvent.change(judgment, { target: { value: '符合' } })
+    expect(await screen.findByLabelText('客觀證據')).toBeTruthy()
+    expect(screen.queryByLabelText('發現說明')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'QP-28 NO 1 加發現說明' }))
+    fireEvent.change(await screen.findByLabelText('發現說明'), { target: { value: '現場說明' } })
+    fireEvent.change(screen.getByLabelText('客觀證據'), { target: { value: 'QR-01' } })
+
+    fireEvent.change(screen.getByLabelText('判定'), { target: { value: '觀察' } })
+    expect(await screen.findByLabelText('發現說明')).toHaveProperty('value', '現場說明')
+    expect(screen.getByLabelText('客觀證據')).toHaveProperty('value', 'QR-01')
+
+    fireEvent.change(screen.getByLabelText('判定'), { target: { value: '不適用' } })
+    expect(await screen.findByLabelText('不適用理由')).toBeTruthy()
+    expect(screen.getByLabelText('發現說明')).toHaveProperty('value', '現場說明')
+    expect(screen.getByLabelText('客觀證據')).toHaveProperty('value', 'QR-01')
+  })
 })

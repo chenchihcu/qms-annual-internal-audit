@@ -13,6 +13,12 @@ import { FOCUS_RING } from '../lib/focusRing'
 import { checkImpartiality } from '../lib/impartiality'
 import { findNcrsForChecklistItem, isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import type { NavigateOptions } from '../lib/navigation'
+import {
+  evidenceFieldValue,
+  optionalEvidenceFields,
+  visibleEvidenceFields,
+  type EvidenceField,
+} from '../lib/checklistEvidence'
 import { isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
@@ -29,6 +35,13 @@ import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
+
+const EVIDENCE_FIELD_LABELS: Record<EvidenceField, string> = {
+  description: '發現說明',
+  sampleSize: '抽樣數',
+  objectiveEvidence: '客觀證據',
+  notApplicableReason: '不適用理由',
+}
 
 interface ProcedureAuditPanelProps {
   store: AuditStore
@@ -50,7 +63,6 @@ export function ProcedureAuditPanel({
     updateChecklistItem,
     addChecklistItem,
     removeChecklistItem,
-    markChecklistItemNA,
     getProcedureTitle,
     startAudit,
     validateAuditStart,
@@ -76,6 +88,9 @@ export function ProcedureAuditPanel({
   const [deleteTarget, setDeleteTarget] = useState<{ itemId: string; isNonConform: boolean } | null>(
     null,
   )
+  const [revealedEvidence, setRevealedEvidence] = useState<
+    Record<string, Partial<Record<EvidenceField, boolean>>>
+  >({})
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const [qpCode, departmentId] = selectedKey.split('|')
@@ -260,6 +275,54 @@ export function ProcedureAuditPanel({
 
   const isItemNonConform = (item: (typeof audit.items)[0]) => item.judgment === '不符'
 
+  const revealEvidenceField = (itemId: string, field: EvidenceField) => {
+    setRevealedEvidence((current) => ({
+      ...current,
+      [itemId]: { ...current[itemId], [field]: true },
+    }))
+  }
+
+  const renderEvidenceCell = (item: ChecklistItem) => {
+    const visibleFields = visibleEvidenceFields(item, revealedEvidence[item.id] ?? {})
+    const optionalFields = canJudge
+      ? optionalEvidenceFields(item).filter((field) => !visibleFields.includes(field))
+      : []
+    return (
+      <>
+        <div className="space-y-2 no-print">
+          {visibleFields.map((field) => (
+            <Input
+              key={field}
+              label={EVIDENCE_FIELD_LABELS[field]}
+              value={evidenceFieldValue(item, field)}
+              onChange={(value) => updateChecklistItem(audit.id, item.id, { [field]: value })}
+              disabled={!canJudge}
+            />
+          ))}
+          {optionalFields.length > 0 && (
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {optionalFields.map((field) => (
+                <button
+                  key={field}
+                  type="button"
+                  className={`text-xs text-link hover:underline ${FOCUS_RING}`}
+                  aria-label={`${audit.qpCode} NO ${item.no} 加${EVIDENCE_FIELD_LABELS[field]}`}
+                  onClick={() => revealEvidenceField(item.id, field)}
+                >
+                  加{EVIDENCE_FIELD_LABELS[field]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <span className="print-only">
+          {item.description}
+          {item.objectiveEvidence ? ` · 證據：${item.objectiveEvidence}` : ''}
+        </span>
+      </>
+    )
+  }
+
   const handleRemove = (itemId: string, isNonConform: boolean) => {
     setDeleteTarget({ itemId, isNonConform })
   }
@@ -294,7 +357,7 @@ export function ProcedureAuditPanel({
     <div className="space-y-0.5">
       {label && <span className="text-xs text-muted no-print">{label}</span>}
       <select
-        className={`w-full min-w-[5.5rem] rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
+        className={`w-full min-w-0 rounded border border-line bg-surface px-1 py-1 no-print ${FOCUS_RING}`}
         value={value ?? ''}
         disabled={disabled}
         onChange={(e) => onChange((e.target.value || null) as Judgment | null)}
@@ -571,15 +634,23 @@ export function ProcedureAuditPanel({
         </div>
 
         <ScrollRegion ariaLabel="查檢表項目清單">
-          <table className="qr-checklist w-full border-collapse text-sm">
+          <table className="qr-checklist w-full min-w-[64rem] table-fixed border-collapse text-sm">
+            <colgroup>
+              <col style={{ width: '9rem' }} />
+              <col style={{ width: '3rem' }} />
+              <col />
+              <col style={{ width: '7rem' }} />
+              <col style={{ width: '14rem' }} />
+              <col className="no-print" style={{ width: '6rem' }} />
+            </colgroup>
             <thead>
               <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2 w-24">項目</th>
-                <th className="border border-line p-2 w-12">NO</th>
+                <th className="border border-line p-2">項目</th>
+                <th className="border border-line p-2">NO</th>
                 <th className="border border-line p-2">稽核內容</th>
-                <th className="border border-line p-2 min-w-[9rem]">判定</th>
+                <th className="border border-line p-2">判定</th>
                 <th className="border border-line p-2">發現／證據</th>
-                <th className="border border-line p-2 w-24 no-print">操作</th>
+                <th className="border border-line p-2 no-print">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -601,7 +672,7 @@ export function ProcedureAuditPanel({
                     }`}
                   >
                     {item.id === firstVisibleId && visibleCatItems.length > 0 && (
-                      <td className="no-print border border-line p-2 align-top font-medium" rowSpan={visibleCatItems.length}>
+                      <td className="no-print border border-line p-2 align-top font-medium break-words" rowSpan={visibleCatItems.length}>
                         {cat}
                       </td>
                     )}
@@ -611,7 +682,7 @@ export function ProcedureAuditPanel({
                       </td>
                     )}
                     <td className="border border-line p-2 align-top text-center">{item.no}</td>
-                    <td className="border border-line p-2 align-top">
+                    <td className="border border-line p-2 align-top break-words">
                       {isChecklistItemPending(item) && (
                         <span className="mb-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
                           未判定
@@ -650,59 +721,10 @@ export function ProcedureAuditPanel({
                       {renderNcrHint(item)}
                     </td>
                     <td className="border border-line p-2 align-top">
-                      <div className="space-y-2">
-                        <Input
-                          label="發現說明"
-                          value={item.description}
-                          onChange={(value) =>
-                            updateChecklistItem(audit.id, item.id, { description: value })
-                          }
-                          disabled={!canJudge}
-                          className="no-print"
-                        />
-                        <Input
-                          label="抽樣數"
-                          value={item.sampleSize ?? ''}
-                          onChange={(value) =>
-                            updateChecklistItem(audit.id, item.id, { sampleSize: value })
-                          }
-                          disabled={!canJudge}
-                          className="no-print"
-                        />
-                        <Input
-                          label="客觀證據"
-                          value={item.objectiveEvidence ?? ''}
-                          onChange={(value) =>
-                            updateChecklistItem(audit.id, item.id, { objectiveEvidence: value })
-                          }
-                          disabled={!canJudge}
-                          className="no-print"
-                        />
-                        <Input
-                          label="不適用理由"
-                          value={item.notApplicableReason ?? ''}
-                          onChange={(value) =>
-                            updateChecklistItem(audit.id, item.id, { notApplicableReason: value })
-                          }
-                          disabled={!canJudge}
-                          className="no-print"
-                        />
-                      </div>
-                      <span className="print-only">
-                        {item.description}
-                        {item.objectiveEvidence ? ` · 證據：${item.objectiveEvidence}` : ''}
-                      </span>
+                      {renderEvidenceCell(item)}
                     </td>
                     <td className="border border-line p-2 align-top no-print">
-                      {isSeedChecklistItem(item) && canJudge ? (
-                        <button
-                          type="button"
-                          className={`text-xs text-muted hover:underline ${FOCUS_RING}`}
-                          onClick={() => markChecklistItemNA(audit.id, item.id)}
-                        >
-                          標不適用
-                        </button>
-                      ) : canJudge ? (
+                      {!isSeedChecklistItem(item) && canJudge ? (
                         <button
                           type="button"
                           className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
