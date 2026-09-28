@@ -83,8 +83,8 @@ describe('App tab smoke', () => {
     const guide = document.querySelector('[data-workflow-guide="top"]')
     expect(guide).toBeNull()
     expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
-    expect(screen.getByRole('heading', { name: '稽核總覽' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: '追蹤清單' })).toBeTruthy()
+    expect(screen.getByRole('region', { name: '稽核總覽' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '追蹤清單' })).toBeNull()
     await screen.findByRole('button', { name: '前往：前年度未結觀察' })
     fireEvent.click(screen.getByRole('button', { name: '前往：前年度未結觀察' }))
     await waitFor(() => {
@@ -96,7 +96,7 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
     })
 
     const main = document.querySelector('main#main')
@@ -104,7 +104,7 @@ describe('App tab smoke', () => {
 
     expect(document.activeElement).toBe(main)
     expect(window.location.hash).toBe('#tab=system-settings')
-    expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+    expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
   })
 
   it('returns to the top when switching workflow pages', async () => {
@@ -114,7 +114,7 @@ describe('App tab smoke', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
     })
 
     expect(scrollTo).toHaveBeenCalledTimes(initialCalls + 1)
@@ -125,7 +125,7 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
     })
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
     expect(screen.queryByText('關於')).toBeNull()
@@ -154,20 +154,22 @@ describe('App tab smoke', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '年度稽核計畫' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '依日期與利害關係人自動編排' })).toBeTruthy()
     })
     expect(screen.queryByText(/內稽年度請用頁首切換/)).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '方案風險' })).toBeTruthy()
+      expect(screen.getByRole('region', { name: '程序風險評估一覽' })).toBeTruthy()
+      expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
     })
     expect(screen.queryByText(/不取代程序固有風險/)).toBeNull()
     expect(screen.queryByText(/至利害關係人編輯部門 O／S/)).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '利害關係人' })).toBeTruthy()
+      expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
+      expect(screen.queryByText('評分規則與編排影響')).toBeNull()
     })
     expect(screen.queryByText(/兩者不可互代/)).toBeNull()
   })
@@ -176,7 +178,7 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '不符合' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '不符合' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: /不符合事項一覽/ })).toBeTruthy()
     })
     expect(screen.queryByText(/查檢表判定「不符」時自動匯入/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '手動新增 NCR' }))
@@ -189,14 +191,17 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '不符合' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '不符合' })).toBeTruthy()
+      expect(screen.getByRole('heading', { name: /不符合事項一覽/ })).toBeTruthy()
     })
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '觀察事項' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '觀察事項' })).toBeTruthy()
+      expect(screen.getByRole('button', { name: '登錄觀察事項' })).toBeTruthy()
+      expect(screen.getByRole('region', { name: '觀察事項紀錄一覽' })).toBeTruthy()
     })
+    expect(screen.queryByRole('heading', { name: /觀察事項紀錄一覽/ })).toBeNull()
+    expect(screen.queryByRole('heading', { name: /查檢未同步一覽/ })).toBeNull()
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 
@@ -213,7 +218,7 @@ describe('App tab smoke', () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '系統設定' })).toBeTruthy()
+      expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
     })
     expect(screen.queryByRole('button', { name: '清除全部資料' })).toBeNull()
     expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()

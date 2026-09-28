@@ -6,24 +6,30 @@ import { exportAllFormsExcel } from '../lib/formExport'
 import {
   PROFILE_SNAPSHOT_READY_MESSAGE,
   procedureFieldErrors,
-  standardFieldErrors,
 } from '../lib/auditProfileValidation'
 import { procedureSourceReady, standardReady } from '../lib/workflowStatus'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Input, Select } from './ui/Badge'
-import { PageToolbar } from './ui/PageToolbar'
+import { Button, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import type { ScoringRules, TabId } from '../types'
 import { TrashPanel } from './TrashPanel'
+import { SystemFlowChart } from './SystemFlowChart'
 import { WorkspaceMigrationReview } from './WorkspaceMigrationReview'
 
-type SettingsSection = 'audit' | 'data' | 'trash'
+type SettingsSection = 'audit' | 'data' | 'trash' | 'flow'
+type AuditPane = 'procedure' | 'scoring'
 type ScoringField = keyof ScoringRules
 
 const SETTINGS_SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'audit', label: '稽核資料' },
   { id: 'data', label: '備份與匯出' },
   { id: 'trash', label: '回收區' },
+  { id: 'flow', label: '系統流程' },
+]
+
+const AUDIT_PANES: Array<{ id: AuditPane; label: string }> = [
+  { id: 'procedure', label: '程序與紀錄' },
+  { id: 'scoring', label: '進階評分設定' },
 ]
 
 function ScoringRuleInput({
@@ -51,7 +57,6 @@ function ScoringRuleInput({
       required
       value={draft}
       error={error}
-      hint="0 或更高"
       onChange={(next) => {
         setDraft(next)
         setError('')
@@ -74,6 +79,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
   const { state, updateSettings, updateCompanyAuditProfile, exportJSON, importJSON } = store
   const fileRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SettingsSection>('audit')
+  const [auditPane, setAuditPane] = useState<AuditPane>('procedure')
   const [pendingRestore, setPendingRestore] = useState<{ json: string; summary: string } | null>(null)
   const [restoreStatus, setRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [scoringSavedMessage, setScoringSavedMessage] = useState(false)
@@ -86,7 +92,6 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
     && procedureSourceReady(state, state.activeCompanyId)
 
   const procedureErrors = procedureFieldErrors(profile)
-  const standardErrors = standardFieldErrors(profile)
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -140,7 +145,6 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
 
   return (
     <div className="space-y-5">
-      <PageToolbar title="系統設定" />
       <WorkspaceMigrationReview store={store} onNavigate={(tab) => onNavigate?.(tab)} />
 
       <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="系統設定區塊">
@@ -169,137 +173,100 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
 
       {activeSection === 'audit' && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-            <h2 className="mb-2 text-base font-semibold text-slate-900">稽核基本資料</h2>
-            <p className="mb-5 text-sm text-slate-600">稽核開始時會保存適用依據快照。欄位變更即時儲存於目前瀏覽器。</p>
-            <section aria-labelledby="audit-standards-heading">
-              <h3 id="audit-standards-heading" className="mb-3 text-sm font-semibold">適用標準</h3>
-              <p className="mb-4 text-xs text-slate-600">本案一張證書，兩項標準的版本與適用性分別確認。</p>
-              <h4 className="text-sm font-semibold text-slate-900">管理系統認證證書</h4>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <Input
-                  label="證書範圍"
-                  value={profile.certificateScope}
-                  hint={standardErrors?.certificateScope}
-                  onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateScope: value })}
-                />
-                <Input
-                  label="證書編號／引用"
-                  value={profile.certificateReference}
-                  hint={standardErrors?.certificateReference}
-                  onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { certificateReference: value })}
-                />
-              </div>
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[520px] border-collapse text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
-                      <th className="border border-slate-200 p-2">標準</th>
-                      <th className="border border-slate-200 p-2">版本</th>
-                      <th className="border border-slate-200 p-2">適用性</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {profile.applicableStandards.map((standard, index) => (
-                      <tr key={standard.name}>
-                        <td className="border border-slate-200 p-2 align-top font-medium text-slate-800">{standard.name}</td>
-                        <td className="border border-slate-200 p-2 align-top">
-                          <Input
-                            label={`版本 — ${standard.name}`}
-                            value={standard.version}
-                            onChange={(value) => {
-                              const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
-                              standards[index] = { ...standard, version: value }
-                              updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
-                            }}
-                          />
-                          {standard.name === 'ISO 9001' && !standard.version.includes('2026') && (
-                            <p className="mt-1 text-xs text-amber-700">
-                              ISO 9001:2026 已發布；請依有效證書與認證機構轉版安排確認本年度適用版本。
-                            </p>
-                          )}
-                        </td>
-                        <td className="border border-slate-200 p-2 align-top">
-                          <Select
-                            label={`適用性 — ${standard.name}`}
-                            value={standard.confirmationStatus}
-                            onChange={(value) => {
-                              const standards = [...state.companyAuditProfiles[state.activeCompanyId].applicableStandards]
-                              standards[index] = { ...standard, confirmationStatus: value as 'pending' | 'confirmed' }
-                              updateCompanyAuditProfile(state.activeCompanyId, { applicableStandards: standards })
-                            }}
-                            options={[{ value: 'pending', label: '待確認' }, { value: 'confirmed', label: '已確認' }]}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {standardErrors?.confirmation && (
-                <p className="mt-2 text-xs text-amber-700 dark:text-amber-300" role="status">{standardErrors.confirmation}</p>
-              )}
-            </section>
-
-            <section aria-labelledby="audit-source-heading" className="mt-6 border-t border-slate-200 pt-5">
-              <h3 id="audit-source-heading" className="mb-3 text-sm font-semibold">稽核程序與正式紀錄位置</h3>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Input
-                  label="稽核程序代碼"
-                  value={profile.auditProcedureCode}
-                    hint={procedureErrors?.auditProcedureCode}
-                  onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })}
-                />
-                <Input
-                  label="程序版本"
-                  value={profile.auditProcedureVersion}
-                    hint={procedureErrors?.auditProcedureVersion}
-                  onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })}
-                />
-                <Input
-                  label="正式紀錄保存位置"
-                  value={profile.formalRecordLocation}
-                    hint={procedureErrors?.formalRecordLocation}
-                  onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })}
-                />
-              </div>
-            </section>
-            {profileReady && (
-              <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
-            )}
+          <div
+            className="flex flex-wrap gap-1 border-b border-slate-200"
+            role="tablist"
+            aria-label="稽核資料分頁"
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+              event.preventDefault()
+              const index = AUDIT_PANES.findIndex((pane) => pane.id === auditPane)
+              const step = event.key === 'ArrowRight' ? 1 : -1
+              const next = AUDIT_PANES[(index + step + AUDIT_PANES.length) % AUDIT_PANES.length]
+              setAuditPane(next.id)
+              queueMicrotask(() => document.getElementById(`audit-tab-${next.id}`)?.focus())
+            }}
+          >
+            {AUDIT_PANES.map(({ id, label }) => {
+              const selected = auditPane === id
+              return (
+                <button
+                  key={id}
+                  id={`audit-tab-${id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  aria-controls={`audit-pane-${id}`}
+                  tabIndex={selected ? 0 : -1}
+                  className={`min-h-10 border-b-2 px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${selected ? 'border-blue-700 text-blue-800' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+                  onClick={() => setAuditPane(id)}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
-          <details className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-900">進階評分設定</summary>
-            <p className="mt-3 text-sm text-slate-600">只調整後續稽核的計分；已回報紀錄不會回寫。未經核准的評分規則請維持預設值。</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <ScoringRuleInput
-                key={`conform-${state.settings.scoringRules.conform}`}
-                field="conform"
-                label="符合得分"
-                value={state.settings.scoringRules.conform}
-                onSave={saveScoringRule}
-                onEdit={() => setScoringSavedMessage(false)}
-              />
-              <ScoringRuleInput
-                key={`nonConform-${state.settings.scoringRules.nonConform}`}
-                field="nonConform"
-                label="不符得分"
-                value={state.settings.scoringRules.nonConform}
-                onSave={saveScoringRule}
-                onEdit={() => setScoringSavedMessage(false)}
-              />
-              <ScoringRuleInput
-                key={`observation-${state.settings.scoringRules.observation}`}
-                field="observation"
-                label="觀察得分（部分）"
-                value={state.settings.scoringRules.observation}
-                onSave={saveScoringRule}
-                onEdit={() => setScoringSavedMessage(false)}
-              />
+          {auditPane === 'procedure' && (
+            <div role="tabpanel" id="audit-pane-procedure" aria-labelledby="audit-tab-procedure" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+              <div className="grid gap-3 sm:grid-cols-3">
+                  <Input
+                    label="稽核程序代碼"
+                    value={profile.auditProcedureCode}
+                      hint={procedureErrors?.auditProcedureCode}
+                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })}
+                  />
+                  <Input
+                    label="程序版本"
+                    value={profile.auditProcedureVersion}
+                      hint={procedureErrors?.auditProcedureVersion}
+                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })}
+                  />
+                  <Input
+                    label="正式紀錄保存位置"
+                    value={profile.formalRecordLocation}
+                      hint={procedureErrors?.formalRecordLocation}
+                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })}
+                  />
+              </div>
+              {profileReady && (
+                <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
+              )}
             </div>
-            {scoringSavedMessage && <p className="mt-3 text-sm text-green-700" role="status">評分規則已寫入</p>}
-          </details>
+          )}
+
+          {auditPane === 'scoring' && (
+            <div role="tabpanel" id="audit-pane-scoring" aria-labelledby="audit-tab-scoring" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+              <p className="text-sm text-slate-600">只調整後續稽核的計分；已回報紀錄不會回寫。未經核准的評分規則請維持預設值。</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                <ScoringRuleInput
+                  key={`conform-${state.settings.scoringRules.conform}`}
+                  field="conform"
+                  label="符合得分"
+                  value={state.settings.scoringRules.conform}
+                  onSave={saveScoringRule}
+                  onEdit={() => setScoringSavedMessage(false)}
+                />
+                <ScoringRuleInput
+                  key={`nonConform-${state.settings.scoringRules.nonConform}`}
+                  field="nonConform"
+                  label="不符得分"
+                  value={state.settings.scoringRules.nonConform}
+                  onSave={saveScoringRule}
+                  onEdit={() => setScoringSavedMessage(false)}
+                />
+                <ScoringRuleInput
+                  key={`observation-${state.settings.scoringRules.observation}`}
+                  field="observation"
+                  label="觀察得分（部分）"
+                  value={state.settings.scoringRules.observation}
+                  onSave={saveScoringRule}
+                  onEdit={() => setScoringSavedMessage(false)}
+                />
+              </div>
+              {scoringSavedMessage && <p className="mt-3 text-sm text-green-700" role="status">評分規則已寫入</p>}
+            </div>
+          )}
         </div>
       )}
 
@@ -338,6 +305,8 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       )}
 
       {activeSection === 'trash' && <TrashPanel store={store} />}
+
+      {activeSection === 'flow' && <SystemFlowChart onNavigate={onNavigate} />}
 
       {pendingRestore && (
         <ConfirmDialog

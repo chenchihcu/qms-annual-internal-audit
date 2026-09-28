@@ -197,12 +197,12 @@ function App() {
           </div>
         )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
-        <WorkflowGuide tab={tab} state={store.state} onNavigate={setTab} />
+        {tab !== 'plan' && tab !== 'personnel' && <WorkflowGuide tab={tab} state={store.state} onNavigate={setTab} />}
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
               <TabErrorBoundary tabLabel="年度稽核計畫">
-                <AnnualPlan store={store} />
+                <AnnualPlan store={store} onNavigate={setTab} />
               </TabErrorBoundary>
             )}
             {tab === 'audit' && (

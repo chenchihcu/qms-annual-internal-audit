@@ -68,9 +68,14 @@ for (const width of widths) {
     const count = await tab.count()
     if (count !== 1) throw new Error(`expected exactly one tab button for ${label}, got ${count}`)
     await tab.click({ timeout: 2000 })
-    const heading = page.getByRole('heading', { name: label, exact: true })
-    await heading.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {})
-    if (await heading.count() !== 1) throw new Error(`expected page heading ${label} after navigation`)
+    const becameCurrent = await page.waitForFunction((expected) => {
+      if (document.body.innerText.includes('正在載入頁面…')) return false
+      const sidebarCurrent = [...document.querySelectorAll('button[aria-current="page"]')]
+        .some((node) => (node.innerText || '').replace(/\s+/g, ' ').trim() === expected)
+      if (!sidebarCurrent) return false
+      return Boolean(document.querySelector(`form[aria-label="${expected}表單"], [aria-label="${expected}"]`))
+    }, label, { timeout: 8000 }).then(() => true).catch(() => false)
+    if (!becameCurrent) throw new Error(`expected ${label} to be the current page`)
     const text = await page.locator('body').innerText()
     const rootHTML = await page.locator('#root').innerHTML().catch(() => '')
     const stale = oldCopy.filter((phrase) => text.includes(phrase))
@@ -155,6 +160,8 @@ for (const width of widths) {
       const planMonthMatch = planMonthLabel?.match(/^(.+) (\d+) 月：/)
       if (!planMonthMatch) throw new Error('無法解析年度計畫月格的程序與月份')
       await planMonthButton.click()
+      const monthMenu = page.getByRole('menu', { name: `${planMonthMatch[1]} ${planMonthMatch[2]} 月狀態` })
+      await monthMenu.getByRole('menuitemradio', { name: '擬定', exact: true }).click()
       const changedPlanTitle = await planMonthButton.getAttribute('title')
       if (!changedPlanTitle?.startsWith('排程：擬定')) throw new Error('月格點擊後未寫入「擬定」排程')
       await page.reload({ waitUntil: 'domcontentloaded' })
@@ -179,12 +186,17 @@ for (const width of widths) {
       )
 
       async function findPersonRow() {
-        const search = page.getByLabel('搜尋姓名／編號／機構', { exact: true })
-        if (!await search.isVisible()) await page.getByText('篩選條件', { exact: true }).click()
-        await search.fill(personName)
         const row = page.getByRole('row').filter({ hasText: personName })
-        await row.waitFor({ state: 'visible', timeout: 5000 })
-        return row
+        const next = page.getByRole('button', { name: '人員合格名單下一頁', exact: true })
+        for (let pageIndex = 0; pageIndex < 30; pageIndex += 1) {
+          if (await row.count()) {
+            await row.first().waitFor({ state: 'visible', timeout: 5000 })
+            return row.first()
+          }
+          if (!(await next.count()) || await next.isDisabled()) break
+          await next.click()
+        }
+        throw new Error('人員名單找不到剛新增的人員')
       }
 
       workflowStage = '人員重載讀回'
@@ -236,7 +248,7 @@ for (const width of widths) {
       await permanentTrashRow.waitFor({ state: 'detached', timeout: 5000 })
       await page.getByRole('status').filter({ hasText: '已永久清除。' }).waitFor({ state: 'visible', timeout: 5000 })
       await navigateTab('人員合格名單')
-      if (await page.getByRole('row').filter({ hasText: personName }).count() !== 0) {
+      if (await page.locator('#personnel-form tr').filter({ hasText: personName }).count() !== 0) {
         throw new Error('永久清除後人員仍出現在人員名單')
       }
       personnelPermanentDeleteVerified = true
@@ -312,7 +324,7 @@ for (const width of widths) {
 
       workflowStage = '方案風險證據引用保存'
       await navigateTab('方案風險')
-      const riskRegion = page.getByRole('region', { name: '程序風險評估表格' })
+      const riskRegion = page.getByRole('region', { name: '程序風險評估一覽' })
       const riskRow = riskRegion.getByRole('row').nth(1)
       const riskIdentityParts = (await riskRow.getByRole('cell').first().innerText()).split('\n').map((value) => value.trim())
       const [riskQpCode, riskDepartment] = riskIdentityParts
@@ -494,14 +506,19 @@ for (const width of widths) {
 
       workflowStage = '系統設定 JSON 備份下載'
       await navigateTab('系統設定')
-      await page.getByRole('heading', { name: '管理系統認證證書', exact: true }).waitFor({ state: 'visible', timeout: 5000 })
-      if (await page.getByLabel('證書編號／引用', { exact: true }).count() !== 1) {
-        throw new Error('ISO 9001 與 AS9100 未共用唯一證書引用欄位')
+      if (await page.getByRole('heading', { name: '管理系統認證證書', exact: true }).count() !== 0
+        || await page.getByRole('heading', { name: '稽核基本資料', exact: true }).count() !== 0
+        || await page.getByLabel('證書編號／引用', { exact: true }).count() !== 0
+        || await page.getByLabel('證書範圍', { exact: true }).count() !== 0) {
+        throw new Error('設定頁仍顯示已移除的證書或稽核基本資料')
       }
-      if (await page.getByLabel(/依據引用.*ISO 9001/).count() !== 0 || await page.getByLabel(/依據引用.*AS9100/).count() !== 0) {
-        throw new Error('適用標準仍要求重複輸入個別證書引用')
+      if (await page.getByLabel('稽核程序代碼', { exact: true }).count() !== 1) {
+        throw new Error('程序與紀錄未保留稽核程序代碼')
       }
-      workflowChecks.push('ISO 9001／AS9100 分別保留版本適用性並共用證書資料')
+      if (await page.getByRole('radio', { name: '系統流程', exact: true }).count() !== 1) {
+        throw new Error('系統設定沒有系統流程')
+      }
+      workflowChecks.push('設定頁只保留程序與紀錄，不顯示已移除的證書表單')
       await page.getByRole('radio', { name: '備份與匯出', exact: true }).locator('xpath=..').click()
       const backupDownloadEvent = page.waitForEvent('download', { timeout: 10000 })
       await page.getByRole('button', { name: '下載完整備份', exact: true }).click()
