@@ -63,12 +63,12 @@ export function TrashPanel({ store }: { store: AuditStore }) {
               <col className="col-action no-print" />
             </colgroup>
             <thead>
-              <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2">類型</th>
-                <th className="border border-line p-2">資料</th>
-                <th className="border border-line p-2">原位置</th>
-                <th className="border border-line p-2">移除時間</th>
-                <th className="border border-line p-2 no-print">操作</th>
+              <tr>
+                <th >類型</th>
+                <th >資料</th>
+                <th >原位置</th>
+                <th >移除時間</th>
+                <th className="no-print">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -76,11 +76,11 @@ export function TrashPanel({ store }: { store: AuditStore }) {
                 const summary = trashEntrySummary(entry)
                 return (
                   <tr key={entry.id} className={!pagination.isVisible(index) ? 'pagination-hidden-row' : undefined}>
-                    <td className="border border-line p-2">{TRASH_KIND_LABELS[entry.kind]}</td>
-                    <td className="border border-line p-2">{summary || '—'}</td>
-                    <td className="border border-line p-2">{trashContext(entry)}</td>
-                    <td className="border border-line p-2 text-xs">{deletedAtLabel(entry.deletedAt)}</td>
-                    <td className="border border-line p-2 no-print">
+                    <td >{TRASH_KIND_LABELS[entry.kind]}</td>
+                    <td >{summary || '—'}</td>
+                    <td >{trashContext(entry)}</td>
+                    <td className="text-xs">{deletedAtLabel(entry.deletedAt)}</td>
+                    <td className="no-print">
                       <div className="flex flex-wrap gap-1">
                         <Button variant="secondary" onClick={() => handleRestore(entry)} aria-label={`還原：${summary}`}>
                           還原

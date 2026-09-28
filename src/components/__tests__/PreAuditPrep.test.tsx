@@ -72,6 +72,9 @@ describe('PreAuditPrep', () => {
     expect(screen.getByText(/年度校正項目別勿漏校/)).toBeTruthy()
     expect(screen.getByText(/進料／出貨檢驗放行見項 21 分開備查/)).toBeTruthy()
     expect(screen.queryByText(/校驗帳可合併/)).toBeNull()
+    expect(screen.queryByText('其他注意事項')).toBeNull()
+    const points = screen.getByText('稽核要點').closest('details')
+    expect(points?.textContent).toContain('忌諱塗改任何紀錄或文件')
   })
 
   it('uses one continuous display sequence and accessible controls', () => {
@@ -91,14 +94,12 @@ describe('PreAuditPrep', () => {
     expect(screen.queryByRole('button', { name: /外稽準備第 \d+ 頁/ })).toBeNull()
   })
 
-  it('shows external audit team reminder when assignments are missing', () => {
-    const store = makeStore((state) => {
-      state.people = []
-      state.annualPersonnelAssignments = []
-    })
+  it('does not show the external team arrangement panel', () => {
+    const store = makeStore()
     render(<PreAuditPrep store={store} />)
-    expect(screen.getByText(/尚未確認第三方團隊/)).toBeTruthy()
-    expect(screen.getByText(/尚未安排本年度陪稽人員/)).toBeTruthy()
+    expect(screen.queryByText('外部稽核團隊與陪稽安排')).toBeNull()
+    expect(screen.queryByText(/尚未確認第三方團隊/)).toBeNull()
+    expect(screen.queryByText(/尚未安排本年度陪稽人員/)).toBeNull()
   })
 
   it('shows date-order warnings from the preparation page without changing saved dates', () => {

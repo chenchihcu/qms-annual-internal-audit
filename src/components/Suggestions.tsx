@@ -89,26 +89,31 @@ export function Suggestions({
     const deptId = carryDept[sug.id] ?? sug.departmentId ?? rows[0]?.departmentId ?? ''
     const canCarry = sug.status === 'open' && !sug.carriedToYear && rows.length > 0
     return (
-      <div className="flex flex-col gap-2">
-        {sug.carriedToYear && <span className="text-xs text-blue-600">已帶入 {sug.carriedToYear}</span>}
+      <>
+        {sug.carriedToYear && <span className="w-full text-xs text-blue-600">已帶入 {sug.carriedToYear}</span>}
         {canCarry && rows.length > 1 && (
-          <Select
-            label="帶入部門"
-            value={deptId}
-            onChange={(value) => setCarryDept({ ...carryDept, [sug.id]: value })}
-            options={rows.map((row) => ({ value: row.departmentId, label: row.department }))}
-          />
+          <div className="w-full">
+            <Select
+              label="帶入部門"
+              value={deptId}
+              onChange={(value) => setCarryDept({ ...carryDept, [sug.id]: value })}
+              options={rows.map((row) => ({ value: row.departmentId, label: row.department }))}
+            />
+          </div>
         )}
         {canCarry && (
           <Button
             variant="secondary"
+            className="w-fit shrink-0 whitespace-nowrap"
             disabled={!deptId}
+            aria-label={`帶入 ${currentYear} 年`}
+            title={`帶入 ${currentYear} 年`}
             onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
           >
-            帶入 {currentYear} 年
+            帶入
           </Button>
         )}
-      </div>
+      </>
     )
   }
 
@@ -121,7 +126,6 @@ export function Suggestions({
           formTitle="第三方稽核建議事項一覽表"
         />
         <PageToolbar
-          title="第三方建議"
           actions={(
             <>
               {!showForm && <Button ref={triggerRef} icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄建議</Button>}
@@ -182,8 +186,6 @@ export function Suggestions({
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
 
-        <h3 className="mb-3 font-semibold">第三方建議一覽（{listedSuggestions.length}）</h3>
-
         {listedSuggestions.length === 0 ? (
           <EmptyState message="目前沒有建議事項。" />
         ) : (
@@ -200,14 +202,14 @@ export function Suggestions({
                 <col className="col-action no-print" />
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-left">
-                  <th className="border p-2">年度</th>
-                  <th className="border p-2">摘要</th>
-                  <th className="border p-2">QP</th>
-                  <th className="border p-2">負責單位</th>
-                  <th className="border p-2">進度</th>
-                  <th className="border p-2">狀態</th>
-                  <th className="border p-2 no-print">操作</th>
+                <tr>
+                  <th >年度</th>
+                  <th >摘要</th>
+                  <th >QP</th>
+                  <th >負責單位</th>
+                  <th >進度</th>
+                  <th >狀態</th>
+                  <th className="no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,13 +217,13 @@ export function Suggestions({
                   <Fragment key={sug.id}>
                   <tr
                     data-suggestion-id={sug.id}
-                    className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50 ${highlightRecordId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
+                    className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${highlightRecordId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
                   >
-                    <td className="border p-2 text-xs">{sug.year}</td>
-                    <td className="border p-2 break-words">{sug.issue}</td>
-                    <td className="border p-2 text-xs font-medium break-words">{sug.procedure}</td>
-                    <td className="border p-2 text-xs break-words">{sug.responsibleUnit}</td>
-                    <td className="border p-2">
+                    <td className="text-xs">{sug.year}</td>
+                    <td className="break-words">{sug.issue}</td>
+                    <td className="text-xs font-medium break-words">{sug.procedure}</td>
+                    <td className="text-xs break-words">{sug.responsibleUnit}</td>
+                    <td >
                       <textarea
                         className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
                         rows={2}
@@ -231,7 +233,7 @@ export function Suggestions({
                       />
                       <span className="print-only">{sug.progress}</span>
                     </td>
-                    <td className="border p-2">
+                    <td >
                       <div className="no-print">
                         <Select
                           ariaLabel={`${sug.year} ${sug.procedure} 建議狀態`}
@@ -245,16 +247,18 @@ export function Suggestions({
                       </div>
                       <span className="print-only"><Badge label={statusLabel[sug.status]} /></span>
                     </td>
-                    <td className="border p-2 no-print">
-                      {renderCarryActions(sug)}
-                      <button
-                        type="button"
-                        className={`min-h-11 text-sm text-link hover:underline ${FOCUS_RING}`}
-                        aria-label={`${sug.year} ${sug.procedure} 建議明細：${sug.issue}`}
-                        aria-expanded={expandedId === sug.id}
-                        aria-controls={`suggestion-detail-${sug.id}`}
-                        onClick={() => setExpandedId(expandedId === sug.id ? null : sug.id)}
-                      >{expandedId === sug.id ? '收合' : '明細'}</button>
+                    <td className="no-print">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {renderCarryActions(sug)}
+                        <button
+                          type="button"
+                          className={`inline-flex min-h-11 w-fit shrink-0 items-center whitespace-nowrap text-sm text-link hover:underline ${FOCUS_RING}`}
+                          aria-label={`${sug.year} ${sug.procedure} 建議明細：${sug.issue}`}
+                          aria-expanded={expandedId === sug.id}
+                          aria-controls={`suggestion-detail-${sug.id}`}
+                          onClick={() => setExpandedId(expandedId === sug.id ? null : sug.id)}
+                        >{expandedId === sug.id ? '收合' : '明細'}</button>
+                      </div>
                     </td>
                   </tr>
                   <tr id={`suggestion-detail-${sug.id}`} hidden={expandedId !== sug.id || !pagination.isVisible(index)} className="no-print bg-page">

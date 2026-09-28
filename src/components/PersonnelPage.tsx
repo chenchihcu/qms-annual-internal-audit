@@ -19,7 +19,7 @@ import { CheckboxList } from './ui/CheckboxList'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { EmptyState } from './ui/EmptyState'
-import { PageToolbar } from './ui/PageToolbar'
+import { WorkflowGuide } from './ui/WorkflowGuide'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
@@ -136,11 +136,6 @@ function ScopeCheckboxGroup({
 
 export function PersonnelPage({ store }: { store: AuditStore }) {
   const { state, addPerson, updatePerson, deactivatePerson, movePersonToTrash, upsertAnnualPersonnelAssignment } = store
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState<'all' | PersonnelRole>('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [departmentFilter, setDepartmentFilter] = useState('all')
-  const [scopeFilter, setScopeFilter] = useState('')
   const [editing, setEditing] = useState<FormState | null>(null)
   const [dirty, setDirty] = useState(false)
   const [pendingCancel, setPendingCancel] = useState(false)
@@ -184,17 +179,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     }
   }, [editingId])
 
-  const rows = useMemo(() => state.people.filter((person) => {
-    const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
-    const affiliationText = person.affiliations.map((item) => [item.externalOrganization, item.departmentId].filter(Boolean).join(' ')).join(' ')
-    const matchesSearch = `${person.name} ${person.employeeNumber} ${affiliationText}`.toLowerCase().includes(search.toLowerCase())
-    const matchesRole = roleFilter === 'all' || roles.includes(roleFilter)
-    const status = primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)
-    const matchesDepartment = departmentFilter === 'all' || person.affiliations.some((item) => item.departmentId === departmentFilter)
-    const scopeText = person.qualifications.map((qualification) => formatQualificationScopeSummary(qualification)).join(' ')
-    const matchesScope = scopeText.toLowerCase().includes(scopeFilter.toLowerCase())
-    return matchesSearch && matchesRole && matchesDepartment && matchesScope && (statusFilter === 'all' || status === statusFilter)
-  }), [state.people, state.settings.auditYear, state.annualPersonnelAssignments, search, roleFilter, statusFilter, departmentFilter, scopeFilter, today])
+  const rows = state.people
 
   const patchForm = (patch: Partial<FormState>) => {
     setEditing((current) => current ? { ...current, ...patch } : current)
@@ -398,21 +383,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     [state.people, state.activeCompanyId, state.settings.auditYear, state.annualPersonnelAssignments, editing?.effectiveFrom],
   )
 
-  const filterFields = (
-    <>
-      <Input label="搜尋姓名／編號／機構" value={search} onChange={setSearch} />
-      <Select label="角色" value={roleFilter} onChange={(v) => setRoleFilter(v as typeof roleFilter)} options={[{ value: 'all', label: '全部角色' }, ...ROLES.map((role) => ({ value: role, label: PERSONNEL_ROLE_LABELS[role] }))]} />
-      <Select label="資格狀態" value={statusFilter} onChange={setStatusFilter} options={['all', '有效', '待確認', '未生效', '已逾期', '已暫停', '已終止', '已停用'].map((value) => ({ value, label: value === 'all' ? '全部狀態' : value }))} />
-      <Select label="責任單位" value={departmentFilter} onChange={setDepartmentFilter} options={[{ value: 'all', label: '全部責任單位' }, ...state.company.departments.map((department) => ({ value: department.id, label: department.name }))]} />
-      <Input label="可稽核程序／範圍" value={scopeFilter} onChange={setScopeFilter} />
-    </>
-  )
-  const pagination = useTablePagination(
-    rows.length,
-    10,
-    undefined,
-    JSON.stringify([search, roleFilter, statusFilter, departmentFilter, scopeFilter, state.settings.auditYear]),
-  )
+  const pagination = useTablePagination(rows.length, 10, undefined, String(state.settings.auditYear))
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -422,28 +393,14 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         formTitle="人員合格名單"
       />
       <div>
-        <PageToolbar
-          title="人員合格名單"
-          actions={(
-            <>
-              <Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false); setSaveMessage(false) }}>新增人員</Button>
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
-            </>
-          )}
-        />
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-3 no-print">
+          <WorkflowGuide tab="personnel" state={state} className="mr-auto min-w-[min(100%,12rem)] flex-1" />
+          <Button icon={ACTION_ICONS.add} onClick={() => { setEditing(blankForm()); setDirty(false); setSaveMessage(false) }}>新增人員</Button>
+          <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
+        </div>
         {saveMessage && !editing && (
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
-        <details className="mt-2 no-print">
-          <summary className="cursor-pointer text-sm font-medium text-slate-700">篩選條件</summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filterFields}</div>
-        </details>
-        <details className="mt-4 no-print">
-          <summary className="cursor-pointer text-xs text-slate-500">使用說明</summary>
-          <p className="mt-2 text-xs text-slate-500">
-            系統只登錄正式紀錄的引用；不取代資格評定、核准、登入權限或電子簽章。空白範圍不算「全部」，開始稽核時仍須符合當次 QP 與單位。
-          </p>
-        </details>
       </div>
 
       {editing && (
@@ -512,34 +469,32 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       </div>)}
 
       <div>
-        <h3 className="mb-3 font-semibold">人員合格名單一覽（{rows.length}）</h3>
-
         {rows.length === 0 ? (
           <EmptyState message="目前沒有人員。" />
         ) : (
           <>
           <ScrollRegion ariaLabel="人員合格名單一覽">
-            <table className="worksheet-table min-w-[61rem]">
+            <table className="worksheet-table min-w-[48rem]">
               <colgroup>
-                <col className="col-name" />
-                <col className="col-name" />
-                <col className="col-name" />
-                <col />
-                <col className="col-status" />
-                <col />
-                <col className="col-date" />
-                <col className="col-action no-print" />
+                <col className="col-person-name" />
+                <col className="col-person-org" />
+                <col className="col-person-dept" />
+                <col className="col-person-role" />
+                <col className="col-person-status" />
+                <col className="print-table-column" />
+                <col className="col-person-date" />
+                <col className="col-person-action no-print" />
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-left">
-                  <th className="border p-2">姓名／編號</th>
-                  <th className="border p-2">所屬單位</th>
-                  <th className="border p-2">責任單位</th>
-                  <th className="border p-2">角色</th>
-                  <th className="border p-2">狀態</th>
-                  <th className="border p-2">適用範圍</th>
-                  <th className="border p-2">有效日期</th>
-                  <th className="border p-2 no-print">操作</th>
+                <tr>
+                  <th>姓名／編號</th>
+                  <th >所屬單位</th>
+                  <th >責任單位</th>
+                  <th >角色</th>
+                  <th >狀態</th>
+                  <th className="print-table-cell">適用範圍</th>
+                  <th >有效日期</th>
+                  <th className="no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -549,45 +504,44 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                   return (
                     <tr
                       key={person.id}
-                      className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50`}
+                      className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}`}
                     >
-                      <td className="border p-2 font-medium">
+                      <td className="font-medium">
                         {person.name}
                         <span className="block text-xs font-normal text-slate-500">{person.employeeNumber || '—'}</span>
                       </td>
-                      <td className="border p-2">
+                      <td >
                         {affiliation?.externalOrganization || (person.type === 'internal' ? '公司內部' : '待確認')}
                       </td>
-                      <td className="border p-2">
+                      <td >
                         {state.company.departments.find((d) => d.id === affiliation?.departmentId)?.name ?? affiliation?.departmentId ?? '—'}
                       </td>
-                      <td className="border p-2">
+                      <td >
                         {personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments).map((r) => PERSONNEL_ROLE_LABELS[r]).join('、') || '待確認'}
                       </td>
-                      <td className="border p-2">
+                      <td >
                         <Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} />
                       </td>
-                      <td className="border p-2 text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td>
-                      <td className="border p-2 text-xs">
+                      <td className="print-table-cell text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td>
+                      <td className="text-xs">
                         {qualification
                           ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}`
                           : '—'}
                       </td>
-                      <td className="border p-2 no-print">
-                        <div className="flex gap-1">
-                          <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => openEdit(person)}>編輯</Button>
+                      <td className="no-print">
+                        <div className="flex flex-wrap gap-1">
+                          <Button variant="ghost" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openEdit(person)}>編輯</Button>
                           {person.active && (
-                            <Button variant="ghost" icon="minusCircle" onClick={() => setPendingDeactivate(person)}>停用</Button>
+                            <Button variant="ghost" icon="minusCircle" className="shrink-0 whitespace-nowrap" onClick={() => setPendingDeactivate(person)}>停用</Button>
                           )}
                           <Button
                             variant="ghost"
                             icon={ACTION_ICONS.delete}
-                            className="text-red-700"
+                            className="shrink-0 text-red-700"
                             aria-label={`移至回收區：${person.name}`}
+                            title="移至回收區"
                             onClick={() => setDeleteTarget({ id: person.id, label: `${person.name}${person.employeeNumber ? ` · ${person.employeeNumber}` : ''}` })}
-                          >
-                            移至回收區
-                          </Button>
+                          />
                         </div>
                       </td>
                     </tr>

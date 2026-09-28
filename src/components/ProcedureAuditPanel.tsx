@@ -493,10 +493,6 @@ export function ProcedureAuditPanel({
               <div className="min-w-0 break-words"><span className="block text-sm font-medium">稽核流程 (QP)</span>{audit.qpCode} {audit.process}</div>
               <div className="min-w-0 break-words"><span className="block text-sm font-medium">對應文件</span>{audit.documents}</div>
               <Input
-                id="audit-notify-date" label="通知日期" type="date" value={audit.notifyDate}
-                onChange={(value) => handleHeaderChange('notifyDate', value)} disabled={!auditSetupEditable}
-              />
-              <Input
                 id="audit-date" label="實施日期" type="date" value={audit.auditDate}
                 onChange={(value) => handleHeaderChange('auditDate', value)} disabled={!auditSetupEditable}
               />
@@ -565,10 +561,10 @@ export function ProcedureAuditPanel({
               <col />
             </colgroup>
             <tbody>
-              <tr><td className="qr-label border border-line p-2">被稽核部門</td><td className="border border-line p-2">{audit.department}</td><td className="qr-label border border-line p-2">稽核流程 (QP)</td><td className="border border-line p-2">{audit.qpCode} {audit.process}</td></tr>
-              <tr><td className="qr-label border border-line p-2">對應文件</td><td className="border border-line p-2">{audit.documents}</td><td className="qr-label border border-line p-2">通知日期</td><td className="border border-line p-2">{audit.notifyDate}</td></tr>
-              <tr><td className="qr-label border border-line p-2">實施日期</td><td className="border border-line p-2">{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td className="border border-line p-2">{audit.departmentManager}</td></tr>
-              <tr><td className="qr-label border border-line p-2">稽核人員</td><td className="border border-line p-2" colSpan={3}>{audit.auditors}</td></tr>
+              <tr><td className="qr-label border border-line p-2">被稽核部門</td><td >{audit.department}</td><td className="qr-label border border-line p-2">稽核流程 (QP)</td><td >{audit.qpCode} {audit.process}</td></tr>
+              <tr><td className="qr-label border border-line p-2">對應文件</td><td >{audit.documents}</td><td className="qr-label border border-line p-2">通知日期</td><td >{audit.notifyDate}</td></tr>
+              <tr><td className="qr-label border border-line p-2">實施日期</td><td >{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td >{audit.departmentManager}</td></tr>
+              <tr><td className="qr-label border border-line p-2">稽核人員</td><td  colSpan={3}>{audit.auditors}</td></tr>
             </tbody>
           </table>
         </div>
@@ -603,13 +599,13 @@ export function ProcedureAuditPanel({
               <col className="col-action no-print" />
             </colgroup>
             <thead>
-              <tr className="bg-page text-left text-muted">
-                <th className="border border-line p-2">項目</th>
-                <th className="border border-line p-2">NO</th>
-                <th className="border border-line p-2">稽核內容</th>
-                <th className="border border-line p-2">判定</th>
-                <th className="border border-line p-2">發現／證據</th>
-                <th className="border border-line p-2 no-print">操作</th>
+              <tr>
+                <th >項目</th>
+                <th >NO</th>
+                <th >稽核內容</th>
+                <th >判定</th>
+                <th >發現／證據</th>
+                <th className="no-print">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -631,17 +627,17 @@ export function ProcedureAuditPanel({
                     }`}
                   >
                     {item.id === firstVisibleId && visibleCatItems.length > 0 && (
-                      <td className="no-print border border-line p-2 align-top font-medium break-words" rowSpan={visibleCatItems.length}>
+                      <td className="no-print align-top font-medium break-words" rowSpan={visibleCatItems.length}>
                         {cat}
                       </td>
                     )}
                     {idx === 0 && (
-                      <td className="pagination-print-cell border border-line p-2 align-top font-medium" rowSpan={catItems.length}>
+                      <td className="pagination-print-cell align-top font-medium" rowSpan={catItems.length}>
                         {cat}
                       </td>
                     )}
-                    <td className="border border-line p-2 align-top text-center">{item.no}</td>
-                    <td className="border border-line p-2 align-top break-words">
+                    <td className="align-top text-center">{item.no}</td>
+                    <td className="align-top break-words">
                       {isChecklistItemPending(item) && (
                         <span className="mb-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
                           未判定
@@ -670,7 +666,7 @@ export function ProcedureAuditPanel({
                         <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">來源：{item.sourceYear} 年追蹤</span>
                       )}
                     </td>
-                    <td className="border border-line p-2 align-top">
+                    <td className="align-top">
                       {renderJudgmentSelect(
                         item.judgment,
                         (j) => updateChecklistItem(audit.id, item.id, { judgment: j }),
@@ -679,10 +675,10 @@ export function ProcedureAuditPanel({
                       )}
                       {renderNcrHint(item)}
                     </td>
-                    <td className="border border-line p-2 align-top">
+                    <td className="align-top">
                       {renderEvidenceCell(item)}
                     </td>
-                    <td className="border border-line p-2 align-top no-print">
+                    <td className="align-top no-print">
                       {!isSeedChecklistItem(item) && canJudge ? (
                         <button
                           type="button"

@@ -56,7 +56,7 @@ function DoneCell({
   onUpdate: (patch: Partial<ExternalAuditPrepItemState>) => void
 }) {
   return (
-    <td className="border p-2 text-center align-top">
+    <td className="text-center align-top">
       <label className="inline-flex items-center gap-2">
         <input type="checkbox" className="no-print h-4 w-4" checked={item.completed}
           aria-label={`第 ${displayNo} 項 ${itemTitle} 已完成`}
@@ -139,38 +139,8 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
   return (
     <div className="space-y-6 print-area qr-form">
       <div>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-sm font-semibold">外稽準備</h2>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-wrap items-end gap-3 no-print">
-          {prepYearMatchesLedger && !showPrepYearEditor ? (
-            <Button variant="secondary" onClick={() => setShowPrepYearEditor(true)}>
-              改準備表年度
-            </Button>
-          ) : (
-            <Input
-              label="準備表年度"
-              type="number"
-              value={prepYearInput}
-              onChange={(value) => handlePrepYearDraftChange(value)}
-              ariaLabel="外稽準備表年度"
-            />
-          )}
-          <Input
-            label="外部稽核日期"
-            type="date"
-            value={externalAuditPrep.externalAuditDate ?? ''}
-            onChange={(value) => updateExternalPrepSequence({ externalAuditDate: value })}
-          />
-            </div>
-            <div className="flex items-center gap-2 no-print">
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 no-print">
+        <div className="mb-4 flex flex-col gap-3 no-print min-[720px]:flex-row min-[720px]:items-start">
+        <div className="min-w-0 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 min-[720px]:w-auto min-[720px]:flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-800">
             <span className="font-semibold text-slate-700">稽核序位</span>
             <span>
@@ -239,6 +209,34 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </div>
           )}
         </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
+              {prepYearMatchesLedger && !showPrepYearEditor ? (
+                <Button variant="secondary" onClick={() => setShowPrepYearEditor(true)}>
+                  改準備表年度
+                </Button>
+              ) : (
+                <Input
+                  label="準備表年度"
+                  type="number"
+                  value={prepYearInput}
+                  onChange={(value) => handlePrepYearDraftChange(value)}
+                  ariaLabel="外稽準備表年度"
+                />
+              )}
+              <Input
+                label="外部稽核日期"
+                type="date"
+                value={externalAuditPrep.externalAuditDate ?? ''}
+                onChange={(value) => updateExternalPrepSequence({ externalAuditDate: value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
+              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
+            </div>
+          </div>
+        </div>
 
         <PrintDocHeader
           companyName="年度內部稽核工作區"
@@ -256,12 +254,12 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               <col />
             </colgroup>
             <thead>
-              <tr className="bg-slate-50 text-left">
-                <th className="border p-2">項次</th>
-                <th className="border p-2">稽核前準備事項</th>
-                <th className="border p-2">負責人</th>
-                <th className="border p-2 text-center">完成</th>
-                <th className="border p-2">備註/表單</th>
+              <tr>
+                <th >項次</th>
+                <th >稽核前準備事項</th>
+                <th >負責人</th>
+                <th className="text-center">完成</th>
+                <th >備註/表單</th>
               </tr>
             </thead>
             <tbody>
@@ -281,8 +279,8 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
                 return (
                   <tr key={itemState.id} className={done ? 'bg-green-50/30' : ''}>
-                    <td className="border p-2 text-center align-top font-medium">{displayNo}</td>
-                    <td className="border p-2 align-top">
+                    <td className="text-center align-top font-medium">{displayNo}</td>
+                    <td className="align-top">
                       <div className="font-medium">{title}</div>
                       {formsText && (
                         <p className="mt-1 text-xs text-slate-600">{formsText}</p>
@@ -292,14 +290,14 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       )}
                       {callout && <CalloutBadge type={callout} />}
                     </td>
-                    <td className="border p-2 align-top text-xs">{template.owner}</td>
+                    <td className="align-top text-xs">{template.owner}</td>
                     <DoneCell
                       item={itemState}
                       displayNo={displayNo}
                       itemTitle={title}
                       onUpdate={(patch) => updateExternalPrepItem(itemState.id, patch)}
                     />
-                    <td className="border p-2 align-top">
+                    <td className="align-top">
                       <input
                         className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
                         aria-label={`第 ${displayNo} 項備註`}
@@ -318,22 +316,14 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           </table>
         </ScrollRegion>
 
-        {/* 序位規則摘要 */}
         <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
           <summary className="cursor-pointer text-xs font-semibold text-slate-600">稽核要點</summary>
           <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.sequenceRules.filter((rule) => !isLegacyCompanySpecificPrepText(rule)).map((rule) => (
-              <li key={rule}>{workspacePrepText(rule)}</li>
+              <li key={`rule-${rule}`}>{workspacePrepText(rule)}</li>
             ))}
-          </ul>
-        </details>
-
-        {/* 頁尾 otherNotes */}
-        <details className="mt-4 border-t border-slate-200 pt-4">
-          <summary className="cursor-pointer text-xs font-semibold text-slate-600">其他注意事項</summary>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.otherNotes.filter((note) => !isLegacyCompanySpecificPrepText(note)).map((note) => (
-              <li key={note}>{workspacePrepText(note)}</li>
+              <li key={`note-${note}`}>{workspacePrepText(note)}</li>
             ))}
           </ul>
         </details>

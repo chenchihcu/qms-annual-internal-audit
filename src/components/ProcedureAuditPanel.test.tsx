@@ -27,7 +27,7 @@ describe('ProcedureAuditPanel', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
       expect(screen.getByLabelText('實施日期')).toBeTruthy()
-      expect(screen.getByRole('heading', { name: '查檢表' })).toBeTruthy()
+      expect(screen.queryByRole('heading', { name: '查檢表' })).toBeNull()
       expect(screen.getByRole('region', { name: '查檢判定計數統計表' })).toBeTruthy()
       expect(screen.getByText('程序得分')).toBeTruthy()
       expect(screen.getByRole('columnheader', { name: '未判定' })).toBeTruthy()
@@ -76,14 +76,12 @@ describe('ProcedureAuditPanel', () => {
 
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
 
-    const notifyDate = await screen.findByLabelText('通知日期') as HTMLInputElement
-    const auditDate = screen.getByLabelText('實施日期') as HTMLInputElement
+    const auditDate = await screen.findByLabelText('實施日期') as HTMLInputElement
+    expect(screen.queryByLabelText('通知日期', { hidden: true })).toBeNull()
     await waitFor(() => {
-      expect(notifyDate.value).toBe(audit.notifyDate)
       expect(auditDate.value).toBe(audit.auditDate)
       expect(screen.getByText(status)).toBeTruthy()
     })
-    expect(notifyDate.disabled).toBe(!setupEditable)
     expect(auditDate.disabled).toBe(!setupEditable)
 
     const judgments = screen.getAllByLabelText('判定') as HTMLSelectElement[]
@@ -122,7 +120,7 @@ describe('ProcedureAuditPanel', () => {
 
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
     await waitFor(() => {
-      expect((screen.getByLabelText('通知日期') as HTMLInputElement).value).toBe(audit.notifyDate)
+      expect(screen.queryByLabelText('通知日期', { hidden: true })).toBeNull()
       expect(screen.getByText('規劃中')).toBeTruthy()
     })
     fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))

@@ -16,7 +16,6 @@ import { PersonNameSelect } from './ui/PersonNameSelect'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
-import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
@@ -213,9 +212,6 @@ export function Observations({
 
   const showingUnsynced = showUnsyncedView
   const listCount = showingUnsynced ? auditObservations.length : records.length
-  const listTitle = showingUnsynced
-    ? `查檢未同步一覽（${auditObservations.length}）`
-    : `觀察事項紀錄一覽（${records.length}）`
   const listRegionLabel = showingUnsynced ? '查檢未同步一覽' : '觀察事項紀錄一覽'
   const targetRecordId = editId ?? highlightRecordId
   const highlightedIndex = targetRecordId ? records.findIndex((item) => item.id === targetRecordId) : -1
@@ -242,23 +238,54 @@ export function Observations({
 
   return (
     <div className="space-y-6 print-area qr-form">
-      {(importableObs.length > 0 || importableNCR.length > 0) && (
-        <Card className="border-amber-200 bg-amber-50/40 no-print">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-amber-900">
-              跨年待帶入：觀察 {importableObs.length} 件、NCR {importableNCR.length} 件。
+      <div className="mb-3 flex flex-wrap items-center gap-2 no-print">
+        {(importableObs.length > 0 || importableNCR.length > 0) && (
+          <div className="flex w-fit max-w-full shrink-0 flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
+            <p className="whitespace-nowrap text-sm text-amber-900" title={`跨年待帶入：觀察 ${importableObs.length} 件、NCR ${importableNCR.length} 件`}>
+              待帶入 觀察 {importableObs.length}、NCR {importableNCR.length}
             </p>
+            <details open={priorDetailsOpen} onToggle={(e) => setPriorDetailsOpen((e.target as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer whitespace-nowrap text-sm font-medium text-slate-800" aria-label="逐筆帶入">逐筆</summary>
+            </details>
             <Button
+              className="shrink-0 whitespace-nowrap"
               icon={ACTION_ICONS.restore}
               disabled={importableObs.length === 0 && importableNCR.length === 0}
+              aria-label="匯入全部待追蹤項目"
               onClick={() => setShowImportDialog(true)}
             >
-              匯入全部待追蹤項目
+              全部帶入
             </Button>
           </div>
-          <details className="mt-3" open={priorDetailsOpen} onToggle={(e) => setPriorDetailsOpen((e.target as HTMLDetailsElement).open)}>
-            <summary className="cursor-pointer text-sm font-medium text-slate-800">逐筆帶入</summary>
-            <div className="mt-4 space-y-4" ref={priorSectionRef}>
+        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!showUnsyncedView && (
+            <FilterChips
+              options={statusFilterOptions}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              ariaLabel="觀察事項狀態篩選"
+              tone="slate"
+            />
+          )}
+          <Button
+            variant={showUnsyncedView ? 'primary' : 'secondary'}
+            className="shrink-0 whitespace-nowrap"
+            onClick={() => setShowUnsyncedView((value) => !value)}
+            aria-pressed={showUnsyncedView}
+            aria-label={`查檢未同步 ${auditObservations.length}`}
+          >
+            未同步 {auditObservations.length}
+          </Button>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {!showForm && <Button ref={triggerRef} variant="secondary" icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄觀察事項</Button>}
+          <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+        </div>
+      </div>
+      {(importableObs.length > 0 || importableNCR.length > 0) && priorDetailsOpen && (
+        <div className="no-print rounded-xl border border-amber-200 bg-amber-50/40 p-5">
+            <div className="space-y-4" ref={priorSectionRef}>
               <div>
                 <h3 className="mb-2 text-sm font-medium">前年度觀察事項（{priorObs.length}）</h3>
                 {priorObs.length === 0 ? (
@@ -307,8 +334,7 @@ export function Observations({
                 )}
               </div>
             </div>
-          </details>
-        </Card>
+        </div>
       )}
 
       <div>
@@ -316,15 +342,6 @@ export function Observations({
           companyName={company.name}
           auditYear={currentYear}
           formTitle="觀察事項紀錄台帳"
-        />
-        <PageToolbar
-          title="觀察事項"
-          actions={(
-            <>
-              {!showForm && <Button ref={triggerRef} variant="secondary" icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄觀察事項</Button>}
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
-            </>
-          )}
         />
       {showForm && (
         <div ref={formRef} className="mb-4">
@@ -359,24 +376,6 @@ export function Observations({
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
 
-        <div className="mb-3 flex flex-wrap items-center gap-2 no-print">
-          {!showUnsyncedView && (
-            <FilterChips
-              options={statusFilterOptions}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              ariaLabel="觀察事項狀態篩選"
-              tone="slate"
-            />
-          )}
-          <Button
-            variant={showUnsyncedView ? 'primary' : 'secondary'}
-            onClick={() => setShowUnsyncedView((value) => !value)}
-            aria-pressed={showUnsyncedView}
-          >
-            查檢未同步 {auditObservations.length}
-          </Button>
-        </div>
         {!showUnsyncedView && (
           <details className="mb-3 no-print">
             <summary className="cursor-pointer text-sm font-medium text-slate-700">更多篩選</summary>
@@ -400,8 +399,6 @@ export function Observations({
             </div>
           </details>
         )}
-
-        <h3 className="mb-3 font-semibold">{listTitle}</h3>
 
         {listCount === 0 ? (
           <EmptyState
@@ -430,18 +427,18 @@ export function Observations({
                   <col className="col-year" />
                 </colgroup>
                 <thead>
-                  <tr className="bg-slate-50 text-left">
-                    <th className="border p-2">QP／部門</th>
-                    <th className="border p-2">摘要</th>
-                    <th className="border p-2">來源年</th>
+                  <tr>
+                    <th >QP／部門</th>
+                    <th >摘要</th>
+                    <th >來源年</th>
                   </tr>
                 </thead>
                 <tbody>
                   {auditObservations.map((obs, index) => (
-                    <tr key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50`}>
-                      <td className="border p-2 text-xs">{obs.label}</td>
-                      <td className="border p-2">{obs.content}</td>
-                      <td className="border p-2 text-xs">{obs.sourceYear ? `${obs.sourceYear} 年` : '—'}</td>
+                    <tr key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}`}>
+                      <td className="text-xs">{obs.label}</td>
+                      <td >{obs.content}</td>
+                      <td className="text-xs">{obs.sourceYear ? `${obs.sourceYear} 年` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -457,19 +454,19 @@ export function Observations({
                   <col className="col-name" />
                   <col className="col-status" />
                   <col className="col-date" />
-                  <col className="col-action no-print" />
+                  <col className="col-observation-action no-print" />
                 </colgroup>
                 <thead>
-                  <tr className="bg-slate-50 text-left">
-                    <th className="border p-2">年度</th>
-                    <th className="border p-2">來源</th>
-                    <th className="border p-2">摘要</th>
-                    <th className="border p-2">QP</th>
-                    <th className="border p-2">部門</th>
-                    <th className="border p-2">責任</th>
-                    <th className="border p-2">狀態</th>
-                    <th className="border p-2">到期</th>
-                    <th className="border p-2 no-print">操作</th>
+                  <tr>
+                    <th >年度</th>
+                    <th >來源</th>
+                    <th >摘要</th>
+                    <th >QP</th>
+                    <th >部門</th>
+                    <th >責任</th>
+                    <th >狀態</th>
+                    <th >到期</th>
+                    <th className="no-print">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -478,10 +475,10 @@ export function Observations({
                   const sourceLabel = (item.sourceType ?? 'internal_audit') === 'internal_audit' ? '內部稽核' : '第三方稽核'
                   return (
                     <Fragment key={item.id}>
-                    <tr id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50 ${highlightRecordId === item.id ? 'ring-2 ring-primary ring-inset' : ''}`}>
-                      <td className="border p-2 text-xs">{item.year}</td>
-                      <td className="border p-2"><Badge label={sourceLabel} /></td>
-                      <td className="border p-2">
+                    <tr id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${highlightRecordId === item.id ? 'ring-2 ring-primary ring-inset' : ''}`}>
+                      <td className="text-xs">{item.year}</td>
+                      <td ><Badge label={sourceLabel} /></td>
+                      <td >
                         <button
                           type="button"
                           className={`text-left font-medium text-blue-800 underline-offset-2 hover:underline ${FOCUS_RING}`}
@@ -492,16 +489,17 @@ export function Observations({
                           {item.content}
                         </button>
                       </td>
-                      <td className="border p-2 text-xs">{item.qpCode}</td>
-                      <td className="border p-2 text-xs">{item.department}</td>
-                      <td className="border p-2 text-xs">{item.owner || '—'}</td>
-                      <td className="border p-2 text-xs"><Badge label={statusLabel[item.status]} /></td>
-                      <td className="border p-2 text-xs">{item.dueDate || '—'}</td>
-                      <td className="border p-2 no-print">
-                        <div className="flex flex-wrap gap-2">
+                      <td className="text-xs">{item.qpCode}</td>
+                      <td className="text-xs">{item.department}</td>
+                      <td className="text-xs">{item.owner || '—'}</td>
+                      <td className="text-xs"><Badge label={statusLabel[item.status]} /></td>
+                      <td className="text-xs">{item.dueDate || '—'}</td>
+                      <td className="no-print">
+                        <div className="flex flex-col gap-1">
                           <Button
                             variant="secondary"
                             icon={ACTION_ICONS.edit}
+                            className="w-full shrink-0 whitespace-nowrap"
                             disabled={item.status === 'became_ncr'}
                             onClick={() => {
                               setExpandedId(item.id)
@@ -519,10 +517,10 @@ export function Observations({
                             編輯／結案
                           </Button>
                           {item.status === 'open' && (
-                            <Button variant="secondary" icon={ACTION_ICONS.convertNcr} onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button>
+                            <Button variant="secondary" icon={ACTION_ICONS.convertNcr} className="w-full shrink-0 whitespace-nowrap" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button>
                           )}
                           {item.status === 'closed' && (
-                            <Button variant="secondary" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
+                            <Button variant="secondary" className="w-full shrink-0 whitespace-nowrap" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
                           )}
                         </div>
                       </td>

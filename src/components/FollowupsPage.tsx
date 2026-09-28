@@ -15,7 +15,6 @@ import { FOLLOWUP_FILTER_ICONS } from '../lib/uiIcons'
 import { Badge } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
-import { PageToolbar } from './ui/PageToolbar'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
@@ -44,16 +43,12 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <PageToolbar title="待改善追蹤" />
-
         <FilterChips
           options={filterOptions}
           value={filter}
           onChange={setFilter}
           ariaLabel="追蹤類型篩選"
         />
-
-        <h3 className="mb-3 font-semibold">待改善追蹤一覽（{visibleRows.length}）</h3>
 
         {visibleRows.length === 0 ? (
           <EmptyState message="目前沒有待追蹤項目。" />
@@ -70,20 +65,20 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                 <col className="col-date" />
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-left">
-                  <th className="border p-2">類型</th>
-                  <th className="border p-2">摘要</th>
-                  <th className="border p-2">QP</th>
-                  <th className="border p-2">部門／單位</th>
-                  <th className="border p-2">狀態</th>
-                  <th className="border p-2">到期</th>
+                <tr>
+                  <th >類型</th>
+                  <th >摘要</th>
+                  <th >QP</th>
+                  <th >部門／單位</th>
+                  <th >狀態</th>
+                  <th >到期</th>
                 </tr>
               </thead>
               <tbody>
                 {visibleRows.map((row, index) => (
-                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50`}>
-                    <td className="border p-2"><Badge label={FOLLOWUP_KIND_LABELS[row.kind]} /></td>
-                    <td className="border p-2">
+                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}`}>
+                    <td ><Badge label={FOLLOWUP_KIND_LABELS[row.kind]} /></td>
+                    <td >
                       <button
                         type="button"
                         className="text-left font-medium text-blue-800 underline-offset-2 hover:underline"
@@ -102,9 +97,9 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                         {row.label}
                       </button>
                     </td>
-                    <td className="border p-2 text-xs">{row.qpCode || '—'}</td>
-                    <td className="border p-2 text-xs">{row.department || '—'}</td>
-                    <td className="border p-2 text-xs">
+                    <td className="text-xs">{row.qpCode || '—'}</td>
+                    <td className="text-xs">{row.department || '—'}</td>
+                    <td className="text-xs">
                       {row.status}
                       {isFollowupOverdue(row.dueDate, today) && (
                         <span className="ml-2 inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
@@ -112,7 +107,7 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                         </span>
                       )}
                     </td>
-                    <td className="border p-2 text-xs">{row.dueDate || '—'}</td>
+                    <td className="text-xs">{row.dueDate || '—'}</td>
                   </tr>
                 ))}
               </tbody>

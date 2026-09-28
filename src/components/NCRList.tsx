@@ -11,7 +11,6 @@ import { departmentMemberCandidates, verifierCandidates } from '../lib/personnel
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { PersonNameSelect } from './ui/PersonNameSelect'
 import { EmptyState } from './ui/EmptyState'
-import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
@@ -108,19 +107,20 @@ export function NCRList({
           formTitle="不符合事項清單 QR-28-03"
         />
 
-        <PageToolbar
-          title="不符合"
-          actions={!showForm && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
+          {!showForm && (
             <Button
               ref={triggerRef}
               variant="secondary"
               icon={ACTION_ICONS.add}
+              className="no-print"
               onClick={() => setShowForm(true)}
             >
               手動新增 NCR
             </Button>
           )}
-        />
+        </div>
 
         {showForm && (
           <div ref={formRef} className="mb-6 no-print">
@@ -160,8 +160,6 @@ export function NCRList({
           </div>
         )}
 
-        <h3 className="mb-3 text-sm font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
-
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />
         ) : (
@@ -180,16 +178,16 @@ export function NCRList({
                 <col className="col-action no-print" />
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-left">
-                  <th className="border p-2">NCR#</th>
-                  <th className="border p-2">QP</th>
-                  <th className="border p-2">部門</th>
-                  <th className="border p-2">公司</th>
-                  <th className="border p-2">摘要</th>
-                  <th className="border p-2">狀態</th>
-                  <th className="border p-2">日期</th>
-                  <th className="border p-2">到期</th>
-                  <th className="border p-2 no-print">操作</th>
+                <tr>
+                  <th >NCR#</th>
+                  <th >QP</th>
+                  <th >部門</th>
+                  <th >公司</th>
+                  <th >摘要</th>
+                  <th >狀態</th>
+                  <th >日期</th>
+                  <th >到期</th>
+                  <th className="no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -202,13 +200,13 @@ export function NCRList({
                       <tr
                         id={`ncr-${ncr.id}`}
                         data-ncr-id={ncr.id}
-                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}hover:bg-slate-50 ${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
+                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
                       >
-                        <td className="border p-2 font-mono text-xs">{displayNumber}</td>
-                        <td className="border p-2 text-xs">{ncr.qpCode}</td>
-                        <td className="border p-2 text-xs break-words">{ncr.department}</td>
-                        <td className="border p-2 text-xs break-words">{ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '—'}</td>
-                        <td className="border p-2">
+                        <td className="font-mono text-xs">{displayNumber}</td>
+                        <td className="text-xs">{ncr.qpCode}</td>
+                        <td className="text-xs break-words">{ncr.department}</td>
+                        <td className="text-xs break-words">{ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '—'}</td>
+                        <td >
                           {stale && (
                             <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
                               查檢已非不符，建議結案
@@ -223,7 +221,7 @@ export function NCRList({
                           />
                           <span className="print-only">{ncr.description}</span>
                         </td>
-                        <td className="border p-2">
+                        <td >
                           <div className="no-print">
                             <Select
                               value={ncr.status}
@@ -237,9 +235,9 @@ export function NCRList({
                             <p className="mt-1 text-xs text-red-700" role="alert">{closeErrors[ncr.id]}</p>
                           )}
                         </td>
-                        <td className="border p-2 text-xs">{ncr.date || '—'}</td>
-                        <td className="border p-2 text-xs">{ncr.dueDate || '—'}</td>
-                        <td className="border p-2 no-print">
+                        <td className="text-xs">{ncr.date || '—'}</td>
+                        <td className="text-xs">{ncr.dueDate || '—'}</td>
+                        <td className="no-print">
                           <div className="flex flex-wrap items-center gap-2">
                             <button
                               type="button"
