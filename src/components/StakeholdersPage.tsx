@@ -21,7 +21,7 @@ function ArrangementImpactSummary({
   const title = [impact.sortLine, impact.frequencyLine, impact.timingLine].join('\n')
 
   return (
-    <p className="text-xs text-slate-800" title={title}>
+    <p className="text-slate-800" title={title}>
       {impact.summary}
     </p>
   )
@@ -45,13 +45,13 @@ function DepartmentRow({
       className={`${hidden ? 'pagination-hidden-row ' : ''}${tagged ? '' : 'bg-amber-50/50'}`}
       data-stakeholder-dept={dept.id}
     >
-      <td className="text-xs">
+      <td>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-slate-900">{dept.name}</span>
           {!tagged && <Badge label="待標註" />}
         </div>
       </td>
-      <td className="text-xs">{dept.owner || '—'}</td>
+      <td>{dept.owner || '—'}</td>
       <td >
         {dept.stakeholders.length > 0 ? (
           <div className="flex flex-wrap gap-1">
@@ -60,13 +60,13 @@ function DepartmentRow({
             ))}
           </div>
         ) : (
-          <span className="text-xs text-slate-400">—</span>
+          <span className="text-slate-400">—</span>
         )}
       </td>
-      <td className="text-xs">
+      <td>
         <Badge label={level} />
       </td>
-      <td className="text-xs font-semibold">{priority}</td>
+      <td className="font-semibold">{priority}</td>
       <td >
         <ArrangementImpactSummary dept={dept} level={level} />
       </td>

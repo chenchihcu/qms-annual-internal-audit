@@ -523,7 +523,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                         <Badge label={primaryState(person, today, state.settings.auditYear, state.annualPersonnelAssignments)} />
                       </td>
                       <td className="print-table-cell text-xs">{qualification ? formatQualificationScopeSummary(qualification) : '—'}</td>
-                      <td className="text-xs">
+                      <td>
                         {qualification
                           ? `${qualification.effectiveFrom || '待確認'}～${qualification.validityMode === 'no_expiry' ? '無固定期限' : qualification.effectiveTo || '待確認'}`
                           : '—'}

@@ -126,7 +126,7 @@ export function StakeholderEditDialog({
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             <div>
-              <p className="text-xs font-medium text-slate-600">利害關係人</p>
+              <p className="text-sm font-medium text-slate-600">利害關係人</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {STAKEHOLDER_TAGS.map((tag) => {
                   const active = dept.stakeholders.includes(tag)

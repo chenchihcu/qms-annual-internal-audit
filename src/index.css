@@ -179,6 +179,7 @@ html.dark {
     .worksheet-table thead th {
       background: var(--color-page);
       color: var(--color-muted);
+      font-size: 0.75rem;
       font-weight: 600;
       text-align: left;
     }

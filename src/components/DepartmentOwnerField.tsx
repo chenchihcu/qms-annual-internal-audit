@@ -87,14 +87,14 @@ export function DepartmentOwnerField({
           <>
             <button
               type="button"
-              className={`shrink-0 rounded bg-primary px-2 py-1 text-xs font-medium text-white hover:opacity-90 ${FOCUS_RING}`}
+              className={`shrink-0 rounded bg-primary px-2 py-1 text-sm font-medium text-white hover:opacity-90 ${FOCUS_RING}`}
               onClick={handleSave}
             >
               儲存
             </button>
             <button
               type="button"
-              className={`shrink-0 rounded border border-line px-2 py-1 text-xs text-muted hover:bg-page ${FOCUS_RING}`}
+              className={`shrink-0 rounded border border-line px-2 py-1 text-sm text-muted hover:bg-page ${FOCUS_RING}`}
               onClick={handleCancel}
             >
               取消

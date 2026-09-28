@@ -97,9 +97,9 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                         {row.label}
                       </button>
                     </td>
-                    <td className="text-xs">{row.qpCode || '—'}</td>
-                    <td className="text-xs">{row.department || '—'}</td>
-                    <td className="text-xs">
+                    <td>{row.qpCode || '—'}</td>
+                    <td>{row.department || '—'}</td>
+                    <td>
                       {row.status}
                       {isFollowupOverdue(row.dueDate, today) && (
                         <span className="ml-2 inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
@@ -107,7 +107,7 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                         </span>
                       )}
                     </td>
-                    <td className="text-xs">{row.dueDate || '—'}</td>
+                    <td>{row.dueDate || '—'}</td>
                   </tr>
                 ))}
               </tbody>

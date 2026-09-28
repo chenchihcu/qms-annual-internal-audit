@@ -40,7 +40,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 台帳一覽 SSOT（`observations`／`ncr`／`suggestions`／`followups`／`personnel`／`stakeholders`／`risk`）：篩選或工具列後 → `ScrollRegion`（`aria-label`「{名稱}一覽」）→ `worksheet-table` + `colgroup`；**預設不**顯示可見 `h3`「{名稱}一覽（n）」（使用者點選移除標籤時只拿掉 `h2`／`h3` 與 `PageToolbar` 頁名，保留 aria、列印表頭、按鈕與篩選）。不符合一覽標題與「手動新增 NCR」**同一列**並排。表頭／格線／列 hover 由 [`src/index.css`](src/index.css) 的 `.worksheet-table` 統一。空清單用 `EmptyState`。`ScrollRegion` **不**顯示「此表可左右滑動查看完整欄位」。稽核總覽「項目」欄寬用 `col-overview-item`（10.4rem），勿改全域 `col-name`。年度計畫、查檢、外稽準備、回收區工作表同一套畫面樣式；列印黑框在 `@media print`。
 
-殼層藍卡只留產品名；`headerScope` 只在頂欄。儀表板另一家台帳純摘要，不切公司。
+殼層藍卡只留產品名；`headerScope` 只在頂欄。內稽頁首把「年度稽核 ·」與年度輸入合成一列，可見「內稽年度」不重複；`aria-label` 仍為「內稽年度」。外稽準備頁首仍顯示準備表年度，內稽年度切換留在該頁右側。儀表板另一家台帳純摘要，不切公司。
 
 外稽準備（`prep`）：**無**頁內「外稽準備」`h2`、**無**頁首 Guide。工具列與稽核序位區 **並排**：左側序位卡 `flex-1` 補滿空白，右側準備表年度／外稽日期／匯出／`準備清單 a/b`。準備表年度與 `settings.auditYear` 相同時只顯示「改準備表年度」。稽核序位一行；有缺口或順序異常才展開阻擋。清單不分頁。「稽核要點」含序位規則與其他注意事項，不再另列「其他注意事項」。種子句子不改寫。檢查：同年無「外稽準備表年度」輸入；無「外稽準備第 n 頁」。來源：2026-09-27 五頁低效益簡化；2026-09-27 瀏覽器點選調整。
 
@@ -58,7 +58,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 空狀態：[`EmptyState.tsx`](src/components/ui/EmptyState.tsx)，句型「目前沒有{物件}」。
 
-畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
+畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。工作表表頭 12px 由 [`src/index.css`](src/index.css) `.worksheet-table thead th` 統一設定，不在各頁 `th` 逐格加 class；`tbody td` 繼承表格 `text-sm`，禁止在資料格上再套 `text-xs`（長文欄與短欄同級）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
 
 圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 12 頁，不渲染 PDCA 分組標題。
 
@@ -95,8 +95,11 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 | 合併收合區 | 兩段 `details` 收進先點的標題。種子句子不改寫 | 外稽準備無「其他注意事項」；「稽核要點」含「忌諱塗改任何紀錄或文件」 |
 | 月格結果 | 點月格開選單。滿意等寫 `manualMonthOverrides`；`months` 只留空白或擬定 | `applyMonthCellChoice(..., '滿意')` 的 `months` 為「擬定」 |
 | 增加流程圖 | 加在既有 radiogroup。步驟來自 `TAB_GROUPS`，不含系統設定。點步驟開啟該頁 | 有「系統流程」；圖上無「系統設定」按鈕 |
+| 合併頁首年度 | 內稽頁首「年度稽核 ·」與年度輸入同一列。外稽準備不併入，該列是準備表年度，不是內稽年度 | 總覽無可見「內稽年度」；輸入 `aria-label` 仍為「內稽年度」；外稽準備頁首仍有該標籤與「外稽準備 · {年} 年」 |
+| 整合相同身份 | 點到的唯讀身份若已在選單選項裡，刪唯讀格，留選單與其欄位標籤。選單旁的日期／人員摘要不刪。附屬值與主鍵不同才留在設定區。列印與匯出不刪 | 查檢表選單含程序與部門；設定區無「稽核流程 (QP)」；對應文件≠程序代碼時設定區仍有「對應文件」；「稽核設定」旁摘要仍在 |
+| 日期改名 | 只改點到的可見標籤、同頁摘要，以及該頁提前攔截的提示。列印、匯出與 `useAuditStore` 的「實際實施日期」不改 | 畫面「稽核日期」「未填稽核日期」「開始稽核前須填寫稽核日期」；列印仍「實施日期」 |
 
-出處：2026-09-28 瀏覽器點選本對話。日期警告併入「稽核要點」、人員操作格「優化」未做，不列入。
+出處：2026-09-28 瀏覽器點選。頁首年度、查檢設定整合、日期改名見上方查檢表段與殼層段。日期警告併入「稽核要點」、人員操作格「優化」未做，不列入。
 
 ## 2026-09-28 畫面字級對齊（harvest）
 
@@ -107,6 +110,9 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 | 盤點 | 依序：`src/index.css`（`body`／`@media print`）→ `rg 'text-(xs\|sm\|base\|lg\|xl)' src` → 共用 `Button`／`Input`／`.worksheet-table` | 列印／`print-only`／`formExport` 標為例外，不列入畫面違規 |
 | 兩級契約 | 畫面僅 14px（`text-sm`）與 12px（`text-xs`）；`h1`–`h4` 須有 `text-sm`，禁止畫面 `text-base`／`text-lg` 以上（列印表頭除外） | `rg 'text-(base\|lg\|xl\|2xl\|3xl)' src --glob '*.tsx'` 為零（`PrintDocHeader` 的 `print-only` 除外） |
 | 不升級密度 | 不把 `body` 或工作表整體升到 16px；層級靠 `font-semibold`／`font-bold`，不靠更大字級 | 使用者未核准前不改 `index.css` `body` 14px 與 `html` rem 基準 |
-| 驗收 | 受影響頁元件測試 + `43124` 量測關鍵標題 `getComputedStyle` 為 14px | 設定備份區 `h2`、確認對話、利害關係人編輯對話已量測 |
+| 表頭 SSOT | 螢幕用 `.worksheet-table thead th { font-size: 0.75rem }`；台帳 `td` 不另加 `text-xs` | 不符合等同表：`th` 12px、`td`（QP／摘要）皆 14px |
+| 控制項同級 | 與 `Input`／`Button` 同層的標籤、`details summary`、列內文字按鈕、未用共用元件的 `textarea`／inline 輸入用 `text-sm` | 外稽「稽核要點」summary、年度切換「內稽年度」、附件標籤為 14px |
+| 緊湊例外 | 月格 44px 狀態按鈕、方案風險因素循環小按鈕、收合區內條列說明、流程圖群組名可維持 `text-xs` | 月格「矯正圓滿」仍 12px；`Badge`／錯誤／員工編號附註仍 12px |
+| 驗收 | 受影響頁元件測試 + `43124` `getComputedStyle`：表頭 12px、資料格與表單控制 14px | 設定備份區 `h2`、確認對話、利害關係人編輯對話已量測 |
 
-出處：2026-09-28「字體尺寸優化」對話；產品決策：對齊現行 14／12，不選整體放大一階。
+出處：2026-09-28「字體尺寸優化」對話；2026-09-28 字級一致性實作與 `43124` 量測。產品決策：對齊現行 14／12，不選整體放大一階。

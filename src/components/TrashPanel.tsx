@@ -79,7 +79,7 @@ export function TrashPanel({ store }: { store: AuditStore }) {
                     <td >{TRASH_KIND_LABELS[entry.kind]}</td>
                     <td >{summary || '—'}</td>
                     <td >{trashContext(entry)}</td>
-                    <td className="text-xs">{deletedAtLabel(entry.deletedAt)}</td>
+                    <td>{deletedAtLabel(entry.deletedAt)}</td>
                     <td className="no-print">
                       <div className="flex flex-wrap gap-1">
                         <Button variant="secondary" onClick={() => handleRestore(entry)} aria-label={`還原：${summary}`}>

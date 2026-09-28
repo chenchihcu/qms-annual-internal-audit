@@ -51,7 +51,7 @@ export function AttachmentField({
   return (
     <div className="mt-2">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted">{label}</span>
+        <span className="text-sm font-medium text-muted">{label}</span>
         {!disabled && (
           <button
             type="button"

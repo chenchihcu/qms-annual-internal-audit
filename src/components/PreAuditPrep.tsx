@@ -290,7 +290,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                       )}
                       {callout && <CalloutBadge type={callout} />}
                     </td>
-                    <td className="align-top text-xs">{template.owner}</td>
+                    <td className="align-top">{template.owner}</td>
                     <DoneCell
                       item={itemState}
                       displayNo={displayNo}
@@ -299,7 +299,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                     />
                     <td className="align-top">
                       <input
-                        className="w-full rounded border border-slate-200 px-2 py-1 text-xs no-print"
+                        className="w-full rounded border border-slate-200 px-2 py-1 text-sm no-print"
                         aria-label={`第 ${displayNo} 項備註`}
                         placeholder="備註"
                         value={itemState.remark}
@@ -317,7 +317,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         </ScrollRegion>
 
         <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <summary className="cursor-pointer text-xs font-semibold text-slate-600">稽核要點</summary>
+          <summary className="cursor-pointer text-sm font-semibold text-slate-600">稽核要點</summary>
           <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
             {seed.sequenceRules.filter((rule) => !isLegacyCompanySpecificPrepText(rule)).map((rule) => (
               <li key={`rule-${rule}`}>{workspacePrepText(rule)}</li>

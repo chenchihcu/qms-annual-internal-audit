@@ -219,10 +219,10 @@ export function Suggestions({
                     data-suggestion-id={sug.id}
                     className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${highlightRecordId === sug.id ? 'ring-2 ring-primary ring-inset' : ''}`}
                   >
-                    <td className="text-xs">{sug.year}</td>
+                    <td>{sug.year}</td>
                     <td className="break-words">{sug.issue}</td>
-                    <td className="text-xs font-medium break-words">{sug.procedure}</td>
-                    <td className="text-xs break-words">{sug.responsibleUnit}</td>
+                    <td className="font-medium break-words">{sug.procedure}</td>
+                    <td className="break-words">{sug.responsibleUnit}</td>
                     <td >
                       <textarea
                         className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}

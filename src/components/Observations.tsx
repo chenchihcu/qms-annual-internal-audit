@@ -436,9 +436,9 @@ export function Observations({
                 <tbody>
                   {auditObservations.map((obs, index) => (
                     <tr key={obs.id} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}`}>
-                      <td className="text-xs">{obs.label}</td>
+                      <td>{obs.label}</td>
                       <td >{obs.content}</td>
-                      <td className="text-xs">{obs.sourceYear ? `${obs.sourceYear} 年` : '—'}</td>
+                      <td>{obs.sourceYear ? `${obs.sourceYear} 年` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -476,7 +476,7 @@ export function Observations({
                   return (
                     <Fragment key={item.id}>
                     <tr id={`observation-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${highlightRecordId === item.id ? 'ring-2 ring-primary ring-inset' : ''}`}>
-                      <td className="text-xs">{item.year}</td>
+                      <td>{item.year}</td>
                       <td ><Badge label={sourceLabel} /></td>
                       <td >
                         <button
@@ -489,11 +489,11 @@ export function Observations({
                           {item.content}
                         </button>
                       </td>
-                      <td className="text-xs">{item.qpCode}</td>
-                      <td className="text-xs">{item.department}</td>
-                      <td className="text-xs">{item.owner || '—'}</td>
-                      <td className="text-xs"><Badge label={statusLabel[item.status]} /></td>
-                      <td className="text-xs">{item.dueDate || '—'}</td>
+                      <td>{item.qpCode}</td>
+                      <td>{item.department}</td>
+                      <td>{item.owner || '—'}</td>
+                      <td><Badge label={statusLabel[item.status]} /></td>
+                      <td>{item.dueDate || '—'}</td>
                       <td className="no-print">
                         <div className="flex flex-col gap-1">
                           <Button

@@ -455,9 +455,9 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                     >
 
-                      <td className="text-xs font-medium text-slate-900">{row.qpCode}</td>
+                      <td className="font-medium text-slate-900">{row.qpCode}</td>
 
-                      <td className="text-xs">{row.department}</td>
+                      <td>{row.department}</td>
 
                       <td className="align-top">
 
@@ -483,7 +483,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                           <details className="no-print shrink-0">
 
-                            <summary className="cursor-pointer whitespace-nowrap text-xs text-blue-800">其他因素（可暫定）</summary>
+                            <summary className="cursor-pointer whitespace-nowrap text-sm text-blue-800">其他因素（可暫定）</summary>
 
                             <ul className="mt-1 space-y-1 text-xs">
 
@@ -519,7 +519,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                       </td>
 
-                      <td className="align-top text-xs font-semibold">
+                      <td className="align-top font-semibold">
 
                         {priority.score}
 
@@ -531,7 +531,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                       </td>
 
-                      <td className="align-top text-xs">
+                      <td className="align-top">
 
                         <Badge label={priority.level} />
 

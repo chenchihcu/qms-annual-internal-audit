@@ -7,10 +7,11 @@ import { ConfirmDialog } from './ui/ConfirmDialog'
 interface AuditYearSwitcherProps {
   store: AuditStore
   compact?: boolean
+  hideLabel?: boolean
   inputAriaLabel?: string
 }
 
-export function AuditYearSwitcher({ store, compact = false, inputAriaLabel = '內稽年度' }: AuditYearSwitcherProps) {
+export function AuditYearSwitcher({ store, compact = false, hideLabel = false, inputAriaLabel = '內稽年度' }: AuditYearSwitcherProps) {
   const { state, switchAuditYear } = store
   const { settings } = state
   const [yearOverride, setYearOverride] = useState<string | null>(null)
@@ -39,17 +40,24 @@ export function AuditYearSwitcher({ store, compact = false, inputAriaLabel = '�
     setYearOverride(null)
   }
 
+  const yearInput = (
+    <input
+      type="number"
+      className={`rounded border border-slate-300 bg-surface px-2 py-1 text-sm font-medium text-ink ${compact ? 'w-20' : 'w-24'}`}
+      value={yearDraft}
+      aria-label={inputAriaLabel}
+      onChange={(event) => handleYearDraftChange(event.target.value)}
+    />
+  )
+
   return (
     <>
-      <label className={`flex items-center gap-2 text-sm text-slate-600 ${compact ? '' : 'rounded-lg border border-line px-3 py-2'}`}>
-        <input
-          type="number"
-          className={`rounded border border-slate-300 px-2 py-1 ${compact ? 'w-20 text-sm' : 'w-24'}`}
-          value={yearDraft}
-          aria-label={inputAriaLabel}
-          onChange={(event) => handleYearDraftChange(event.target.value)}
-        />
-      </label>
+      {hideLabel ? yearInput : (
+        <label className={`flex items-center gap-2 text-sm text-slate-600 ${compact ? '' : 'rounded-lg border border-line px-3 py-2'}`}>
+          <span className="text-sm">內稽年度</span>
+          {yearInput}
+        </label>
+      )}
       {pendingYear != null && (
         <ConfirmDialog
           open

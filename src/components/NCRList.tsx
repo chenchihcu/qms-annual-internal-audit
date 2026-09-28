@@ -6,7 +6,8 @@ import { FOCUS_RING } from '../lib/focusRing'
 import { isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import { planRowSelectOptions } from '../lib/planRowOptions'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { NCR_COMPANY_SCOPE_LABELS, type NCRClassification, type NCRStatus } from '../types'
+import { ncrCompanyScopeLabel } from '../lib/certificateScope'
+import type { NCRClassification, NCRStatus } from '../types'
 import { departmentMemberCandidates, verifierCandidates } from '../lib/personnel'
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { PersonNameSelect } from './ui/PersonNameSelect'
@@ -125,7 +126,7 @@ export function NCRList({
         {showForm && (
           <div ref={formRef} className="mb-6 no-print">
             <p className="mb-3 text-sm text-muted">
-              查檢表判定「不符」時自動匯入；發現快照會隨查檢更新，描述欄供矯正說明，不會被查檢覆寫。此處可登錄會議或現場發現。
+              查檢表判定「不符」時自動匯入。描述為發現文字，不會被查檢覆寫；矯正內容請填「矯正措施」。此處可登錄會議或現場發現。
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <Select
@@ -202,10 +203,10 @@ export function NCRList({
                         data-ncr-id={ncr.id}
                         className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}`}
                       >
-                        <td className="font-mono text-xs">{displayNumber}</td>
-                        <td className="text-xs">{ncr.qpCode}</td>
-                        <td className="text-xs break-words">{ncr.department}</td>
-                        <td className="text-xs break-words">{ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '—'}</td>
+                        <td className="font-mono">{displayNumber}</td>
+                        <td>{ncr.qpCode}</td>
+                        <td className="break-words">{ncr.department}</td>
+                        <td className="break-words">{ncrCompanyScopeLabel(ncr.companyScope) || '—'}</td>
                         <td >
                           {stale && (
                             <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
@@ -213,7 +214,7 @@ export function NCRList({
                             </p>
                           )}
                           <textarea
-                            className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
+                            className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 text-sm no-print ${FOCUS_RING}`}
                             rows={2}
                             value={ncr.description}
                             onChange={(e) => updateNCR(ncr.id, { description: e.target.value })}
@@ -235,8 +236,8 @@ export function NCRList({
                             <p className="mt-1 text-xs text-red-700" role="alert">{closeErrors[ncr.id]}</p>
                           )}
                         </td>
-                        <td className="text-xs">{ncr.date || '—'}</td>
-                        <td className="text-xs">{ncr.dueDate || '—'}</td>
+                        <td>{ncr.date || '—'}</td>
+                        <td>{ncr.dueDate || '—'}</td>
                         <td className="no-print">
                           <div className="flex flex-wrap items-center gap-2">
                             <button
