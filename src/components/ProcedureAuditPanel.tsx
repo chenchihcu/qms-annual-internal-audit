@@ -239,7 +239,7 @@ export function ProcedureAuditPanel({
 
   const handleStartAudit = () => {
     if (!audit.auditDate?.trim()) {
-      setStartErrors(['開始稽核前須填寫實施日期'])
+      setStartErrors(['開始稽核前須填寫稽核日期'])
       revealSetupError(true)
       return
     }
@@ -454,7 +454,7 @@ export function ProcedureAuditPanel({
                 onClick={() => setSetupState({ scope: setupScope, open: !setupOpen })}
               >稽核設定</Button>
               <p className="min-w-0 break-words text-sm text-muted">
-                {audit.qpCode} · {audit.department} · {audit.auditDate || '未填實施日期'} · {audit.auditors || '未選稽核人員'}
+                {audit.qpCode} · {audit.department} · {audit.auditDate || '未填稽核日期'} · {audit.auditors || '未選稽核人員'}
               </p>
             </div>
           </div>
@@ -491,9 +491,8 @@ export function ProcedureAuditPanel({
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="min-w-0 break-words"><span className="block text-sm font-medium">稽核流程 (QP)</span>{audit.qpCode} {audit.process}</div>
-              <div className="min-w-0 break-words"><span className="block text-sm font-medium">對應文件</span>{audit.documents}</div>
               <Input
-                id="audit-date" label="實施日期" type="date" value={audit.auditDate}
+                id="audit-date" label="稽核日期" type="date" value={audit.auditDate}
                 onChange={(value) => handleHeaderChange('auditDate', value)} disabled={!auditSetupEditable}
               />
               <div>
@@ -543,10 +542,6 @@ export function ProcedureAuditPanel({
                 />
                 <span>客觀性風險已確認（同單位稽核等）</span>
               </label>
-              <Input label="客觀性控制措施／依據" value={audit.team?.impartialityNote ?? ''}
-                onChange={(value) => updateTeam({ impartialityNote: value })} disabled={!auditSetupEditable}
-                className="sm:col-span-2"
-              />
             </div>
             {auditStatus === '規劃中' && <Button variant="secondary" onClick={handleMarkNotified}>標記已通知</Button>}
           </div>
@@ -563,7 +558,7 @@ export function ProcedureAuditPanel({
             <tbody>
               <tr><td className="qr-label border border-line p-2">被稽核部門</td><td >{audit.department}</td><td className="qr-label border border-line p-2">稽核流程 (QP)</td><td >{audit.qpCode} {audit.process}</td></tr>
               <tr><td className="qr-label border border-line p-2">對應文件</td><td >{audit.documents}</td><td className="qr-label border border-line p-2">通知日期</td><td >{audit.notifyDate}</td></tr>
-              <tr><td className="qr-label border border-line p-2">實施日期</td><td >{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td >{audit.departmentManager}</td></tr>
+              <tr><td className="qr-label border border-line p-2">稽核日期</td><td >{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td >{audit.departmentManager}</td></tr>
               <tr><td className="qr-label border border-line p-2">稽核人員</td><td  colSpan={3}>{audit.auditors}</td></tr>
             </tbody>
           </table>

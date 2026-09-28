@@ -233,6 +233,10 @@ describe('App tab smoke', () => {
     })
     const yearInput = screen.getByLabelText('內稽年度') as HTMLInputElement
     expect(yearInput.value).toBe('2026')
+    expect(screen.getByText('年度稽核')).toBeTruthy()
+    expect(screen.queryByText(/年度稽核 ·/)).toBeNull()
+    expect(screen.queryByText('內稽年度')).toBeNull()
+    expect(screen.getByRole('button', { name: '列印目前頁面' })).toBeTruthy()
     fireEvent.change(yearInput, { target: { value: '2027' } })
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('切換至 2027 年')
@@ -260,7 +264,7 @@ describe('App tab smoke', () => {
     fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
     await waitFor(() => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
-      expect(screen.getByLabelText('實施日期')).toBeTruthy()
+      expect(screen.getByLabelText('稽核日期')).toBeTruthy()
     })
   })
 
@@ -309,7 +313,7 @@ describe('App tab smoke', () => {
     const scoredOption = Array.from(select.options).find((option) => option.text.includes('QP-16'))
     expect(scoredOption).toBeTruthy()
     fireEvent.change(select, { target: { value: scoredOption!.value } })
-    expect(screen.getByLabelText('實施日期')).toBeTruthy()
+    expect(screen.getByLabelText('稽核日期')).toBeTruthy()
   })
 
   it('asks before switching external prep year', async () => {

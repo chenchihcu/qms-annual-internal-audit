@@ -332,7 +332,7 @@ function validateAuditStartState(state: AppState, audit: ProcedureAudit) {
     audit.auditDate || audit.plannedDate || '', standards,
   )
   const errors = [...result.errors]
-  if (!audit.auditDate) errors.unshift('開始稽核前須填寫實際實施日期')
+  if (!audit.auditDate) errors.unshift('開始稽核前須填寫稽核日期')
   if (standards.length === 0) errors.unshift('適用標準與版本尚未確認')
   if (!profile.auditProcedureCode.trim()) errors.unshift('稽核程序代碼尚未填寫')
   if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') {

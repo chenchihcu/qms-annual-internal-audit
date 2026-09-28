@@ -42,7 +42,6 @@ export function AuditYearSwitcher({ store, compact = false, inputAriaLabel = '�
   return (
     <>
       <label className={`flex items-center gap-2 text-sm text-slate-600 ${compact ? '' : 'rounded-lg border border-line px-3 py-2'}`}>
-        <span className={compact ? 'text-xs' : 'text-sm'}>內稽年度</span>
         <input
           type="number"
           className={`rounded border border-slate-300 px-2 py-1 ${compact ? 'w-20 text-sm' : 'w-24'}`}
