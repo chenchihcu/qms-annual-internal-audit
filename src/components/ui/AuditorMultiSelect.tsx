@@ -112,10 +112,8 @@ export function AuditorMultiSelect({
   return (
     <div className={`no-print ${className}`}>
       {candidatePicker}
-      {value.trim() && (
-        <p className="mt-1 text-xs text-muted">
-          {options.length === 0 ? '目前記錄：' : '已選：'}{summary}
-        </p>
+      {options.length === 0 && value.trim() && (
+        <p className="mt-1 text-xs text-muted">目前記錄：{summary}</p>
       )}
       <span className="print-only">{summary}</span>
     </div>

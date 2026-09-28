@@ -93,8 +93,16 @@ html.dark {
       width: 6.5rem;
     }
 
+    col.col-inherent {
+      width: 12.5rem;
+    }
+
     col.col-name {
       width: 8rem;
+    }
+
+    col.col-overview-item {
+      width: 10.4rem;
     }
 
     col.col-judge {
@@ -107,6 +115,38 @@ html.dark {
 
     col.col-action {
       width: 7.5rem;
+    }
+
+    col.col-person-name {
+      width: 6.25rem;
+    }
+
+    col.col-person-org {
+      width: 5.75rem;
+    }
+
+    col.col-person-dept {
+      width: 6.75rem;
+    }
+
+    col.col-person-role {
+      width: 4.5rem;
+    }
+
+    col.col-person-status {
+      width: 6.25rem;
+    }
+
+    col.col-person-date {
+      width: 6.75rem;
+    }
+
+    col.col-person-action {
+      width: 14.125rem;
+    }
+
+    col.col-observation-action {
+      width: 10.5rem;
     }
 
     col.col-month {
@@ -124,11 +164,28 @@ html.dark {
 
     .worksheet-table {
       @apply w-full table-fixed border-collapse text-sm;
+      background: var(--color-surface);
+      color: var(--color-ink);
     }
 
     .worksheet-table th,
     .worksheet-table td {
       @apply min-w-0 break-words;
+      border: 1px solid var(--color-line);
+      padding: 0.5rem;
+      vertical-align: top;
+    }
+
+    .worksheet-table thead th {
+      background: var(--color-page);
+      color: var(--color-muted);
+      font-weight: 600;
+      text-align: left;
+    }
+
+    .worksheet-table tbody tr:hover > td,
+    .worksheet-table tbody tr:hover > th {
+      background: var(--color-page);
     }
 
     .worksheet-cell {
@@ -266,12 +323,15 @@ html.dark {
     font-size: 16pt;
   }
 
+  .worksheet-table,
   .qr-header-table,
   .qr-checklist,
   .qr-plan-table {
     border: 1.5pt solid #000;
   }
 
+  .worksheet-table td,
+  .worksheet-table th,
   .qr-header-table td,
   .qr-header-table th,
   .qr-checklist td,
@@ -280,6 +340,10 @@ html.dark {
   .qr-plan-table th {
     border: 0.75pt solid #000;
     padding: 4pt 6pt;
+  }
+
+  .worksheet-table thead tr {
+    background: #e8e8e8 !important;
   }
 
   .qr-label {

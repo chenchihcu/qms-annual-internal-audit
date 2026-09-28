@@ -42,14 +42,14 @@ function GapLine({
   )
 }
 
-export function WorkflowGuide({ tab, state, onNavigate }: WorkflowGuideProps) {
-  if (tab === 'dashboard' || !getTabWorkflow(tab)) return null
+export function WorkflowGuide({ tab, state, onNavigate, className = 'mb-4' }: WorkflowGuideProps & { className?: string }) {
+  if (tab === 'dashboard' || tab === 'prep' || tab === 'followups' || tab === 'risk' || !getTabWorkflow(tab)) return null
 
   const status = getTabWorkflowStatus(state, tab)
   if (status.gaps.length === 0 && status.advisories.length === 0) return null
 
   return (
-    <div className="mb-4 rounded-lg border border-line bg-surface px-3 py-2.5 no-print" data-workflow-guide="top">
+    <div className={`${className} rounded-lg border border-line bg-surface px-3 py-2.5 no-print`} data-workflow-guide="top">
       <ul className="space-y-0.5 text-xs text-amber-900">
         {status.gaps.map((gap) => (
           <GapLine key={gap.message} gap={gap} tone="gap" onNavigate={onNavigate} />

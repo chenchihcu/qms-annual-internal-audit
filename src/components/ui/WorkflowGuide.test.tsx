@@ -19,6 +19,16 @@ describe('WorkflowGuide', () => {
     expect(onNavigate).toHaveBeenCalledWith('personnel')
   })
 
+  it('keeps the top guide off prep and followups', () => {
+    const state = createDemoState()
+    const { container, rerender } = render(
+      <WorkflowGuide tab="prep" state={state} onNavigate={() => {}} />,
+    )
+    expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
+    rerender(<WorkflowGuide tab="followups" state={state} onNavigate={() => {}} />)
+    expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
+  })
+
   it('keeps workflow gap details off the dashboard', () => {
     const { container } = render(
       <WorkflowGuide tab="dashboard" state={createDemoState()} onNavigate={() => {}} />,
