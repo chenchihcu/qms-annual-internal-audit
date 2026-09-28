@@ -26,7 +26,7 @@ describe('ProcedureAuditPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
-      expect(screen.getByLabelText('實施日期')).toBeTruthy()
+      expect(screen.getByLabelText('稽核日期')).toBeTruthy()
       expect(screen.queryByRole('heading', { name: '查檢表' })).toBeNull()
       const stats = screen.getByLabelText('查檢判定統計')
       expect(within(stats).getByText('程序得分')).toBeTruthy()
@@ -76,8 +76,9 @@ describe('ProcedureAuditPanel', () => {
 
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
 
-    const auditDate = await screen.findByLabelText('實施日期') as HTMLInputElement
+    const auditDate = await screen.findByLabelText('稽核日期') as HTMLInputElement
     expect(screen.queryByLabelText('通知日期')).toBeNull()
+    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
     await waitFor(() => {
       expect(auditDate.value).toBe(audit.auditDate)
       expect(screen.getByText(status)).toBeTruthy()
@@ -95,14 +96,25 @@ describe('ProcedureAuditPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: / 稽核設定$/ }))
     }
 
-    const impartialityCheckbox = screen.getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
-    const impartialityNote = screen.getByLabelText('客觀性控制措施／依據') as HTMLInputElement
+    const setup = screen.getByRole('group', { name: '稽核設定' })
+    expect(within(setup).queryByText('對應文件')).toBeNull()
+    expect(within(setup).queryByLabelText('客觀性控制措施／依據')).toBeNull()
+    expect(within(setup).getByText('稽核人員')).toBeTruthy()
+    const impartialityCheckbox = within(setup).getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
     expect(impartialityCheckbox.disabled).toBe(!setupEditable)
-    expect(impartialityNote.disabled).toBe(!setupEditable)
+    if (status === '規劃中') {
+      expect(within(setup).getByRole('button', { name: '標記已通知' })).toBeTruthy()
+    }
 
     if (status === '執行中') {
       expect(screen.getByText(/日期、人員與客觀性設定已固定/)).toBeTruthy()
     }
+
+    const printHeader = document.querySelector('.qr-header-table')
+    expect(printHeader?.textContent).toContain('對應文件')
+    expect(printHeader?.textContent).toContain('稽核日期')
+    expect(printHeader?.textContent).toContain(audit.qpCode)
+    expect(printHeader?.textContent).not.toContain('客觀性控制措施')
   })
 
   it('prevents starting an audit without an implementation date', async () => {
@@ -123,7 +135,9 @@ describe('ProcedureAuditPanel', () => {
     })
     fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))
 
-    expect((await screen.findByRole('alert')).textContent).toContain('開始稽核前須填寫實施日期')
+    expect((await screen.findByRole('alert')).textContent).toContain('開始稽核前須填寫稽核日期')
+    expect(screen.queryByText('未填實施日期')).toBeNull()
+    expect(screen.getByText(/未填稽核日期/)).toBeTruthy()
     expect(screen.getByText('規劃中')).toBeTruthy()
   })
 

@@ -213,9 +213,6 @@ export function validateAuditTeam(
   if (warnings.length > 0 && !team?.impartialityConfirmed) {
     errors.push('客觀性風險尚未確認')
   }
-  if (team?.impartialityConfirmed && !team.impartialityNote.trim()) {
-    errors.push('已確認客觀性時須填寫控制措施或判斷依據')
-  }
   return { canStart: errors.length === 0, errors, warnings }
 }
 
