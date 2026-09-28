@@ -151,6 +151,8 @@ export interface AuditTeamValidation {
   canStart: boolean
   errors: string[]
   warnings: string[]
+  /** 主任稽核員或稽核員（不含陪同）所屬單位與受稽單位相同 */
+  sameDepartmentConflict: boolean
 }
 
 export function validateAuditTeam(
@@ -164,6 +166,7 @@ export function validateAuditTeam(
 ): AuditTeamValidation {
   const errors: string[] = []
   const warnings: string[] = []
+  let sameDepartmentConflict = false
   const onDate = auditDate || new Date().toISOString().slice(0, 10)
   const byId = new Map(people.map((person) => [person.id, person]))
 
@@ -207,13 +210,16 @@ export function validateAuditTeam(
     const sameDepartment = person.affiliations.some(
       (a) => a.companyId === companyId && a.departmentId === departmentId && (!a.effectiveTo || a.effectiveTo >= onDate),
     )
-    if (sameDepartment) warnings.push(`${person.name} 所屬單位與受稽單位相同，請確認客觀性控制`)
+    if (sameDepartment) {
+      sameDepartmentConflict = true
+      warnings.push(`${person.name} 所屬單位與受稽單位相同，請確認客觀性控制`)
+    }
   })
 
-  if (warnings.length > 0 && !team?.impartialityConfirmed) {
+  if (sameDepartmentConflict && !team?.impartialityConfirmed) {
     errors.push('客觀性風險尚未確認')
   }
-  return { canStart: errors.length === 0, errors, warnings }
+  return { canStart: errors.length === 0, errors, warnings, sameDepartmentConflict }
 }
 
 export function resolveLeadAuditorPersonId(

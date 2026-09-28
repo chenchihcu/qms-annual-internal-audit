@@ -140,14 +140,83 @@ describe('ProcedureAuditPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: / 稽核設定$/ }))
     }
 
-    const impartialityCheckbox = screen.getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
-    const impartialityNote = screen.getByLabelText('客觀性控制措施／依據') as HTMLInputElement
-    expect(impartialityCheckbox.disabled).toBe(!setupEditable)
-    expect(impartialityNote.disabled).toBe(!setupEditable)
+    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
+    expect(screen.queryByRole('checkbox', { name: /客觀性風險已確認/ })).toBeNull()
 
     if (status === '執行中') {
       expect(screen.getByText(/日期、人員與客觀性設定已固定/)).toBeTruthy()
     }
+  })
+
+  it('shows the impartiality checkbox only when an assignee belongs to the audited department', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-03' && item.departmentId === 'dept-qa')
+      ?? company.audits[0]
+    const sameDepartment = state.people.find((person) => person.affiliations.some(
+      (affiliation) => affiliation.departmentId === 'dept-qa',
+    ))
+    const otherDepartment = state.people.find((person) => person.affiliations.some(
+      (affiliation) => affiliation.departmentId && affiliation.departmentId !== 'dept-qa',
+    ))
+    if (!sameDepartment || !otherDepartment) throw new Error('demo people missing department affiliations')
+    audit.id = 'audit-QP-03-dept-qa'
+    audit.qpCode = 'QP-03'
+    audit.departmentId = 'dept-qa'
+    audit.status = '規劃中'
+    audit.team = {
+      leadAuditorPersonId: sameDepartment.id,
+      auditorPersonIds: [],
+      escortPersonIds: [],
+      impartialityConfirmed: false,
+      impartialityNote: '既有依據',
+    }
+    company.audits = [audit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    const { unmount } = render(<AuditPage selectedKey="QP-03|dept-qa" />)
+    const checkbox = await screen.findByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
+    expect(checkbox.disabled).toBe(false)
+    expect(checkbox.checked).toBe(false)
+    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
+    fireEvent.click(checkbox)
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
+      const savedAudit = saved.companies?.[saved.activeCompanyId]?.audits?.find(
+        (item: { id: string }) => item.id === audit.id,
+      )
+      expect(savedAudit?.team?.impartialityConfirmed).toBe(true)
+      expect(savedAudit?.team?.impartialityNote).toBe('既有依據')
+    })
+    unmount()
+
+    audit.team = {
+      ...audit.team,
+      leadAuditorPersonId: otherDepartment.id,
+      impartialityConfirmed: false,
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    const otherDepartmentView = render(<AuditPage selectedKey="QP-03|dept-qa" />)
+    await screen.findByLabelText('稽核日期')
+    expect(screen.queryByRole('checkbox', { name: /客觀性風險已確認/ })).toBeNull()
+    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
+    otherDepartmentView.unmount()
+
+    audit.status = '執行中'
+    audit.team = {
+      leadAuditorPersonId: sameDepartment.id,
+      auditorPersonIds: [],
+      escortPersonIds: [],
+      impartialityConfirmed: true,
+      impartialityNote: '既有依據',
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    render(<AuditPage selectedKey="QP-03|dept-qa" />)
+    fireEvent.click(await screen.findByRole('button', { name: /稽核設定$/ }))
+    const lockedCheckbox = await screen.findByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
+    expect(lockedCheckbox.disabled).toBe(true)
+    expect(lockedCheckbox.checked).toBe(true)
+    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
   })
 
   it('prevents starting an audit without an implementation date', async () => {

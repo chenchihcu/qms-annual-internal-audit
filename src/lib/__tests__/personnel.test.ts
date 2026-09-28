@@ -57,8 +57,16 @@ describe('personnel qualification validation', () => {
     const sameDepartment = { ...person, affiliations: [{ id: 'a1', companyId: 'jiurun' as const, departmentId: 'dept-qa' }] }
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
     const result = validateAuditTeam([sameDepartment], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
+    expect(result.sameDepartmentConflict).toBe(true)
     expect(result.warnings).toHaveLength(1)
     expect(result.errors).toContain('客觀性風險尚未確認')
+  })
+
+  it('does not flag same-department conflict when lead and auditors are from other departments', () => {
+    const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
+    const result = validateAuditTeam([person], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
+    expect(result.sameDepartmentConflict).toBe(false)
+    expect(result.errors).not.toContain('客觀性風險尚未確認')
   })
 
   it('allows start when impartiality is confirmed and the stored note is empty', () => {
@@ -66,6 +74,7 @@ describe('personnel qualification validation', () => {
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: true, impartialityNote: '' }
     const result = validateAuditTeam([sameDepartment], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
     expect(result.canStart).toBe(true)
+    expect(result.sameDepartmentConflict).toBe(true)
     expect(result.warnings).toHaveLength(1)
     expect(result.errors).not.toContain('已確認客觀性時須填寫控制措施或判斷依據')
     expect(team.impartialityNote).toBe('')

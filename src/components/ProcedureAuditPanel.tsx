@@ -236,6 +236,7 @@ export function ProcedureAuditPanel({
     auditCategory: audit.auditCategory,
     departments: company.departments,
   })
+  const showImpartialityConfirm = validateAuditStart(audit).sameDepartmentConflict
 
   const handleStartAudit = () => {
     if (!audit.auditDate?.trim()) {
@@ -540,17 +541,15 @@ export function ProcedureAuditPanel({
                   disabled={!auditSetupEditable} ariaLabel="稽核人員"
                 />
               </div>
-              <label className="flex items-start gap-2 text-sm">
-                <input type="checkbox" className={`mt-1 ${FOCUS_RING}`}
-                  checked={audit.team?.impartialityConfirmed ?? false} disabled={!auditSetupEditable}
-                  onChange={(event) => updateTeam({ impartialityConfirmed: event.target.checked })}
-                />
-                <span>客觀性風險已確認（同單位稽核等）</span>
-              </label>
-              <Input label="客觀性控制措施／依據" value={audit.team?.impartialityNote ?? ''}
-                onChange={(value) => updateTeam({ impartialityNote: value })} disabled={!auditSetupEditable}
-                className="sm:col-span-2"
-              />
+              {showImpartialityConfirm && (
+                <label className="flex items-start gap-2 text-sm sm:col-span-2 lg:col-span-3">
+                  <input type="checkbox" className={`mt-1 ${FOCUS_RING}`}
+                    checked={audit.team?.impartialityConfirmed ?? false} disabled={!auditSetupEditable}
+                    onChange={(event) => updateTeam({ impartialityConfirmed: event.target.checked })}
+                  />
+                  <span>客觀性風險已確認（同單位稽核等）</span>
+                </label>
+              )}
             </div>
             {auditStatus === '規劃中' && <Button variant="secondary" onClick={handleMarkNotified}>標記已通知</Button>}
           </div>
