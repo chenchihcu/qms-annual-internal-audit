@@ -40,6 +40,7 @@ import {
 } from '../lib/personnel'
 import { parseBackupJson, serializeBackup } from '../lib/backup'
 import { migrateState } from '../lib/migrate'
+import { applyMonthCellChoice, type MonthCellChoice } from '../lib/planStatus'
 import {
   applyWorkspaceConflictChoice,
   markWorkspaceConflictReviewed,
@@ -59,7 +60,11 @@ import {
   normalizeNCR,
   syncNCRDescriptions,
 } from '../lib/ncr'
-import { createChecklistForProcedure, getProcedureTitle } from '../data/checklistLoader'
+import {
+  createChecklistForProcedure,
+  getProcedureTitle,
+  refreshedSeedItemsIfPendingOnly,
+} from '../data/checklistLoader'
 import { PROCEDURE_PLAN_TEMPLATE } from '../data/procedurePlan'
 import type { MonthStatus } from '../types'
 import { companySettingsFor } from '../types'
@@ -697,13 +702,23 @@ export function useAuditStore() {
     })
   }, [])
 
+  const setPlanMonthChoice = useCallback((rowId: string, monthIndex: number, choice: MonthCellChoice) => {
+    setState((s) => {
+      const co = s.companies[s.activeCompanyId]
+      return patchCompany(s, s.activeCompanyId, {
+        planRows: co.planRows.map((r) => {
+          if (r.id !== rowId) return r
+          return { ...r, ...applyMonthCellChoice(r, monthIndex, choice), manualOverride: true }
+        }),
+      })
+    })
+  }, [])
+
   const getOrCreateAudit = useCallback(
     (qpCode: string, departmentId: string): ProcedureAudit => {
       const co = activeCompany
       const auditId = `audit-${qpCode}-${departmentId}`
       const existing = co.audits.find((a) => a.id === auditId)
-      if (existing) return existing
-
       const entry =
         PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === qpCode && e.departmentId === departmentId,
@@ -712,6 +727,19 @@ export function useAuditStore() {
       const dept =
         co.departments.find((d) => d.id === departmentId) ??
         co.departments.find((d) => d.id === resolvedDeptId)
+
+      if (existing) {
+        if (existing.status !== '已回報') {
+          const departmentForSeed = dept?.name ?? existing.department
+          const refreshed = refreshedSeedItemsIfPendingOnly(
+            qpCode,
+            departmentForSeed,
+            existing.items,
+          )
+          if (refreshed) return { ...existing, items: refreshed }
+        }
+        return existing
+      }
 
       if (!dept || !entry) {
         return {
@@ -1573,6 +1601,7 @@ export function useAuditStore() {
     replacePlanRows,
     updatePlanRow,
     setPlanMonthStatus,
+    setPlanMonthChoice,
     getOrCreateAudit,
     createAuditEvent,
     updateAudit,

@@ -682,7 +682,7 @@ function mergeSettings(
       addChoiceConflict(
         conflicts,
         'settings',
-        `稽核基本資料：${field}`,
+        `系統設定：${field}`,
         `兩份舊設定的「${field}」不同；選定後會套用到工作區設定。`,
         { kind: 'settings', field },
         { source: '來源資料一', value: a },
@@ -771,7 +771,7 @@ function normalizeProfile(raw: AppState, conflicts: WorkspaceMigrationConflict[]
           conflicts,
           'settings',
           `${incoming.name} 的${field}待覆核`,
-          '兩份舊設定有不同內容。請在「稽核基本資料」檢視證據並修正後，再標記完成。',
+          '兩份舊設定的標準版本或適用性不同。設定頁不再編輯這些欄位；請核對備份內容後標記完成。',
         )
       } else if (!current[field]) {
         current[field] = incoming[field] as never
@@ -779,17 +779,26 @@ function normalizeProfile(raw: AppState, conflicts: WorkspaceMigrationConflict[]
     }
   }
   const profile = { ...left, applicableStandards: [...standards.values()] }
-  for (const field of ['certificateScope', 'certificateReference', 'auditProcedureCode', 'auditProcedureVersion', 'formalRecordLocation'] as const) {
-    const a = left[field]
-    const b = right[field]
-    if (!a) (profile as unknown as Record<string, unknown>)[field] = b
-    else if (b && a !== b) {
-      addManualConflict(
-        conflicts,
-        'settings',
-        `稽核基本資料：${field}待覆核`,
-        '兩份舊設定有不同內容。請在「稽核基本資料」檢視依據並修正後，再標記完成。',
-      )
+  const profileConflicts: Array<{ fields: readonly string[]; title: (field: string) => string; summary: string }> = [
+    {
+      fields: ['auditProcedureCode', 'auditProcedureVersion', 'formalRecordLocation'],
+      title: (field) => `程序與紀錄：${field}待覆核`,
+      summary: '兩份舊設定有不同內容。請在系統設定的「程序與紀錄」檢視並修正後，再標記完成。',
+    },
+    {
+      fields: ['certificateScope', 'certificateReference'],
+      title: (field) => `證書資料：${field}待覆核`,
+      summary: '兩份舊設定的證書內容不同。設定頁不再編輯證書範圍與引用；請核對備份後標記完成。',
+    },
+  ]
+  for (const group of profileConflicts) {
+    for (const field of group.fields) {
+      const a = left[field as keyof typeof left]
+      const b = right[field as keyof typeof right]
+      if (!a) (profile as unknown as Record<string, unknown>)[field] = b
+      else if (b && a !== b) {
+        addManualConflict(conflicts, 'settings', group.title(field), group.summary)
+      }
     }
   }
   return profile

@@ -100,7 +100,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     id: 'stakeholders',
     label: tabLabel('stakeholders'),
     purpose: '標定各部門利害關係人與 O／S（低／中／高）。',
-    entry: '稽核基本資料已於系統設定確認',
+    entry: '稽核程序與紀錄已於系統設定確認',
     exit: '每個部門至少一個利害關係人標籤',
     outputs: '部門標籤與 O／S（不改月格）',
     prevTab: 'system-settings',

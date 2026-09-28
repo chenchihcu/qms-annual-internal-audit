@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDemoState } from '../../data/demoData'
-import { procedureFieldErrors, standardFieldErrors } from '../auditProfileValidation'
+import { procedureFieldErrors } from '../auditProfileValidation'
 import { procedureSourceReady, standardReady } from '../workflowStatus'
 
 describe('auditProfileValidation', () => {
@@ -21,29 +21,14 @@ describe('auditProfileValidation', () => {
     expect(procedureSourceReady(state, 'jiurun')).toBe(true)
   })
 
-  it('maps standard gaps to field errors', () => {
+  it('does not require certificate text or applicability confirmation', () => {
     const state = createDemoState()
     const profile = state.companyAuditProfiles.jiurun
-    const errors = standardFieldErrors(profile)
-    expect(errors.confirmation).toBe('至少一項適用標準須標為已確認')
-    expect(errors.certificateScope).toBe('尚未填寫')
-    expect(errors.certificateReference).toBe('尚未填寫')
-    expect(standardReady(state, 'jiurun')).toBe(false)
-  })
-
-  it('uses one shared certificate reference for every confirmed standard', () => {
-    const state = createDemoState()
-    const profile = state.companyAuditProfiles.jiurun
-    profile.applicableStandards[0].confirmationStatus = 'confirmed'
-    profile.applicableStandards[1].confirmationStatus = 'confirmed'
-    profile.certificateScope = '精密零件'
-    profile.certificateReference = 'REF-001'
-    expect(profile.applicableStandards.every((standard) => !standard.evidenceReference)).toBe(true)
-    expect(standardFieldErrors(profile)).toEqual({})
-    expect(standardReady(state, 'jiurun')).toBe(true)
-
+    profile.certificateScope = ''
     profile.certificateReference = ''
-    expect(standardFieldErrors(profile).certificateReference).toBe('尚未填寫')
-    expect(standardReady(state, 'jiurun')).toBe(false)
+    profile.applicableStandards.forEach((standard) => {
+      standard.confirmationStatus = 'pending'
+    })
+    expect(standardReady(state, 'jiurun')).toBe(true)
   })
 })

@@ -49,6 +49,28 @@ export function procedureSeedKey(qpCode: string, department: string): string {
   return `${qpCode}|${department}`
 }
 
+/** 部門主檔名稱與查檢種子 procedures 鍵不一致時的對照（與 procedurePlan DEPT_ID 語意一致） */
+const DEPARTMENT_SEED_ALIASES: Record<string, string> = {
+  開發工程: '開發工程部',
+}
+
+export function normalizeDepartmentForSeedLookup(department?: string): string | undefined {
+  if (!department) return department
+  const trimmed = department.trim()
+  return DEPARTMENT_SEED_ALIASES[trimmed] ?? trimmed
+}
+
+function departmentSeedLookupCandidates(department?: string): string[] {
+  if (!department) return []
+  const trimmed = department.trim()
+  const normalized = normalizeDepartmentForSeedLookup(trimmed) ?? trimmed
+  const out: string[] = []
+  for (const name of [trimmed, normalized]) {
+    if (name && !out.includes(name)) out.push(name)
+  }
+  return out
+}
+
 export function isSeedFinalized(): boolean {
   return CHECKLIST_SEED.import?.finalized ?? true
 }
@@ -63,15 +85,15 @@ export function resolveProcedureSeed(
   qpCode: string,
   department?: string,
 ): SeedProcedure | undefined {
-  if (department) {
-    const composite = CHECKLIST_SEED.procedures[procedureSeedKey(qpCode, department)]
+  for (const dep of departmentSeedLookupCandidates(department)) {
+    const composite = CHECKLIST_SEED.procedures[procedureSeedKey(qpCode, dep)]
     if (composite && !composite._pending) return composite
   }
   const direct = CHECKLIST_SEED.procedures[qpCode]
   if (direct && !direct._pending) return direct
-  if (department) {
+  for (const dep of departmentSeedLookupCandidates(department)) {
     const match = Object.values(CHECKLIST_SEED.procedures).find(
-      (p) => p.procedureCode === qpCode && p.department === department && !p._pending,
+      (p) => p.procedureCode === qpCode && p.department === dep && !p._pending,
     )
     if (match) return match
   }
@@ -186,4 +208,32 @@ export function countChecklistItems(qpCode: string, department?: string): number
   const proc = resolveProcedureSeed(qpCode, department)
   if (!proc) return 0
   return proc.categories.reduce((sum, c) => sum + c.items.length, 0)
+}
+
+function checklistItemHasUserWork(item: ChecklistItem): boolean {
+  if (item.judgment) return true
+  if (item.description?.trim()) return true
+  if (item.objectiveEvidence?.trim()) return true
+  if (item.evidenceReference?.trim()) return true
+  if (item.notApplicableReason?.trim()) return true
+  if (item.attachments?.length) return true
+  if (item.origin === 'custom' || item.origin === 'carryforward') return true
+  return false
+}
+
+/** 僅含未填寫的「待匯入」占位、可安全以種子題目取代 */
+export function isPendingImportOnlyAudit(items: ChecklistItem[]): boolean {
+  if (items.length === 0) return false
+  return items.every((item) => item.category === '待匯入' && !checklistItemHasUserWork(item))
+}
+
+export function refreshedSeedItemsIfPendingOnly(
+  qpCode: string,
+  department: string | undefined,
+  items: ChecklistItem[],
+): ChecklistItem[] | null {
+  if (!isPendingImportOnlyAudit(items)) return null
+  const seedItems = createChecklistForProcedure(qpCode, department)
+  if (seedItems.length === 1 && seedItems[0].category === '待匯入') return null
+  return seedItems.map((item) => ({ ...item, origin: 'seed' as const }))
 }

@@ -12,7 +12,7 @@ import type {
   ExternalAuditPrepItemState,
   ProcedureAudit,
 } from '../types'
-import { COMPANY_LABELS, companySettingsFor } from '../types'
+import { COMPANY_LABELS, companySettingsFor, NCR_COMPANY_SCOPE_LABELS } from '../types'
 import { ncrNumberLabels } from './ncr'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
@@ -174,13 +174,14 @@ export function exportAllAuditsExcel(state: AppState, companyId: CompanyId): voi
 /** QR-28-03 不符合事項 */
 export function buildNcrSheet(co: CompanyData, settings: AuditSettings): SpreadsheetSheet {
   const title = [[`${co.name} · ${settings.auditYear} 不符合事項清單 QR-28-03`]]
-  const header = ['NCR#', '來源事件', 'QP', '部門', '流程', '要求快照', '證據快照', '發現快照', '日期', '狀態', '矯正措施', '效果確認', '確認人', '確認日']
+  const header = ['NCR#', '來源事件', 'QP', '部門', '公司', '流程', '要求快照', '證據快照', '發現快照', '日期', '狀態', '矯正措施', '效果確認', '確認人', '確認日']
   const ncrLabels = ncrNumberLabels(co.ncrs)
   const rows = co.ncrs.map((ncr) => [
     ncrLabels.get(ncr.id) ?? ncr.ncrNumber,
     ncr.sourceAuditId ?? '',
     ncr.qpCode,
     ncr.department,
+    ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '',
     ncr.process,
     ncr.requirementSnapshot ?? '',
     ncr.evidenceSnapshot ?? '',

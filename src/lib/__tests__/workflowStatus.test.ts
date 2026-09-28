@@ -15,11 +15,14 @@ describe('workflowStatus', () => {
     expect(canProceedToNextTab(state, 'dashboard')).toBe(true)
   })
 
-  it('routes standard and procedure readiness gaps to system settings', () => {
+  it('routes procedure readiness gaps to system settings', () => {
     const state = createDemoState()
     state.companyAuditProfiles.jiurun.applicableStandards[0].confirmationStatus = 'pending'
+    state.companyAuditProfiles.jiurun.certificateScope = ''
+    state.companyAuditProfiles.jiurun.certificateReference = ''
     const overview = getPdcaOverview(state, 'jiurun')
-    expect(overview.plan.gaps.filter((gap) => /適用標準|程序來源/.test(gap.message)).every((gap) => gap.tab === 'system-settings')).toBe(true)
+    expect(overview.plan.gaps.some((gap) => gap.message === '適用標準與證書依據未完整')).toBe(false)
+    expect(overview.plan.gaps.filter((gap) => /程序來源/.test(gap.message)).every((gap) => gap.tab === 'system-settings')).toBe(true)
     expect(getTabWorkflowStatus(state, 'system-settings').ready).toBe(true)
     expect(canProceedToNextTab(state, 'ncr')).toBe(true)
     expect(canProceedToNextTab(state, 'observations')).toBe(true)
@@ -126,15 +129,13 @@ describe('workflowStatus', () => {
     expect(status.advisories.some((item) => item.message.includes('待追蹤觀察'))).toBe(false)
   })
 
-  it('detects standard readiness from one shared certificate reference', () => {
+  it('keeps standard readiness when certificate text is blank', () => {
     const state = createDemoState()
     const profile = state.companyAuditProfiles.jiurun
-    profile.applicableStandards[0].confirmationStatus = 'confirmed'
-    profile.applicableStandards[1].confirmationStatus = 'confirmed'
-    profile.certificateScope = '精密零件製造'
-    profile.certificateReference = 'REF-001'
-    expect(standardReady(state, 'jiurun')).toBe(true)
+    profile.applicableStandards[0].confirmationStatus = 'pending'
+    profile.applicableStandards[1].confirmationStatus = 'pending'
+    profile.certificateScope = ''
     profile.certificateReference = ''
-    expect(standardReady(state, 'jiurun')).toBe(false)
+    expect(standardReady(state, 'jiurun')).toBe(true)
   })
 })

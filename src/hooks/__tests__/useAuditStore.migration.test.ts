@@ -249,6 +249,44 @@ describe('getOrCreateAudit', () => {
     expect(audit!.departmentId).toBe('dept-qa')
     expect(audit!.items.length).toBeGreaterThan(0)
   })
+
+  it('refreshes pending-import placeholder for 開發工程 QP-11', () => {
+    const { result } = renderHook(() => useAuditStore())
+
+    act(() => {
+      result.current.updateAudit({
+        id: 'audit-QP-11-dept-eng',
+        qpCode: 'QP-11',
+        departmentId: 'dept-eng',
+        department: '開發工程',
+        process: '新產品規劃管理程序',
+        documents: 'QP-11',
+        notifyDate: '',
+        auditDate: '',
+        departmentManager: '工程部經理',
+        auditors: '李稽核',
+        auditCategory: '系統稽核',
+        items: [
+          {
+            id: 'chk-pending',
+            category: '待匯入',
+            no: 1,
+            content: '（QP-11 查檢項目待匯入）',
+            judgment: null,
+            description: '',
+          },
+        ],
+      })
+    })
+
+    let audit: ReturnType<typeof result.current.getOrCreateAudit> | undefined
+    act(() => {
+      audit = result.current.getOrCreateAudit('QP-11', 'dept-eng')
+    })
+
+    expect(audit!.items.length).toBe(7)
+    expect(audit!.items.some((item) => item.category === '待匯入')).toBe(false)
+  })
 })
 
 describe('year datasets', () => {

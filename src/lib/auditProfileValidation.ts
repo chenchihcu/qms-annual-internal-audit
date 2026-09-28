@@ -25,15 +25,3 @@ export function procedureFieldErrors(profile: CompanyAuditProfile): {
   return errors
 }
 
-export function standardFieldErrors(profile: CompanyAuditProfile): {
-  confirmation?: string
-  certificateScope?: string
-  certificateReference?: string
-} {
-  const confirmed = profile.applicableStandards.filter((s) => s.confirmationStatus === 'confirmed')
-  return {
-    confirmation: confirmed.length === 0 ? '至少一項適用標準須標為已確認' : undefined,
-    certificateScope: !profile.certificateScope.trim() ? '尚未填寫' : undefined,
-    certificateReference: !profile.certificateReference.trim() ? '尚未填寫' : undefined,
-  }
-}

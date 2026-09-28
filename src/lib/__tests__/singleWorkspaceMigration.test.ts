@@ -176,4 +176,19 @@ describe('single-workspace migration', () => {
     expect(migrated.yearArchives['2025']?.companies.jiurun).toBeDefined()
     expect(migrated.companySettings.jiurun.auditYear).toBe(2026)
   })
+
+  it('does not point profile conflicts at the removed audit basics screen', () => {
+    const state = legacyState()
+    state.companyAuditProfiles.jiurun.certificateScope = '左側範圍'
+    state.companyAuditProfiles.zhenglongxing.certificateScope = '右側範圍'
+    state.companyAuditProfiles.jiurun.auditProcedureVersion = 'A'
+    state.companyAuditProfiles.zhenglongxing.auditProcedureVersion = 'B'
+
+    const migrated = migrateToSingleWorkspace(state)
+    const summaries = (migrated.workspaceMigrationConflicts ?? []).map((conflict) => `${conflict.title}\n${conflict.summary}`)
+
+    expect(summaries.some((text) => text.includes('稽核基本資料'))).toBe(false)
+    expect(summaries.some((text) => text.includes('設定頁不再編輯證書範圍與引用'))).toBe(true)
+    expect(summaries.some((text) => text.includes('程序與紀錄'))).toBe(true)
+  })
 })

@@ -70,6 +70,31 @@ export function deriveMonthStatus(
   return '滿意'
 }
 
+export type MonthCellChoice = 'blank' | '擬定' | '滿意' | '不滿意' | '矯正中' | '矯正圓滿'
+
+const RESULT_CHOICES: MonthCellChoice[] = ['滿意', '不滿意', '矯正中', '矯正圓滿']
+
+/** 點選月格：排程只寫 `months`（空白／擬定）；滿意等結果只寫 `manualMonthOverrides`。 */
+export function applyMonthCellChoice(
+  row: Pick<PlanRow, 'months' | 'manualMonthOverrides'>,
+  monthIndex: number,
+  choice: MonthCellChoice,
+): { months: MonthStatus[]; manualMonthOverrides: (MonthStatus | null)[] } {
+  const months = [...row.months] as MonthStatus[]
+  const manualMonthOverrides = Array.from({ length: 12 }, (_, index) => row.manualMonthOverrides?.[index] ?? null)
+  if (monthIndex < 0 || monthIndex > 11) return { months, manualMonthOverrides }
+
+  if (choice === 'blank') {
+    months[monthIndex] = null
+    manualMonthOverrides[monthIndex] = null
+    return { months, manualMonthOverrides }
+  }
+
+  months[monthIndex] = '擬定'
+  manualMonthOverrides[monthIndex] = RESULT_CHOICES.includes(choice) ? choice : null
+  return { months, manualMonthOverrides }
+}
+
 export function getDisplayMonthStatus(
   row: PlanRow,
   monthIndex: number,

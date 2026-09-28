@@ -59,12 +59,7 @@ export function procedureSourceReady(state: AppState, companyId: CompanyId = sta
   )
 }
 
-export function standardReady(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
-  const profile = profileFor(state, companyId)
-  const confirmed = profile.applicableStandards.filter((s) => s.confirmationStatus === 'confirmed')
-  if (confirmed.length === 0) return false
-  if (!profile.certificateScope.trim()) return false
-  if (!profile.certificateReference.trim()) return false
+export function standardReady(_state?: AppState, _companyId?: CompanyId): boolean {
   return true
 }
 
