@@ -12,7 +12,7 @@ export function buildYearSwitchDescription(
   const archived = state.yearArchives[String(targetYear)]?.companies[companyId]
   const restoreNote = archived
     ? `將還原 ${targetYear} 年已封存的計畫與事件。`
-    : `將建立 ${targetYear} 年空白年度台帳（計畫與事件需重新建立）。`
+    : `將建立 ${targetYear} 年台帳：計畫列保留並清空月格，查檢事件與追蹤紀錄需重新建立。`
   const gapNote = !pdca.annualCloseReady && pdca.annualCloseGaps.length > 0
     ? `\n\n目前年度尚未達結案條件：\n${pdca.annualCloseGaps.slice(0, 4).map((gap) => `· ${gap.message}`).join('\n')}`
     : ''

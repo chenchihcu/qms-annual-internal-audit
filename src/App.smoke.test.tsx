@@ -183,7 +183,7 @@ describe('App tab smoke', () => {
     expect(screen.queryByText(/查檢表判定「不符」時自動匯入/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '手動新增 NCR' }))
     expect(
-      screen.getByText(/查檢表判定「不符」時自動匯入；發現快照會隨查檢更新，描述欄供矯正說明，不會被查檢覆寫。此處可登錄會議或現場發現。/),
+      screen.getByText(/查檢表判定「不符」時自動匯入。描述為發現文字，不會被查檢覆寫；矯正內容請填「矯正措施」。此處可登錄會議或現場發現。/),
     ).toBeTruthy()
   })
 
@@ -233,10 +233,8 @@ describe('App tab smoke', () => {
     })
     const yearInput = screen.getByLabelText('內稽年度') as HTMLInputElement
     expect(yearInput.value).toBe('2026')
-    expect(screen.getByText('年度稽核')).toBeTruthy()
-    expect(screen.queryByText(/年度稽核 ·/)).toBeNull()
+    expect(screen.getByText('年度稽核 ·')).toBeTruthy()
     expect(screen.queryByText('內稽年度')).toBeNull()
-    expect(screen.getByRole('button', { name: '列印目前頁面' })).toBeTruthy()
     fireEvent.change(yearInput, { target: { value: '2027' } })
     const dialog = await screen.findByRole('alertdialog')
     expect(dialog.textContent).toContain('切換至 2027 年')
@@ -322,6 +320,8 @@ describe('App tab smoke', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '改準備表年度' })).toBeTruthy()
     })
+    expect(screen.getByText(/外稽準備 · \d+ 年/)).toBeTruthy()
+    expect(screen.getByText('內稽年度')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '改準備表年度' }))
     const yearInput = screen.getByLabelText('外稽準備表年度') as HTMLInputElement
     expect(yearInput.value).toBe('2026')

@@ -59,10 +59,10 @@ function App() {
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarNavRef = useRef<HTMLElement>(null)
   const mainRef = useRef<HTMLElement>(null)
-  const { externalAuditPrep } = store.state
+  const { settings, externalAuditPrep } = store.state
   const headerScope = tab === 'prep'
     ? `外稽準備 · ${externalAuditPrep.year} 年`
-    : '年度稽核'
+    : `年度稽核 · ${settings.auditYear} 年`
   const setTab = (next: TabId, options?: NavigateOptions | string) => {
     const resolved: NavigateOptions | undefined =
       typeof options === 'string' ? { auditKey: options } : options
@@ -151,14 +151,20 @@ function App() {
                 <Icon name="menu" />
                 選單
               </button>
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="min-h-11 px-2 text-left">
-                  <span className="block truncate text-sm font-medium text-ink" title={headerScope}>{headerScope}</span>
-                </div>
-                <AuditYearSwitcher store={store} compact />
+              <div className="flex min-h-11 min-w-0 items-center gap-2 px-2 text-left text-sm font-medium text-ink" title={headerScope}>
+                {tab === 'prep' ? (
+                  <span className="truncate">{headerScope}</span>
+                ) : (
+                  <>
+                    <span className="shrink-0">年度稽核 ·</span>
+                    <AuditYearSwitcher store={store} compact hideLabel />
+                    <span className="shrink-0">年</span>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              {tab === 'prep' && <AuditYearSwitcher store={store} compact />}
               <button
                 type="button"
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm hover:bg-slate-50"

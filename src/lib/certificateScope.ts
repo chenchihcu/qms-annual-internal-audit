@@ -1,4 +1,4 @@
-import type { ChecklistItem, ProcedureAudit } from '../types'
+import { NCR_COMPANY_SCOPE_LABELS, type ChecklistItem, type NcrCompanyScope, type ProcedureAudit } from '../types'
 import { isSeedChecklistItem } from './checklistItem'
 
 /** 新查檢題目在單一工作區只保留一個判定。 */
@@ -26,6 +26,12 @@ export function defaultNcrCompanyScopeForItem(_item: ChecklistItem): 'both' {
 
 export function ncrCompanyScopeForDualSide(_side: 'jiurun' | 'zhenglongxing'): 'both' {
   return 'both'
+}
+
+/** 畫面與匯出。both 表示未依公司拆分，不顯示成兩張證書。 */
+export function ncrCompanyScopeLabel(scope: NcrCompanyScope | undefined): string {
+  if (!scope || scope === 'both') return ''
+  return NCR_COMPANY_SCOPE_LABELS[scope]
 }
 
 export function listDualCertificateItemKeys(): string[] {

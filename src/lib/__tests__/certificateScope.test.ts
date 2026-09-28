@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { backfillCertificateScopeForItem } from '../certificateScope'
+import { backfillCertificateScopeForItem, ncrCompanyScopeLabel } from '../certificateScope'
 import type { ChecklistItem } from '../../types'
+
+describe('ncrCompanyScopeLabel', () => {
+  it('hides the shared scope and keeps a legacy company name', () => {
+    expect(ncrCompanyScopeLabel(undefined)).toBe('')
+    expect(ncrCompanyScopeLabel('both')).toBe('')
+    expect(ncrCompanyScopeLabel('jiurun')).toBe('九潤')
+    expect(ncrCompanyScopeLabel('zhenglongxing')).toBe('正隆興')
+  })
+})
 
 describe('backfillCertificateScopeForItem', () => {
   it('normalizes a legacy checklist item to one shared judgment', () => {

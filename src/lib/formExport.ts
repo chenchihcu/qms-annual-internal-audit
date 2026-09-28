@@ -12,7 +12,8 @@ import type {
   ExternalAuditPrepItemState,
   ProcedureAudit,
 } from '../types'
-import { COMPANY_LABELS, companySettingsFor, NCR_COMPANY_SCOPE_LABELS } from '../types'
+import { COMPANY_LABELS, companySettingsFor } from '../types'
+import { ncrCompanyScopeLabel } from './certificateScope'
 import { ncrNumberLabels } from './ncr'
 
 const MONTHS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
@@ -181,7 +182,7 @@ export function buildNcrSheet(co: CompanyData, settings: AuditSettings): Spreads
     ncr.sourceAuditId ?? '',
     ncr.qpCode,
     ncr.department,
-    ncr.companyScope ? NCR_COMPANY_SCOPE_LABELS[ncr.companyScope] : '',
+    ncrCompanyScopeLabel(ncr.companyScope),
     ncr.process,
     ncr.requirementSnapshot ?? '',
     ncr.evidenceSnapshot ?? '',

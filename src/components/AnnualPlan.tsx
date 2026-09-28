@@ -160,7 +160,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
       <ConfirmDialog
         open={regenConfirm}
         title="自動編排年度計畫"
-        description="未手動鎖定的計畫列，月格狀態將依風險與窗口重新計算。已手動調整的列會保留。"
+        description="未手動調整的計畫列，將依日期、利害關係人與風險重排月格（寫入擬定）。已手動調整的列會保留。"
         confirmLabel="重新編排"
         onConfirm={() => {
           regeneratePlan()

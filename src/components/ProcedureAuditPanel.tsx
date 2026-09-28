@@ -490,7 +490,12 @@ export function ProcedureAuditPanel({
             className={`mt-3 space-y-3 ${FOCUS_RING}`}
           >
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <div className="min-w-0 break-words"><span className="block text-sm font-medium">稽核流程 (QP)</span>{audit.qpCode} {audit.process}</div>
+              {audit.documents.trim() !== '' && audit.documents.trim() !== audit.qpCode.trim() && (
+                <div className="min-w-0 break-words">
+                  <span className="block text-sm font-medium">對應文件</span>
+                  {audit.documents}
+                </div>
+              )}
               <Input
                 id="audit-date" label="稽核日期" type="date" value={audit.auditDate}
                 onChange={(value) => handleHeaderChange('auditDate', value)} disabled={!auditSetupEditable}
@@ -542,6 +547,10 @@ export function ProcedureAuditPanel({
                 />
                 <span>客觀性風險已確認（同單位稽核等）</span>
               </label>
+              <Input label="客觀性控制措施／依據" value={audit.team?.impartialityNote ?? ''}
+                onChange={(value) => updateTeam({ impartialityNote: value })} disabled={!auditSetupEditable}
+                className="sm:col-span-2"
+              />
             </div>
             {auditStatus === '規劃中' && <Button variant="secondary" onClick={handleMarkNotified}>標記已通知</Button>}
           </div>
@@ -558,7 +567,7 @@ export function ProcedureAuditPanel({
             <tbody>
               <tr><td className="qr-label border border-line p-2">被稽核部門</td><td >{audit.department}</td><td className="qr-label border border-line p-2">稽核流程 (QP)</td><td >{audit.qpCode} {audit.process}</td></tr>
               <tr><td className="qr-label border border-line p-2">對應文件</td><td >{audit.documents}</td><td className="qr-label border border-line p-2">通知日期</td><td >{audit.notifyDate}</td></tr>
-              <tr><td className="qr-label border border-line p-2">稽核日期</td><td >{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td >{audit.departmentManager}</td></tr>
+              <tr><td className="qr-label border border-line p-2">實施日期</td><td >{audit.auditDate}</td><td className="qr-label border border-line p-2">被稽核部門主管</td><td >{audit.departmentManager}</td></tr>
               <tr><td className="qr-label border border-line p-2">稽核人員</td><td  colSpan={3}>{audit.auditors}</td></tr>
             </tbody>
           </table>
@@ -677,7 +686,7 @@ export function ProcedureAuditPanel({
                       {!isSeedChecklistItem(item) && canJudge ? (
                         <button
                           type="button"
-                          className={`text-xs text-red-600 hover:underline ${FOCUS_RING}`}
+                          className={`text-sm text-red-600 hover:underline ${FOCUS_RING}`}
                           onClick={() => handleRemove(item.id, isItemNonConform(item))}
                         >
                           移至回收區

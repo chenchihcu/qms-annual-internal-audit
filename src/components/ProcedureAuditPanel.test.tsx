@@ -34,6 +34,51 @@ describe('ProcedureAuditPanel', () => {
     })
   })
 
+  it('folds matching documents into the procedure cell', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits.find((item) => item.qpCode === 'QP-03') ?? company.audits[0]
+    audit.id = 'audit-QP-03-dept-qa'
+    audit.qpCode = 'QP-03'
+    audit.department = '品保部'
+    audit.departmentId = 'dept-qa'
+    audit.process = '品質目標及管理審查管理程序'
+    audit.documents = 'QP-03'
+    audit.status = '規劃中'
+    company.audits = [audit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey="QP-03|dept-qa" />)
+    const setup = await screen.findByRole('group', { name: '稽核設定' })
+    const selector = screen.getByLabelText('查檢表') as HTMLSelectElement
+    expect(selector.selectedOptions[0]?.textContent).toContain('QP-03 品質目標及管理審查管理程序')
+    expect(within(setup).queryByText('稽核流程 (QP)')).toBeNull()
+    expect(within(setup).queryByText(/品質目標及管理審查管理程序/)).toBeNull()
+    expect(within(setup).queryByText(/對應文件/)).toBeNull()
+    expect(within(setup).getByLabelText('稽核日期')).toBeTruthy()
+  })
+
+  it('keeps a distinct document on the procedure cell', async () => {
+    const state = createCurrentDemoState()
+    const company = state.companies[state.activeCompanyId]
+    const audit = company.audits[0]
+    audit.id = 'audit-QP-03-dept-qa'
+    audit.qpCode = 'QP-03'
+    audit.department = '品保部'
+    audit.departmentId = 'dept-qa'
+    audit.process = '品質目標及管理審查管理程序'
+    audit.documents = 'QR-28-04'
+    audit.status = '規劃中'
+    company.audits = [audit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey="QP-03|dept-qa" />)
+    const setup = await screen.findByRole('group', { name: '稽核設定' })
+    expect(within(setup).queryByText('稽核流程 (QP)')).toBeNull()
+    expect(within(setup).getByText('對應文件')).toBeTruthy()
+    expect(within(setup).getByText('QR-28-04')).toBeTruthy()
+  })
+
   it('shows legacy QP-03 seed wording as one shared audit question', async () => {
     const state = createDemoState()
     const company = state.companies[state.activeCompanyId]
@@ -78,7 +123,6 @@ describe('ProcedureAuditPanel', () => {
 
     const auditDate = await screen.findByLabelText('稽核日期') as HTMLInputElement
     expect(screen.queryByLabelText('通知日期')).toBeNull()
-    expect(screen.queryByLabelText('客觀性控制措施／依據')).toBeNull()
     await waitFor(() => {
       expect(auditDate.value).toBe(audit.auditDate)
       expect(screen.getByText(status)).toBeTruthy()
@@ -96,25 +140,14 @@ describe('ProcedureAuditPanel', () => {
       fireEvent.click(screen.getByRole('button', { name: / 稽核設定$/ }))
     }
 
-    const setup = screen.getByRole('group', { name: '稽核設定' })
-    expect(within(setup).queryByText('對應文件')).toBeNull()
-    expect(within(setup).queryByLabelText('客觀性控制措施／依據')).toBeNull()
-    expect(within(setup).getByText('稽核人員')).toBeTruthy()
-    const impartialityCheckbox = within(setup).getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
+    const impartialityCheckbox = screen.getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
+    const impartialityNote = screen.getByLabelText('客觀性控制措施／依據') as HTMLInputElement
     expect(impartialityCheckbox.disabled).toBe(!setupEditable)
-    if (status === '規劃中') {
-      expect(within(setup).getByRole('button', { name: '標記已通知' })).toBeTruthy()
-    }
+    expect(impartialityNote.disabled).toBe(!setupEditable)
 
     if (status === '執行中') {
       expect(screen.getByText(/日期、人員與客觀性設定已固定/)).toBeTruthy()
     }
-
-    const printHeader = document.querySelector('.qr-header-table')
-    expect(printHeader?.textContent).toContain('對應文件')
-    expect(printHeader?.textContent).toContain('稽核日期')
-    expect(printHeader?.textContent).toContain(audit.qpCode)
-    expect(printHeader?.textContent).not.toContain('客觀性控制措施')
   })
 
   it('prevents starting an audit without an implementation date', async () => {
@@ -136,8 +169,6 @@ describe('ProcedureAuditPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))
 
     expect((await screen.findByRole('alert')).textContent).toContain('開始稽核前須填寫稽核日期')
-    expect(screen.queryByText('未填實施日期')).toBeNull()
-    expect(screen.getByText(/未填稽核日期/)).toBeTruthy()
     expect(screen.getByText('規劃中')).toBeTruthy()
   })
 

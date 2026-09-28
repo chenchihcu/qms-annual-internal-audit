@@ -7,6 +7,8 @@ description: "把 QMS 年度內部稽核專案變更路由到正確來源文件�
 
 Classify the task before changing this repository. This project stores audit state in browser `localStorage`; do not describe tool data as formal controlled records.
 
+若使用者只附本 skill、未說明具體變更，先用 AskQuestion 定路由範圍（例如分類未提交 diff、生命週期、UI、儲存／遷移）；預設不修改原始碼，除非使用者確認範圍。
+
 ## Read First
 
 | Change surface | Read first |

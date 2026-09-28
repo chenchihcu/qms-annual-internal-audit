@@ -52,5 +52,6 @@ Implementation: `src/lib/dashboardMetrics.ts`.
 
 - Lead auditor: `resolveLeadAuditorPersonId` (`src/lib/personnel.ts`); not free text on annual plan.
 - Internal audit year: header `AuditYearSwitcher` only.
+- Year-switch confirm copy (`buildYearSwitchDescription`) must match `switchWorkspaceYear` in `src/lib/singleWorkspaceMigration.ts`: no archive → keep `planRows`, clear `months` to `null`, empty audits/NCR/observations/suggestions; do not describe a blank plan rebuild. Check: `src/lib/__tests__/auditYearSwitch.test.ts`.
 - External audit date: edit on prep page; sync `settings.externalAuditDate`.
 - Internal audit complete: derived via `buildMergedCertificateCoverage`; not a manual prep flag.
