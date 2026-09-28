@@ -19,6 +19,7 @@ Read when changing checklists, plan months, NCR close, dashboard counts, or navi
 - Only `執行中` allows judgment edits.
 - `startAudit` / `validateAuditStartState` in `src/hooks/useAuditStore.ts`.
 - Report requires formal record number + no pending checklist items (`isChecklistItemPending` in `src/lib/scoring.ts`).
+- `updateAudit` attempting `已回報` must pass the same `canCompleteAuditReport` gate as the UI (store fail-closed).
 - Conform / non-conform need `objectiveEvidence`; N/A needs `notApplicableReason` or legacy description.
 
 ## Plan months

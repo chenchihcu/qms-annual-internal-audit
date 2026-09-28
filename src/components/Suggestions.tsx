@@ -3,6 +3,7 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
+import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
 import { exportSuggestionsExcel } from '../lib/formExport'
 import type { SuggestionStatus, ThirdPartySuggestion } from '../types'
 import { ACTION_ICONS } from '../lib/uiIcons'
@@ -14,6 +15,7 @@ import { ScrollRegion } from './ui/ScrollRegion'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
+import { FollowupRecordLinkNotice } from './ui/FollowupRecordLinkNotice'
 
 export function Suggestions({
   store,
@@ -48,7 +50,7 @@ export function Suggestions({
     ...company.suggestions,
     ...Object.entries(state.yearArchives)
       .filter(([year]) => year !== String(currentYear))
-      .flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.suggestions ?? []),
+      .flatMap(([, archive]) => Object.values(archive.companies ?? {}).flatMap((co) => co.suggestions ?? [])),
   ], [company.suggestions, state.yearArchives, state.activeCompanyId, currentYear])
 
   const prior = allSuggestions.filter((s) => s.year < currentYear)
@@ -57,6 +59,13 @@ export function Suggestions({
   const highlightIndex = highlightRecordId
     ? listedSuggestions.findIndex((suggestion) => suggestion.id === highlightRecordId)
     : -1
+  const recordLinkResult = useMemo(
+    () => (highlightRecordId ? resolveFollowupRecordLink(state, highlightRecordId, 'suggestion') : null),
+    [state, highlightRecordId],
+  )
+  const showRecordLinkNotice = Boolean(
+    highlightRecordId && highlightIndex < 0 && recordLinkResult && recordLinkResult.status !== 'found',
+  )
   const pagination = useTablePagination(
     listedSuggestions.length,
     10,
@@ -125,6 +134,7 @@ export function Suggestions({
           auditYear={currentYear}
           formTitle="第三方稽核建議事項一覽表"
         />
+        {showRecordLinkNotice && recordLinkResult && <FollowupRecordLinkNotice result={recordLinkResult} />}
         <PageToolbar
           actions={(
             <>

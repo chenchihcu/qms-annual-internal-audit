@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
+import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
 import { isNcrStale, ncrNumberLabels } from '../lib/ncr'
 import { planRowSelectOptions } from '../lib/planRowOptions'
 import { ACTION_ICONS } from '../lib/uiIcons'
@@ -17,6 +18,7 @@ import { ScrollRegion } from './ui/ScrollRegion'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
+import { FollowupRecordLinkNotice } from './ui/FollowupRecordLinkNotice'
 
 const STATUSES: NCRStatus[] = ['開立', '矯正中', '結案']
 const CLASSIFICATIONS: NCRClassification[] = ['重大', '輕微']
@@ -45,6 +47,13 @@ export function NCRList({
   const highlightIndex = highlightRecordId
     ? company.ncrs.findIndex((ncr) => ncr.id === highlightRecordId)
     : -1
+  const recordLinkResult = useMemo(
+    () => (highlightRecordId ? resolveFollowupRecordLink(state, highlightRecordId, 'ncr') : null),
+    [state, highlightRecordId],
+  )
+  const showRecordLinkNotice = Boolean(
+    highlightRecordId && highlightIndex < 0 && recordLinkResult && recordLinkResult.status !== 'found',
+  )
   const displayNumbers = ncrNumberLabels(company.ncrs)
   const pagination = useTablePagination(
     company.ncrs.length,
@@ -107,6 +116,8 @@ export function NCRList({
           auditYear={settings.auditYear}
           formTitle="不符合事項清單 QR-28-03"
         />
+
+        {showRecordLinkNotice && recordLinkResult && <FollowupRecordLinkNotice result={recordLinkResult} />}
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>

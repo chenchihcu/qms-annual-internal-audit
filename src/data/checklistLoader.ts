@@ -237,3 +237,46 @@ export function refreshedSeedItemsIfPendingOnly(
   if (seedItems.length === 1 && seedItems[0].category === '待匯入') return null
   return seedItems.map((item) => ({ ...item, origin: 'seed' as const }))
 }
+
+export interface ChecklistSeedDiagnosis {
+  pendingImportOnly: boolean
+  seedResolved: boolean
+  departmentCandidates: string[]
+  seedImportInProgress: string | null
+  advisory: string
+}
+
+/** 查檢「待匯入」占位時的種子／別名診斷（不修改快照） */
+export function diagnoseChecklistSeed(
+  qpCode: string,
+  department: string | undefined,
+  items: ChecklistItem[],
+): ChecklistSeedDiagnosis {
+  const departmentCandidates = departmentSeedLookupCandidates(department)
+  const seedResolved = Boolean(resolveProcedureSeed(qpCode, department))
+  const pendingImportOnly = isPendingImportOnlyAudit(items)
+  const seedImportInProgress = seedImportProgress()
+  const parts: string[] = []
+  if (seedImportInProgress) {
+    parts.push(`種子資料 ${seedImportInProgress}，完成前可能仍顯示占位。`)
+  }
+  if (pendingImportOnly && !seedResolved) {
+    parts.push(
+      `尚未解析到種子題目（QP ${qpCode}）。已嘗試部門鍵：${
+        departmentCandidates.length > 0 ? departmentCandidates.join('、') : '（未提供部門）'
+      }。請核對部門主檔名稱與種子別名，勿直接判定種子未上傳。`,
+    )
+  } else if (items.some((item) => item.category === '待匯入')) {
+    parts.push('部分列仍為待匯入占位；若已填寫判定或證據，系統不會自動覆寫快照。')
+  }
+  if (parts.length === 0) {
+    parts.push('查檢項目待確認：請核對部門別名與種子狀態。')
+  }
+  return {
+    pendingImportOnly,
+    seedResolved,
+    departmentCandidates,
+    seedImportInProgress,
+    advisory: parts.join(' '),
+  }
+}

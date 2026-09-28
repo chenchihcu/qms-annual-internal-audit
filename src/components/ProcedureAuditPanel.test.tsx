@@ -5,9 +5,14 @@ import { createChecklistForProcedure } from '../data/checklistLoader'
 import { useAuditStore } from '../hooks/useAuditStore'
 import { migrateState } from '../lib/migrate'
 import { migrateToSingleWorkspace } from '../lib/singleWorkspaceMigration'
+import type { AppState } from '../types'
 import { ProcedureAuditPanel } from './ProcedureAuditPanel'
 
 beforeEach(() => localStorage.clear())
+
+function activeCompanyData(state: AppState) {
+  return state.companies[state.activeCompanyId]
+}
 
 function AuditPage({ selectedKey = 'QP-05|dept-qa' }: { selectedKey?: string }) {
   const store = useAuditStore()
@@ -36,7 +41,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('folds matching documents into the procedure cell', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-03') ?? company.audits[0]
     audit.id = 'audit-QP-03-dept-qa'
     audit.qpCode = 'QP-03'
@@ -60,7 +65,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('keeps a distinct document on the procedure cell', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits[0]
     audit.id = 'audit-QP-03-dept-qa'
     audit.qpCode = 'QP-03'
@@ -81,7 +86,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('shows legacy QP-03 seed wording as one shared audit question', async () => {
     const state = createDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const sourceAudit = company.audits[0]
     company.audits = [
       {
@@ -110,7 +115,7 @@ describe('ProcedureAuditPanel', () => {
     { status: '已回報', setupEditable: false, canJudge: false },
   ] as const)('enforces editable fields for $status audits', async ({ status, setupEditable, canJudge }) => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
     audit.id = 'audit-QP-28-dept-qa'
     company.audits = [audit]
@@ -150,7 +155,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('shows the impartiality checkbox only when an assignee belongs to the audited department', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-03' && item.departmentId === 'dept-qa')
       ?? company.audits[0]
     const sameDepartment = state.people.find((person) => person.affiliations.some(
@@ -221,7 +226,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('prevents starting an audit without an implementation date', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
     audit.id = 'audit-QP-28-dept-qa'
     company.audits = [audit]
@@ -243,7 +248,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('resets unsaved report references when changing audit records', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
     const otherPlan = company.planRows.find((row) => row.qpCode !== audit.qpCode || row.departmentId !== audit.departmentId)!
     audit.id = `audit-${audit.qpCode}-${audit.departmentId}`
@@ -274,7 +279,7 @@ describe('ProcedureAuditPanel', () => {
 
   it('shows evidence fields for the current judgment and keeps saved text', async () => {
     const state = createCurrentDemoState()
-    const company = state.companies[state.activeCompanyId]
+    const company = activeCompanyData(state)
     const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
     audit.id = 'audit-QP-28-dept-qa'
     audit.status = '執行中'
@@ -317,5 +322,44 @@ describe('ProcedureAuditPanel', () => {
     expect(await screen.findByLabelText('不適用理由')).toBeTruthy()
     expect(screen.getByLabelText('發現說明')).toHaveProperty('value', '現場說明')
     expect(screen.getByLabelText('客觀證據')).toHaveProperty('value', 'QR-01')
+  })
+
+  it('shows seed diagnosis banner for 待匯入 placeholder rows', async () => {
+    const state = createCurrentDemoState()
+    const company = activeCompanyData(state)
+    const audit = {
+      id: 'audit-QP-99-dept-qa',
+      qpCode: 'QP-99',
+      departmentId: 'dept-qa',
+      department: '品保部',
+      process: '未知程序',
+      documents: 'QP-99',
+      notifyDate: '',
+      auditDate: '',
+      departmentManager: company.departments.find((d) => d.id === 'dept-qa')?.owner ?? '',
+      auditors: '',
+      auditCategory: '系統稽核' as const,
+      items: [
+        {
+          id: 'chk-placeholder',
+          category: '待匯入' as const,
+          no: 1,
+          content: '（QP-99-UNKNOWN 查檢項目待匯入）',
+          judgment: null,
+          description: '',
+          origin: 'seed' as const,
+        },
+      ],
+      year: state.companySettings[state.activeCompanyId].auditYear,
+      status: '規劃中' as const,
+      scope: '品保部／未知程序',
+      criteria: 'QP-99',
+    }
+    company.audits = [audit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey="QP-99|dept-qa" />)
+
+    expect(await screen.findByText(/別名/)).toBeTruthy()
   })
 })

@@ -3,6 +3,7 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
+import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
 import { exportObservationsExcel } from '../lib/formExport'
 import { MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
 import { ncrNumberLabel, ncrNumberLabels } from '../lib/ncr'
@@ -21,6 +22,7 @@ import { ScrollRegion } from './ui/ScrollRegion'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
+import { FollowupRecordLinkNotice } from './ui/FollowupRecordLinkNotice'
 
 type YearFilter = 'all' | string
 type LedgerSourceFilter = 'all' | 'internal_audit' | 'third_party_audit'
@@ -223,6 +225,17 @@ export function Observations({
       : undefined,
     `${yearFilter}|${sourceFilter}|${statusFilter}|${showUnsyncedView}`,
   )
+  const recordLinkResult = useMemo(
+    () => (highlightRecordId ? resolveFollowupRecordLink(state, highlightRecordId, 'observation') : null),
+    [state, highlightRecordId],
+  )
+  const showRecordLinkNotice = Boolean(
+    highlightRecordId
+      && !showingUnsynced
+      && highlightedIndex < 0
+      && recordLinkResult
+      && recordLinkResult.status !== 'found',
+  )
 
   const importAllOpen = () => {
     for (const obs of importableObs) {
@@ -343,6 +356,7 @@ export function Observations({
           auditYear={currentYear}
           formTitle="觀察事項紀錄台帳"
         />
+        {showRecordLinkNotice && recordLinkResult && <FollowupRecordLinkNotice result={recordLinkResult} />}
       {showForm && (
         <div ref={formRef} className="mb-4">
         <Card className="border-blue-200 no-print">

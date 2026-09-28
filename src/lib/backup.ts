@@ -143,5 +143,14 @@ export function describeBackup(state: AppState): string {
   return `${year} 年度 · ${workspace.audits.length} 筆查檢 · ${unresolved} 項待覆核 · v${state.version}`
 }
 
+export function describeRestorePreview(sourceVersion: number | undefined, migrated: AppState): string {
+  const targetVersion = migrated.version
+  const migrationNote =
+    sourceVersion != null && sourceVersion !== targetVersion
+      ? `\n來源備份 v${sourceVersion}，還原後為 v${targetVersion}（已執行格式轉換）。`
+      : `\n備份版本 v${targetVersion}。`
+  return `${describeBackup(migrated)}${migrationNote}\n\n目前工作區資料將被覆寫。`
+}
+
 /** Demo fallback must remain valid after failed parse in loadState. */
 export { createDemoState }

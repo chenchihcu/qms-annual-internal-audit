@@ -22,6 +22,7 @@ import {
 import { isChecklistItemPending } from '../lib/scoring'
 import { formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
+import { diagnoseChecklistSeed } from '../data/checklistLoader'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import type { ChecklistItem, Judgment, TabId } from '../types'
 import { auditorCandidates, departmentMemberCandidates } from '../lib/personnel'
@@ -212,6 +213,12 @@ export function ProcedureAuditPanel({
     setSetupFocus((previous) => ({ request: previous.request + 1, date }))
   }
 
+  const seedDiagnosis = useMemo(() => {
+    if (!auditForPage || (auditForPage.status ?? '規劃中') === '已回報') return null
+    if (!auditForPage.items.some((item) => item.category === '待匯入')) return null
+    return diagnoseChecklistSeed(auditForPage.qpCode, auditForPage.department, auditForPage.items)
+  }, [auditForPage])
+
   if (!qpCode || !departmentId) {
     return <p className="text-muted">請先於年度稽核計畫建立查檢項目</p>
   }
@@ -228,6 +235,9 @@ export function ProcedureAuditPanel({
   const canJudge = auditStatus === '執行中' && !auditLocked
   const managerMismatch =
     auditLocked && dept != null && audit.departmentManager !== dept.owner
+  const departmentNameMismatch =
+    auditLocked && dept != null && audit.department.trim() !== dept.name.trim()
+  const showPendingImportBanner = seedDiagnosis != null
 
   const impartialityWarning = checkImpartiality({
     auditors: audit.auditors,
@@ -236,7 +246,7 @@ export function ProcedureAuditPanel({
     auditCategory: audit.auditCategory,
     departments: company.departments,
   })
-  const showImpartialityConfirm = validateAuditStart(audit).sameDepartmentConflict
+  const showImpartialityConfirm = validateAuditStart(audit).warnings.length > 0
 
   const handleStartAudit = () => {
     if (!audit.auditDate?.trim()) {
@@ -272,7 +282,11 @@ export function ProcedureAuditPanel({
       setReportErrors(gaps)
       return
     }
-    updateAudit({ ...candidate, status: '已回報' })
+    const result = updateAudit({ ...candidate, status: '已回報' })
+    if (!result.ok) {
+      setReportErrors(result.gaps)
+      return
+    }
     setReportErrors([])
   }
 
@@ -460,6 +474,11 @@ export function ProcedureAuditPanel({
             </div>
           </div>
           <ImpartialityBanner warning={impartialityWarning} />
+          {showPendingImportBanner && seedDiagnosis && (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status">
+              {seedDiagnosis.advisory}
+            </p>
+          )}
           {startErrors.length > 0 && (
             <ul className="list-disc space-y-0.5 pl-5 text-sm text-red-700" role="alert">
               {startErrors.map((msg) => <li key={msg}>{msg}</li>)}
@@ -477,6 +496,16 @@ export function ProcedureAuditPanel({
           )}
           {auditLocked && (
             <p className="text-sm text-muted">本表已回報鎖定；後續主檔變更不會改寫歷史紀錄。</p>
+          )}
+          {managerMismatch && (
+            <p className="text-sm text-amber-900" role="status">
+              部門主管與現行主檔不同（快照：{audit.departmentManager || '—'}；主檔：{dept?.owner || '—'}）。
+            </p>
+          )}
+          {departmentNameMismatch && (
+            <p className="text-sm text-amber-900" role="status">
+              部門名稱與現行主檔不同（快照：{audit.department}；主檔：{dept?.name}）。
+            </p>
           )}
         </div>
 

@@ -6,6 +6,7 @@ import {
   parseBackupJson,
   serializeBackup,
   validateAppState,
+  describeRestorePreview,
   BACKUP_FORMAT,
   backupFilename,
 } from '../backup'
@@ -106,5 +107,25 @@ describe('backup round-trip', () => {
   it('rejects a structurally valid backup from a newer version', () => {
     const newer = { ...createDemoState(), version: 15 }
     expect(() => parseBackupJson(JSON.stringify(newer))).toThrow('拒絕降版還原')
+  })
+
+  it('describeRestorePreview notes migration from older backup versions', () => {
+    const demo = createDemoState()
+    demo.version = 7
+    demo.dataSource = 'user'
+    delete demo.trash
+    const restored = parseBackupJson(JSON.stringify(demo))
+    const preview = describeRestorePreview(7, restored)
+    expect(preview).toMatch(/2026 年度/)
+    expect(preview).toMatch(/來源備份 v7/)
+    expect(preview).toMatch(/覆寫/)
+  })
+
+  it('describeRestorePreview for v14 backup shows target version only', () => {
+    const demo = createDemoState()
+    const restored = backupRoundTrip(demo)
+    const preview = describeRestorePreview(14, restored)
+    expect(preview).toMatch(/備份版本 v14/)
+    expect(preview).not.toMatch(/格式轉換/)
   })
 })

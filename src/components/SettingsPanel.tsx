@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
-import { backupFilename, describeBackup, parseBackupJson } from '../lib/backup'
+import { backupFilename, describeRestorePreview, parseBackupJson } from '../lib/backup'
 import { downloadBlob } from '../lib/download'
 import { exportAllFormsExcel } from '../lib/formExport'
 import {
@@ -100,8 +100,19 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
     reader.onload = () => {
       try {
         const json = reader.result as string
+        let sourceVersion: number | undefined
+        try {
+          const parsed = JSON.parse(json) as { _format?: string; state?: { version?: number }; version?: number }
+          const stateRaw =
+            parsed._format === 'qms-annual-internal-audit-backup' && parsed.state
+              ? parsed.state
+              : parsed
+          if (typeof stateRaw.version === 'number') sourceVersion = stateRaw.version
+        } catch {
+          sourceVersion = undefined
+        }
         const preview = parseBackupJson(json)
-        setPendingRestore({ json, summary: describeBackup(preview) })
+        setPendingRestore({ json, summary: describeRestorePreview(sourceVersion, preview) })
         setRestoreStatus(null)
       } catch (err) {
         setRestoreStatus({
@@ -312,7 +323,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
         <ConfirmDialog
           open
           title="確定還原備份？"
-          description={`${pendingRestore.summary}\n\n目前資料將被覆寫。`}
+          description={pendingRestore.summary}
           confirmLabel="確認還原"
           variant="danger"
           onConfirm={confirmRestore}

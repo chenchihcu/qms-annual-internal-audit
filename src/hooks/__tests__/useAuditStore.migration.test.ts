@@ -305,7 +305,7 @@ describe('year datasets', () => {
     const currentAudits = result.current.state.company.audits.length
     const prepBefore = result.current.state.externalAuditPrep.items[0].completed
     act(() => result.current.switchAuditYear(2027))
-    expect(result.current.state.companies.zhenglongxing.audits).toHaveLength(0)
+    expect(result.current.state.company.audits).toHaveLength(0)
     expect(result.current.state.yearArchives['2026']?.companies.jiurun?.audits).toHaveLength(currentAudits)
     expect(result.current.state.externalAuditPrep.items[0].completed).toBe(prepBefore)
   })
@@ -488,7 +488,13 @@ describe('audit event records', () => {
     expect(stillRunning.auditDate).toBe('2026-06-01')
     expect(stillRunning.reportReference).toBe('REPORT-001')
 
-    act(() => result.current.updateAudit({ ...stillRunning, status: '已回報' }))
+    stillRunning.items.forEach((item) => {
+      act(() => result.current.updateChecklistItem(sourceAudit.id, item.id, {
+        judgment: '符合',
+        objectiveEvidence: '測試證據',
+      }))
+    })
+    act(() => result.current.updateAudit({ ...stillRunning, status: '已回報', reportReference: 'REPORT-001' }))
     expect(result.current.state.company.audits.find((item) => item.id === sourceAudit.id)?.status).toBe('已回報')
     const originalContent = result.current.state.company.audits.find((item) => item.id === sourceAudit.id)!.items[0].content
     act(() => result.current.updateChecklistItem(sourceAudit.id, started.items[0].id, { content: '不應改寫歷史' }))
@@ -516,6 +522,12 @@ describe('audit event records', () => {
     act(() => result.current.startAudit(auditId))
     act(() => {
       const started = result.current.state.company.audits.find((item) => item.id === auditId)!
+      started.items.forEach((item) => {
+        result.current.updateChecklistItem(auditId, item.id, {
+          judgment: '符合',
+          objectiveEvidence: '測試證據',
+        })
+      })
       result.current.updateAudit({ ...started, status: '已回報', reportReference: 'RPT-LOCK' })
     })
     const beforeCount = result.current.state.company.audits.find((item) => item.id === auditId)!.items.length

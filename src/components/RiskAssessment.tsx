@@ -328,6 +328,17 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
   const rows = useMemo(() => company.planRows, [company.planRows])
 
+  const unsavedRiskRowCount = useMemo(
+    () => rows.filter((row) => {
+      const saved = savedRecord(company, row)
+      const persisted = isPersisted(saved)
+      const draft = drafts[rowKey(row)] ?? draftFromSaved(row, saved)
+      if (!persisted) return true
+      return JSON.stringify(draft) !== JSON.stringify(draftFromSaved(row, saved))
+    }).length,
+    [rows, company, drafts],
+  )
+
   const pagination = useTablePagination(rows.length)
 
 
@@ -347,7 +358,11 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
       />
 
-
+      {unsavedRiskRowCount > 0 && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 no-print" role="status">
+          尚有 {unsavedRiskRowCount} 列方案風險未按「存檔」寫入；PDCA 就緒仍只計已存檔列。
+        </p>
+      )}
 
       <div>
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ChecklistItem } from '../../types'
 import {
   createChecklistForProcedure,
+  diagnoseChecklistSeed,
   getSeedChecklistQuestions,
   isPendingImportOnlyAudit,
   refreshedSeedItemsIfPendingOnly,
@@ -65,6 +66,13 @@ describe('待匯入占位刷新', () => {
       },
     ]
     expect(refreshedSeedItemsIfPendingOnly('QP-11', '開發工程', withJudgment)).toBeNull()
+  })
+
+  it('diagnoseChecklistSeed 對占位列提供別名提示', () => {
+    const diagnosis = diagnoseChecklistSeed('QP-99-UNKNOWN', '開發工程', placeholder)
+    expect(diagnosis.pendingImportOnly).toBe(true)
+    expect(diagnosis.departmentCandidates).toContain('開發工程')
+    expect(diagnosis.advisory).toMatch(/別名/)
   })
 })
 

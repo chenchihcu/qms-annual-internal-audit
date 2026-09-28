@@ -79,6 +79,9 @@ import {
   permanentlyDeleteTrashRecord,
   restoreTrashRecord,
 } from '../lib/trash'
+import { canCompleteAuditReport } from '../lib/workflowStatus'
+
+export type UpdateAuditResult = { ok: true } | { ok: false; gaps: string[] }
 
 interface LoadStateResult {
   state: AppState
@@ -812,37 +815,63 @@ export function useAuditStore() {
     return id
   }, [currentAuditYear])
 
-  const updateAudit = useCallback((audit: ProcedureAudit) => {
+  const updateAudit = useCallback((audit: ProcedureAudit): UpdateAuditResult => {
+    const co = state.companies[state.activeCompanyId]
+    const stored = co.audits.find((item) => item.id === audit.id)
+    if (audit.status === '已回報') {
+      if (stored?.status !== '執行中') {
+        return { ok: false, gaps: ['須於執行中狀態且填寫正式紀錄編號後才能完成回報'] }
+      }
+      if (!audit.reportReference?.trim()) {
+        return { ok: false, gaps: ['須填寫正式紀錄編號'] }
+      }
+      const candidate = {
+        ...stored,
+        reportReference: audit.reportReference.trim(),
+        status: '已回報' as const,
+      }
+      const gate = canCompleteAuditReport(candidate, settingsFor(state).scoringRules)
+      if (!gate.ready) return { ok: false, gaps: gate.gaps }
+    }
+
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      const exists = co.audits.some((a) => a.id === audit.id)
+      const company = s.companies[s.activeCompanyId]
+      const exists = company.audits.some((a) => a.id === audit.id)
       const audits = exists
-        ? co.audits.map((stored) => {
-            if (stored.id !== audit.id) return stored
-            if (stored.status === '已回報') return stored
-            if (stored.status === '執行中') {
-              const status = audit.status === '已回報' && audit.reportReference?.trim() ? '已回報' : '執行中'
-              return {
-                ...stored,
-                reportReference: audit.reportReference,
-                status: status as ProcedureAudit['status'],
+        ? company.audits.map((current) => {
+            if (current.id !== audit.id) return current
+            if (current.status === '已回報') return current
+            if (current.status === '執行中') {
+              const reportRef = audit.reportReference?.trim() ?? current.reportReference
+              if (audit.status === '已回報' && reportRef) {
+                const candidate = {
+                  ...current,
+                  reportReference: reportRef,
+                  status: '已回報' as const,
+                }
+                const gate = canCompleteAuditReport(candidate, settingsFor(s).scoringRules)
+                if (!gate.ready) return current
+                return candidate
               }
+              return { ...current, reportReference: audit.reportReference }
             }
+            if (audit.status === '已回報') return current
             return audit
           })
-        : [...co.audits, audit]
+        : [...company.audits, audit]
 
-      let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, co.ncrs)
+      let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, company.ncrs)
       ncrs = syncNCRDescriptions(ncrs, audits)
         .filter((item) => !isRecordInTrash(s.trash, 'ncr', s.activeCompanyId, item.id, settingsFor(s).auditYear)
           && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', s.activeCompanyId, item.id, item.sourceYear ?? settingsFor(s).auditYear))
 
-      const observations = syncObservationsFromAudits(audits, co.observations, settingsFor(s).auditYear)
+      const observations = syncObservationsFromAudits(audits, company.observations, settingsFor(s).auditYear)
         .filter((item) => !isRecordInTrash(s.trash, 'observation', s.activeCompanyId, item.id, settingsFor(s).auditYear)
           && !isGeneratedRecordPermanentlyDeleted(s, 'observation', s.activeCompanyId, item.id, item.year))
       return patchCompany(s, s.activeCompanyId, { audits, ncrs, observations })
     })
-  }, [])
+    return { ok: true }
+  }, [state])
 
   const updateChecklistItem = useCallback(
     (auditId: string, itemId: string, patch: Partial<ChecklistItem>) => {
