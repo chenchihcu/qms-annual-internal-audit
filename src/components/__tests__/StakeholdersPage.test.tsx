@@ -13,18 +13,17 @@ describe('StakeholdersPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: '利害關係人' })).toBeTruthy()
+      expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
+      expect(screen.queryByText('評分規則與編排影響')).toBeNull()
+      expect(screen.queryByRole('heading', { name: '利害關係人' })).toBeNull()
+      expect(screen.queryByRole('heading', { name: /部門利害關係人一覽/ })).toBeNull()
     }, { timeout: 5000 })
 
     const form = document.getElementById('stakeholders-form') as HTMLElement
     expect(form).toBeTruthy()
-    expect(within(form).getByText(/評分規則與編排影響/)).toBeTruthy()
-    const rulesPanel = within(form).getByText(/評分規則與編排影響/).closest('details')
-    expect(rulesPanel?.hasAttribute('open')).toBe(false)
-    expect(within(form).getByText(/優先分數 = Σ\(標籤權重\)×2 \+ O×S/)).toBeTruthy()
-    expect(within(form).getByText(/編排影響（預覽自動編排時）/)).toBeTruthy()
     expect(within(form).queryByText(/QP-28/)).toBeNull()
     expect(within(form).getAllByText(/本部門 QP · 優先/).length).toBeGreaterThan(0)
+    expect(within(form).queryByRole('radiogroup', { name: /發生度/ })).toBeNull()
     const guide = document.querySelector('[data-workflow-guide="top"]')
     if (guide) {
       expect(guide.textContent).toMatch(/待完成：利害關係人已標註 \d+\/\d+/)
@@ -33,7 +32,7 @@ describe('StakeholdersPage', () => {
     expect(within(form).getAllByText('管理部').length).toBeGreaterThan(0)
   })
 
-  it('updates chip pressed state when toggling stakeholder tag', async () => {
+  it('updates chip and occurrence only in edit dialog', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
 
@@ -43,8 +42,17 @@ describe('StakeholdersPage', () => {
 
     const adminRow = formDepartmentRow('dept-admin')
     expect(adminRow).toBeTruthy()
+    expect(within(adminRow!).queryByRole('button', { name: '供應商' })).toBeNull()
 
-    const supplierChip = within(adminRow!).getByRole('button', { name: '供應商' })
+    const editBtn = within(adminRow!).getByRole('button', { name: /編輯 管理部/ })
+    fireEvent.click(editBtn)
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy()
+    })
+
+    const dialog = screen.getByRole('dialog')
+    const supplierChip = within(dialog).getByRole('button', { name: '供應商' })
     const pressedBefore = supplierChip.getAttribute('aria-pressed')
     fireEvent.click(supplierChip)
 
@@ -58,6 +66,12 @@ describe('StakeholdersPage', () => {
     await waitFor(() => {
       expect(within(group).getByRole('radio', { name: /發生度 高：一年多次或持續發生/ }).getAttribute('aria-checked')).toBe('true')
     })
+
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+    expect(document.activeElement).toBe(editBtn)
   })
 })
 
