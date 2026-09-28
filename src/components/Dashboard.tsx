@@ -10,9 +10,10 @@ import {
   countPriorOpenObservations,
 } from '../lib/dashboardMetrics'
 import type { NavigateOptions, ObservationSection } from '../lib/navigation'
-import { FOCUS_RING } from '../lib/focusRing'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { TabId } from '../types'
+import { Button } from './ui/Badge'
+import { ScrollRegion } from './ui/ScrollRegion'
 
 interface DashboardProps {
   state: AuditStore['state']
@@ -61,16 +62,13 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
       key: 'ncr',
       label: '未結 NCR',
       value: String(openNCR),
-      hint: `共 ${company.ncrs.length} 筆紀錄`,
+      hint: openNCR !== company.ncrs.length ? `共 ${company.ncrs.length} 筆紀錄` : undefined,
       tab: 'ncr' as TabId,
     },
     {
       key: 'prep',
       label: '外稽準備',
       value: `${prepProgress.done}/${prepProgress.total}`,
-      hint: prepProgress.done < prepProgress.total
-        ? `尚有 ${prepProgress.total - prepProgress.done} 項待辦`
-        : '準備項目已完成',
       tab: 'prep' as TabId,
     },
   ]
@@ -106,49 +104,63 @@ export function Dashboard({ state, onNavigate }: DashboardProps) {
     },
   ]
 
+  const overviewRows = [
+    ...summaryMetrics.map((metric) => ({
+      key: metric.key,
+      label: metric.label,
+      value: metric.value,
+      hint: metric.hint,
+      tab: metric.tab,
+      options: undefined as NavigateOptions | undefined,
+    })),
+    ...trackingRows.map((row) => ({
+      key: row.key,
+      label: row.label,
+      value: String(row.value),
+      hint: undefined as string | undefined,
+      tab: row.tab,
+      options: row.options,
+    })),
+  ]
+
   return (
-    <div className="space-y-5 print-area">
-      <header>
-        <h2 className="text-base font-semibold text-ink">稽核總覽</h2>
-      </header>
-
-      <section aria-labelledby="dashboard-summary-heading">
-        <h3 id="dashboard-summary-heading" className="sr-only">年度摘要</h3>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {summaryMetrics.map((metric) => (
-            <button
-              key={metric.key}
-              type="button"
-              className={`min-w-0 rounded-lg border border-line bg-surface p-4 text-left transition hover:border-primary/50 hover:bg-page ${FOCUS_RING}`}
-              aria-label={`前往：${metric.label}`}
-              onClick={() => onNavigate(metric.tab)}
-            >
-              <span className="block text-sm text-muted">{metric.label}</span>
-              <span className="mt-1 block text-2xl font-semibold tabular-nums text-ink">{metric.value}</span>
-              <span className="mt-1 block text-xs text-muted">{metric.hint}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section aria-labelledby="dashboard-followups-heading" className="rounded-lg border border-line bg-surface p-4">
-        <h3 id="dashboard-followups-heading" className="mb-3 text-sm font-semibold text-ink">追蹤清單</h3>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {trackingRows.map((row) => (
-            <button
-              key={row.key}
-              type="button"
-              className={`flex min-h-14 items-center justify-between gap-3 rounded-md border border-line px-3 py-2 text-left hover:bg-page ${FOCUS_RING}`}
-              aria-label={`前往：${row.label}`}
-              onClick={() => onNavigate(row.tab, row.options)}
-            >
-              <span className="text-sm text-ink">{row.label}</span>
-              <span className="text-lg font-semibold tabular-nums text-ink">{row.value}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
+    <div className="print-area">
+      <ScrollRegion ariaLabel="稽核總覽">
+        <table className="worksheet-table min-w-[38.4rem]">
+          <colgroup>
+            <col className="col-overview-item" />
+            <col className="col-status" />
+            <col />
+            <col className="col-action no-print" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>結果</th>
+              <th>說明</th>
+              <th className="no-print">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {overviewRows.map((row) => (
+              <tr key={row.key}>
+                <td>{row.label}</td>
+                <td className="font-medium tabular-nums">{row.value}</td>
+                <td>{row.hint}</td>
+                <td className="no-print">
+                  <Button
+                    variant="secondary"
+                    aria-label={`前往：${row.label}`}
+                    onClick={() => onNavigate(row.tab, row.options)}
+                  >
+                    開啟
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </ScrollRegion>
     </div>
   )
 }
