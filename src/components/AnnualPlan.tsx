@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
@@ -7,15 +8,14 @@ import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { evaluateDateSequence } from '../lib/coverage'
 import { FOCUS_RING } from '../lib/focusRing'
 import { buildAppHash } from '../lib/navigation'
-import { getDisplayMonthStatus } from '../lib/planStatus'
-import { cycleMonthStatus } from '../lib/planner'
+import { getDisplayMonthStatus, type MonthCellChoice } from '../lib/planStatus'
 import { auditorCandidates, departmentMemberCandidates, resolveLeadAuditorPersonId } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { MONTH_STATUS_LEGEND } from '../types'
-import type { MonthStatus } from '../types'
+import type { MonthStatus, TabId } from '../types'
+import { WorkflowGuide } from './ui/WorkflowGuide'
 import { Badge, Button, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import { PageToolbar } from './ui/PageToolbar'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
@@ -38,13 +38,94 @@ function statusShort(status: MonthStatus): string {
   return status === '矯正圓滿' ? '圓' : status.charAt(0)
 }
 
-export function AnnualPlan({ store }: { store: AuditStore }) {
-  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthStatus } = store
+const MONTH_CELL_CHOICES: { choice: MonthCellChoice; label: string }[] = [
+  { choice: 'blank', label: '空白' },
+  { choice: '擬定', label: '擬定' },
+  { choice: '滿意', label: '滿意' },
+  { choice: '不滿意', label: '不滿意' },
+  { choice: '矯正中', label: '矯正中' },
+  { choice: '矯正圓滿', label: '矯正圓滿' },
+]
+
+function storedMonthChoice(scheduled: MonthStatus, override: MonthStatus | null | undefined): MonthCellChoice {
+  if (override === '滿意' || override === '不滿意' || override === '矯正中' || override === '矯正圓滿') return override
+  return scheduled ? '擬定' : 'blank'
+}
+
+function MonthChoiceMenu({
+  anchor,
+  label,
+  current,
+  onSelect,
+  onClose,
+}: {
+  anchor: DOMRect
+  label: string
+  current: MonthCellChoice
+  onSelect: (choice: MonthCellChoice) => void
+  onClose: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (menuRef.current?.contains(target)) return
+      if (target instanceof Element && target.closest('[data-month-anchor]')) return
+      onClose()
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    menuRef.current?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus()
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  const top = Math.min(anchor.bottom + 4, window.innerHeight - 300)
+  const left = Math.min(Math.max(8, anchor.left), window.innerWidth - 140)
+
+  return createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label={label}
+      className="fixed z-40 min-w-28 rounded-lg border border-line bg-surface p-1"
+      style={{ top, left }}
+    >
+      {MONTH_CELL_CHOICES.map((item) => (
+        <button
+          key={item.choice}
+          type="button"
+          role="menuitemradio"
+          aria-checked={current === item.choice}
+          className={`flex min-h-11 w-full items-center whitespace-nowrap rounded px-3 text-left text-sm ${FOCUS_RING} ${
+            current === item.choice ? statusClass(item.choice === 'blank' ? null : item.choice) : 'hover:bg-page'
+          }`}
+          onClick={() => onSelect(item.choice)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  )
+}
+
+export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigate?: (tab: TabId) => void }) {
+  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthChoice } = store
   const { settings, company } = state
   const effectiveExternalAuditDate = state.externalAuditPrep.externalAuditDate?.trim() || settings.externalAuditDate
   const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: effectiveExternalAuditDate })
 
   const [regenConfirm, setRegenConfirm] = useState(false)
+  const [openMonth, setOpenMonth] = useState<{ key: string; rect: DOMRect } | null>(null)
+  const closeMonthMenu = useCallback(() => setOpenMonth(null), [])
   const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${settings.auditYear}`)
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
@@ -89,28 +170,15 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
       />
       <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
 
-      {dateWarnings.length > 0 && (
-        <div
-          role="alert"
-          className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 no-print dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
-        >
-          {dateWarnings.map((msg) => (
-            <p key={msg}>⚠ {msg}</p>
-          ))}
-        </div>
-      )}
-
       <div>
-        <PageToolbar
-          title="年度稽核計畫"
-          actions={<Button onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>}
-        />
-
-        <div className="mb-4 flex flex-wrap gap-2 text-xs no-print">
-          {MONTH_STATUS_LEGEND.map((l) => (
-            <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
-          ))}
-          <span className="text-muted">（點擊月格切換排程；滿意／不滿意等由查檢與 NCR 推導）</span>
+        <div className="mb-4 flex flex-wrap items-center gap-3 no-print">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm">
+            {MONTH_STATUS_LEGEND.map((l) => (
+              <span key={l.label} className={`rounded px-2 py-1 ${l.color}`}>{l.label}</span>
+            ))}
+            <span className="text-muted">（點月格可選排程或滿意／不滿意／矯正中／矯正圓滿；未手選時仍由查檢與 NCR 推導）</span>
+          </div>
+          <Button className="shrink-0" onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
         </div>
 
         <details className="mb-6 no-print">
@@ -186,17 +254,17 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
               {MONTHS.map((month) => <col key={month} className="col-month" />)}
             </colgroup>
             <thead>
-              <tr className="bg-page text-left text-muted">
-                <th className="border border-line px-1.5 py-2">項次</th>
-                <th className="border border-line px-1.5 py-2">風險</th>
-                <th className="border border-line px-1.5 py-2">QP<span className="no-print">／流程</span></th>
-                <th className="border border-line px-1.5 py-2">被稽核部門</th>
-                <th className="print-table-cell border border-line px-1.5 py-2 whitespace-normal">稽核流程/文件</th>
-                <th className="print-table-cell border border-line px-1.5 py-2">負責人</th>
-                <th className="print-table-cell border border-line px-1.5 py-2">類型</th>
-                <th className="border border-line px-1.5 py-2">稽核人員</th>
+              <tr>
+                <th>項次</th>
+                <th>風險</th>
+                <th>QP<span className="no-print">／流程</span></th>
+                <th>被稽核部門</th>
+                <th className="print-table-cell whitespace-normal">稽核流程/文件</th>
+                <th className="print-table-cell">負責人</th>
+                <th className="print-table-cell">類型</th>
+                <th>稽核人員</th>
                 {MONTHS.map((m) => (
-                  <th key={m} className="border border-line p-1 text-center w-11">{m}</th>
+                  <th key={m} className="p-1 text-center w-11">{m}</th>
                 ))}
               </tr>
             </thead>
@@ -216,15 +284,23 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                         : ''
                   }`}
                 >
-                  <td className="border border-line px-1.5 py-2 tabular-nums">{row.sequence}</td>
-                  <td className="border border-line px-1.5 py-2"><Badge label={row.riskLevel} /></td>
-                  <td className="border border-line px-1.5 py-2 font-medium break-words">
-                    <div className="flex flex-wrap items-center gap-1">
+                  <td className="tabular-nums">{row.sequence}</td>
+                  <td><Badge label={row.riskLevel} /></td>
+                  <td className="font-medium break-words">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <a
                         href={buildAppHash('audit', { auditKey: `${row.qpCode}|${row.departmentId}` })}
                         aria-label={`${row.qpCode} ${row.department} 查檢表`}
-                        className={`inline-flex min-h-11 items-center whitespace-nowrap text-link hover:underline ${FOCUS_RING}`}
+                        className={`inline-flex min-h-11 w-fit shrink-0 items-center whitespace-nowrap text-link hover:underline ${FOCUS_RING}`}
                       >{row.qpCode}</a>
+                      <button
+                        type="button"
+                        className={`no-print inline-flex min-h-11 w-fit shrink-0 items-center whitespace-nowrap text-sm text-link hover:underline ${FOCUS_RING}`}
+                        aria-label={`${row.qpCode} ${row.department} 明細`}
+                        aria-expanded={expanded}
+                        aria-controls={`plan-detail-${row.id}`}
+                        onClick={() => setExpandedId(expanded ? null : row.id)}
+                      >{expanded ? '收合' : '明細'}</button>
                       {unscheduled && (
                         <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
                           未排月格
@@ -237,23 +313,15 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                       )}
                     </div>
                     <div className="no-print text-xs text-muted">{row.process}</div>
-                    <button
-                      type="button"
-                      className={`no-print mt-1 min-h-11 text-sm text-link hover:underline ${FOCUS_RING}`}
-                      aria-label={`${row.qpCode} ${row.department} 明細`}
-                      aria-expanded={expanded}
-                      aria-controls={`plan-detail-${row.id}`}
-                      onClick={() => setExpandedId(expanded ? null : row.id)}
-                    >{expanded ? '收合' : '明細'}</button>
                   </td>
-                  <td className="border border-line px-1.5 py-2 break-words">{row.department}</td>
-                  <td className="print-table-cell border border-line px-1.5 py-2 break-words">
+                  <td className="break-words">{row.department}</td>
+                  <td className="print-table-cell break-words">
                     <div>{row.process}</div>
                     <div className="text-xs text-muted">{row.documents}</div>
                   </td>
-                  <td className="print-table-cell border border-line px-1.5 py-2 break-words">{row.owner}</td>
-                  <td className="print-table-cell border border-line px-1.5 py-2 text-xs break-words">{row.auditCategory}</td>
-                  <td className="border border-line px-1.5 py-2 break-words">
+                  <td className="print-table-cell break-words">{row.owner}</td>
+                  <td className="print-table-cell text-xs break-words">{row.auditCategory}</td>
+                  <td className="break-words">
                     <AuditorMultiSelect
                       value={row.auditors}
                       onChange={(auditors) => updatePlanRow(row.id, { auditors })}
@@ -274,17 +342,38 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                     const displayStatus = scheduledStatus
                       ? getDisplayMonthStatus(row, i, company.audits, company.ncrs, settings.auditYear)
                       : null
+                    const monthKey = `${row.id}|${i}`
+                    const menuLabel = `${row.qpCode} ${i + 1} 月狀態`
                     return (
-                    <td key={i} className="border border-line p-0.5 text-center">
+                    <td key={i} className="p-0.5 text-center">
                       <button
                         type="button"
+                        data-month-anchor={monthKey}
                         title={`排程：${statusLabel(scheduledStatus)} · 顯示：${statusLabel(displayStatus)}`}
                         aria-label={`${row.qpCode} ${i + 1} 月：${statusLabel(displayStatus)}`}
+                        aria-haspopup="menu"
+                        aria-expanded={openMonth?.key === monthKey}
+                        aria-controls={openMonth?.key === monthKey ? `month-menu-${row.id}-${i}` : undefined}
                         className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(displayStatus)}`}
-                        onClick={() => setPlanMonthStatus(row.id, i, cycleMonthStatus(scheduledStatus))}
+                        onClick={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect()
+                          setOpenMonth((current) => current?.key === monthKey ? null : { key: monthKey, rect })
+                        }}
                       >
                         {statusShort(displayStatus)}
                       </button>
+                      {openMonth?.key === monthKey && (
+                        <MonthChoiceMenu
+                          anchor={openMonth.rect}
+                          label={menuLabel}
+                          current={storedMonthChoice(scheduledStatus, row.manualMonthOverrides?.[i])}
+                          onSelect={(choice) => {
+                            setPlanMonthChoice(row.id, i, choice)
+                            setOpenMonth(null)
+                          }}
+                          onClose={closeMonthMenu}
+                        />
+                      )}
                       <span className={`print-only text-xs ${statusClass(displayStatus)}`}>
                         {statusShort(displayStatus)}
                       </span>
@@ -292,7 +381,7 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
                   )})}
                 </tr>
                 <tr id={`plan-detail-${row.id}`} hidden={!expanded || !pagination.isVisible(rowIndex)} className="no-print bg-page">
-                  <td colSpan={17} className="border border-line p-3">
+                  <td colSpan={17} className="p-3">
                     {expanded && (
                       <div className="grid gap-3 sm:grid-cols-3">
                         <div className="min-w-0 break-words"><span className="block text-xs text-muted">對應文件</span>{row.documents || '—'}</div>
@@ -318,6 +407,19 @@ export function AnnualPlan({ store }: { store: AuditStore }) {
           </table>
         </ScrollRegion>
         <TablePagination pagination={pagination} label="年度稽核計畫" />
+      </div>
+      <div className="flex flex-wrap items-stretch gap-3 no-print empty:hidden">
+        <WorkflowGuide tab="plan" state={state} onNavigate={onNavigate} className="min-w-[min(100%,16rem)] flex-1" />
+        {dateWarnings.length > 0 && (
+          <div
+            role="alert"
+            className="min-w-[min(100%,16rem)] flex-1 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+          >
+            {dateWarnings.map((msg) => (
+              <p key={msg}>⚠ {msg}</p>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
