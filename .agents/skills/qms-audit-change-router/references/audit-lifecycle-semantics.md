@@ -2,6 +2,14 @@
 
 Read when changing checklists, plan months, NCR close, dashboard counts, or navigation deep links.
 
+## Checklist seed vs stored snapshot
+
+- Seed questions: `src/data/checklistLoader.ts` + `src/data/checklists.seed.json`.
+- Runtime snapshots live in `company.audits[].items` (localStorage). `createChecklistForProcedure` uses department **profile name**, not always `proceduresRaw.department`.
+- Department alias example: profile `開發工程` → seed key `開發工程部` (`normalizeDepartmentForSeedLookup`).
+- Placeholder row `category: 待匯入` does not mean seed is empty; check alias + existing audit before editing JSON.
+- Safe refresh: `isPendingImportOnlyAudit` + `refreshedSeedItemsIfPendingOnly`; skip when status is `已回報` or any item has user work.
+
 ## Checklist state machine
 
 ```

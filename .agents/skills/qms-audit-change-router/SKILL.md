@@ -15,6 +15,7 @@ Classify the task before changing this repository. This project stores audit sta
 | Audit lifecycle, months, counts, NCR close, deep links | [references/audit-lifecycle-semantics.md](references/audit-lifecycle-semantics.md) |
 | Sidebar, tab order, RWD, workflow gaps | `docs/web-ui-ux-sidebar-spec.md`, `src/lib/navigation.ts`, `.cursor/rules/ui-information-hierarchy.mdc` |
 | Audit semantics, certificate, seed or storage | `AGENTS.md`, `src/lib/singleWorkspaceMigration.ts`, `src/lib/backup.ts`, `src/hooks/useAuditStore.ts`, `docs/single-workspace-migration-spec.md`, affected seeds |
+| Checklist seed, department alias, 待匯入占位 | `src/data/checklistLoader.ts`, `src/data/checklists.seed.json`, `src/data/procedurePlan.ts`, [references/audit-lifecycle-semantics.md](references/audit-lifecycle-semantics.md) |
 | Checklist start/report, evidence fields | `src/components/ProcedureAuditPanel.tsx`, `src/lib/scoring.ts`, `src/lib/workflowStatus.ts` |
 | Plan month schedule vs display | `src/lib/planner.ts`, `src/lib/planStatus.ts`, `src/components/AnnualPlan.tsx` |
 | NCR close, description sync | `src/lib/ncr.ts`, `src/components/NCRList.tsx`, `src/hooks/useAuditStore.ts` |

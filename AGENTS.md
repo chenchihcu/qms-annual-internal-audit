@@ -26,6 +26,9 @@
 - **觀察計數**：儀表板三數不可合併——查檢判定次數、本年度台帳 open、前年度 open（含封存）；實作見 `src/lib/dashboardMetrics.ts`。
 - **任命與年度**：主任稽核員用 `resolveLeadAuditorPersonId`；內稽年度僅頁首切換；外稽日期僅外稽準備編輯並同步 `settings.externalAuditDate`；內部稽核完成為覆蓋推導唯讀。
 - **深連結**：`src/lib/navigation.ts` 的 hash 支援 `record`（`recordId`）；待改善追蹤點列須開到 NCR／觀察／建議該筆並展開。
+- **查檢種子與部門名**：題目基準在 `src/data/checklists.seed.json`，查詢鍵為 `QP|部門`（`resolveProcedureSeed`／`getSeedChecklistQuestions`）。年度計畫 `proceduresRaw.department`（例：開發工程部）與部門主檔 `DepartmentProfile.name`（例：開發工程）可能不一致；`procedurePlan.ts` 的 `DEPT_ID` 與 `checklistLoader` 的部門別名須同步維護。畫面「查檢項目待匯入」先查別名與 `localStorage` 是否只剩占位，不可直接判定種子未上傳。
+- **待匯入占位刷新**：僅當稽核項目全是未填寫的「待匯入」、且狀態非「已回報」時，才可用種子題目取代（`refreshedSeedItemsIfPendingOnly`／`getOrCreateAudit`）。已有判定、說明或證據的快照不覆寫；不得以清 `localStorage` 修復。
+- **外部 QR-28-02 盤點**：與種子比對時以 `checklists.seed.json` 的年度與 `proceduresRaw` 為準（現行為 114 年度種子，非 112 原檔逐字複製）。114 增補題、NCR 附註與 `checklistItem.ts` 顯示層改寫，不因 112 Excel 盤點而覆寫種子或使用者快照。
 
 <!-- 文案邊界依據：2026-09-24「002#稽核介面文案精簡」；來源保留見 src/components/PreAuditPrep.tsx，列印識別驗證見 smoke-playwright.mjs。 -->
 
@@ -52,6 +55,7 @@
 - 文件／技能修改使用內容、引用及治理檢查；只重跑本次修改會影響的 gate，不為取得 Harness marker 重跑無關產品全套測試。命令被啟動前拒絕、產品檢查失敗、Harness 事件未登錄須分開回報，無新證據不重複重試。
 - Harness 識別：從 `functions.exec` 執行固定驗證器時，直接輸出 `exec_command` 的 stdout 原文，不用 `JSON.stringify` 包裝；完成後確認 `C:\Users\user\.codex\data\harness\events.jsonl` 有 `event=verification`、`result=ok`、`verification_marker=true`。若只看到終端 marker 而事件未入帳，視為 Harness 尚未驗證。（2026-09-26）
 - 完整驗證使用固定入口 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1`，依序執行 lint、tests、build 及僅連到 43124 的隔離瀏覽器 smoke；全數成功才輸出 `event=verification result=ok verification_marker=true`。單一檢查使用同一入口加 `-Mode lint`、`-Mode tests`、`-Mode build` 或 `-Mode browser-smoke`；成功時輸出範圍明確的 Harness marker，測試可再限縮 `-TestFile`／`-TestName`。`-Mode local-backup` 只檢查最近 30 分鐘內設定頁完整 JSON 備份（`QMS備份_*.json`）的格式／版本／雜湊；`-Mode migration-backup` 只檢查遷移閘門專用 JSON（`QMS遷移前備份_*.json`）；兩者均可用 `-BackupPath` 指定其他實際路徑，不輸出紀錄內容，也不代表完整程式驗證成功。避免臨時 PowerShell `-Command` 驗證，因本機執行政策會在啟動前拒絕不透明命令；拒絕代表命令未啟動，應改用已檢視的固定 `-File` 入口，不可把拒絕算成測試失敗或成功。
+- 已移除的設定頁（「稽核基本資料」「管理系統認證證書」、證書範圍／編號／適用性輸入）不得從 `HEAD`（`424a86a` 的 `SettingsPanel.tsx` 仍含這些標題）或舊煙測補回。`smoke-playwright.mjs` 只斷言這些標題與欄位不存在；煙測因缺標題失敗時改斷言，不把舊頁加回。`SettingsPanel`、`SystemFlowChart`、設定頁測試、煙測與 [`docs/web-ui-ux-sidebar-spec.md`](docs/web-ui-ux-sidebar-spec.md) 同一批提交，避免捨棄未提交檔後整頁回到舊設計。證書文字仍留在資料與匯出。檢查：設定頁無上述標題與欄位；煙測在它們出現時失敗。出處：2026-09-28 舊設定頁被工作區蓋回。
 - 依變更範圍使用 `npm run lint`、`npm test` 與 `npm run build`；UI 變更另檢查 375／768／1280／1536px 實際呈現與鍵盤操作，涉及收合區時檢查收合後列印內容。僅有 DOM 文字或無整頁 overflow 的檢查，不能取代可讀性、互動與列印驗收。側欄 smoke 斷言產品名須容忍桌面／窄螢幕雙 DOM（`getAllByText`）；`lazy` 分頁測試全套件易逾時，可 `beforeAll` 預載該 chunk。
 - 開始前先檢查 `git status` 並保留既有變更；不得重設、清理或覆蓋不屬於目前工作的檔案。
 - 未經使用者明確要求，不建立提交、不推送、不整合至受保護分支，也不清除或重建使用者資料。
