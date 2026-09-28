@@ -132,7 +132,7 @@ export function Suggestions({
       {showForm && (
         <div ref={formRef} className="mb-4">
         <Card className="border-blue-200 no-print">
-          <h3 className="mb-4 font-semibold">登錄第三方建議</h3>
+          <h3 className="mb-4 text-sm font-semibold">登錄第三方建議</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <Select
               label="程序 QP"

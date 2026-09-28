@@ -306,7 +306,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       {activeSection === 'data' && (
         <div className="space-y-4">
           <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="backup-heading">
-            <h2 id="backup-heading" className="mb-2 text-base font-semibold text-slate-900">備份與還原</h2>
+            <h2 id="backup-heading" className="mb-2 text-sm font-semibold text-slate-900">備份與還原</h2>
             <p className="mb-4 text-sm text-slate-600">完整 JSON 備份包含工作區、年度封存、外稽準備與回收區。資料變更後須重新下載備份，才能還原並覆寫目前資料。</p>
             <div className="flex flex-wrap gap-3">
               <Button icon={ACTION_ICONS.backup} onClick={handleBackup}>下載完整備份</Button>
@@ -328,7 +328,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="export-heading">
-            <h2 id="export-heading" className="mb-2 text-base font-semibold text-slate-900">匯出工作表</h2>
+            <h2 id="export-heading" className="mb-2 text-sm font-semibold text-slate-900">匯出工作表</h2>
             <p className="mb-4 text-sm text-slate-600">匯出目前年度資料供整理、列印或另存正式紀錄；本系統的本機資料不取代受控紀錄。</p>
             <div className="flex flex-wrap gap-3">
               <Button icon={ACTION_ICONS.exportExcel} onClick={handleExportAllExcel}>匯出全部稽核表單</Button>

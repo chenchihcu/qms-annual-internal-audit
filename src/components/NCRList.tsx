@@ -160,7 +160,7 @@ export function NCRList({
           </div>
         )}
 
-        <h3 className="mb-3 font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
+        <h3 className="mb-3 text-sm font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
 
         {company.ncrs.length === 0 ? (
           <EmptyState message="目前無不符合事項" />

@@ -449,7 +449,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       {editing && (
       <div ref={editCardRef}>
       <Card className="border-blue-200">
-        <h3 className="mb-4 font-semibold">{editing.id ? '編輯人員與資格' : '新增人員與資格'}</h3>
+        <h3 className="mb-4 text-sm font-semibold">{editing.id ? '編輯人員與資格' : '新增人員與資格'}</h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Input label="姓名 *" value={editing.name} onChange={(v) => patchForm({ name: v })} />
           <Select label="人員類型" value={editing.type} onChange={(v) => patchForm({ type: v as FormState['type'] })} options={[{ value: 'internal', label: '內部人員' }, { value: 'external', label: '外部人員' }]} />

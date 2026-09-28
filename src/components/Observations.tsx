@@ -329,7 +329,7 @@ export function Observations({
       {showForm && (
         <div ref={formRef} className="mb-4">
         <Card className="border-blue-200 no-print">
-          <h3 className="mb-4 font-semibold">登錄稽核活動觀察事項</h3>
+          <h3 className="mb-4 text-sm font-semibold">登錄稽核活動觀察事項</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Select label="來源活動" value={form.sourceType} onChange={(value) => setForm({ ...form, sourceType: value as typeof form.sourceType, sourceAuditId: '' })} options={[{ value: 'internal_audit', label: '內部稽核' }, { value: 'third_party_audit', label: '第三方稽核' }]} />
             {form.sourceType === 'internal_audit' && <Select label="內部稽核事件" value={form.sourceAuditId} onChange={(value) => { const audit = auditEvents.find((item) => item.id === value); setForm({ ...form, sourceAuditId: value, sourceReference: audit?.reportReference || value, occurrenceDate: audit?.auditDate || audit?.plannedDate || '', qpCode: audit?.qpCode || '', departmentId: audit?.departmentId || form.departmentId }) }} options={[{ value: '', label: '請選擇事件' }, ...auditEvents.map((audit) => ({ value: audit.id, label: `${audit.year ?? currentYear} · ${audit.qpCode} · ${audit.department} · ${audit.auditDate || audit.plannedDate || '日期待確認'}` }))]} />}

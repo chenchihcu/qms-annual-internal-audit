@@ -61,3 +61,16 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
 
 圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 12 頁，不渲染 PDCA 分組標題。
+
+## 2026-09-28 畫面字級對齊（harvest）
+
+字級任務先盤點再改；不改判定、計分、列印正式標題與 `formExport` 內嵌字級。
+
+| 意圖 | 規則 | 檢查 |
+| --- | --- | --- |
+| 盤點 | 依序：`src/index.css`（`body`／`@media print`）→ `rg 'text-(xs\|sm\|base\|lg\|xl)' src` → 共用 `Button`／`Input`／`.worksheet-table` | 列印／`print-only`／`formExport` 標為例外，不列入畫面違規 |
+| 兩級契約 | 畫面僅 14px（`text-sm`）與 12px（`text-xs`）；`h1`–`h4` 須有 `text-sm`，禁止畫面 `text-base`／`text-lg` 以上（列印表頭除外） | `rg 'text-(base\|lg\|xl\|2xl\|3xl)' src --glob '*.tsx'` 為零（`PrintDocHeader` 的 `print-only` 除外） |
+| 不升級密度 | 不把 `body` 或工作表整體升到 16px；層級靠 `font-semibold`／`font-bold`，不靠更大字級 | 使用者未核准前不改 `index.css` `body` 14px 與 `html` rem 基準 |
+| 驗收 | 受影響頁元件測試 + `43124` 量測關鍵標題 `getComputedStyle` 為 14px | 設定備份區 `h2`、確認對話、利害關係人編輯對話已量測 |
+
+出處：2026-09-28「字體尺寸優化」對話；產品決策：對齊現行 14／12，不選整體放大一階。

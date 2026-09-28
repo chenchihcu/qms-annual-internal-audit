@@ -45,7 +45,7 @@ export function MigrationGate({
   return (
     <section className="mx-auto max-w-2xl rounded-xl border border-line bg-surface p-6" aria-labelledby="migration-title">
       <p className="text-xs font-semibold uppercase tracking-wide text-brand">資料格式升級</p>
-      <h1 id="migration-title" className="mt-2 text-xl font-bold text-ink">先備份，再整理為單一稽核工作區</h1>
+      <h1 id="migration-title" className="mt-2 text-sm font-bold text-ink">先備份，再整理為單一稽核工作區</h1>
       <p className="mt-3 text-sm leading-6 text-muted">
         系統會把原本分開的稽核資料合併成一份。資料不一致的欄位會列入待覆核，查檢判定衝突會先暫停計分。
         選取的備份檔與目前原始資料一致前，系統不會改寫原始資料。
