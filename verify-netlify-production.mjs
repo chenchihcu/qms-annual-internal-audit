@@ -13,7 +13,20 @@ if (!response.ok || !remoteIndex.includes(bundle)) {
 }
 
 const browser = await chromium.launch({ headless: true })
-const tabs = ['稽核總覽', '標準', '程序', '方案風險與優先順序', '年度稽核計畫', '稽核員能力與任命', '稽核執行與證據', '不符合與矯正措施', '觀察事項與追蹤', '改善機會與建議', '外部稽核前準備與序位', '系統設定']
+const tabs = [
+  '稽核總覽',
+  '利害關係人',
+  '方案風險',
+  '人員合格名單',
+  '年度稽核計畫',
+  '查檢表',
+  '觀察事項',
+  '不符合',
+  '第三方建議',
+  '待改善追蹤',
+  '外稽準備',
+  '系統設定',
+]
 const widths = [375, 768, 1280, 1536]
 const findings = []
 try {

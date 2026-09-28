@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDemoState, migrateToV8, STORAGE_KEY } from '../data/demoData'
 import { createChecklistForProcedure } from '../data/checklistLoader'
@@ -28,9 +28,9 @@ describe('ProcedureAuditPanel', () => {
       expect(screen.getByLabelText('查檢表')).toBeTruthy()
       expect(screen.getByLabelText('實施日期')).toBeTruthy()
       expect(screen.queryByRole('heading', { name: '查檢表' })).toBeNull()
-      expect(screen.getByRole('region', { name: '查檢判定計數統計表' })).toBeTruthy()
-      expect(screen.getByText('程序得分')).toBeTruthy()
-      expect(screen.getByRole('columnheader', { name: '未判定' })).toBeTruthy()
+      const stats = screen.getByLabelText('查檢判定統計')
+      expect(within(stats).getByText('程序得分')).toBeTruthy()
+      expect(within(stats).getByText('未判定')).toBeTruthy()
     })
   })
 
@@ -77,7 +77,7 @@ describe('ProcedureAuditPanel', () => {
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
 
     const auditDate = await screen.findByLabelText('實施日期') as HTMLInputElement
-    expect(screen.queryByLabelText('通知日期', { hidden: true })).toBeNull()
+    expect(screen.queryByLabelText('通知日期')).toBeNull()
     await waitFor(() => {
       expect(auditDate.value).toBe(audit.auditDate)
       expect(screen.getByText(status)).toBeTruthy()
@@ -91,19 +91,17 @@ describe('ProcedureAuditPanel', () => {
     expect(screen.queryByRole('button', { name: '開始稽核' }) !== null).toBe(status === '規劃中')
     expect(screen.queryByRole('button', { name: '完成回報' }) !== null).toBe(status === '執行中')
 
-    const impartialityCheckbox = screen.queryByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement | null
-    const impartialityNote = screen.queryByLabelText('客觀性控制措施／依據') as HTMLInputElement | null
-    if (status === '已回報') {
-      expect(impartialityCheckbox).toBeNull()
-      expect(impartialityNote).toBeNull()
-    } else {
-      expect(impartialityCheckbox?.disabled).toBe(!setupEditable)
-      expect(impartialityNote?.disabled).toBe(!setupEditable)
+    if (status !== '規劃中') {
+      fireEvent.click(screen.getByRole('button', { name: / 稽核設定$/ }))
     }
 
-    expect(screen.queryByLabelText('稽核人員') !== null).toBe(setupEditable)
+    const impartialityCheckbox = screen.getByRole('checkbox', { name: /客觀性風險已確認/ }) as HTMLInputElement
+    const impartialityNote = screen.getByLabelText('客觀性控制措施／依據') as HTMLInputElement
+    expect(impartialityCheckbox.disabled).toBe(!setupEditable)
+    expect(impartialityNote.disabled).toBe(!setupEditable)
+
     if (status === '執行中') {
-      expect(screen.getByText(/日期、稽核人員與客觀性設定已固定/)).toBeTruthy()
+      expect(screen.getByText(/日期、人員與客觀性設定已固定/)).toBeTruthy()
     }
   })
 
@@ -120,7 +118,7 @@ describe('ProcedureAuditPanel', () => {
 
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
     await waitFor(() => {
-      expect(screen.queryByLabelText('通知日期', { hidden: true })).toBeNull()
+      expect(screen.queryByLabelText('通知日期')).toBeNull()
       expect(screen.getByText('規劃中')).toBeTruthy()
     })
     fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))

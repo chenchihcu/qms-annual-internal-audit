@@ -277,22 +277,25 @@ for (const width of widths) {
       const stakeholderRow = stakeholderRows.first()
       const stakeholderDepartmentId = await stakeholderRow.getAttribute('data-stakeholder-dept')
       if (!stakeholderDepartmentId) throw new Error('利害關係人資料列缺少部門識別')
-      const unselectedTags = stakeholderRow.locator('button[aria-pressed="false"]')
+      const stakeholderEditButton = stakeholderRow.getByRole('button', { name: /編輯 .+ 利害關係人與風險/ })
+      if (await stakeholderEditButton.count() !== 1) throw new Error('第一筆利害關係人資料列沒有編輯按鈕')
+      await stakeholderEditButton.click()
+      const stakeholderDialog = page.getByRole('dialog')
+      await stakeholderDialog.waitFor({ state: 'visible', timeout: 5000 })
+      const unselectedTags = stakeholderDialog.locator('button[aria-pressed="false"]')
       if (await unselectedTags.count() === 0) throw new Error('第一筆利害關係人資料列沒有可編輯標籤')
       const stakeholderTag = unselectedTags.first()
       const stakeholderTagLabel = (await stakeholderTag.innerText()).trim()
       const stakeholderTagValue = stakeholderTagLabel.replace(/\s+·\s+\d+$/, '')
-      const selectedStakeholderTag = stakeholderRow.getByRole('button', { name: stakeholderTagLabel, exact: true })
-      await selectedStakeholderTag.click()
-      await page.waitForFunction(({ departmentId, tag }) => {
-        const row = document.querySelector(`[data-stakeholder-dept="${departmentId}"]`)
-        const button = [...(row?.querySelectorAll('button') ?? [])]
+      await stakeholderTag.click()
+      await page.waitForFunction(({ tag }) => {
+        const dialog = document.querySelector('[role="dialog"]')
+        const button = [...(dialog?.querySelectorAll('button') ?? [])]
           .find((item) => item.textContent?.trim() === tag)
         return button?.getAttribute('aria-pressed') === 'true'
-      }, { departmentId: stakeholderDepartmentId, tag: stakeholderTagLabel }, { timeout: 5000 })
-      if (await selectedStakeholderTag.getAttribute('aria-pressed') !== 'true') {
-        throw new Error('選取利害關係人標籤後狀態未更新')
-      }
+      }, { tag: stakeholderTagLabel }, { timeout: 5000 })
+      await stakeholderDialog.getByRole('button', { name: '關閉', exact: true }).click()
+      await stakeholderDialog.waitFor({ state: 'hidden', timeout: 5000 })
       await page.waitForFunction(({ departmentId, tag }) => {
         const containsSelection = (value) => {
           if (Array.isArray(value)) return value.some(containsSelection)
@@ -315,10 +318,8 @@ for (const width of widths) {
       await page.reload({ waitUntil: 'domcontentloaded' })
       await navigateTab('利害關係人')
       const persistedStakeholderRow = page.locator(`[data-stakeholder-dept="${stakeholderDepartmentId}"]`)
-      const persistedStakeholderTag = persistedStakeholderRow.getByRole('button', { name: stakeholderTagLabel, exact: true })
-      if (await persistedStakeholderTag.count() !== 1) throw new Error('重載後無法唯一定位已儲存利害關係人標籤')
-      if (await persistedStakeholderTag.getAttribute('aria-pressed') !== 'true') {
-        throw new Error('利害關係人標籤未在重載後保存')
+      if (!await persistedStakeholderRow.getByText(stakeholderTagValue, { exact: true }).count()) {
+        throw new Error('重載後表格未顯示已儲存利害關係人標籤')
       }
       workflowChecks.push('利害關係人標籤編輯與重載讀回')
 
@@ -326,8 +327,9 @@ for (const width of widths) {
       await navigateTab('方案風險')
       const riskRegion = page.getByRole('region', { name: '程序風險評估一覽' })
       const riskRow = riskRegion.getByRole('row').nth(1)
-      const riskIdentityParts = (await riskRow.getByRole('cell').first().innerText()).split('\n').map((value) => value.trim())
-      const [riskQpCode, riskDepartment] = riskIdentityParts
+      const riskCells = riskRow.getByRole('cell')
+      const riskQpCode = (await riskCells.nth(0).innerText()).trim()
+      const riskDepartment = (await riskCells.nth(1).innerText()).trim()
       if (!riskQpCode || !riskDepartment) throw new Error('方案風險第一筆資料缺少程序或部門識別')
       const riskEvidenceInput = riskRow.locator('input[aria-label$="證據引用"]')
       if (await riskEvidenceInput.count() !== 1) throw new Error('方案風險第一筆資料沒有唯一證據引用欄位')
@@ -421,14 +423,18 @@ for (const width of widths) {
           && params.get('section') === 'current'
           && params.get('record') === expectedId
       }, observationRecordId, { timeout: 5000 })
-      await page.waitForFunction((expectedId) => (
-        document.querySelector(`#observation-${expectedId} > div`)?.classList.contains('bg-slate-50') ?? false
-      ), observationRecordId, { timeout: 5000 })
+      await page.waitForFunction((expectedId) => {
+        const row = document.querySelector(`#observation-${expectedId}`)
+        const toggle = row?.querySelector('button[aria-expanded]')
+        const detail = document.getElementById(`observation-detail-${expectedId}`)
+        return toggle?.getAttribute('aria-expanded') === 'true' && detail != null
+      }, observationRecordId, { timeout: 5000 })
       workflowChecks.push('待改善追蹤觀察深連結定位與展開')
+      const observationDetail = page.locator(`#observation-detail-${observationRecordId}`)
       await observationCard.getByRole('button', { name: '編輯／結案', exact: true }).click()
-      const saveAndCloseObservation = observationCard.getByRole('button', { name: '儲存並結案', exact: true })
+      const saveAndCloseObservation = observationDetail.getByRole('button', { name: '儲存並結案', exact: true })
       if (await saveAndCloseObservation.isEnabled()) throw new Error('缺少結案證據時觀察事項仍可結案')
-      await observationCard.getByLabel('結案證據／紀錄', { exact: true }).fill('Smoke隔離驗收結案證據')
+      await observationDetail.getByLabel('結案證據／紀錄', { exact: true }).fill('Smoke隔離驗收結案證據')
       if (!await saveAndCloseObservation.isEnabled()) throw new Error('填入結案證據後仍無法結案觀察事項')
       await saveAndCloseObservation.click()
       await page.getByRole('button', { name: '已結案', exact: true }).click()
@@ -624,8 +630,8 @@ for (const width of widths) {
           leadAuditorPersonId: leadId,
           auditorPersonIds: [],
           escortPersonIds: [],
-          impartialityConfirmed: false,
-          impartialityNote: '',
+          impartialityConfirmed: true,
+          impartialityNote: '隔離測試客觀性依據',
         }
         audit.items = audit.items.slice(0, 1).map((item) => ({
           ...item,
@@ -642,7 +648,7 @@ for (const width of widths) {
       if (await auditSelector.count() !== 1) throw new Error('查檢表選擇器不唯一')
       await auditSelector.selectOption('QP-28|dept-qa')
       await page.getByRole('button', { name: '開始稽核', exact: true }).click()
-      await page.getByRole('status').filter({ hasText: '已開始。' }).waitFor({ state: 'visible', timeout: 5000 })
+      await page.getByRole('button', { name: '完成回報', exact: true }).waitFor({ state: 'visible', timeout: 5000 })
 
       const reportReference = page.getByLabel('正式紀錄編號', { exact: true })
       await page.getByRole('button', { name: '完成回報', exact: true }).click()

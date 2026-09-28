@@ -237,7 +237,7 @@ export function Observations({
   }
 
   return (
-    <div className="space-y-6 print-area qr-form">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-clip print-area qr-form">
       <div className="mb-3 flex flex-wrap items-center gap-2 no-print">
         {(importableObs.length > 0 || importableNCR.length > 0) && (
           <div className="flex w-fit max-w-full shrink-0 flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
@@ -337,7 +337,7 @@ export function Observations({
         </div>
       )}
 
-      <div>
+      <div className="min-w-0 max-w-full">
         <PrintDocHeader
           companyName={company.name}
           auditYear={currentYear}

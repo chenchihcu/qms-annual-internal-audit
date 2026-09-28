@@ -40,7 +40,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
-  children: ReactNode
+  children?: ReactNode
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
   icon?: IconName
   ref?: Ref<HTMLButtonElement>
