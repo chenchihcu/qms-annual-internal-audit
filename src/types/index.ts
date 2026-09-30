@@ -60,10 +60,14 @@ export type PersonType = 'internal' | 'external'
 export type PersonnelRole =
   | 'internal_auditor'
   | 'internal_lead_auditor'
+  | 'trainee_auditor'
   | 'management_representative'
   | 'annual_escort'
   | 'third_party_lead_auditor'
   | 'third_party_auditor'
+
+/** 人員資格頁維護的三態（舊資料無此欄時仍走文件／日期推導） */
+export type ManagedQualificationStatus = 'effective' | 'suspended' | 'invalid'
 
 export type ValidityMode = 'fixed' | 'no_expiry' | 'pending'
 
@@ -99,6 +103,13 @@ export interface QualificationRecord {
   revisionOfId?: string
   revisedAt?: string
   statusReason?: string
+  /** 簡化資格頁：有效／暫停／失效 */
+  qualificationStatus?: ManagedQualificationStatus
+  /** 綁定標準名稱；版本由 auditProfile 集中管理 */
+  applicableStandard?: 'AS9100'
+  evidenceAttachments?: EvidenceAttachment[]
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface RoleAppointment {

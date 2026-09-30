@@ -11,10 +11,39 @@ import type {
 export const PERSONNEL_ROLE_LABELS: Record<PersonnelRole, string> = {
   internal_auditor: '合格內部稽核員',
   internal_lead_auditor: '主任稽核員（內部）',
+  trainee_auditor: '實習稽核員',
   management_representative: '管理代表',
   annual_escort: '本年度陪稽核員',
   third_party_lead_auditor: '第三方主任稽核員',
   third_party_auditor: '第三方稽核員',
+}
+
+/** 內部稽核人員資格表單用標籤 */
+export const AUDITOR_QUALIFICATION_FORM_LABELS: Record<
+  'internal_auditor' | 'internal_lead_auditor' | 'trainee_auditor',
+  string
+> = {
+  internal_auditor: '內部稽核員',
+  internal_lead_auditor: '主導稽核員',
+  trainee_auditor: '實習稽核員',
+}
+
+export const AUDITOR_QUALIFICATION_ROLES = [
+  'internal_auditor',
+  'internal_lead_auditor',
+  'trainee_auditor',
+] as const
+
+export type AuditorQualificationRole = (typeof AUDITOR_QUALIFICATION_ROLES)[number]
+
+export function isAuditorQualificationRole(
+  role: PersonnelRole,
+): role is AuditorQualificationRole {
+  return role === 'internal_auditor' || role === 'internal_lead_auditor' || role === 'trainee_auditor'
+}
+
+export function isAssignableAuditorQualificationRole(role: PersonnelRole): boolean {
+  return role === 'internal_auditor' || role === 'internal_lead_auditor'
 }
 
 export const QUALIFICATION_STATE_LABELS: Record<QualificationState, string> = {
@@ -54,6 +83,9 @@ export function qualificationState(
   onDate: string,
 ): QualificationState {
   if (qualification.supersededAt && qualification.supersededAt <= onDate) return 'ended'
+  if (qualification.qualificationStatus === 'invalid') return 'ended'
+  if (qualification.qualificationStatus === 'suspended') return 'suspended'
+  if (qualification.qualificationStatus === 'effective') return 'effective'
   if (qualification.endedAt && qualification.endedAt <= onDate) return 'ended'
   if (qualification.suspendedAt && qualification.suspendedAt <= onDate) return 'suspended'
   if (
@@ -75,26 +107,42 @@ export function qualificationState(
   return 'effective'
 }
 
+export function managedQualificationStatusLabel(
+  qualification: QualificationRecord,
+  onDate: string,
+): string {
+  if (qualification.qualificationStatus === 'effective') return '有效'
+  if (qualification.qualificationStatus === 'suspended') return '暫停'
+  if (qualification.qualificationStatus === 'invalid') return '失效'
+  const state = qualificationState(qualification, onDate)
+  if (state === 'effective') return '有效'
+  if (state === 'suspended') return '暫停'
+  if (state === 'ended' || state === 'expired') return '失效'
+  return QUALIFICATION_STATE_LABELS[state]
+}
+
+export function currentAuditorQualification(
+  person: Person,
+  onDate?: string,
+): QualificationRecord | undefined {
+  const date = onDate ?? new Date().toISOString().slice(0, 10)
+  return person.qualifications.toReversed().find((item) => (
+    isAuditorQualificationRole(item.role)
+    && (!item.supersededAt || item.supersededAt > date)
+  ))
+}
+
 function qualificationMatchesScope(
   q: QualificationRecord,
   companyId: CompanyId,
-  qpCode: string,
-  departmentId: string,
+  _qpCode: string,
+  _departmentId: string,
   onDate: string,
-  requiredStandards: string[],
+  _requiredStandards: string[],
 ) {
-  const roleMatch = q.role === 'internal_auditor' || q.role === 'internal_lead_auditor'
-  const companyMatch = q.companyIds.includes(companyId)
-  const procedureMatch = scopeIncludes(q.procedureScopes, qpCode)
-  const departmentMatch = scopeIncludes(q.departmentScopes, departmentId)
-  const normalized = q.standardVersions.map((value) => value.toLowerCase().replace(/\s+/g, ''))
-  const standardMatch = requiredStandards.length === 0
-    || scopeIncludes(q.standardVersions, QUALIFICATION_SCOPE_ALL)
-    || requiredStandards.every((required) => {
-      const name = required.split(':')[0].toLowerCase().replace(/\s+/g, '')
-      return normalized.some((value) => value.includes(name))
-    })
-  return roleMatch && companyMatch && procedureMatch && departmentMatch && standardMatch && qualificationState(q, onDate) === 'effective'
+  if (!isAssignableAuditorQualificationRole(q.role)) return false
+  const companyMatch = q.companyIds.length === 0 || q.companyIds.includes(companyId)
+  return companyMatch && qualificationState(q, onDate) === 'effective'
 }
 
 export function matchingAuditQualifications(
@@ -115,6 +163,19 @@ export function matchingAuditQualifications(
   ))
 }
 
+function qualificationMatchScore(
+  q: QualificationRecord,
+  qpCode: string,
+  departmentId: string,
+): number {
+  let score = 0
+  if (q.procedureScopes.length === 0 || scopeIncludes(q.procedureScopes, qpCode)) score += 4
+  else score -= 8
+  if (q.departmentScopes.length === 0 || scopeIncludes(q.departmentScopes, departmentId)) score += 2
+  else score -= 4
+  return score
+}
+
 export function findMatchingAuditQualification(
   person: Person,
   role: 'internal_auditor' | 'internal_lead_auditor',
@@ -125,10 +186,14 @@ export function findMatchingAuditQualification(
   requiredStandards: string[] = [],
 ): QualificationRecord | undefined {
   const matches = matchingAuditQualifications(person, companyId, qpCode, departmentId, onDate, requiredStandards)
-  if (role === 'internal_lead_auditor') {
-    return matches.find((qualification) => qualification.role === 'internal_lead_auditor') ?? matches[0]
-  }
-  return matches[0]
+  if (matches.length === 0) return undefined
+  const rolePool = role === 'internal_lead_auditor'
+    ? matches.filter((qualification) => qualification.role === 'internal_lead_auditor')
+    : matches.filter((qualification) => qualification.role === 'internal_auditor')
+  const pool = rolePool.length > 0 ? rolePool : matches
+  return [...pool].sort((left, right) => (
+    qualificationMatchScore(right, qpCode, departmentId) - qualificationMatchScore(left, qpCode, departmentId)
+  ))[0]
 }
 
 export function findActiveLeadAppointment(
@@ -139,7 +204,6 @@ export function findActiveLeadAppointment(
   return person.appointments.find((appointment) => (
     appointment.role === 'internal_lead_auditor'
     && appointment.companyId === companyId
-    && Boolean(appointment.documentReference.trim())
     && Boolean(appointment.effectiveFrom)
     && appointment.effectiveFrom <= onDate
     && (!appointment.effectiveTo || appointment.effectiveTo >= onDate)
@@ -277,7 +341,7 @@ function sortPeopleByName(people: Person[]): Person[] {
   return [...people].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
 }
 
-/** 符合此次 QP／部門／日期的有效內部稽核員（含主任稽核員資格） */
+/** 符合此次日期的可指派內部稽核員（不含實習；不再以 QP／部門／人員標準版本限縮） */
 export function auditorCandidates(
   people: Person[],
   companyId: CompanyId,
@@ -340,7 +404,6 @@ export function verifierCandidates(
       (appointment) => (
         appointment.role === 'management_representative'
         && appointment.companyId === companyId
-        && Boolean(appointment.documentReference.trim())
         && Boolean(appointment.effectiveFrom)
         && appointment.effectiveFrom <= date
         && (!appointment.effectiveTo || appointment.effectiveTo >= date)

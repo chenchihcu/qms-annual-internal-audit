@@ -16,6 +16,9 @@ const colors: Record<string, string> = {
   待追蹤: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
   已結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
   '已轉 NCR': 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+  有效: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800',
+  暫停: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
+  失效: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600',
 }
 
 const FOCUS_RING =

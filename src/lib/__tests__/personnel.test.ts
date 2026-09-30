@@ -32,6 +32,18 @@ describe('personnel qualification validation', () => {
     expect(qualificationState(qualification({ validityMode: 'no_expiry', effectiveTo: undefined }), '2030-01-01')).toBe('effective')
   })
 
+  it('honours managed qualificationStatus without document fields', () => {
+    expect(qualificationState(qualification({
+      qualificationStatus: 'effective',
+      documentTitle: '',
+      documentNumber: '',
+      assessedBy: '',
+      effectiveFrom: '',
+      validityMode: 'pending',
+    }), '2026-06-01')).toBe('effective')
+    expect(qualificationState(qualification({ qualificationStatus: 'invalid' }), '2026-06-01')).toBe('ended')
+  })
+
   it('allows a qualified in-scope lead and blocks an expired one', () => {
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
     expect(validateAuditTeam([person], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01').canStart).toBe(true)
@@ -80,12 +92,11 @@ describe('personnel qualification validation', () => {
     expect(team.impartialityNote).toBe('')
   })
 
-  it('keeps an incomplete scope in draft rather than treating it as all procedures', () => {
+  it('allows start when procedure scope is empty under simplified assignment rules', () => {
     const incomplete = { ...person, qualifications: [qualification({ procedureScopes: [] })] }
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
     const result = validateAuditTeam([incomplete], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
-    expect(result.canStart).toBe(false)
-    expect(result.errors.some((error) => error.includes('缺少符合此次範圍'))).toBe(true)
+    expect(result.canStart).toBe(true)
   })
 
   it('requires lead qualification or an active lead appointment in addition to audit qualification', () => {
@@ -113,31 +124,28 @@ describe('personnel qualification validation', () => {
     expect(validateAuditTeam([appointed], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01').canStart).toBe(true)
   })
 
-  it('treats scope sentinel as matching any procedure, department, and confirmed standard', () => {
-    const team = {
-      leadAuditorPersonId: 'p1',
-      auditorPersonIds: [],
-      escortPersonIds: [],
-      impartialityConfirmed: true,
-      impartialityNote: '職責分離已確認',
-    }
-    const allScopes = {
-      ...person,
-      qualifications: [qualification({
-        procedureScopes: [QUALIFICATION_SCOPE_ALL],
-        departmentScopes: [QUALIFICATION_SCOPE_ALL],
-        standardVersions: [QUALIFICATION_SCOPE_ALL],
-      })],
-    }
-    expect(validateAuditTeam([allScopes], team, 'jiurun', 'QP-01', 'dept-admin', '2026-06-01', ['ISO 9001:2015']).canStart).toBe(true)
-  })
-
-  it('still blocks when explicit procedure list excludes the audit event', () => {
+  it('still matches auditors when explicit procedure list excludes the audit event', () => {
     const team = { leadAuditorPersonId: 'p1', auditorPersonIds: [], escortPersonIds: [], impartialityConfirmed: false, impartialityNote: '' }
     const narrow = { ...person, qualifications: [qualification({ procedureScopes: ['QP-01'] })] }
     const result = validateAuditTeam([narrow], team, 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')
-    expect(result.canStart).toBe(false)
-    expect(result.errors.some((error) => error.includes('缺少符合此次範圍'))).toBe(true)
+    expect(result.canStart).toBe(true)
+  })
+
+  it('excludes trainee auditors from assignment lists', () => {
+    const trainee = {
+      ...person,
+      id: 'p-trainee',
+      qualifications: [qualification({
+        role: 'trainee_auditor',
+        qualificationStatus: 'effective',
+        documentTitle: '',
+        documentNumber: '',
+        assessedBy: '',
+        effectiveFrom: '2026-01-01',
+        validityMode: 'no_expiry',
+      })],
+    }
+    expect(auditorCandidates([trainee], 'jiurun', 'QP-28', 'dept-qa', '2026-06-01')).toHaveLength(0)
   })
 
   it('formats scope lists without printing the sentinel', () => {
@@ -148,9 +156,9 @@ describe('personnel qualification validation', () => {
     expect(formatScopeList(['QP-28', 'QP-01'], '全部程序')).toBe('QP-28、QP-01')
   })
 
-  it('lists auditor candidates by effective qualification scope', () => {
+  it('lists auditor candidates by effective qualification without QP filter', () => {
     expect(auditorCandidates([person], 'jiurun', 'QP-28', 'dept-qa', '2026-06-01').map((p) => p.id)).toEqual(['p1'])
-    expect(auditorCandidates([person], 'jiurun', 'QP-01', 'dept-qa', '2026-06-01')).toHaveLength(0)
+    expect(auditorCandidates([person], 'jiurun', 'QP-01', 'dept-qa', '2026-06-01').map((p) => p.id)).toEqual(['p1'])
   })
 
   it('lists department members by affiliation', () => {

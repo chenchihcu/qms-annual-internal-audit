@@ -221,6 +221,30 @@ function createDemoPeople(): Person[] {
     { name: '李稽核', employeeNumber: 'JR-PR-01', companyId: 'jiurun' as const, departmentId: 'dept-prod' },
     { name: '陳稽核', employeeNumber: 'ZLX-001', companyId: 'zhenglongxing' as const, departmentId: 'dept-admin' },
   ]
+  const demoQualification = (
+    role: 'internal_auditor' | 'internal_lead_auditor' | 'trainee_auditor',
+    companyId: 'jiurun' | 'zhenglongxing',
+    patch: Partial<import('../types').QualificationRecord> = {},
+  ): import('../types').QualificationRecord => ({
+    id: `qual-demo-${role}-${companyId}`,
+    role,
+    companyIds: [companyId],
+    standardVersions: ['ISO 9001:2015', 'AS9100:2016 (Rev D)'],
+    procedureScopes: ['QP-28'],
+    departmentScopes: ['dept-qa'],
+    documentTitle: '內部稽核員資格評估',
+    documentNumber: 'QR-DEMO-01',
+    documentLocation: '',
+    assessedBy: '管理代表',
+    assessmentDate: '2026-01-01',
+    effectiveFrom: '2026-01-01',
+    validityMode: 'no_expiry',
+    qualificationStatus: 'effective',
+    applicableStandard: 'AS9100',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...patch,
+  })
   return configs.map((item, index) => ({
     id: `person-demo-${index + 1}`,
     name: item.name,
@@ -231,10 +255,16 @@ function createDemoPeople(): Person[] {
       companyId: item.companyId,
       departmentId: item.departmentId,
     }],
-    qualifications: [],
+    qualifications: index === 0
+      ? [demoQualification('internal_auditor', item.companyId, { id: 'qual-demo-wang', departmentScopes: [item.departmentId] })]
+      : index === 1
+        ? [demoQualification('internal_auditor', item.companyId, { id: 'qual-demo-wang-audit', procedureScopes: ['QP-28'] })]
+        : index === 2
+          ? [demoQualification('trainee_auditor', item.companyId, { id: 'qual-demo-li', qualificationStatus: 'suspended' as const })]
+          : [],
     appointments: [],
     active: true,
-    notes: '既有示範姓名，資格與任命待確認',
+    notes: index === 0 ? '示範內部稽核員' : '既有示範姓名，資格與任命待確認',
   }))
 }
 
