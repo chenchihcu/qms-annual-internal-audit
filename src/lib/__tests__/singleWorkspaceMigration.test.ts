@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoState, migrateToV8 } from '../../data/demoData'
+import { buildDemoLegacySeed, migrateToV8 } from '../../data/demoData'
 import { migrateState } from '../migrate'
 import {
   applyWorkspaceConflictChoice,
   migrateToSingleWorkspace,
   validateSingleWorkspaceState,
 } from '../singleWorkspaceMigration'
+import { migrateV14ToV15 } from '../workspaceSchemaV15'
 
 function legacyState() {
-  const state = migrateState(migrateToV8(createDemoState()))
+  const state = migrateState(migrateToV8(buildDemoLegacySeed()))
   state.version = 13
   return state
 }
@@ -43,8 +44,9 @@ describe('single-workspace migration', () => {
     expect(row.months[1]).toBe('擬定')
     expect(row.months[3]).toBe('擬定')
     expect(ownerConflict?.candidates?.map((candidate) => candidate.value)).toEqual(['品保主管', '製造主管'])
-    expect(applyWorkspaceConflictChoice(migrated, ownerConflict!, 1).companies.jiurun.planRows[0].owner)
-      .toBe('製造主管')
+    expect(
+      applyWorkspaceConflictChoice(migrateV14ToV15(migrated), ownerConflict!, 1).workspace.planRows[0].owner,
+    ).toBe('製造主管')
   })
 
   it('does not guess between different checklist judgments', () => {
@@ -64,8 +66,9 @@ describe('single-workspace migration', () => {
 
     expect(item.judgment).toBeNull()
     expect(conflict?.candidates?.map((candidate) => candidate.value)).toEqual(['符合', '不符'])
-    expect(applyWorkspaceConflictChoice(migrated, conflict!, 1).companies.jiurun.audits[0].items[0].judgment)
-      .toBe('不符')
+    expect(
+      applyWorkspaceConflictChoice(migrateV14ToV15(migrated), conflict!, 1).workspace.audits[0].items[0].judgment,
+    ).toBe('不符')
   })
 
   it('reassigns colliding record IDs and keeps audit and NCR links on the correct records', () => {

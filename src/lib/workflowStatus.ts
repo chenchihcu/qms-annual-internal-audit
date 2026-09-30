@@ -4,6 +4,7 @@ import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
 import type { AppState, CompanyData, CompanyId, ProcedureAudit, TabId } from '../types'
 import { companySettingsFor, DEFAULT_SCORING_RULES } from '../types'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 
 export function isPlanRowScheduled(row: { months: Array<unknown> }): boolean {
   return row.months.some(Boolean)
@@ -41,35 +42,30 @@ export interface PdcaOverview {
   annualCloseGaps: WorkflowGap[]
 }
 
-function profileFor(state: AppState, companyId: CompanyId) {
-  return state.companyAuditProfiles[companyId]
+function profileFor(state: AppState, _companyId: CompanyId) {
+  return state.auditProfile
 }
 
-function companyFor(state: AppState, companyId: CompanyId = state.activeCompanyId) {
-  return state.companies[companyId]
+function companyFor(state: AppState, _companyId: CompanyId = WORKSPACE_COMPANY_ID) {
+  return state.workspace
 }
 
-export function procedureSourceReady(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function procedureSourceReady(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const profile = profileFor(state, companyId)
-  return Boolean(
-    profile.auditProcedureCode.trim()
-      && profile.auditProcedureVersion.trim()
-      && profile.auditProcedureVersion !== '待確認'
-      && profile.formalRecordLocation.trim(),
-  )
+  return Boolean(profile.formalRecordLocation?.trim())
 }
 
 export function standardReady(_state?: AppState, _companyId?: CompanyId): boolean {
   return true
 }
 
-export function stakeholdersReady(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function stakeholdersReady(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const co = companyFor(state, companyId)
   if (co.departments.length === 0) return false
   return co.departments.every((dept) => dept.stakeholders.length >= 1)
 }
 
-export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const co = companyFor(state, companyId)
   return co.planRows.every((row) =>
     co.procedureRisks?.some(
@@ -78,7 +74,7 @@ export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = 
   )
 }
 
-export function planScheduled(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function planScheduled(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const co = companyFor(state, companyId)
   const settings = companySettingsFor(state, companyId)
   if (!settings.planWindowStart?.trim() || !settings.planWindowEnd?.trim()) return false
@@ -87,7 +83,7 @@ export function planScheduled(state: AppState, companyId: CompanyId = state.acti
   return hasMonth
 }
 
-export function leadAuditorAppointed(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function leadAuditorAppointed(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const settings = companySettingsFor(state, companyId)
   const date = settings.planWindowEnd || `${settings.auditYear}-12-31`
   return Boolean(resolveLeadAuditorPersonId(
@@ -99,7 +95,7 @@ export function leadAuditorAppointed(state: AppState, companyId: CompanyId = sta
   ))
 }
 
-export function auditStarted(state: AppState, companyId: CompanyId = state.activeCompanyId): boolean {
+export function auditStarted(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const co = companyFor(state, companyId)
   return co.audits.some((a) => a.status === '執行中' || a.status === '已回報')
 }
@@ -109,8 +105,8 @@ export function prepComplete(state: AppState): boolean {
   if (progress.done < progress.total) return false
   const warnings = evaluatePrepSequence({
     prep: state.externalAuditPrep,
-    workspace: state.companies[state.activeCompanyId],
-    settings: state.companySettings[state.activeCompanyId],
+    workspace: state.workspace,
+    settings: state.settings,
     yearArchives: state.yearArchives,
   })
   return !warnings.sequenceWarning
@@ -131,11 +127,11 @@ export function canCompleteAuditReport(
   return { ready: gaps.length === 0, gaps }
 }
 
-export function getPdcaOverview(state: AppState, companyId: CompanyId = state.activeCompanyId): PdcaOverview {
+export function getPdcaOverview(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): PdcaOverview {
   const co = companyFor(state, companyId)
   const planGaps: WorkflowGap[] = []
   if (!standardReady(state, companyId)) planGaps.push({ message: '適用標準與證書依據未完整', tab: 'system-settings' })
-  if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '程序來源三欄未齊全', tab: 'system-settings' })
+  if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '正式紀錄保存位置未指定', tab: 'system-settings' })
   if (!stakeholdersReady(state, companyId)) planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'stakeholders' })
   if (!riskPersistedForAllRows(state, companyId)) planGaps.push({ message: '方案風險尚未全部存檔', tab: 'risk' })
   if (!leadAuditorAppointed(state, companyId)) planGaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
@@ -166,8 +162,8 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = state.ac
   }
   const prepWarnings = evaluatePrepSequence({
     prep: state.externalAuditPrep,
-    workspace: state.companies[state.activeCompanyId],
-    settings: state.companySettings[state.activeCompanyId],
+    workspace: state.workspace,
+    settings: state.settings,
     yearArchives: state.yearArchives,
   })
   if (prepWarnings.sequenceWarning) {
@@ -221,7 +217,7 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
 }
 
 export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowStatus {
-  const companyId = state.activeCompanyId
+  const companyId = WORKSPACE_COMPANY_ID
   const co = companyFor(state, companyId)
   const gaps: WorkflowGap[] = []
   const advisories: WorkflowGap[] = []
@@ -314,15 +310,15 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
     case 'prep': {
       const warnings = evaluatePrepSequence({
         prep: state.externalAuditPrep,
-        workspace: state.companies[state.activeCompanyId],
-        settings: state.companySettings[state.activeCompanyId],
+        workspace: state.workspace,
+        settings: state.settings,
         yearArchives: state.yearArchives,
       })
       if (warnings.sequenceWarning) gaps.push({ message: '內稽／管審／外稽順序或日期異常' })
       if (warnings.ncrWarning) advisories.push({ message: warnings.messages[0] ?? '尚有未結案 NCR' })
       const yearMismatch = formatPrepYearMismatch(
         state.externalAuditPrep.year,
-        state.companySettings[state.activeCompanyId].auditYear,
+        state.settings.auditYear,
       )
       if (yearMismatch) advisories.push({ message: yearMismatch })
       ready = gaps.length === 0

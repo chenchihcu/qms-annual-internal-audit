@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { createDemoState, migrateToV8, STORAGE_KEY } from '../../data/demoData'
-import { migrateState } from '../../lib/migrate'
-import { migrateToSingleWorkspace, WORKSPACE_COMPANY_ID } from '../../lib/singleWorkspaceMigration'
+import { createDemoState, STORAGE_KEY } from '../../data/demoData'
 import { movePersonToTrash } from '../../lib/trash'
 import { useAuditStore } from '../../hooks/useAuditStore'
 import { SettingsPanel } from '../SettingsPanel'
@@ -10,7 +8,7 @@ import { SettingsPanel } from '../SettingsPanel'
 beforeEach(() => localStorage.clear())
 
 function createPersistedWorkspaceState() {
-  return migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  return createDemoState()
 }
 
 function seedSettingsLocalStorage(state = createPersistedWorkspaceState()) {
@@ -29,14 +27,14 @@ describe('SettingsPanel profile feedback', () => {
     render(<SystemSettingsPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('仍為待確認')).toBeTruthy()
+      expect(screen.getByText('尚未指定保存位置')).toBeTruthy()
+      expect(screen.getByRole('button', { name: '指定保存位置' })).toBeTruthy()
       expect(screen.queryByText('至少一項適用標準須標為已確認')).toBeNull()
       expect(screen.queryByLabelText('證書範圍')).toBeNull()
       expect(screen.queryByLabelText('證書編號／引用')).toBeNull()
       expect(screen.queryByLabelText('適用性 — AS9100')).toBeNull()
       expect(screen.queryByRole('heading', { name: '適用標準' })).toBeNull()
       expect(screen.queryByText('稽核開始時會保存適用依據快照。欄位變更即時儲存於目前瀏覽器。')).toBeNull()
-      expect(screen.getAllByText('尚未填寫').length).toBeGreaterThan(0)
       expect(screen.queryByRole('heading', { name: '稽核基本資料' })).toBeNull()
       expect(screen.queryByRole('heading', { name: '管理系統認證證書' })).toBeNull()
       expect(screen.queryByLabelText('版本 — AS9100')).toBeNull()
@@ -58,12 +56,13 @@ describe('SettingsPanel profile feedback', () => {
     expect(screen.queryByText('確認 AS9100 的版本與適用性。')).toBeNull()
     expect(screen.queryByLabelText('版本 — ISO 9001')).toBeNull()
     expect(screen.queryByText(/ISO 9001:2026 已發布/)).toBeNull()
-    fireEvent.change(screen.getByLabelText('程序版本'), { target: { value: 'Rev.6' } })
+    fireEvent.click(screen.getByRole('button', { name: '指定保存位置' }))
+    expect(screen.getByRole('dialog', { name: '指定正式紀錄保存位置' })).toBeTruthy()
     fireEvent.change(screen.getByLabelText('正式紀錄保存位置'), { target: { value: '品保部文件櫃 A-1' } })
-    fireEvent.change(screen.getByLabelText('稽核程序代碼'), { target: { value: 'QP-28' } })
+    fireEvent.click(screen.getByRole('button', { name: '確認儲存' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('status').textContent).toMatch(/已寫入。開始稽核時會固定/)
+      expect(screen.getByRole('status').textContent).toMatch(/已設定正式紀錄保存位置/)
     })
   })
 })
@@ -75,7 +74,7 @@ describe('SettingsPanel sections', () => {
 
     expect(screen.queryByRole('heading', { name: '稽核基本資料' })).toBeNull()
     expect(screen.queryByRole('heading', { name: '稽核程序與正式紀錄位置' })).toBeNull()
-    expect(screen.getByLabelText('稽核程序代碼')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '指定保存位置' })).toBeTruthy()
     expect(screen.queryByText('年度資料生命週期與追溯')).toBeNull()
 
     await waitFor(() => {
@@ -126,9 +125,8 @@ describe('SettingsPanel sections', () => {
 
   it('keeps stored standard versions when the certificate fields are not shown', async () => {
     const state = createPersistedWorkspaceState()
-    const companyId = WORKSPACE_COMPANY_ID
-    const iso9001 = state.companyAuditProfiles[companyId].applicableStandards.find((item) => item.name === 'ISO 9001')!
-    const as9100 = state.companyAuditProfiles[companyId].applicableStandards.find((item) => item.name === 'AS9100')!
+    const iso9001 = state.auditProfile.applicableStandards.find((item) => item.name === 'ISO 9001')!
+    const as9100 = state.auditProfile.applicableStandards.find((item) => item.name === 'AS9100')!
     iso9001.version = '2015/Amd 1:2024'
     as9100.version = '2016 (Rev E)'
     seedSettingsLocalStorage(state)
@@ -138,7 +136,7 @@ describe('SettingsPanel sections', () => {
     expect(screen.queryByLabelText('版本 — AS9100')).toBeNull()
     await waitFor(() => {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!)
-      const profile = stored.companyAuditProfiles[companyId]
+      const profile = stored.auditProfile
       const storedIso = profile.applicableStandards.find((item: { name: string }) => item.name === 'ISO 9001')
       const storedAs = profile.applicableStandards.find((item: { name: string }) => item.name === 'AS9100')
       expect(storedIso.version).toBe('2015/Amd 1:2024')

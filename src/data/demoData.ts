@@ -1,5 +1,6 @@
 import type {
   AppState,
+  AppStateV14Legacy,
   AuditSettings,
   CompanyAuditProfile,
   CompanyData,
@@ -8,8 +9,11 @@ import type {
   Person,
   PlanRow,
   ProcedureAudit,
-  YearArchiveEntry,
+  YearArchiveEntryV14,
 } from '../types'
+import { migrateState } from '../lib/migrate'
+import { migrateToSingleWorkspace } from '../lib/singleWorkspaceMigration'
+import { migrateV14ToV15 } from '../lib/workspaceSchemaV15'
 import { carryPlanDatesToAudit } from '../lib/auditDates'
 import { COMPANY_IDS, COMPANY_LABELS, DEFAULT_SCORING_RULES } from '../types'
 import { autoArrangePlan } from '../lib/planner'
@@ -431,7 +435,7 @@ function createCompanyData(companyId: CompanyId): CompanyData {
   }
 }
 
-export function createDemoState(): AppState {
+export function buildDemoLegacySeed(): AppStateV14Legacy {
   const companies = {} as Record<CompanyId, CompanyData>
   for (const id of ['jiurun', 'zhenglongxing'] as CompanyId[]) {
     companies[id] = {
@@ -458,7 +462,7 @@ export function createDemoState(): AppState {
     }
   })
 
-  let state: AppState = {
+  let state: AppStateV14Legacy = {
     activeCompanyId: 'jiurun',
     companySettings: createCompanySettings(),
     companies,
@@ -475,7 +479,7 @@ export function createDemoState(): AppState {
     version: 8,
   }
 
-  state = hydrateSharedPlan(state)
+  state = hydrateSharedPlan(state) as AppStateV14Legacy
   state = {
     ...state,
     companies: {
@@ -498,24 +502,55 @@ export function createDemoState(): AppState {
   return state
 }
 
-export function createBlankState(): AppState {
-  const state = createDemoState()
+export function createLegacyDemoV13(): AppStateV14Legacy {
+  return migrateState(migrateToV8(buildDemoLegacySeed()))
+}
+
+function createBlankLegacyState(): AppStateV14Legacy {
+  const state = createLegacyDemoV13()
   state.people = []
   state.annualPersonnelAssignments = []
-  ;(['jiurun', 'zhenglongxing'] as CompanyId[]).forEach((companyId) => {
-    const company = state.companies[companyId]
+  for (const id of COMPANY_IDS) {
+    const company = state.companies[id]
     company.audits = []
     company.ncrs = []
     company.observations = []
     company.suggestions = []
     company.procedureRisks = []
-    company.planRows = company.planRows.map((row) => ({ ...row, months: Array.from({ length: 12 }, () => null), manualOverride: false }))
-  })
+    company.planRows = company.planRows.map((row) => ({
+      ...row,
+      months: Array.from({ length: 12 }, () => null),
+      manualOverride: false,
+    }))
+  }
   state.externalAuditPrep = createDefaultPrepState(state.companySettings.jiurun.auditYear)
+  state.dataSource = 'user'
   return state
 }
 
-export const STORAGE_KEY = 'qms-annual-internal-audit-v14'
+export function createDemoState(): AppState {
+  return migrateV14ToV15(migrateToSingleWorkspace(createLegacyDemoV13()))
+}
+
+export function createBlankState(): AppState {
+  const state = createDemoState()
+  state.people = []
+  state.annualPersonnelAssignments = []
+  state.workspace.audits = []
+  state.workspace.ncrs = []
+  state.workspace.observations = []
+  state.workspace.suggestions = []
+  state.workspace.procedureRisks = []
+  state.workspace.planRows = state.workspace.planRows.map((row) => ({
+    ...row,
+    months: Array.from({ length: 12 }, () => null),
+    manualOverride: false,
+  }))
+  state.externalAuditPrep = createDefaultPrepState(state.settings.auditYear)
+  return state
+}
+
+export const STORAGE_KEY = 'qms-annual-internal-audit-v15'
 export const LEGACY_STORAGE_KEY_V8 = 'qms-annual-internal-audit-v8'
 export const LEGACY_STORAGE_KEY_V7 = 'qms-annual-internal-audit-v7'
 export const LEGACY_STORAGE_KEY_V6 = 'qms-annual-internal-audit-v6'
@@ -532,7 +567,7 @@ function cloneSettings(settings: AuditSettings): AuditSettings {
   }
 }
 
-function legacyAuditYear(base: AppState, companyId: CompanyId, fallback: number): number {
+function legacyAuditYear(base: AppStateV14Legacy, companyId: CompanyId, fallback: number): number {
   return base.companySettings?.[companyId]?.auditYear
     ?? base.companySettings?.jiurun?.auditYear
     ?? base.settings?.auditYear
@@ -540,10 +575,10 @@ function legacyAuditYear(base: AppState, companyId: CompanyId, fallback: number)
 }
 
 function migrateLegacyYearArchives(
-  archives: AppState['yearArchives'] | Record<string, unknown> | undefined,
-): Record<string, YearArchiveEntry> {
+  archives: AppStateV14Legacy['yearArchives'] | Record<string, unknown> | undefined,
+): Record<string, YearArchiveEntryV14> {
   if (!archives) return {}
-  const next: Record<string, YearArchiveEntry> = {}
+  const next: Record<string, YearArchiveEntryV14> = {}
   for (const [year, entry] of Object.entries(archives)) {
     const legacy = entry as {
       settings?: AuditSettings
@@ -570,9 +605,9 @@ function migrateLegacyYearArchives(
   return next
 }
 
-export function migrateToV4(raw: AppState): AppState {
+export function migrateToV4(raw: AppStateV14Legacy): AppStateV14Legacy {
   if (raw.version >= 4 && raw.externalAuditPrep) return raw
-  const demo = createDemoState()
+  const demo = createLegacyDemoV13()
   demo.activeCompanyId = raw.activeCompanyId
   if (raw.settings) {
     const shared = stripExternalAuditDate(cloneSettings(raw.settings))
@@ -585,12 +620,12 @@ export function migrateToV4(raw: AppState): AppState {
   return migrateToV7(demo)
 }
 
-export function migrateToV5(raw: AppState): AppState {
+export function migrateToV5(raw: AppStateV14Legacy): AppStateV14Legacy {
   return migrateToV7(raw)
 }
 
-export function migrateToV6(raw: AppState): AppState {
-  const defaults = createDemoState()
+export function migrateToV6(raw: AppStateV14Legacy): AppStateV14Legacy {
+  const defaults = createLegacyDemoV13()
   const base = raw.version >= 4 && raw.externalAuditPrep ? raw : migrateToV4(raw)
   const companyAuditProfiles = base.companyAuditProfiles ?? defaults.companyAuditProfiles
   const companies = Object.fromEntries(
@@ -646,7 +681,7 @@ export function migrateToV6(raw: AppState): AppState {
   }
 }
 
-export function migrateToV7(raw: AppState): AppState {
+export function migrateToV7(raw: AppStateV14Legacy): AppStateV14Legacy {
   const v6 = raw.companySettings ? raw : migrateToV6(raw)
   if (v6.version >= 7 && v6.companySettings) {
     return {
@@ -698,7 +733,7 @@ export function migrateToV7(raw: AppState): AppState {
   }
 }
 
-export function migrateToV8(raw: AppState): AppState {
+export function migrateToV8(raw: AppStateV14Legacy): AppStateV14Legacy {
   if (raw.version >= 8 && !Array.isArray(raw.trash)) {
     throw new Error('v8 回收區資料結構不完整')
   }
@@ -729,15 +764,13 @@ export function migrateToV8(raw: AppState): AppState {
 }
 
 /** 舊版 v1 遷移（若存在） */
-export function migrateV1State(raw: unknown): AppState | null {
+export function migrateV1State(raw: unknown): AppStateV14Legacy | null {
   if (!raw || typeof raw !== 'object') return null
   const old = raw as Record<string, unknown>
-  if (old.version === 2 && old.companies) return raw as AppState
+  if (old.version === 2 && old.companies) return raw as AppStateV14Legacy
   if (!old.departments || !old.settings) return null
 
-  const demo = createBlankState()
-  // A v1 payload represents imported user data; never let demo refresh replace or add records.
-  demo.dataSource = 'user'
+  const demo = createBlankLegacyState()
   demo.activeCompanyId = 'jiurun'
   demo.companies.zhenglongxing = {
     ...demo.companies.zhenglongxing,
@@ -779,7 +812,7 @@ export function migrateV1State(raw: unknown): AppState | null {
   }
   company.ncrs = Array.isArray(old.ncrs) ? old.ncrs as CompanyData['ncrs'] : []
   company.observations = Array.isArray(old.observations) ? old.observations as CompanyData['observations'] : []
-  return demo
+  return migrateToV8({ ...demo, version: 8, trash: demo.trash ?? [] })
 }
 
 export { getProcedureTitle }

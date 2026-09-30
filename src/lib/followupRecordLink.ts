@@ -1,5 +1,6 @@
 import type { AppState, CompanyId, TabId } from '../types'
 import { companySettingsFor } from '../types'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 import { isRecordInTrash } from './trash'
 
 export type FollowupRecordLinkStatus = 'found' | 'missing' | 'trash' | 'archived'
@@ -12,12 +13,12 @@ export interface FollowupRecordLinkResult {
 
 function findInArchive(
   state: AppState,
-  companyId: CompanyId,
+  _companyId: CompanyId,
   recordId: string,
   kind: 'ncr' | 'observation' | 'suggestion',
 ): boolean {
   for (const archive of Object.values(state.yearArchives)) {
-    const company = archive.companies?.[companyId]
+    const company = archive.workspace
     if (!company) continue
     if (kind === 'ncr' && company.ncrs.some((item) => item.id === recordId)) return true
     if (kind === 'observation' && company.observations.some((item) => item.id === recordId)) return true
@@ -30,10 +31,10 @@ export function resolveFollowupRecordLink(
   state: AppState,
   recordId: string,
   listKind: 'ncr' | 'observation' | 'suggestion',
-  companyId: CompanyId = state.activeCompanyId,
+  companyId: CompanyId = WORKSPACE_COMPANY_ID,
 ): FollowupRecordLinkResult {
   const year = companySettingsFor(state, companyId).auditYear
-  const company = state.companies[companyId]
+  const company = state.workspace
   const trashKind = listKind === 'ncr' ? 'ncr' : listKind === 'observation' ? 'observation' : 'suggestion'
   const trashYear = listKind === 'ncr' ? undefined : year
 

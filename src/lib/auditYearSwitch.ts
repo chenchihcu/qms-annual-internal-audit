@@ -1,15 +1,16 @@
 import { getPdcaOverview } from './workflowStatus'
 import type { AppState, CompanyId } from '../types'
 import { companySettingsFor } from '../types'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 
 export function buildYearSwitchDescription(
   state: AppState,
   targetYear: number,
-  companyId: CompanyId = state.activeCompanyId,
+  companyId: CompanyId = WORKSPACE_COMPANY_ID,
 ): string {
   const settings = companySettingsFor(state, companyId)
   const pdca = getPdcaOverview(state, companyId)
-  const archived = state.yearArchives[String(targetYear)]?.companies[companyId]
+  const archived = state.yearArchives[String(targetYear)]?.workspace
   const restoreNote = archived
     ? `將還原 ${targetYear} 年已封存的計畫與事件。`
     : `將建立 ${targetYear} 年台帳：計畫列保留並清空月格，查檢事件與追蹤紀錄需重新建立。`

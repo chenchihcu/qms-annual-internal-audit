@@ -5,27 +5,22 @@ import { carryPlanDatesToAudit } from '../auditDates'
 import { buildQr2801PrintHeaderMeta, buildQr2802PrintHeaderMeta } from '../printForm'
 
 describe('buildQr2801PrintHeaderMeta', () => {
-  it('includes company context, 主要客戶, and 計畫窗口 for both companies', () => {
+  it('includes company context, 主要客戶, and 計畫窗口 for workspace', () => {
     const state = createDemoState()
-    for (const companyId of ['jiurun', 'zhenglongxing'] as const) {
-      const company = {
-        ...state.companies[companyId],
-        keyCustomerName: companyId === 'jiurun' ? '九潤精密' : state.companies[companyId].keyCustomerName,
-      }
-      const settings = state.companySettings[companyId]
-      const meta = buildQr2801PrintHeaderMeta(settings, company)
-      expect(meta.subtitle).toContain('主任稽核員')
-      expect(meta.detailLines.some((line) => line.includes('主要客戶'))).toBe(true)
-      expect(meta.detailLines.some((line) => line.includes('計畫窗口'))).toBe(true)
-      expect(meta.detailLines.some((line) => line.includes(settings.planWindowStart))).toBe(true)
-      expect(meta.detailLines.some((line) => line.includes(settings.planWindowEnd))).toBe(true)
-    }
+    const company = { ...state.workspace, keyCustomerName: '九潤精密' }
+    const settings = state.settings
+    const meta = buildQr2801PrintHeaderMeta(settings, company)
+    expect(meta.subtitle).toContain('主任稽核員')
+    expect(meta.detailLines.some((line) => line.includes('主要客戶'))).toBe(true)
+    expect(meta.detailLines.some((line) => line.includes('計畫窗口'))).toBe(true)
+    expect(meta.detailLines.some((line) => line.includes(settings.planWindowStart))).toBe(true)
+    expect(meta.detailLines.some((line) => line.includes(settings.planWindowEnd))).toBe(true)
   })
 
   it('adds filter line when stakeholder filter is active', () => {
     const state = createDemoState()
-    const company = { ...state.companies.jiurun, keyCustomerName: '九潤精密' }
-    const meta = buildQr2801PrintHeaderMeta(state.companySettings.jiurun, company, {
+    const company = { ...state.workspace, keyCustomerName: '九潤精密' }
+    const meta = buildQr2801PrintHeaderMeta(state.settings, company, {
       tag: '客戶',
       visible: 5,
       total: 31,
@@ -39,7 +34,7 @@ describe('buildQr2801PrintHeaderMeta', () => {
 describe('buildQr2802PrintHeaderMeta', () => {
   it('includes 計畫月份 from clicked plan month in print header', () => {
     const state = createDemoState()
-    const company = state.companies.jiurun
+    const company = state.workspace
     const row = company.planRows.find((r) => r.qpCode === 'QP-05' && r.departmentId === 'dept-qa')!
     const audit = company.audits.find((a) => a.qpCode === 'QP-05' && a.departmentId === 'dept-qa')!
     const carried = carryPlanDatesToAudit(
@@ -50,7 +45,7 @@ describe('buildQr2802PrintHeaderMeta', () => {
           .map((_, i) => (i <= 1 ? ('擬定' as const) : null)),
       },
       audit,
-      state.companySettings.jiurun.auditYear,
+      state.settings.auditYear,
       2,
     )
     const meta = buildQr2802PrintHeaderMeta(carried, company, getProcedureTitle)

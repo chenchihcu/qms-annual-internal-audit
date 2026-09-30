@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
@@ -100,7 +101,7 @@ export function Observations({
   const [form, setForm] = useState({ sourceType: 'third_party_audit' as 'internal_audit' | 'third_party_audit', sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', departmentId: company.departments[0]?.id ?? '', content: '', description: '', owner: '', dueDate: '' })
   const [pendingNcrId, setPendingNcrId] = useState<string | null>(null)
   const [showImportDialog, setShowImportDialog] = useState(false)
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${currentYear}`, highlightRecordId)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${currentYear}`, highlightRecordId)
   const [priorDetailsState, setPriorDetailsState] = useState(() => ({
     section,
     open: section === 'prior',
@@ -132,20 +133,20 @@ export function Observations({
   }, [highlightRecordId])
   const allObservations = useMemo(() => [
     ...company.observations,
-    ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.observations ?? []),
-  ], [company.observations, state.yearArchives, state.activeCompanyId, currentYear])
+    ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.workspace?.observations ?? []),
+  ], [company.observations, state.yearArchives, currentYear])
   const currentNcrDisplayNumbers = useMemo(() => ncrNumberLabels(company.ncrs), [company.ncrs])
   const priorObs = allObservations.filter((o) => o.year < currentYear && o.status === 'open')
   const openPriorNCR = Object.entries(state.yearArchives)
     .filter(([year]) => year !== String(currentYear))
-    .flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.ncrs ?? [])
+    .flatMap(([, archive]) => archive.workspace?.ncrs ?? [])
     .filter((n) => n.status !== '結案')
   const priorNcrDisplayNumbers = ncrNumberLabels(openPriorNCR)
   const years = [...new Set(allObservations.map((item) => item.year))].sort((a, b) => b - a)
   const auditEvents = useMemo(() => [
     ...company.audits,
-    ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.companies[state.activeCompanyId]?.audits ?? []),
-  ], [company.audits, state.yearArchives, state.activeCompanyId, currentYear])
+    ...Object.entries(state.yearArchives).filter(([year]) => year !== String(currentYear)).flatMap(([, archive]) => archive.workspace?.audits ?? []),
+  ], [company.audits, state.yearArchives, currentYear])
 
   const procedureOptions = useMemo(
     () => [{ value: '', label: '請選擇' }, ...procedureQpSelectOptions(company.planRows)],
@@ -155,8 +156,8 @@ export function Observations({
   const referenceDate = `${currentYear}-12-31`
 
   const formOwnerCandidates = useMemo(
-    () => departmentMemberCandidates(state.people, state.activeCompanyId, form.departmentId, referenceDate),
-    [state.people, state.activeCompanyId, form.departmentId, referenceDate],
+    () => departmentMemberCandidates(state.people, WORKSPACE_COMPANY_ID, form.departmentId, referenceDate),
+    [state.people, form.departmentId, referenceDate],
   )
   const records = useMemo(() => allObservations.filter((item) =>
     (yearFilter === 'all' || item.year === Number(yearFilter)) &&
@@ -293,7 +294,7 @@ export function Observations({
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {!showForm && <Button ref={triggerRef} variant="secondary" icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄觀察事項</Button>}
-          <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+          <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, WORKSPACE_COMPANY_ID)}>匯出 Excel</Button>
         </div>
       </div>
       {(importableObs.length > 0 || importableNCR.length > 0) && priorDetailsOpen && (
@@ -580,7 +581,7 @@ export function Observations({
                                   onChange={(value) => setEditDraft({ ...editDraft, owner: value })}
                                   candidates={departmentMemberCandidates(
                                     state.people,
-                                    state.activeCompanyId,
+                                    WORKSPACE_COMPANY_ID,
                                     item.departmentId,
                                     `${item.year}-12-31`,
                                   )}

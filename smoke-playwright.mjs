@@ -518,13 +518,13 @@ for (const width of widths) {
         || await page.getByLabel('證書範圍', { exact: true }).count() !== 0) {
         throw new Error('設定頁仍顯示已移除的證書或稽核基本資料')
       }
-      if (await page.getByLabel('稽核程序代碼', { exact: true }).count() !== 1) {
-        throw new Error('程序與紀錄未保留稽核程序代碼')
+      if (await page.getByRole('button', { name: /指定保存位置|變更保存位置/ }).count() !== 1) {
+        throw new Error('程序與紀錄未保留正式紀錄保存位置指定功能')
       }
       if (await page.getByRole('radio', { name: '系統流程', exact: true }).count() !== 1) {
         throw new Error('系統設定沒有系統流程')
       }
-      workflowChecks.push('設定頁只保留程序與紀錄，不顯示已移除的證書表單')
+      workflowChecks.push('設定頁只保留正式紀錄保存位置指定，不顯示已移除的證書表單')
       await page.getByRole('radio', { name: '備份與匯出', exact: true }).locator('xpath=..').click()
       const backupDownloadEvent = page.waitForEvent('download', { timeout: 10000 })
       await page.getByRole('button', { name: '下載完整備份', exact: true }).click()
@@ -574,15 +574,15 @@ for (const width of widths) {
 
       workflowStage = '查檢開始、判定與完成回報鎖定'
       await page.evaluate(() => {
-        const storageKey = 'qms-annual-internal-audit-v14'
+        const storageKey = 'qms-annual-internal-audit-v15'
         const raw = localStorage.getItem(storageKey)
         if (!raw) throw new Error('隔離測試資料不存在')
         const state = JSON.parse(raw)
-        const companyId = state.activeCompanyId
-        const profile = state.companyAuditProfiles?.[companyId]
-        const company = state.companies?.[companyId]
-        const audit = company?.audits?.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')
+        const profile = state.auditProfile
+        const workspace = state.workspace
+        const audit = workspace?.audits?.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')
         if (!profile || !audit || !audit.items?.length) throw new Error('隔離測試查檢資料不完整')
+        const workspaceCompanyId = state.people?.find((person) => person.affiliations?.length)?.affiliations?.[0]?.companyId ?? 'jiurun'
 
         profile.applicableStandards = [{
           name: 'ISO 9001',
@@ -601,11 +601,11 @@ for (const width of widths) {
           name: '隔離測試主任稽核員',
           employeeNumber: 'SMOKE-001',
           type: 'internal',
-          affiliations: [{ id: 'smoke-affiliation', companyId, departmentId: 'dept-admin' }],
+          affiliations: [{ id: 'smoke-affiliation', companyId: workspaceCompanyId, departmentId: 'dept-admin' }],
           qualifications: [{
             id: 'smoke-qualification',
             role: 'internal_lead_auditor',
-            companyIds: [companyId],
+            companyIds: [workspaceCompanyId],
             standardVersions: ['ISO 9001:2015'],
             procedureScopes: ['QP-28'],
             departmentScopes: ['dept-qa'],

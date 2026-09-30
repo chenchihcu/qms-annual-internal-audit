@@ -7,8 +7,6 @@ import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
 import { ALL_TABS, parseAppHash, syncHash, type NavigateOptions } from './lib/navigation'
 import { Icon } from './components/ui/Icon'
-import { MigrationGate } from './components/MigrationGate'
-
 const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
 const ProcedureAuditPanel = lazy(() => import('./components/ProcedureAuditPanel').then((module) => ({ default: module.ProcedureAuditPanel })))
 const NCRList = lazy(() => import('./components/NCRList').then((module) => ({ default: module.NCRList })))
@@ -122,7 +120,7 @@ function App() {
           </button>
         ))}
       </nav>
-      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v14</p>
+      <p className="border-t border-line p-4 text-xs text-muted">資料儲存於本機 · v15</p>
     </div>
   )
 
@@ -179,16 +177,6 @@ function App() {
       </header>
 
       <main id="main" ref={mainRef} tabIndex={-1} className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-6 outline-none">
-        {store.migrationRequired ? (
-          <MigrationGate
-            downloadRequested={store.migrationBackupRequested}
-            backupConfirmed={store.migrationBackupConfirmed}
-            warning={store.storageWarning}
-            onDownload={store.downloadMigrationBackup}
-            onVerifyBackup={store.verifyMigrationBackup}
-            onContinue={store.completeMigration}
-          />
-        ) : <>
         {store.storageWarning && (
           <div role="alert" className="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <Icon name="warning" className="mt-0.5 text-amber-700" />
@@ -278,7 +266,6 @@ function App() {
           </TabErrorBoundary>
         )}
         </Suspense>
-        </>}
       </main>
       </div>
     </div>

@@ -165,7 +165,7 @@ function workspaceDataForPrepYear(
 ): CompanyData {
   if (settings.auditYear === prepYear) return workspace
   // v14 still stores archived workspaces behind the legacy jiurun compatibility key.
-  return yearArchives[String(prepYear)]?.companies.jiurun ?? workspace
+  return yearArchives[String(prepYear)]?.workspace ?? workspace
 }
 
 export interface PrepSequenceWarnings {

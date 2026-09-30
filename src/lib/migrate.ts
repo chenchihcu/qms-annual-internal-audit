@@ -1,4 +1,4 @@
-import { createDemoState } from '../data/demoData'
+import { buildDemoLegacySeed, migrateToV8 } from '../data/demoData'
 import { migrateChecklistItem } from './checklistEvidence'
 import { carryPlanDatesToAudit } from './auditDates'
 import { normalizeAuditNotice } from './auditNotice'
@@ -6,10 +6,13 @@ import { normalizeAttachments } from './attachments'
 import { isOldClonedDemo } from './demoRefresh'
 import { normalizeExternalAuditSchedule } from './externalAuditSchedule'
 import { normalizeNCR } from './ncr'
-import type { AppState, CompanyData, CompanyId, MonthStatus, NCR, PlanRow } from '../types'
+import type { AppStateV14Legacy, CompanyData, CompanyId, MonthStatus, NCR, PlanRow } from '../types'
 import { COMPANY_IDS, DEFAULT_VIEW_ROLE } from '../types'
 
-function resolveDataSource(state: AppState, incomingDataSource?: AppState['dataSource']): AppState['dataSource'] {
+function resolveDataSource(
+  state: AppStateV14Legacy,
+  incomingDataSource?: AppStateV14Legacy['dataSource'],
+): AppStateV14Legacy['dataSource'] {
   const source = incomingDataSource ?? state.dataSource
   if (source === 'user' && !isOldClonedDemo(state)) return 'user'
   return 'demo'
@@ -85,15 +88,17 @@ function migrateCompany(company: CompanyData, auditYear: number): CompanyData {
   }
 }
 
-function refreshDemoCompanies(): AppState['companies'] {
-  const fresh = createDemoState()
-  return {
-    jiurun: fresh.companies.jiurun,
-    zhenglongxing: fresh.companies.zhenglongxing,
+function refreshDemoCompanies(): AppStateV14Legacy['companies'] {
+  const seed = migrateToV8(buildDemoLegacySeed())
+  const companies = { ...seed.companies }
+  for (const companyId of COMPANY_IDS) {
+    const settings = seed.companySettings[companyId]
+    companies[companyId] = migrateCompany(companies[companyId], settings.auditYear)
   }
+  return companies
 }
 
-export function migrateState(raw: AppState): AppState {
+export function migrateState(raw: AppStateV14Legacy): AppStateV14Legacy {
   if (raw.version >= CURRENT_STORAGE_VERSION) {
     return {
       ...raw,
@@ -103,7 +108,7 @@ export function migrateState(raw: AppState): AppState {
 
   const fromVersion = raw.version ?? 0
   const incomingDataSource = raw.dataSource
-  let next: AppState = {
+  let next: AppStateV14Legacy = {
     ...raw,
     version: CURRENT_STORAGE_VERSION,
     companies: { ...raw.companies },
@@ -139,7 +144,7 @@ export function migrateState(raw: AppState): AppState {
       }
       return acc
     },
-    {} as Record<CompanyId, AppState['companySettings'][CompanyId]>,
+    {} as Record<CompanyId, AppStateV14Legacy['companySettings'][CompanyId]>,
   )
 
   next = {

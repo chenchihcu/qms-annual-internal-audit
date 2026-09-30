@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoState } from '../../data/demoData'
+import { buildDemoLegacySeed, createDemoState, migrateToV6 } from '../../data/demoData'
 import {
   companiesAreDifferentiated,
   isOldClonedDemo,
@@ -16,8 +16,7 @@ describe('demoRefresh', () => {
   })
 
   it('detects old cloned demo layout', () => {
-    const state = createDemoState()
-    state.version = 6
+    const state = migrateToV6({ ...buildDemoLegacySeed(), version: 6 })
     state.companies.zhenglongxing = JSON.parse(JSON.stringify(state.companies.jiurun))
     expect(isOldClonedDemo(state)).toBe(true)
     expect(shouldRefreshToCurrentDemo(state)).toBe(true)

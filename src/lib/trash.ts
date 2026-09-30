@@ -10,6 +10,7 @@ import type {
 } from '../types'
 import { isSeedChecklistItem } from './checklistItem'
 import { ncrNumberLabel } from './ncr'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 
 type CompanyCollection = 'ncrs' | 'observations' | 'suggestions'
 type CompanyRecord = NCR | Observation | ThirdPartySuggestion
@@ -79,18 +80,16 @@ function withCompanyRecords(
   collection: CompanyCollection,
   records: CompanyRecord[],
 ): AppState {
+  if (companyId !== 'jiurun') return state
   if (!archiveYear) {
     return {
       ...state,
-      companies: {
-        ...state.companies,
-        [companyId]: { ...state.companies[companyId], [collection]: records },
-      },
+      workspace: { ...state.workspace, [collection]: records },
     }
   }
 
   const archive = state.yearArchives[archiveYear]
-  const company = archive?.companies[companyId]
+  const company = archive?.workspace
   if (!archive || !company) return state
   return {
     ...state,
@@ -98,10 +97,7 @@ function withCompanyRecords(
       ...state.yearArchives,
       [archiveYear]: {
         ...archive,
-        companies: {
-          ...archive.companies,
-          [companyId]: { ...company, [collection]: records },
-        },
+        workspace: { ...company, [collection]: records },
       },
     },
   }
@@ -109,16 +105,16 @@ function withCompanyRecords(
 
 function findCompanyRecord(
   state: AppState,
-  companyId: CompanyId,
+  _companyId: CompanyId,
   collection: CompanyCollection,
   recordId: string,
 ): { record: CompanyRecord; index: number; archiveYear?: string } | null {
-  const current = companyRecords(state.companies[companyId], collection)
+  const current = companyRecords(state.workspace, collection)
   const currentIndex = current.findIndex((item) => item.id === recordId)
   if (currentIndex >= 0) return { record: current[currentIndex], index: currentIndex }
 
   for (const [archiveYear, archive] of Object.entries(state.yearArchives)) {
-    const company = archive.companies[companyId]
+    const company = archive.workspace
     if (!company) continue
     const records = companyRecords(company, collection)
     const index = records.findIndex((item) => item.id === recordId)
@@ -144,16 +140,16 @@ export function moveCompanyRecordToTrash(
 
   const locationYear = found.archiveYear
     ? Number(found.archiveYear)
-    : state.companySettings[companyId].auditYear
+    : state.settings.auditYear
   const source = found.archiveYear
-    ? state.yearArchives[found.archiveYear]?.companies[companyId]
-    : state.companies[companyId]
+    ? state.yearArchives[found.archiveYear]?.workspace
+    : state.workspace
   if (!source) return state
   const records = companyRecords(source, collection).filter((item) => item.id !== recordId)
   const next = withCompanyRecords(state, companyId, found.archiveYear, collection, records)
   const location = {
     companyId,
-    year: Number.isInteger(locationYear) ? locationYear : state.companySettings[companyId].auditYear,
+    year: Number.isInteger(locationYear) ? locationYear : state.settings.auditYear,
     ...(found.archiveYear ? { archiveYear: found.archiveYear } : {}),
   }
   const common = {
@@ -261,8 +257,8 @@ export function moveChecklistItemToTrash(
   trashId: string,
   deletedAt: string,
 ): AppState {
-  const companyId = state.activeCompanyId
-  const company = state.companies[companyId]
+  const companyId = WORKSPACE_COMPANY_ID
+  const company = state.workspace
   const audit = company.audits.find((item) => item.id === auditId)
   if (!audit || audit.status === '已回報') return state
   const originalIndex = audit.items.findIndex((item) => item.id === recordId)
@@ -279,16 +275,13 @@ export function moveChecklistItemToTrash(
     record,
     deletedAt,
     originalIndex,
-    location: { companyId, auditId, year: audit.year ?? state.companySettings[companyId].auditYear },
+    location: { companyId, auditId, year: audit.year ?? state.settings.auditYear },
   }
   return {
     ...state,
-    companies: {
-      ...state.companies,
-      [companyId]: {
-        ...company,
-        audits: company.audits.map((item) => item.id === auditId ? { ...item, items } : item),
-      },
+    workspace: {
+      ...company,
+      audits: company.audits.map((item) => item.id === auditId ? { ...item, items } : item),
     },
     trash: [...(state.trash ?? []), entry],
   }
@@ -300,11 +293,11 @@ function insertAt<T>(records: T[], index: number, record: T): T[] {
   return next
 }
 
-function targetCompanyArchiveYear(state: AppState, companyId: CompanyId, year: number, archiveYear?: string): string | undefined | null {
-  if (archiveYear && state.yearArchives[archiveYear]?.companies[companyId]) return archiveYear
-  if (state.companySettings[companyId].auditYear === year) return undefined
+function targetCompanyArchiveYear(state: AppState, _companyId: CompanyId, year: number, archiveYear?: string): string | undefined | null {
+  if (archiveYear && state.yearArchives[archiveYear]?.workspace) return archiveYear
+  if (state.settings.auditYear === year) return undefined
   const key = String(year)
-  return state.yearArchives[key]?.companies[companyId] ? key : null
+  return state.yearArchives[key]?.workspace ? key : null
 }
 
 function restoreCompanyRecord(
@@ -315,8 +308,8 @@ function restoreCompanyRecord(
   const archiveYear = targetCompanyArchiveYear(state, entry.location.companyId, entry.location.year, entry.location.archiveYear)
   if (archiveYear === null) return null
   const data = archiveYear
-    ? state.yearArchives[archiveYear].companies[entry.location.companyId]
-    : state.companies[entry.location.companyId]
+    ? state.yearArchives[archiveYear].workspace
+    : state.workspace
   if (!data) return null
   const records = companyRecords(data, collection)
   if (records.some((record) => record.id === entry.recordId)) return null
@@ -357,8 +350,8 @@ function restoreChecklistItem(state: AppState, entry: Extract<TrashEntry, { kind
   const archiveYear = targetCompanyArchiveYear(state, companyId, year, entry.location.archiveYear)
   if (archiveYear === null) return null
   const company = archiveYear
-    ? state.yearArchives[archiveYear].companies[companyId]
-    : state.companies[companyId]
+    ? state.yearArchives[archiveYear].workspace
+    : state.workspace
   if (!company) return null
   const audit = company.audits.find((item) => item.id === auditId)
   if (!audit || audit.status === '已回報' || audit.items.some((item) => item.id === entry.recordId)) return null
@@ -367,7 +360,7 @@ function restoreChecklistItem(state: AppState, entry: Extract<TrashEntry, { kind
   if (!archiveYear) {
     return {
       ...state,
-      companies: { ...state.companies, [companyId]: { ...company, audits } },
+      workspace: { ...company, audits },
     }
   }
   const archive = state.yearArchives[archiveYear]
@@ -377,7 +370,7 @@ function restoreChecklistItem(state: AppState, entry: Extract<TrashEntry, { kind
       ...state.yearArchives,
       [archiveYear]: {
         ...archive,
-        companies: { ...archive.companies, [companyId]: { ...company, audits } },
+        workspace: { ...company, audits },
       },
     },
   }
@@ -403,8 +396,8 @@ export function restoreTrashRecord(state: AppState, trashId: string): RestoreTra
         : restoreChecklistItem(state, entry)
   if (!restored) {
     const reason = entry.kind === 'checklist_item' && entry.location.archiveYear === undefined
-      && state.companySettings[entry.location.companyId].auditYear !== entry.location.year
-      && !state.yearArchives[String(entry.location.year)]?.companies[entry.location.companyId]
+      && state.settings.auditYear !== entry.location.year
+      && !state.yearArchives[String(entry.location.year)]?.workspace
       ? 'source_missing'
       : entry.kind !== 'person' && entry.kind !== 'onsite_slot'
         && 'companyId' in entry.location

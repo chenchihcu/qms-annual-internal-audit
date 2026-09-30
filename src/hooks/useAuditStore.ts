@@ -45,11 +45,16 @@ import {
   applyWorkspaceConflictChoice,
   markWorkspaceConflictReviewed,
   migrateToSingleWorkspace,
-  SINGLE_WORKSPACE_STORAGE_VERSION,
-  validateSingleWorkspaceState,
   WORKSPACE_COMPANY_ID,
 } from '../lib/singleWorkspaceMigration'
-import { downloadBlob } from '../lib/download'
+import {
+  isAppStateV14Legacy,
+  LEGACY_STORAGE_KEY_V14,
+  migrateV14ToV15,
+  SINGLE_WORKSPACE_STORAGE_VERSION,
+  switchWorkspaceYear,
+  validateV15State,
+} from '../lib/workspaceSchemaV15'
 import { autoArrangePlan } from '../lib/planner'
 import { buildEffectiveProcedureRisks } from '../lib/risk'
 import {
@@ -87,9 +92,6 @@ interface LoadStateResult {
   state: AppState
   persistenceAllowed: boolean
   storageWarning: string | null
-  migrationRequired?: boolean
-  migrationBackupRaw?: string
-  migrationBackupStorageKey?: string
 }
 
 function loadFailure(message: string): LoadStateResult {
@@ -100,7 +102,30 @@ function loadFailure(message: string): LoadStateResult {
   }
 }
 
-function parseStoredState(raw: string, label: string, storageKey: string): LoadStateResult {
+function persistMigratedV15(migrated: AppState, label: string): LoadStateResult {
+  if (!validateV15State(migrated)) {
+    return loadFailure(`${label} 無法安全升級至 v15`)
+  }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
+    const readBack = localStorage.getItem(STORAGE_KEY)
+    if (!readBack) {
+      localStorage.removeItem(STORAGE_KEY)
+      return loadFailure(`${label} 新版資料寫入後讀回失敗`)
+    }
+    const parsed = JSON.parse(readBack) as AppState
+    if (!validateV15State(parsed)) {
+      localStorage.removeItem(STORAGE_KEY)
+      return loadFailure(`${label} 新版資料寫入後驗證失敗`)
+    }
+    return { state: parsed, persistenceAllowed: true, storageWarning: null }
+  } catch {
+    localStorage.removeItem(STORAGE_KEY)
+    return loadFailure(`${label} 新版資料寫入失敗`)
+  }
+}
+
+function parseStoredState(raw: string, label: string, _storageKey: string): LoadStateResult {
   let parsed: AppState
   try {
     parsed = JSON.parse(raw) as AppState
@@ -110,33 +135,35 @@ function parseStoredState(raw: string, label: string, storageKey: string): LoadS
   if (typeof parsed.version !== 'number') return loadFailure(`${label} 缺少資料版本`)
   if (parsed.version > SINGLE_WORKSPACE_STORAGE_VERSION) return loadFailure(`${label} 為較新的 v${parsed.version}，本系統拒絕降版載入`)
   if (parsed.version === SINGLE_WORKSPACE_STORAGE_VERSION) {
-    if (!validateSingleWorkspaceState(parsed)) return loadFailure(`${label} 新版工作區結構不完整`)
+    if (!validateV15State(parsed)) return loadFailure(`${label} 新版工作區結構不完整`)
     return { state: parsed, persistenceAllowed: true, storageWarning: null }
   }
-  if (!parsed.companies && parsed.version !== 1) return loadFailure(`${label} 結構不完整`)
+  if (isAppStateV14Legacy(parsed)) {
+    try {
+      const migrated = migrateV14ToV15(parsed)
+      return persistMigratedV15(migrated, label)
+    } catch {
+      return loadFailure(`${label} 無法安全升級至 v15`)
+    }
+  }
+  if (!('companies' in parsed) && parsed.version !== 1) return loadFailure(`${label} 結構不完整`)
   try {
+    const legacy = parsed as unknown as Parameters<typeof migrateToV8>[0]
     const v8 = parsed.version >= 8
-      ? migrateToV8(parsed)
+      ? migrateToV8(legacy)
       : parsed.version === 1
         ? (() => {
             const migratedV1 = migrateV1State(parsed)
             if (!migratedV1) throw new Error('v1 結構不完整')
             return migrateToV8(migratedV1)
           })()
-        : migrateToV8(parsed)
+        : migrateToV8(legacy)
     const v13 = migrateState(v8)
-    const migrated = migrateToSingleWorkspace(v13)
-    if (!validateSingleWorkspaceState(migrated)) throw new Error('工作區格式驗證失敗')
-    return {
-      state: migrated,
-      persistenceAllowed: false,
-      storageWarning: null,
-      migrationRequired: true,
-      migrationBackupRaw: raw,
-      migrationBackupStorageKey: storageKey,
-    }
+    const v14 = migrateToSingleWorkspace(v13)
+    const migrated = migrateV14ToV15(v14)
+    return persistMigratedV15(migrated, label)
   } catch {
-    return loadFailure(`${label} 無法安全遷移至單一工作區`)
+    return loadFailure(`${label} 無法安全遷移至 v15`)
   }
 }
 
@@ -144,6 +171,10 @@ function loadState(): LoadStateResult {
   const current = localStorage.getItem(STORAGE_KEY)
   if (current) {
     return parseStoredState(current, '目前資料', STORAGE_KEY)
+  }
+  const v14Raw = localStorage.getItem(LEGACY_STORAGE_KEY_V14)
+  if (v14Raw) {
+    return parseStoredState(v14Raw, 'v14 資料', LEGACY_STORAGE_KEY_V14)
   }
   for (const [key, label] of [
     [LEGACY_STORAGE_KEY_V8, 'v8 資料'],
@@ -167,92 +198,21 @@ function loadState(): LoadStateResult {
     try {
       const migrated = migrateV1State(parsed)
       if (!migrated) return loadFailure('v1 資料結構不完整')
-      const state = migrateToSingleWorkspace(migrateState(migrateToV8(migrated)))
-      return {
-        state,
-        persistenceAllowed: false,
-        storageWarning: null,
-        migrationRequired: true,
-        migrationBackupRaw: legacy,
-        migrationBackupStorageKey: 'qms-annual-internal-audit-v1',
-      }
+      const state = migrateV14ToV15(migrateToSingleWorkspace(migrateState(migrateToV8(migrated))))
+      return persistMigratedV15(state, 'v1 資料')
     } catch {
       return loadFailure('v1 資料無法安全遷移至 v8')
     }
   }
-  const demo = migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
-  return { state: demo, persistenceAllowed: true, storageWarning: null }
+  return { state: createDemoState(), persistenceAllowed: true, storageWarning: null }
 }
 
 function nextId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36)}`
 }
 
-function emptyYearCompany(company: CompanyData): CompanyData {
-  return {
-    ...company,
-    planRows: company.planRows.map((row) => ({
-      ...row,
-      months: Array.from({ length: 12 }, () => null),
-      manualOverride: false,
-    })),
-    audits: [],
-    ncrs: [],
-    observations: [],
-    suggestions: [],
-  }
-}
-
-function settingsFor(state: AppState, companyId: CompanyId = state.activeCompanyId) {
-  return companySettingsFor(state, companyId)
-}
-
-function switchYearState(state: AppState, year: number, companyId: CompanyId): AppState {
-  const currentSettings = state.companySettings[companyId]
-  if (!Number.isInteger(year) || year < 2000 || year > 2200 || year === currentSettings.auditYear) return state
-
-  const archiveYear = String(currentSettings.auditYear)
-  const existingArchive = state.yearArchives[archiveYear] ?? { companies: {}, companySettings: {} }
-  const archives = {
-    ...state.yearArchives,
-    [archiveYear]: {
-      companies: { ...existingArchive.companies, [companyId]: state.companies[companyId] },
-      companySettings: { ...existingArchive.companySettings, [companyId]: currentSettings },
-    },
-  }
-
-  const restored = archives[String(year)]
-  const restoredCompany = restored?.companies[companyId]
-  const restoredSettings = restored?.companySettings[companyId]
-  if (restoredCompany && restoredSettings) {
-    return {
-      ...state,
-      companies: { ...state.companies, [companyId]: restoredCompany },
-      companySettings: {
-        ...state.companySettings,
-        [companyId]: { ...restoredSettings, auditYear: year },
-      },
-      yearArchives: archives,
-    }
-  }
-
-  const replaceYear = (value?: string) => value ? value.replace(/^\d{4}/, String(year)) : value
-  return {
-    ...state,
-    companies: { ...state.companies, [companyId]: emptyYearCompany(state.companies[companyId]) },
-    companySettings: {
-      ...state.companySettings,
-      [companyId]: {
-        ...currentSettings,
-        auditYear: year,
-        yearStart: replaceYear(currentSettings.yearStart)!,
-        planWindowStart: replaceYear(currentSettings.planWindowStart)!,
-        planWindowEnd: replaceYear(currentSettings.planWindowEnd)!,
-        managementReviewDate: replaceYear(currentSettings.managementReviewDate),
-      },
-    },
-    yearArchives: archives,
-  }
+function settingsFor(state: AppState) {
+  return companySettingsFor(state)
 }
 
 function switchPrepYearState(state: AppState, year: number): AppState {
@@ -272,7 +232,7 @@ function switchPrepYearState(state: AppState, year: number): AppState {
 function buildTeamSnapshot(state: AppState, audit: ProcedureAudit): AuditTeamSnapshot {
   const members: AuditTeamSnapshot['members'] = []
   const auditDate = audit.auditDate || audit.plannedDate || ''
-  const standards = state.companyAuditProfiles[state.activeCompanyId].applicableStandards
+  const standards = state.auditProfile.applicableStandards
     .filter((standard) => standard.confirmationStatus === 'confirmed')
     .map((standard) => `${standard.name}:${standard.version}`)
   const add = (personId: string | undefined, role: 'lead' | 'auditor' | 'escort') => {
@@ -280,25 +240,25 @@ function buildTeamSnapshot(state: AppState, audit: ProcedureAudit): AuditTeamSna
     const person = state.people.find((p) => p.id === personId)
     if (!person) return
     const affiliation = person.affiliations.find((candidate) => (
-      candidate.companyId === state.activeCompanyId
+      candidate.companyId === WORKSPACE_COMPANY_ID
       && (!candidate.effectiveFrom || candidate.effectiveFrom <= auditDate)
       && (!candidate.effectiveTo || candidate.effectiveTo >= auditDate)
     )) ?? person.affiliations.find((candidate) => Boolean(candidate.externalOrganization))
-    const departmentName = state.companies[state.activeCompanyId].departments
+    const departmentName = state.workspace.departments
       .find((department) => department.id === affiliation?.departmentId)?.name
     const qualification = role === 'escort'
       ? undefined
       : findMatchingAuditQualification(
           person,
           role === 'lead' ? 'internal_lead_auditor' : 'internal_auditor',
-          state.activeCompanyId,
+          WORKSPACE_COMPANY_ID,
           audit.qpCode,
           audit.departmentId,
           auditDate,
           standards,
         )
     const appointment = role === 'lead'
-      ? findActiveLeadAppointment(person, state.activeCompanyId, auditDate)
+      ? findActiveLeadAppointment(person, WORKSPACE_COMPANY_ID, auditDate)
       : undefined
     const scope = role === 'escort'
       ? `陪同／協調：${audit.scope || `${audit.qpCode} ${audit.department}`}`
@@ -326,29 +286,30 @@ function buildTeamSnapshot(state: AppState, audit: ProcedureAudit): AuditTeamSna
 }
 
 function validateAuditStartState(state: AppState, audit: ProcedureAudit) {
-  const profile = state.companyAuditProfiles[state.activeCompanyId]
+  const profile = state.auditProfile
   const standards = profile.applicableStandards
     .filter((item) => item.confirmationStatus === 'confirmed')
     .map((item) => `${item.name}:${item.version}`)
   const result = validateAuditTeam(
-    state.people, audit.team, state.activeCompanyId, audit.qpCode, audit.departmentId,
+    state.people, audit.team, WORKSPACE_COMPANY_ID, audit.qpCode, audit.departmentId,
     audit.auditDate || audit.plannedDate || '', standards,
   )
   const errors = [...result.errors]
   if (!audit.auditDate) errors.unshift('開始稽核前須填寫稽核日期')
   if (standards.length === 0) errors.unshift('適用標準與版本尚未確認')
-  if (!profile.auditProcedureCode.trim()) errors.unshift('稽核程序代碼尚未填寫')
-  if (!profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認') {
-    errors.unshift('稽核程序版本仍為待確認')
-  }
-  if (!profile.formalRecordLocation.trim()) errors.unshift('正式紀錄保存位置尚未填寫')
+  if (!profile.auditProcedureCode?.trim()) errors.unshift('稽核程序代碼尚未填寫')
+  if (!profile.formalRecordLocation?.trim()) errors.unshift('正式紀錄保存位置尚未填寫')
+  const procedureVersion =
+    !profile.auditProcedureVersion || profile.auditProcedureVersion === '待確認'
+      ? '依現行受控版本'
+      : profile.auditProcedureVersion
   return {
     ...result,
     canStart: errors.length === 0,
     errors,
     standards,
-    procedureCode: profile.auditProcedureCode,
-    procedureVersion: profile.auditProcedureVersion,
+    procedureCode: profile.auditProcedureCode?.trim() || audit.qpCode || 'QP-28',
+    procedureVersion,
     formalRecordLocation: profile.formalRecordLocation,
   }
 }
@@ -385,18 +346,18 @@ function syncObservationsFromAudits(audits: ProcedureAudit[], existing: Observat
 }
 
 function findObservation(state: AppState, id: string): Observation | undefined {
-  return state.companies[state.activeCompanyId].observations.find((item) => item.id === id)
-    ?? Object.values(state.yearArchives).flatMap((archive) => archive.companies[state.activeCompanyId]?.observations ?? []).find((item) => item.id === id)
+  return state.workspace.observations.find((item) => item.id === id)
+    ?? Object.values(state.yearArchives).flatMap((archive) => archive.workspace?.observations ?? []).find((item) => item.id === id)
 }
 
 function findNCR(state: AppState, id: string): NCR | undefined {
-  return state.companies[state.activeCompanyId].ncrs.find((item) => item.id === id)
-    ?? Object.values(state.yearArchives).flatMap((archive) => archive.companies[state.activeCompanyId]?.ncrs ?? []).find((item) => item.id === id)
+  return state.workspace.ncrs.find((item) => item.id === id)
+    ?? Object.values(state.yearArchives).flatMap((archive) => archive.workspace?.ncrs ?? []).find((item) => item.id === id)
 }
 
 function findSuggestion(state: AppState, id: string): ThirdPartySuggestion | undefined {
-  return state.companies[state.activeCompanyId].suggestions.find((item) => item.id === id)
-    ?? Object.values(state.yearArchives).flatMap((archive) => archive.companies[state.activeCompanyId]?.suggestions ?? []).find((item) => item.id === id)
+  return state.workspace.suggestions.find((item) => item.id === id)
+    ?? Object.values(state.yearArchives).flatMap((archive) => archive.workspace?.suggestions ?? []).find((item) => item.id === id)
 }
 
 function observationRevisionFields(item: Observation): ObservationRevisionFields {
@@ -412,27 +373,24 @@ function observationRevisionFields(item: Observation): ObservationRevisionFields
 }
 
 function patchObservation(state: AppState, id: string, patch: (item: Observation) => Observation): AppState {
-  const company = state.companies[state.activeCompanyId]
+  const company = state.workspace
   if (company.observations.some((item) => item.id === id)) {
-    return patchCompany(state, state.activeCompanyId, {
+    return patchWorkspace(state, {
       observations: company.observations.map((item) => item.id === id ? patch(item) : item),
     })
   }
   for (const [year, archive] of Object.entries(state.yearArchives)) {
-    const sourceCompany = archive.companies[state.activeCompanyId]
-    if (!sourceCompany || !sourceCompany.observations.some((item) => item.id === id)) continue
+    const sourceWorkspace = archive.workspace
+    if (!sourceWorkspace || !sourceWorkspace.observations.some((item) => item.id === id)) continue
     return {
       ...state,
       yearArchives: {
         ...state.yearArchives,
         [year]: {
           ...archive,
-          companies: {
-            ...archive.companies,
-            [state.activeCompanyId]: {
-              ...sourceCompany,
-              observations: sourceCompany.observations.map((item) => item.id === id ? patch(item) : item),
-            },
+          workspace: {
+            ...sourceWorkspace,
+            observations: sourceWorkspace.observations.map((item) => item.id === id ? patch(item) : item),
           },
         },
       },
@@ -442,8 +400,7 @@ function patchObservation(state: AppState, id: string, patch: (item: Observation
 }
 
 function saveState(state: AppState) {
-  const { settings: _legacy, ...persisted } = state
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
 function persistenceFailureMessage(error: unknown): string {
@@ -454,17 +411,10 @@ function persistenceFailureMessage(error: unknown): string {
   return `${reason}。變更只保留在目前頁面；請立即下載完整備份，重新整理前先確認資料已安全保存。`
 }
 
-function patchCompany(
-  state: AppState,
-  companyId: CompanyId,
-  patch: Partial<CompanyData>,
-): AppState {
+function patchWorkspace(state: AppState, patch: Partial<CompanyData>): AppState {
   return {
     ...state,
-    companies: {
-      ...state.companies,
-      [companyId]: { ...state.companies[companyId], ...patch },
-    },
+    workspace: { ...state.workspace, ...patch },
   }
 }
 
@@ -473,9 +423,6 @@ export function useAuditStore() {
   const [state, setState] = useState<AppState>(initial.state)
   const [persistenceAllowed, setPersistenceAllowed] = useState(initial.persistenceAllowed)
   const [storageWarning, setStorageWarning] = useState<string | null>(initial.storageWarning)
-  const [migrationRequired, setMigrationRequired] = useState(Boolean(initial.migrationRequired))
-  const [migrationBackupRequested, setMigrationBackupRequested] = useState(false)
-  const [migrationBackupConfirmed, setMigrationBackupConfirmed] = useState(false)
 
   useEffect(() => {
     if (!persistenceAllowed) return
@@ -489,21 +436,18 @@ export function useAuditStore() {
     }
   }, [state, persistenceAllowed])
 
-  const activeCompany = state.companies[state.activeCompanyId]
+  const activeCompany = state.workspace
 
   const updateSettings = useCallback((
     patch: Partial<AuditSettings>,
     options?: { resetExternalPrep?: boolean },
   ) => {
     setState((s) => {
-      const companyId = s.activeCompanyId
       if (patch.auditYear != null && (!Number.isInteger(patch.auditYear) || patch.auditYear < 2000 || patch.auditYear > 2200)) return s
-      const base = patch.auditYear == null ? s : switchYearState(s, patch.auditYear, companyId)
-      const current = base.companySettings[companyId]
+      const base = patch.auditYear == null ? s : switchWorkspaceYear(s, patch.auditYear)
+      const current = base.settings
       const { auditYear: nextYear, ...rest } = patch
-      const nextSettings = nextYear == null
-        ? { ...current, ...rest }
-        : { ...base.companySettings[companyId], ...rest }
+      const nextSettings = { ...current, ...rest }
       let externalAuditPrep = base.externalAuditPrep
       if (nextYear != null && nextYear !== base.externalAuditPrep.year) {
         externalAuditPrep = options?.resetExternalPrep
@@ -513,94 +457,14 @@ export function useAuditStore() {
       return {
         ...base,
         externalAuditPrep,
-        companySettings: {
-          ...base.companySettings,
-          [companyId]: nextSettings,
-        },
+        settings: nextSettings,
       }
     })
   }, [])
 
   const switchAuditYear = useCallback((year: number) => {
-    setState((s) => switchYearState(s, year, s.activeCompanyId))
+    setState((s) => switchWorkspaceYear(s, year))
   }, [])
-
-  const switchCompany = useCallback((companyId: CompanyId) => {
-    if (companyId !== WORKSPACE_COMPANY_ID) return
-    setState((s) => ({ ...s, activeCompanyId: WORKSPACE_COMPANY_ID }))
-  }, [])
-
-  const downloadMigrationBackup = useCallback(() => {
-    if (!initial.migrationBackupRaw || !initial.migrationBackupStorageKey) {
-      setStorageWarning('找不到遷移前原始資料，未啟動下載或升級。')
-      return false
-    }
-    try {
-      const date = new Date().toISOString().slice(0, 10)
-      downloadBlob(
-        new Blob([initial.migrationBackupRaw], { type: 'application/json' }),
-        `QMS遷移前備份_${date}.json`,
-      )
-      setMigrationBackupRequested(true)
-      setMigrationBackupConfirmed(false)
-      setStorageWarning(null)
-      return true
-    } catch (error) {
-      setStorageWarning(`無法啟動備份下載：${error instanceof Error ? error.message : '瀏覽器下載失敗'}。尚未套用升級。`)
-      return false
-    }
-  }, [initial.migrationBackupRaw, initial.migrationBackupStorageKey])
-
-  const verifyMigrationBackup = useCallback(async (file: File) => {
-    if (!migrationBackupRequested || !initial.migrationBackupRaw) return false
-    try {
-      const selectedContents = await file.text()
-      JSON.parse(selectedContents)
-      if (selectedContents !== initial.migrationBackupRaw) {
-        setMigrationBackupConfirmed(false)
-        setStorageWarning('所選備份與目前瀏覽器原始資料不一致；尚未套用升級。請重新下載並選取該檔案。')
-        return false
-      }
-      setMigrationBackupConfirmed(true)
-      setStorageWarning(null)
-      return true
-    } catch {
-      setMigrationBackupConfirmed(false)
-      setStorageWarning('所選檔案不是有效 JSON；尚未套用升級。請重新下載原始備份。')
-      return false
-    }
-  }, [initial.migrationBackupRaw, migrationBackupRequested])
-
-  const completeMigration = useCallback(() => {
-    if (!migrationRequired || !migrationBackupRequested || !migrationBackupConfirmed) return false
-    try {
-      if (
-        !initial.migrationBackupStorageKey ||
-        !initial.migrationBackupRaw ||
-        localStorage.getItem(initial.migrationBackupStorageKey) !== initial.migrationBackupRaw
-      ) {
-        setStorageWarning('原始資料在備份後已有變動。尚未套用升級；請重新載入並重新備份。')
-        return false
-      }
-      const serialized = JSON.stringify(state)
-      localStorage.setItem(STORAGE_KEY, serialized)
-      const readBack = localStorage.getItem(STORAGE_KEY)
-      if (!readBack || !validateSingleWorkspaceState(JSON.parse(readBack))) {
-        setStorageWarning('新版資料寫入後驗證失敗；舊資料仍保留，請重新下載備份並重試。')
-        return false
-      }
-      setState(JSON.parse(readBack) as AppState)
-      setMigrationRequired(false)
-      setMigrationBackupRequested(false)
-      setMigrationBackupConfirmed(false)
-      setPersistenceAllowed(true)
-      setStorageWarning(null)
-      return true
-    } catch (error) {
-      setStorageWarning(`新版資料尚未套用：${error instanceof Error ? error.message : '本機儲存失敗'}。原始資料未刪除。`)
-      return false
-    }
-  }, [initial.migrationBackupRaw, initial.migrationBackupStorageKey, migrationRequired, migrationBackupRequested, migrationBackupConfirmed, state])
 
   const resolveWorkspaceConflict = useCallback((conflictId: string, choiceIndex?: number) => {
     setState((current) => {
@@ -615,8 +479,8 @@ export function useAuditStore() {
   const updateDepartment = useCallback(
     (id: string, patch: Partial<CompanyData['departments'][0]>) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
-        return patchCompany(s, s.activeCompanyId, {
+        const co = s.workspace
+        return patchWorkspace(s, {
           departments: co.departments.map((d) => (d.id === id ? { ...d, ...patch } : d)),
         })
       })
@@ -625,12 +489,12 @@ export function useAuditStore() {
   )
 
   const updateDepartmentOwner = useCallback((departmentId: string, newOwner: string) => {
-    setState((s) => applyDepartmentOwnerChange(s, departmentId, newOwner, settingsFor(s).scoringRules, s.activeCompanyId))
+    setState((s) => applyDepartmentOwnerChange(s, departmentId, newOwner, settingsFor(s).scoringRules, WORKSPACE_COMPANY_ID))
   }, [])
 
   const updateProcedureRisk = useCallback((qpCode: string, departmentId: string, patch: Partial<ProcedureRiskRecord>) => {
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
+      const company = s.workspace
       const current = company.procedureRisks ?? []
       const existing = current.find((item) => item.qpCode === qpCode && item.departmentId === departmentId)
       const next: ProcedureRiskRecord = {
@@ -643,7 +507,7 @@ export function useAuditStore() {
         ...existing,
         ...patch,
       }
-      return patchCompany(s, s.activeCompanyId, {
+      return patchWorkspace(s, {
         procedureRisks: existing
           ? current.map((item) => item.id === existing.id ? next : item)
           : [...current, next],
@@ -653,7 +517,7 @@ export function useAuditStore() {
 
   const regeneratePlan = useCallback(() => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.workspace
       const openCount =
         co.observations.filter((o) => o.status === 'open').length +
         co.suggestions.filter((sg) => sg.status === 'open').length +
@@ -672,18 +536,18 @@ export function useAuditStore() {
         },
         { leadAuditor: settingsFor(s).leadAuditor },
       )
-      return patchCompany(s, s.activeCompanyId, { planRows })
+      return patchWorkspace(s, { planRows })
     })
   }, [])
 
   const replacePlanRows = useCallback((planRows: PlanRow[]) => {
-    setState((s) => patchCompany(s, s.activeCompanyId, { planRows }))
+    setState((s) => patchWorkspace(s, { planRows }))
   }, [])
 
   const updatePlanRow = useCallback((id: string, patch: Partial<PlanRow>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.workspace
+      return patchWorkspace(s, {
         planRows: co.planRows.map((r) =>
           r.id === id ? { ...r, ...patch, manualOverride: true } : r,
         ),
@@ -693,8 +557,8 @@ export function useAuditStore() {
 
   const setPlanMonthStatus = useCallback((rowId: string, monthIndex: number, status: MonthStatus) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.workspace
+      return patchWorkspace(s, {
         planRows: co.planRows.map((r) => {
           if (r.id !== rowId) return r
           const months = [...r.months] as MonthStatus[]
@@ -707,8 +571,8 @@ export function useAuditStore() {
 
   const setPlanMonthChoice = useCallback((rowId: string, monthIndex: number, choice: MonthCellChoice) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const co = s.workspace
+      return patchWorkspace(s, {
         planRows: co.planRows.map((r) => {
           if (r.id !== rowId) return r
           return { ...r, ...applyMonthCellChoice(r, monthIndex, choice), manualOverride: true }
@@ -783,14 +647,14 @@ export function useAuditStore() {
   const createAuditEvent = useCallback((qpCode: string, departmentId: string, plannedDate = '') => {
     const id = nextId(`audit-${currentAuditYear}-${qpCode}-${departmentId}`)
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
+      const company = s.workspace
       const entry = PROCEDURE_PLAN_TEMPLATE.find((item) => item.qpCode === qpCode && item.departmentId === departmentId)
         ?? PROCEDURE_PLAN_TEMPLATE.find((item) => item.qpCode === qpCode)
       const department = company.departments.find((item) => item.id === departmentId)
       if (!entry || !department) return s
       const leadId = resolveLeadAuditorPersonId(
         s.people,
-        s.activeCompanyId,
+        WORKSPACE_COMPANY_ID,
         settingsFor(s).auditYear,
         s.annualPersonnelAssignments,
       )
@@ -800,7 +664,11 @@ export function useAuditStore() {
         auditors: department.defaultAuditors, auditCategory: entry.auditCategory,
         items: createChecklistForProcedure(qpCode, department.name).map((item) => ({ ...item, origin: 'seed' })),
         year: settingsFor(s).auditYear, status: '規劃中', scope: `${department.name}／${entry.process}`,
-        criteria: `${qpCode} 與公司程序`, procedureVersion: s.companyAuditProfiles[s.activeCompanyId].auditProcedureVersion,
+        criteria: `${qpCode} 與公司程序`,
+        procedureVersion:
+          !s.auditProfile.auditProcedureVersion || s.auditProfile.auditProcedureVersion === '待確認'
+            ? '依現行受控版本'
+            : s.auditProfile.auditProcedureVersion,
         standardSnapshot: [],
         team: {
           leadAuditorPersonId: leadId,
@@ -810,13 +678,13 @@ export function useAuditStore() {
           impartialityNote: '',
         },
       }
-      return patchCompany(s, s.activeCompanyId, { audits: [...company.audits, audit] })
+      return patchWorkspace(s, { audits: [...company.audits, audit] })
     })
     return id
   }, [currentAuditYear])
 
   const updateAudit = useCallback((audit: ProcedureAudit): UpdateAuditResult => {
-    const co = state.companies[state.activeCompanyId]
+    const co = state.workspace
     const stored = co.audits.find((item) => item.id === audit.id)
     if (audit.status === '已回報') {
       if (stored?.status !== '執行中') {
@@ -835,7 +703,7 @@ export function useAuditStore() {
     }
 
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
+      const company = s.workspace
       const exists = company.audits.some((a) => a.id === audit.id)
       const audits = exists
         ? company.audits.map((current) => {
@@ -862,13 +730,13 @@ export function useAuditStore() {
 
       let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, company.ncrs)
       ncrs = syncNCRDescriptions(ncrs, audits)
-        .filter((item) => !isRecordInTrash(s.trash, 'ncr', s.activeCompanyId, item.id, settingsFor(s).auditYear)
-          && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', s.activeCompanyId, item.id, item.sourceYear ?? settingsFor(s).auditYear))
+        .filter((item) => !isRecordInTrash(s.trash, 'ncr', WORKSPACE_COMPANY_ID, item.id, settingsFor(s).auditYear)
+          && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', WORKSPACE_COMPANY_ID, item.id, item.sourceYear ?? settingsFor(s).auditYear))
 
       const observations = syncObservationsFromAudits(audits, company.observations, settingsFor(s).auditYear)
-        .filter((item) => !isRecordInTrash(s.trash, 'observation', s.activeCompanyId, item.id, settingsFor(s).auditYear)
-          && !isGeneratedRecordPermanentlyDeleted(s, 'observation', s.activeCompanyId, item.id, item.year))
-      return patchCompany(s, s.activeCompanyId, { audits, ncrs, observations })
+        .filter((item) => !isRecordInTrash(s.trash, 'observation', WORKSPACE_COMPANY_ID, item.id, settingsFor(s).auditYear)
+          && !isGeneratedRecordPermanentlyDeleted(s, 'observation', WORKSPACE_COMPANY_ID, item.id, item.year))
+      return patchWorkspace(s, { audits, ncrs, observations })
     })
     return { ok: true }
   }, [state])
@@ -876,7 +744,7 @@ export function useAuditStore() {
   const updateChecklistItem = useCallback(
     (auditId: string, itemId: string, patch: Partial<ChecklistItem>) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.workspace
         const audits = co.audits.map((a) => {
           if (a.id !== auditId) return a
           if (a.status === '已回報') return a
@@ -889,12 +757,12 @@ export function useAuditStore() {
         })
         let ncrs = collectNCRsFromAudits(audits, settingsFor(s).auditYear, co.ncrs)
         ncrs = syncNCRDescriptions(ncrs, audits)
-          .filter((item) => !isRecordInTrash(s.trash, 'ncr', s.activeCompanyId, item.id, settingsFor(s).auditYear)
-            && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', s.activeCompanyId, item.id, item.sourceYear ?? settingsFor(s).auditYear))
+          .filter((item) => !isRecordInTrash(s.trash, 'ncr', WORKSPACE_COMPANY_ID, item.id, settingsFor(s).auditYear)
+            && !isGeneratedRecordPermanentlyDeleted(s, 'ncr', WORKSPACE_COMPANY_ID, item.id, item.sourceYear ?? settingsFor(s).auditYear))
         const observations = syncObservationsFromAudits(audits, co.observations, settingsFor(s).auditYear)
-          .filter((item) => !isRecordInTrash(s.trash, 'observation', s.activeCompanyId, item.id, settingsFor(s).auditYear)
-            && !isGeneratedRecordPermanentlyDeleted(s, 'observation', s.activeCompanyId, item.id, item.year))
-        return patchCompany(s, s.activeCompanyId, { audits, ncrs, observations })
+          .filter((item) => !isRecordInTrash(s.trash, 'observation', WORKSPACE_COMPANY_ID, item.id, settingsFor(s).auditYear)
+            && !isGeneratedRecordPermanentlyDeleted(s, 'observation', WORKSPACE_COMPANY_ID, item.id, item.year))
+        return patchWorkspace(s, { audits, ncrs, observations })
       })
     },
     [],
@@ -902,7 +770,7 @@ export function useAuditStore() {
 
   const addChecklistItem = useCallback((auditId: string) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.workspace
       const audits = co.audits.map((a) => {
         if (a.id !== auditId) return a
         if (a.status === '已回報') return a
@@ -924,7 +792,7 @@ export function useAuditStore() {
           ],
         }
       })
-      return patchCompany(s, s.activeCompanyId, { audits })
+      return patchWorkspace(s, { audits })
     })
   }, [])
 
@@ -950,7 +818,7 @@ export function useAuditStore() {
       companyScope?: NcrCompanyScope
     }) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.workspace
         const auditYear = settingsFor(s).auditYear
         const dept = co.departments.find((d) => d.id === input.departmentId)
         const entry = PROCEDURE_PLAN_TEMPLATE.find(
@@ -969,14 +837,14 @@ export function useAuditStore() {
           companyScope: input.companyScope ?? 'both',
           sourceYear: auditYear,
         })
-        return patchCompany(s, s.activeCompanyId, { ncrs: [...co.ncrs, ncr] })
+        return patchWorkspace(s, { ncrs: [...co.ncrs, ncr] })
       })
     },
     [],
   )
 
   const updateNCR = useCallback((id: string, patch: Partial<NCR>): { ok: boolean; missing?: string[] } => {
-    const co = state.companies[state.activeCompanyId]
+    const co = state.workspace
     const current = co.ncrs.find((n) => n.id === id)
     if (!current) return { ok: false, missing: ['找不到 NCR'] }
     const next = { ...current, ...patch }
@@ -985,8 +853,8 @@ export function useAuditStore() {
       if (!gate.ok) return { ok: false, missing: gate.missing }
     }
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const company = s.workspace
+      return patchWorkspace(s, {
         ncrs: company.ncrs.map((n) => (n.id === id ? next : n)),
       })
     })
@@ -1013,8 +881,8 @@ export function useAuditStore() {
 
   const addObservation = useCallback((observation: Omit<Observation, 'id'>) => {
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, { observations: [...company.observations, { ...observation, id: nextId('observation') }] })
+      const company = s.workspace
+      return patchWorkspace(s, { observations: [...company.observations, { ...observation, id: nextId('observation') }] })
     })
   }, [])
 
@@ -1029,7 +897,7 @@ export function useAuditStore() {
 
   const convertObservationToNCR = useCallback((id: string) => {
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
+      const company = s.workspace
       const observation = findObservation(s, id)
       if (!observation || observation.status !== 'open' || observation.convertedNcrId) return s
       const ncrId = nextId('ncr-observation')
@@ -1051,7 +919,7 @@ export function useAuditStore() {
         observationId: observation.id,
       })
       return patchObservation(
-        patchCompany(s, s.activeCompanyId, { ncrs: [...company.ncrs, ncr] }),
+        patchWorkspace(s, { ncrs: [...company.ncrs, ncr] }),
         id,
         (item) => ({
           ...item,
@@ -1069,33 +937,30 @@ export function useAuditStore() {
 
   const updateSuggestion = useCallback((id: string, patch: Partial<ThirdPartySuggestion>) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.workspace
       if (co.suggestions.some((sg) => sg.id === id)) {
-        return patchCompany(s, s.activeCompanyId, {
+        return patchWorkspace(s, {
           suggestions: co.suggestions.map((sg) => (sg.id === id ? { ...sg, ...patch } : sg)),
         })
       }
       const yearKey = Object.keys(s.yearArchives).find((year) =>
-        s.yearArchives[year].companies[s.activeCompanyId]?.suggestions.some((sg) => sg.id === id),
+        s.yearArchives[year].workspace?.suggestions.some((sg) => sg.id === id),
       )
       if (!yearKey) return s
       const archive = s.yearArchives[yearKey]
-      const archivedCompany = archive.companies[s.activeCompanyId]
-      if (!archivedCompany) return s
+      const archivedWorkspace = archive.workspace
+      if (!archivedWorkspace) return s
       return {
         ...s,
         yearArchives: {
           ...s.yearArchives,
           [yearKey]: {
             ...archive,
-            companies: {
-              ...archive.companies,
-              [s.activeCompanyId]: {
-                ...archivedCompany,
-                suggestions: archivedCompany.suggestions.map((sg) =>
-                  sg.id === id ? { ...sg, ...patch } : sg,
-                ),
-              },
+            workspace: {
+              ...archivedWorkspace,
+              suggestions: archivedWorkspace.suggestions.map((sg) =>
+                sg.id === id ? { ...sg, ...patch } : sg,
+              ),
             },
           },
         },
@@ -1105,8 +970,8 @@ export function useAuditStore() {
 
   const addSuggestion = useCallback((suggestion: Omit<ThirdPartySuggestion, 'id'>) => {
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const company = s.workspace
+      return patchWorkspace(s, {
         suggestions: [...company.suggestions, { ...suggestion, id: nextId('suggestion') }],
       })
     })
@@ -1141,7 +1006,7 @@ export function useAuditStore() {
   const moveCompanyRecordToTrashAction = useCallback((kind: TrashCompanyRecordKind, id: string) => {
     const trashId = nextId('trash')
     const deletedAt = new Date().toISOString()
-    setState((s) => moveCompanyRecordToTrash(s, kind, id, s.activeCompanyId, trashId, deletedAt))
+    setState((s) => moveCompanyRecordToTrash(s, kind, id, WORKSPACE_COMPANY_ID, trashId, deletedAt))
   }, [])
 
   const restoreFromTrash = useCallback((trashId: string) => {
@@ -1175,20 +1040,17 @@ export function useAuditStore() {
     })
   }, [])
 
-  const updateCompanyAuditProfile = useCallback((companyId: CompanyId, patch: Partial<CompanyAuditProfile>) => {
+  const updateCompanyAuditProfile = useCallback((_companyId: CompanyId, patch: Partial<CompanyAuditProfile>) => {
     setState((s) => ({
       ...s,
-      companyAuditProfiles: {
-        ...s.companyAuditProfiles,
-        [companyId]: { ...s.companyAuditProfiles[companyId], ...patch, companyId },
-      },
+      auditProfile: { ...s.auditProfile, ...patch, companyId: s.auditProfile.companyId },
     }))
   }, [])
 
   const validateAuditStart = useCallback((audit: ProcedureAudit) => validateAuditStartState(state, audit), [state])
 
   const startAudit = useCallback((auditId: string) => {
-    const audit = state.companies[state.activeCompanyId].audits.find((item) => item.id === auditId)
+    const audit = state.workspace.audits.find((item) => item.id === auditId)
     if (!audit) return { canStart: false, errors: ['找不到稽核事件'], warnings: [] }
     if (audit.status === '執行中' || audit.status === '已回報') {
       return { canStart: false, errors: ['稽核事件已開始，歷史資格快照不可重新建立'], warnings: [] }
@@ -1196,8 +1058,8 @@ export function useAuditStore() {
     const result = validateAuditStartState(state, audit)
     if (!result.canStart) return result
     setState((s) => {
-      const company = s.companies[s.activeCompanyId]
-      return patchCompany(s, s.activeCompanyId, {
+      const company = s.workspace
+      return patchWorkspace(s, {
         audits: company.audits.map((item) => item.id === auditId
           ? {
               ...item,
@@ -1247,16 +1109,10 @@ export function useAuditStore() {
         if (externalAuditDate !== undefined) {
           prep.externalAuditDate = externalAuditDate
         }
-        const companySettings = { ...s.companySettings }
-        if (externalAuditDate !== undefined) {
-          for (const companyId of Object.keys(companySettings) as CompanyId[]) {
-            companySettings[companyId] = {
-              ...companySettings[companyId],
-              externalAuditDate,
-            }
-          }
-        }
-        return { ...s, externalAuditPrep: prep, companySettings }
+        const settings = externalAuditDate !== undefined
+          ? { ...s.settings, externalAuditDate }
+          : s.settings
+        return { ...s, externalAuditPrep: prep, settings }
       })
     },
     [],
@@ -1307,7 +1163,7 @@ export function useAuditStore() {
   const carryForwardObservation = useCallback(
     (obsId: string, qpCode: string, departmentId: string) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.workspace
         const obs = findObservation(s, obsId)
         if (!obs || obs.status !== 'open' || obs.carriedToYear === settingsFor(s).auditYear || obs.carryForwards?.some((entry) => entry.year === settingsFor(s).auditYear)) return s
 
@@ -1359,7 +1215,7 @@ export function useAuditStore() {
           : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
 
         return patchObservation(
-          patchCompany(s, s.activeCompanyId, { audits }),
+          patchWorkspace(s, { audits }),
           obsId,
           (item) => ({
             ...item,
@@ -1375,7 +1231,7 @@ export function useAuditStore() {
 
   const carryForwardNCR = useCallback((ncrId: string, qpCode: string, departmentId: string) => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.workspace
       const ncr = findNCR(s, ncrId)
       if (!ncr || ncr.status === '結案') return s
 
@@ -1426,14 +1282,14 @@ export function useAuditStore() {
           )
         : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
 
-      return patchCompany(s, s.activeCompanyId, { audits })
+      return patchWorkspace(s, { audits })
     })
   }, [])
 
   const carryForwardSuggestion = useCallback(
     (sugId: string, qpCode: string, departmentId: string) => {
       setState((s) => {
-        const co = s.companies[s.activeCompanyId]
+        const co = s.workspace
         const sug = findSuggestion(s, sugId)
         if (!sug || sug.status === 'closed') return s
 
@@ -1485,33 +1341,30 @@ export function useAuditStore() {
             )
           : [...co.audits, { ...audit, items: [...audit.items, newItem] }]
 
-        let next = patchCompany(s, s.activeCompanyId, {
+        let next = patchWorkspace(s, {
           audits,
           suggestions: co.suggestions.map((sg) =>
             sg.id === sugId ? { ...sg, carriedToYear: settingsFor(s).auditYear } : sg,
           ),
         })
         const archiveYear = Object.keys(next.yearArchives).find((year) =>
-          next.yearArchives[year].companies[next.activeCompanyId]?.suggestions.some((sg) => sg.id === sugId),
+          next.yearArchives[year].workspace?.suggestions.some((sg) => sg.id === sugId),
         )
         if (archiveYear && !co.suggestions.some((sg) => sg.id === sugId)) {
           const archive = next.yearArchives[archiveYear]
-          const archivedCompany = archive.companies[next.activeCompanyId]
-          if (archivedCompany) {
+          const archivedWorkspace = archive.workspace
+          if (archivedWorkspace) {
             next = {
               ...next,
               yearArchives: {
                 ...next.yearArchives,
                 [archiveYear]: {
                   ...archive,
-                  companies: {
-                    ...archive.companies,
-                    [next.activeCompanyId]: {
-                      ...archivedCompany,
-                      suggestions: archivedCompany.suggestions.map((sg) =>
-                        sg.id === sugId ? { ...sg, carriedToYear: settingsFor(next).auditYear } : sg,
-                      ),
-                    },
+                  workspace: {
+                    ...archivedWorkspace,
+                    suggestions: archivedWorkspace.suggestions.map((sg) =>
+                      sg.id === sugId ? { ...sg, carriedToYear: settingsFor(next).auditYear } : sg,
+                    ),
                   },
                 },
               },
@@ -1528,7 +1381,7 @@ export function useAuditStore() {
 
   const importJSON = useCallback((json: string) => {
     const migrated = parseBackupJson(json)
-    if (!validateSingleWorkspaceState(migrated)) throw new Error('備份資料轉換後未通過結構驗證，未套用還原')
+    if (!validateV15State(migrated)) throw new Error('備份資料轉換後未通過結構驗證，未套用還原')
     localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated))
     const readBack = localStorage.getItem(STORAGE_KEY)
     if (!readBack) throw new Error('還原資料寫入後無法讀回，未套用還原')
@@ -1538,26 +1391,21 @@ export function useAuditStore() {
     } catch {
       throw new Error('還原資料讀回後格式錯誤，未套用還原')
     }
-    if (!validateSingleWorkspaceState(verified)) throw new Error('還原資料讀回後未通過結構驗證，未套用還原')
+    if (!validateV15State(verified)) throw new Error('還原資料讀回後未通過結構驗證，未套用還原')
     setPersistenceAllowed(true)
-    setMigrationRequired(false)
-    setMigrationBackupRequested(false)
-    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
     setState(verified)
   }, [])
 
   const resetToDemo = useCallback(() => {
     setPersistenceAllowed(true)
-    setMigrationRequired(false)
-    setMigrationBackupRequested(false)
-    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
-    setState(migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState()))))
+    setState(createDemoState())
   }, [])
 
   const clearAll = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(LEGACY_STORAGE_KEY_V14)
     localStorage.removeItem(LEGACY_STORAGE_KEY_V8)
     localStorage.removeItem(LEGACY_STORAGE_KEY_V7)
     localStorage.removeItem(LEGACY_STORAGE_KEY_V6)
@@ -1565,16 +1413,13 @@ export function useAuditStore() {
     localStorage.removeItem('qms-annual-internal-audit-v4')
     localStorage.removeItem('qms-annual-internal-audit-v1')
     setPersistenceAllowed(true)
-    setMigrationRequired(false)
-    setMigrationBackupRequested(false)
-    setMigrationBackupConfirmed(false)
     setStorageWarning(null)
-    setState(migrateToSingleWorkspace(migrateState(migrateToV8(createBlankState()))))
+    setState(createBlankState())
   }, [])
 
   const ensureAllAudits = useCallback(() => {
     setState((s) => {
-      const co = s.companies[s.activeCompanyId]
+      const co = s.workspace
       const audits = [...co.audits]
       for (const entry of PROCEDURE_PLAN_TEMPLATE) {
         const id = `audit-${entry.qpCode}-${entry.departmentId}`
@@ -1597,7 +1442,7 @@ export function useAuditStore() {
           })
         }
       }
-      return patchCompany(s, s.activeCompanyId, { audits })
+      return patchWorkspace(s, { audits })
     })
   }, [])
 
@@ -1613,16 +1458,9 @@ export function useAuditStore() {
   return {
     state: syncedState,
     storageWarning,
-    migrationRequired,
-    migrationBackupRequested,
-    migrationBackupConfirmed,
-    downloadMigrationBackup,
-    verifyMigrationBackup,
-    completeMigration,
     resolveWorkspaceConflict,
     updateSettings,
     switchAuditYear,
-    switchCompany,
     updateDepartment,
     updateDepartmentOwner,
     updateProcedureRisk,

@@ -1,5 +1,6 @@
 import type { AppState, CompanyId, ScoringRules } from '../types'
 import { isAuditComplete } from './scoring'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 
 export interface DepartmentOwnerChangePreview {
   departmentId: string
@@ -16,8 +17,8 @@ function normalizeOwner(owner: string): string {
   return owner.trim()
 }
 
-function companyFor(state: AppState, companyId: CompanyId = state.activeCompanyId) {
-  return state.companies[companyId]
+function companyFor(state: AppState, _companyId: CompanyId = WORKSPACE_COMPANY_ID) {
+  return state.workspace
 }
 
 export function previewDepartmentOwnerChange(
@@ -25,7 +26,7 @@ export function previewDepartmentOwnerChange(
   departmentId: string,
   newOwner: string,
   rules: ScoringRules,
-  companyId: CompanyId = state.activeCompanyId,
+  companyId: CompanyId = WORKSPACE_COMPANY_ID,
 ): DepartmentOwnerChangePreview | null {
   const company = companyFor(state, companyId)
   const dept = company.departments.find((d) => d.id === departmentId)
@@ -71,7 +72,7 @@ export function applyDepartmentOwnerChange(
   departmentId: string,
   newOwner: string,
   rules: ScoringRules,
-  companyId: CompanyId = state.activeCompanyId,
+  companyId: CompanyId = WORKSPACE_COMPANY_ID,
 ): AppState {
   const preview = previewDepartmentOwnerChange(state, departmentId, newOwner, rules, companyId)
   if (!preview || !preview.changed) return state
@@ -81,22 +82,19 @@ export function applyDepartmentOwnerChange(
 
   return {
     ...state,
-    companies: {
-      ...state.companies,
-      [companyId]: {
-        ...company,
-        departments: company.departments.map((d) =>
-          d.id === departmentId ? { ...d, owner: normalized } : d,
-        ),
-        planRows: company.planRows.map((row) =>
-          row.departmentId === departmentId ? { ...row, owner: normalized } : row,
-        ),
-        audits: company.audits.map((audit) => {
-          if (audit.departmentId !== departmentId) return audit
-          if (isAuditComplete(audit, rules)) return audit
-          return { ...audit, departmentManager: normalized }
-        }),
-      },
+    workspace: {
+      ...company,
+      departments: company.departments.map((d) =>
+        d.id === departmentId ? { ...d, owner: normalized } : d,
+      ),
+      planRows: company.planRows.map((row) =>
+        row.departmentId === departmentId ? { ...row, owner: normalized } : row,
+      ),
+      audits: company.audits.map((audit) => {
+        if (audit.departmentId !== departmentId) return audit
+        if (isAuditComplete(audit, rules)) return audit
+        return { ...audit, departmentManager: normalized }
+      }),
     },
   }
 }

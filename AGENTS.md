@@ -13,7 +13,7 @@
 - 修改資料結構、預設種子或儲存流程前，先確認既有使用者資料的相容性；不得以清除 `localStorage` 作為一般修復方式。
 - 人員、稽核計畫、查檢與改善使用單一工作區；雙公司欄位只作舊資料相容，不重建公司切換。跨年度與各表單的語意變更須同步檢視所有讀寫頁面。
 - 本案共用一張證書，證書範圍／引用只記錄一次；ISO 9001、AS9100 各自保留版本與適用性。不得將本案共用證書推定為所有組織的固定關係。
-- 單一工作區遷移沿用已核准規格：遷移前下載並核對本機備份；無衝突合併、矛盾待覆核、查檢判定不猜測。自建資料刪除先進可還原回收區，永久清除另確認。
+- 單一工作區遷移沿用已核准規格：讀到 v14 或更舊鍵時在瀏覽器內升級並寫入 v15，舊鍵保留；無衝突合併、矛盾待覆核、查檢判定不猜測。升級後請用設定頁下載 v15 完整備份。自建資料刪除先進可還原回收區，永久清除另確認。
 - SCMH、指導手冊及歷史表單須保留來源與年代；只採用已核對適用性的資訊，不將指導資料或舊版內容直接升格為現行強制要求。
 - 文案精簡只改 UI 包裝與系統訊息；保留使用者輸入、查檢表快照、`src/data/externalAuditPrep.seed.json` 的來源內容、列印來源標題及 QP／QR 識別字。驗證時分開比對 UI 與來源內容，不能以「移除舊文案」為由改寫正式來源。
 
@@ -38,7 +38,7 @@
 - 畫面字級兩級（14px／12px）、盤點順序與列印／匯出例外見 `.cursor/rules/ui-information-hierarchy.mdc`「畫面字級」與「2026-09-28 畫面字級對齊（harvest）」；螢幕用工作表表頭 12px 以 `src/index.css` 的 `.worksheet-table thead th` 為 SSOT，勿在各頁 `th` 逐格加字級 class。字級優化先全庫盤點再改，未核准不把 body 或工作表升到 16px。
 - 短碼、日期、狀態與人員用固定欄寬；自由文字在欄內換行並可查看全文。工作表先設 `table-fixed` 與 `colgroup`，空欄不塌縮、長文不撐欄；看到撐開再調比例不算完成。長清單沿用共用分頁，保留篩選、編輯、讀回與完整列印。
 - 維持稽核員可完成的完整流程，包含輸入、追蹤、查閱及列印；重要狀態須有文字說明，不可只靠顏色表達。
-- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk`／`stakeholders` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示。側欄保留「資料儲存於本機 · v14」；外稽準備進度用可見 `準備清單 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
+- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk`／`stakeholders` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示。側欄保留「資料儲存於本機 · v15」；外稽準備進度用可見 `準備清單 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
 - 主要導覽採左側選單，依稽核作業流程排列；專案基準與驗收條件見 `docs/web-ui-ux-sidebar-spec.md`。功能項目使用語意一致的圖示，側欄寬度依圖示與最長項目名稱的實際內容需求設定，不保留非必要空白。
 - 表單欄位須有明確標籤、可見鍵盤焦點及可理解的錯誤提示；空白、載入、錯誤與成功狀態須有清楚回饋。
 - 將欄位改為固定選單前，先由現行型別、資料來源或受控規範確認完整值域；敘述及外部自訂值保留自由輸入，數值無核准範圍時不造選項，混合內外部值可提供保留自訂值的提示清單。檢查：逐欄核對型別、既有值及實際選項。來源：2026-09-27 手動輸入與選單盤點。
@@ -54,7 +54,7 @@
 - 唯一本機服務為 `http://127.0.0.1:43124/`；啟動、瀏覽器檢查與 smoke 固定使用此位置，不輪流檢查其他埠。手動開頁 hash 為 `#tab=<TabId>`（`parseAppHash`／`buildAppHash`），非 `#<tabId>`。43124 已被佔用代表 dev 已在跑，勿另判為必須重啟的失敗。（2026-09-27）
 - 文件／技能修改使用內容、引用及治理檢查；只重跑本次修改會影響的 gate，不為取得 Harness marker 重跑無關產品全套測試。命令被啟動前拒絕、產品檢查失敗、Harness 事件未登錄須分開回報，無新證據不重複重試。
 - Harness 識別：從 `functions.exec` 執行固定驗證器時，直接輸出 `exec_command` 的 stdout 原文，不用 `JSON.stringify` 包裝；完成後確認 `C:\Users\user\.codex\data\harness\events.jsonl` 有 `event=verification`、`result=ok`、`verification_marker=true`。若只看到終端 marker 而事件未入帳，視為 Harness 尚未驗證。（2026-09-26）
-- 完整驗證使用固定入口 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1`，依序執行 lint、tests、build 及僅連到 43124 的隔離瀏覽器 smoke；全數成功才輸出 `event=verification result=ok verification_marker=true`。單一檢查使用同一入口加 `-Mode lint`、`-Mode tests`、`-Mode build` 或 `-Mode browser-smoke`；成功時輸出範圍明確的 Harness marker，測試可再限縮 `-TestFile`／`-TestName`。`-Mode local-backup` 只檢查最近 30 分鐘內設定頁完整 JSON 備份（`QMS備份_*.json`）的格式／版本／雜湊；`-Mode migration-backup` 只檢查遷移閘門專用 JSON（`QMS遷移前備份_*.json`）；兩者均可用 `-BackupPath` 指定其他實際路徑，不輸出紀錄內容，也不代表完整程式驗證成功。避免臨時 PowerShell `-Command` 驗證，因本機執行政策會在啟動前拒絕不透明命令；拒絕代表命令未啟動，應改用已檢視的固定 `-File` 入口，不可把拒絕算成測試失敗或成功。
+- 完整驗證使用固定入口 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1`，依序執行 lint、tests、build 及僅連到 43124 的隔離瀏覽器 smoke；全數成功才輸出 `event=verification result=ok verification_marker=true`。單一檢查使用同一入口加 `-Mode lint`、`-Mode tests`、`-Mode build` 或 `-Mode browser-smoke`；成功時輸出範圍明確的 Harness marker，測試可再限縮 `-TestFile`／`-TestName`。`-Mode local-backup` 只檢查設定頁完整 JSON 備份（`QMS備份_*.json`）為 v15 封套（`state.version === 15`、含 `workspace`／`settings`／`auditProfile`、不含 `companies`）；未指定 `-BackupPath` 時限最近 30 分鐘內檔案。可用 `-BackupPath` 指定路徑，不輸出紀錄內容，也不代表完整程式驗證成功。避免臨時 PowerShell `-Command` 驗證，因本機執行政策會在啟動前拒絕不透明命令；拒絕代表命令未啟動，應改用已檢視的固定 `-File` 入口，不可把拒絕算成測試失敗或成功。
 - 已移除的設定頁（「稽核基本資料」「管理系統認證證書」、證書範圍／編號／適用性輸入）不得從 `HEAD`（`424a86a` 的 `SettingsPanel.tsx` 仍含這些標題）或舊煙測補回。`smoke-playwright.mjs` 只斷言這些標題與欄位不存在；煙測因缺標題失敗時改斷言，不把舊頁加回。`SettingsPanel`、`SystemFlowChart`、設定頁測試、煙測與 [`docs/web-ui-ux-sidebar-spec.md`](docs/web-ui-ux-sidebar-spec.md) 同一批提交，避免捨棄未提交檔後整頁回到舊設計。證書文字仍留在資料與匯出。檢查：設定頁無上述標題與欄位；煙測在它們出現時失敗。出處：2026-09-28 舊設定頁被工作區蓋回。
 - 依變更範圍使用 `npm run lint`、`npm test` 與 `npm run build`；UI 變更另檢查 375／768／1280／1536px 實際呈現與鍵盤操作，涉及收合區時檢查收合後列印內容。僅有 DOM 文字或無整頁 overflow 的檢查，不能取代可讀性、互動與列印驗收。側欄 smoke 斷言產品名須容忍桌面／窄螢幕雙 DOM（`getAllByText`）；`lazy` 分頁測試全套件易逾時，可 `beforeAll` 預載該 chunk。
 - 開始前先檢查 `git status` 並保留既有變更；不得重設、清理或覆蓋不屬於目前工作的檔案。

@@ -9,7 +9,7 @@ describe('applyAuditYearChange', () => {
     state.externalAuditPrep.items[0].remark = '已準備'
 
     const next = applyAuditYearChange(state, 'jiurun', 2027, false)
-    expect(next.companySettings.jiurun.auditYear).toBe(2027)
+    expect(next.settings.auditYear).toBe(2027)
     expect(next.externalAuditPrep.year).toBe(2026)
     expect(next.externalAuditPrep.items[0].completed).toBe(true)
     expect(next.externalAuditPrep.items[0].remark).toBe('已準備')

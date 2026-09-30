@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { backupFilename, describeRestorePreview, parseBackupJson } from '../lib/backup'
@@ -5,7 +6,6 @@ import { downloadBlob } from '../lib/download'
 import { exportAllFormsExcel } from '../lib/formExport'
 import {
   PROFILE_SNAPSHOT_READY_MESSAGE,
-  procedureFieldErrors,
 } from '../lib/auditProfileValidation'
 import { procedureSourceReady, standardReady } from '../lib/workflowStatus'
 import { ACTION_ICONS } from '../lib/uiIcons'
@@ -15,6 +15,7 @@ import type { ScoringRules, TabId } from '../types'
 import { TrashPanel } from './TrashPanel'
 import { SystemFlowChart } from './SystemFlowChart'
 import { WorkspaceMigrationReview } from './WorkspaceMigrationReview'
+import { FormalRecordLocationDialog } from './FormalRecordLocationDialog'
 
 type SettingsSection = 'audit' | 'data' | 'trash' | 'flow'
 type AuditPane = 'procedure' | 'scoring'
@@ -83,15 +84,14 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
   const [pendingRestore, setPendingRestore] = useState<{ json: string; summary: string } | null>(null)
   const [restoreStatus, setRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [scoringSavedMessage, setScoringSavedMessage] = useState(false)
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false)
   const [backedUpState, setBackedUpState] = useState<typeof state | null>(null)
-  const profile = state.companyAuditProfiles[state.activeCompanyId]
+  const profile = state.auditProfile
   const trashCount = state.trash?.length ?? 0
 
   const profileReady =
-    standardReady(state, state.activeCompanyId)
-    && procedureSourceReady(state, state.activeCompanyId)
-
-  const procedureErrors = procedureFieldErrors(profile)
+    standardReady(state, WORKSPACE_COMPANY_ID)
+    && procedureSourceReady(state, WORKSPACE_COMPANY_ID)
 
   const handleRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -151,7 +151,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
   }
 
   const handleExportAllExcel = () => {
-    exportAllFormsExcel(state, state.activeCompanyId)
+    exportAllFormsExcel(state, WORKSPACE_COMPANY_ID)
   }
 
   return (
@@ -220,25 +220,31 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
 
           {auditPane === 'procedure' && (
             <div role="tabpanel" id="audit-pane-procedure" aria-labelledby="audit-tab-procedure" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-              <div className="grid gap-3 sm:grid-cols-3">
-                  <Input
-                    label="稽核程序代碼"
-                    value={profile.auditProcedureCode}
-                      hint={procedureErrors?.auditProcedureCode}
-                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureCode: value })}
-                  />
-                  <Input
-                    label="程序版本"
-                    value={profile.auditProcedureVersion}
-                      hint={procedureErrors?.auditProcedureVersion}
-                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { auditProcedureVersion: value })}
-                  />
-                  <Input
-                    label="正式紀錄保存位置"
-                    value={profile.formalRecordLocation}
-                      hint={procedureErrors?.formalRecordLocation}
-                    onChange={(value) => updateCompanyAuditProfile(state.activeCompanyId, { formalRecordLocation: value })}
-                  />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold text-slate-900">正式紀錄保存位置</h3>
+                  <p className="text-sm text-slate-600">
+                    組織受控之內部稽核查檢表與年度結案報告存檔路徑（各程序文件依現行受控版本執行稽核）。
+                  </p>
+                  <div className="pt-1 text-sm">
+                    <span className="font-medium text-slate-700">目前設定：</span>
+                    {profile.formalRecordLocation ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+                        {profile.formalRecordLocation}
+                      </span>
+                    ) : (
+                      <span className="font-medium text-amber-700">尚未指定保存位置</span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Button
+                    icon={ACTION_ICONS.edit}
+                    onClick={() => setLocationDialogOpen(true)}
+                  >
+                    {profile.formalRecordLocation ? '變更保存位置' : '指定保存位置'}
+                  </Button>
+                </div>
               </div>
               {profileReady && (
                 <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
@@ -318,6 +324,16 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       {activeSection === 'trash' && <TrashPanel store={store} />}
 
       {activeSection === 'flow' && <SystemFlowChart onNavigate={onNavigate} />}
+
+      <FormalRecordLocationDialog
+        open={locationDialogOpen}
+        currentLocation={profile.formalRecordLocation}
+        onConfirm={(nextLocation) => {
+          updateCompanyAuditProfile(WORKSPACE_COMPANY_ID, { formalRecordLocation: nextLocation })
+          setLocationDialogOpen(false)
+        }}
+        onCancel={() => setLocationDialogOpen(false)}
+      />
 
       {pendingRestore && (
         <ConfirmDialog

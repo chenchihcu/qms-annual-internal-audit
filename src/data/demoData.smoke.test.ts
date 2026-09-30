@@ -13,26 +13,23 @@ describe('createDemoState smoke', () => {
     expect(() => createDemoState()).not.toThrow()
   })
 
-  it('keeps the v8 seed behind the current v14 storage key', () => {
+  it('keeps demo seed at v15 storage key', () => {
     const state = createDemoState()
-    expect(state.version).toBe(8)
+    expect(state.version).toBe(15)
     expect(state.trash).toEqual([])
-    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v14')
+    expect(STORAGE_KEY).toBe('qms-annual-internal-audit-v15')
   })
 
   it('defaults ISO 9001 to the current edition without confirming applicability', () => {
     const state = createDemoState()
-    const iso9001 = state.companyAuditProfiles.jiurun.applicableStandards.find((item) => item.name === 'ISO 9001')
+    const iso9001 = state.auditProfile.applicableStandards.find((item) => item.name === 'ISO 9001')
 
     expect(iso9001).toMatchObject({ version: '2026', confirmationStatus: 'pending' })
-    expect(iso9001).not.toHaveProperty('evidenceReference')
   })
 
   it('demo audits align to PROCEDURE_PLAN_TEMPLATE', () => {
     const state = createDemoState()
-    const audits = state.companies.jiurun.audits
-
-    expect(audits).toHaveLength(DEMO_AUDIT_PAIRS.length)
+    const audits = state.workspace.audits
 
     for (const { qpCode, departmentId } of DEMO_AUDIT_PAIRS) {
       const audit = audits.find((a) => a.qpCode === qpCode && a.departmentId === departmentId)

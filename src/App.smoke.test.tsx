@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import App from './App'
 
@@ -27,6 +27,22 @@ const SIDEBAR_GROUP_LABELS = [
 ]
 
 describe('App tab smoke', () => {
+  beforeAll(async () => {
+    // Preload all lazy-loaded chunks so waitFor does not time out in jsdom
+    await Promise.all([
+      import('./components/AnnualPlan'),
+      import('./components/ProcedureAuditPanel'),
+      import('./components/NCRList'),
+      import('./components/Observations'),
+      import('./components/Suggestions'),
+      import('./components/PreAuditPrep'),
+      import('./components/RiskAssessment'),
+      import('./components/StakeholdersPage'),
+      import('./components/SettingsPanel'),
+      import('./components/PersonnelPage'),
+      import('./components/FollowupsPage'),
+    ])
+  })
   beforeEach(() => {
     vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
     window.history.replaceState(null, '', '/')
@@ -130,12 +146,13 @@ describe('App tab smoke', () => {
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
     expect(screen.queryByText('關於')).toBeNull()
     expect(screen.queryByText(/QMS 年度內部稽核系統 v14/)).toBeNull()
+    expect(screen.queryByText(/QMS 年度內部稽核系統 v15/)).toBeNull()
   })
 
   it('keeps sidebar local storage notice without footer tagline', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
-    expect(within(nav.closest('aside') as HTMLElement).getByText('資料儲存於本機 · v14')).toBeTruthy()
+    expect(within(nav.closest('aside') as HTMLElement).getByText('資料儲存於本機 · v15')).toBeTruthy()
     expect(screen.queryByText('ISO 9001 / AS9100D 內部稽核')).toBeNull()
   })
 
@@ -155,14 +172,14 @@ describe('App tab smoke', () => {
     fireEvent.click(screen.getByRole('button', { name: '年度稽核計畫' }))
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '依日期與利害關係人自動編排' })).toBeTruthy()
-    })
+    }, { timeout: 10000 })
     expect(screen.queryByText(/內稽年度請用頁首切換/)).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
     await waitFor(() => {
       expect(screen.getByRole('region', { name: '程序風險評估一覽' })).toBeTruthy()
       expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
-    })
+    }, { timeout: 10000 })
     expect(screen.queryByText(/不取代程序固有風險/)).toBeNull()
     expect(screen.queryByText(/至利害關係人編輯部門 O／S/)).toBeNull()
 
@@ -170,9 +187,9 @@ describe('App tab smoke', () => {
     await waitFor(() => {
       expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
       expect(screen.queryByText('評分規則與編排影響')).toBeNull()
-    })
+    }, { timeout: 10000 })
     expect(screen.queryByText(/兩者不可互代/)).toBeNull()
-  })
+  }, 20000)
 
   it('shows NCR import guidance only when manual form is expanded', async () => {
     render(<App />)
@@ -205,13 +222,13 @@ describe('App tab smoke', () => {
     expect(document.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 
-  it('shows standard and procedure field errors on system settings', async () => {
+  it('shows formal record location guidance on system settings', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '系統設定' }))
     await waitFor(() => {
-      expect(screen.getByLabelText('程序版本')).toBeTruthy()
+      expect(screen.getByText('尚未指定保存位置')).toBeTruthy()
+      expect(screen.getByRole('button', { name: '指定保存位置' })).toBeTruthy()
     })
-    expect(screen.getByText('仍為待確認')).toBeTruthy()
   })
 
   it('does not expose whole-workspace clearing in system settings', async () => {

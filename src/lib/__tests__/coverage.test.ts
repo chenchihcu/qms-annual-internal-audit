@@ -6,18 +6,18 @@ import type { CompanyData } from '../../types'
 describe('buildMergedCertificateCoverage', () => {
   it('reports gaps for demo company with partial audits', () => {
     const demo = createDemoState()
-    const settings = demo.companySettings.jiurun
+    const settings = demo.settings
     const report = buildMergedCertificateCoverage(
-      demo.companies.jiurun,
+      demo.workspace,
       settings.auditYear,
       settings.scoringRules,
     )
     expect(report.gaps.length).toBeGreaterThan(0)
-    expect(deriveInternalAuditComplete(demo.companies.jiurun, settings.auditYear)).toBe(false)
+    expect(deriveInternalAuditComplete(demo.workspace, settings.auditYear)).toBe(false)
   })
 
   it('reports unscheduled plan rows', () => {
-    const base = createDemoState().companies.jiurun
+    const base = createDemoState().workspace
     const company: CompanyData = {
       ...base,
       audits: [],

@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
@@ -29,7 +30,7 @@ export function Suggestions({
   const currentYear = settings.auditYear
   const [showForm, setShowForm] = useState(false)
   const { triggerRef, formRef } = useInlineFormFocus(showForm)
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${currentYear}`, highlightRecordId)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${currentYear}`, highlightRecordId)
   const [saveMessage, setSaveMessage] = useState(false)
   const [form, setForm] = useState({
     procedure: company.planRows[0]?.qpCode ?? '',
@@ -50,8 +51,8 @@ export function Suggestions({
     ...company.suggestions,
     ...Object.entries(state.yearArchives)
       .filter(([year]) => year !== String(currentYear))
-      .flatMap(([, archive]) => Object.values(archive.companies ?? {}).flatMap((co) => co.suggestions ?? [])),
-  ], [company.suggestions, state.yearArchives, state.activeCompanyId, currentYear])
+      .flatMap(([, archive]) => archive.workspace?.suggestions ?? []),
+  ], [company.suggestions, state.yearArchives, currentYear])
 
   const prior = allSuggestions.filter((s) => s.year < currentYear)
   const current = allSuggestions.filter((s) => s.year >= currentYear)
@@ -139,7 +140,7 @@ export function Suggestions({
           actions={(
             <>
               {!showForm && <Button ref={triggerRef} icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄建議</Button>}
-              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportSuggestionsExcel(state, state.activeCompanyId)}>匯出 Excel</Button>
+              <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportSuggestionsExcel(state, WORKSPACE_COMPANY_ID)}>匯出 Excel</Button>
             </>
           )}
         />

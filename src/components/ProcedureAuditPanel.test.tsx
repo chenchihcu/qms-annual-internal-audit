@@ -1,17 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createDemoState, migrateToV8, STORAGE_KEY } from '../data/demoData'
+import { createDemoState, STORAGE_KEY } from '../data/demoData'
 import { createChecklistForProcedure } from '../data/checklistLoader'
 import { useAuditStore } from '../hooks/useAuditStore'
-import { migrateState } from '../lib/migrate'
-import { migrateToSingleWorkspace } from '../lib/singleWorkspaceMigration'
 import type { AppState } from '../types'
 import { ProcedureAuditPanel } from './ProcedureAuditPanel'
 
 beforeEach(() => localStorage.clear())
 
 function activeCompanyData(state: AppState) {
-  return state.companies[state.activeCompanyId]
+  return state.workspace
 }
 
 function AuditPage({ selectedKey = 'QP-05|dept-qa' }: { selectedKey?: string }) {
@@ -20,7 +18,7 @@ function AuditPage({ selectedKey = 'QP-05|dept-qa' }: { selectedKey?: string }) 
 }
 
 function createCurrentDemoState() {
-  return migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  return createDemoState()
 }
 
 describe('ProcedureAuditPanel', () => {
@@ -187,7 +185,7 @@ describe('ProcedureAuditPanel', () => {
     fireEvent.click(checkbox)
     await waitFor(() => {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
-      const savedAudit = saved.companies?.[saved.activeCompanyId]?.audits?.find(
+      const savedAudit = saved.workspace?.audits?.find(
         (item: { id: string }) => item.id === audit.id,
       )
       expect(savedAudit?.team?.impartialityConfirmed).toBe(true)
@@ -350,7 +348,7 @@ describe('ProcedureAuditPanel', () => {
           origin: 'seed' as const,
         },
       ],
-      year: state.companySettings[state.activeCompanyId].auditYear,
+      year: state.settings.auditYear,
       status: '規劃中' as const,
       scope: '品保部／未知程序',
       criteria: 'QP-99',

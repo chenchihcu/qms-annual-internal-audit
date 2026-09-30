@@ -1,5 +1,6 @@
 import type {
   AppState,
+  AppStateV14Legacy,
   AuditSettings,
   CompanyData,
   CompanyId,
@@ -13,14 +14,16 @@ import type {
   WorkspaceMigrationCandidate,
   WorkspaceMigrationConflict,
   WorkspaceMigrationTarget,
-  YearArchiveEntry,
+  YearArchiveEntryV14,
 } from '../types'
 import { relationshipCheckKey } from '../types'
 import { DEFAULT_COMPANY_RELATIONSHIPS, getPrepTemplateForState } from './externalAuditPrep'
+import { switchWorkspaceYear, V14_STORAGE_VERSION } from './workspaceSchemaV15'
 
 /** Kept only as a stable storage key for code that still indexes the v8 maps. */
 export const WORKSPACE_COMPANY_ID: CompanyId = 'jiurun'
-export const SINGLE_WORKSPACE_STORAGE_VERSION = 14
+/** Output version of {@link migrateToSingleWorkspace} (superseded by v15 at rest). */
+export const SINGLE_WORKSPACE_STORAGE_VERSION = V14_STORAGE_VERSION
 
 const OTHER_LEGACY_ID: CompanyId = 'zhenglongxing'
 
@@ -709,7 +712,7 @@ function mergeSettings(
 }
 
 function normalizeTrash(
-  state: AppState,
+  state: AppStateV14Legacy,
   personIdMaps: PersonIdMaps,
   activePeople: Person[],
   conflicts: WorkspaceMigrationConflict[],
@@ -755,7 +758,7 @@ function normalizeTrash(
   })
 }
 
-function normalizeProfile(raw: AppState, conflicts: WorkspaceMigrationConflict[]) {
+function normalizeProfile(raw: AppStateV14Legacy, conflicts: WorkspaceMigrationConflict[]) {
   const left = raw.companyAuditProfiles.jiurun
   const right = raw.companyAuditProfiles.zhenglongxing
   const standards = new Map(left.applicableStandards.map((standard) => [standard.name, { ...standard }]))
@@ -805,12 +808,12 @@ function normalizeProfile(raw: AppState, conflicts: WorkspaceMigrationConflict[]
 }
 
 function mergeArchives(
-  state: AppState,
+  state: AppStateV14Legacy,
   conflicts: WorkspaceMigrationConflict[],
   personIdMaps: PersonIdMaps,
-): Record<string, YearArchiveEntry> {
+): Record<string, YearArchiveEntryV14> {
   const years = new Set(Object.keys(state.yearArchives))
-  const result: Record<string, YearArchiveEntry> = {}
+  const result: Record<string, YearArchiveEntryV14> = {}
   for (const year of years) {
     const archive = state.yearArchives[year]
     const rawLeft = archive?.companies?.jiurun
@@ -834,7 +837,7 @@ function mergeArchives(
 }
 
 /** Merge the former company partitions into one active workspace without choosing conflicting values silently. */
-export function migrateToSingleWorkspace(raw: AppState): AppState {
+export function migrateToSingleWorkspace(raw: AppStateV14Legacy): AppStateV14Legacy {
   if (raw.version >= SINGLE_WORKSPACE_STORAGE_VERSION) return raw
 
   const conflicts: WorkspaceMigrationConflict[] = []
@@ -918,7 +921,7 @@ export function migrateToSingleWorkspace(raw: AppState): AppState {
   }
   const workspaceProfiles = { jiurun: profile, zhenglongxing: profile }
   const empty = emptyCompanyData('')
-  const result: AppState = {
+  const result: AppStateV14Legacy = {
     ...raw,
     version: SINGLE_WORKSPACE_STORAGE_VERSION,
     activeCompanyId: WORKSPACE_COMPANY_ID,
@@ -961,62 +964,6 @@ function setPath(target: Record<string, unknown>, path: string, value: unknown):
   current[parts.at(-1)!] = value
 }
 
-function switchWorkspaceYear(state: AppState, year: number): AppState {
-  const currentSettings = state.companySettings[WORKSPACE_COMPANY_ID]
-  if (!Number.isInteger(year) || year < 2000 || year > 2200 || year === currentSettings.auditYear) return state
-  const currentYearKey = String(currentSettings.auditYear)
-  const existing = state.yearArchives[currentYearKey] ?? { companies: {}, companySettings: {} }
-  const yearArchives = {
-    ...state.yearArchives,
-    [currentYearKey]: {
-      companies: { ...existing.companies, [WORKSPACE_COMPANY_ID]: state.companies[WORKSPACE_COMPANY_ID] },
-      companySettings: { ...existing.companySettings, [WORKSPACE_COMPANY_ID]: currentSettings },
-    },
-  }
-  const restored = yearArchives[String(year)]
-  const restoredCompany = restored?.companies[WORKSPACE_COMPANY_ID]
-  const restoredSettings = restored?.companySettings[WORKSPACE_COMPANY_ID]
-  if (restoredCompany && restoredSettings) {
-    return {
-      ...state,
-      activeCompanyId: WORKSPACE_COMPANY_ID,
-      companies: { ...state.companies, [WORKSPACE_COMPANY_ID]: restoredCompany },
-      companySettings: {
-        jiurun: { ...restoredSettings, auditYear: year },
-        zhenglongxing: { ...restoredSettings, auditYear: year },
-      },
-      yearArchives,
-    }
-  }
-  const replaceYear = (value?: string) => value ? value.replace(/^\d{4}/, String(year)) : value
-  const emptyCompany = {
-    ...state.companies[WORKSPACE_COMPANY_ID],
-    planRows: state.companies[WORKSPACE_COMPANY_ID].planRows.map((row) => ({
-      ...row,
-      months: Array.from({ length: 12 }, () => null),
-      manualOverride: false,
-    })),
-    audits: [],
-    ncrs: [],
-    observations: [],
-    suggestions: [],
-  }
-  const nextSettings = {
-    ...currentSettings,
-    auditYear: year,
-    yearStart: replaceYear(currentSettings.yearStart)!,
-    planWindowStart: replaceYear(currentSettings.planWindowStart)!,
-    planWindowEnd: replaceYear(currentSettings.planWindowEnd)!,
-    managementReviewDate: replaceYear(currentSettings.managementReviewDate),
-  }
-  return {
-    ...state,
-    companies: { ...state.companies, [WORKSPACE_COMPANY_ID]: emptyCompany },
-    companySettings: { jiurun: nextSettings, zhenglongxing: nextSettings },
-    yearArchives,
-  }
-}
-
 export function applyWorkspaceConflictChoice(
   state: AppState,
   conflict: WorkspaceMigrationConflict,
@@ -1028,7 +975,7 @@ export function applyWorkspaceConflictChoice(
   const value = candidate?.value
   const next = structuredClone(state)
   if (target.kind === 'plan') {
-    const row = next.companies[WORKSPACE_COMPANY_ID].planRows.find((item) => item.id === target.rowId)
+    const row = next.workspace.planRows.find((item) => item.id === target.rowId)
     if (row && target.field === 'manualMonthOverrides' && target.monthIndex != null) {
       const overrides = [...(row.manualMonthOverrides ?? Array(12).fill(null))]
       overrides[target.monthIndex] = value as PlanRow['months'][number]
@@ -1037,21 +984,20 @@ export function applyWorkspaceConflictChoice(
       setPath(row as unknown as Record<string, unknown>, target.field, value)
     }
   } else if (target.kind === 'department') {
-    const department = next.companies[WORKSPACE_COMPANY_ID].departments.find((item) => item.id === target.departmentId)
+    const department = next.workspace.departments.find((item) => item.id === target.departmentId)
     if (department) setPath(department as unknown as Record<string, unknown>, target.field, value)
   } else if (target.kind === 'checklist') {
-    const audit = next.companies[WORKSPACE_COMPANY_ID].audits.find((item) => item.id === target.auditId)
+    const audit = next.workspace.audits.find((item) => item.id === target.auditId)
     const item = audit?.items.find((entry) => entry.id === target.itemId)
     if (item) setPath(item as unknown as Record<string, unknown>, target.field, value)
   } else if (target.kind === 'audit') {
-    const audit = next.companies[WORKSPACE_COMPANY_ID].audits.find((item) => item.id === target.auditId)
+    const audit = next.workspace.audits.find((item) => item.id === target.auditId)
     if (audit) setPath(audit as unknown as Record<string, unknown>, target.field, value)
   } else if (target.kind === 'settings') {
     if (target.field === 'auditYear') {
       Object.assign(next, switchWorkspaceYear(next, Number(value)))
     } else {
-      setPath(next.companySettings[WORKSPACE_COMPANY_ID] as unknown as Record<string, unknown>, target.field, value)
-      next.companySettings[OTHER_LEGACY_ID] = next.companySettings[WORKSPACE_COMPANY_ID]
+      setPath(next.settings as unknown as Record<string, unknown>, target.field, value)
     }
   } else if (target.kind === 'prep') {
     if (!target.itemId) next.externalAuditPrep.year = Number(value)
@@ -1074,7 +1020,7 @@ export function markWorkspaceConflictReviewed(
   }
 }
 
-export function validateSingleWorkspaceState(value: unknown): value is AppState {
+export function validateSingleWorkspaceState(value: unknown): value is AppStateV14Legacy {
   if (!isObject(value) || value.version !== SINGLE_WORKSPACE_STORAGE_VERSION) return false
   if (!isObject(value.companies) || !isObject(value.companySettings) || !isObject(value.companyAuditProfiles)) return false
   const workspace = value.companies[WORKSPACE_COMPANY_ID]

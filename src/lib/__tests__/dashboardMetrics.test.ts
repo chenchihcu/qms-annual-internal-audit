@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { createDemoState } from '../../data/demoData'
 import { companySettingsFor } from '../../types'
+import { WORKSPACE_COMPANY_ID } from '../singleWorkspaceMigration'
 import { countCurrentYearOpenObservations, countPriorOpenObservations } from '../dashboardMetrics'
 
 describe('dashboardMetrics', () => {
   it('counts current-year open observations from ledger only', () => {
     const state = createDemoState()
-    const companyId = state.activeCompanyId
+    const companyId = WORKSPACE_COMPANY_ID
     const year = companySettingsFor(state, companyId).auditYear
-    const openCurrent = state.companies[companyId].observations.filter(
+    const openCurrent = state.workspace.observations.filter(
       (o) => o.status === 'open' && o.year === year,
     ).length
     expect(countCurrentYearOpenObservations(state, companyId)).toBe(openCurrent)
@@ -16,9 +17,9 @@ describe('dashboardMetrics', () => {
 
   it('counts prior-year open observations including archives', () => {
     const state = createDemoState()
-    const companyId = state.activeCompanyId
+    const companyId = WORKSPACE_COMPANY_ID
     const year = companySettingsFor(state, companyId).auditYear
-    state.companies[companyId].observations.push({
+    state.workspace.observations.push({
       id: 'obs-prior-open',
       year: year - 1,
       qpCode: 'QP-01',

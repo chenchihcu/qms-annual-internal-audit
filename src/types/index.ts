@@ -205,6 +205,35 @@ export interface CompanyRelationship {
 }
 
 export interface YearArchiveEntry {
+  workspace: CompanyData
+  settings: AuditSettings
+}
+
+/** Pre-v15 single-workspace storage (dual companySettings / companies map). */
+export interface AppStateV14Legacy {
+  activeCompanyId: CompanyId
+  companySettings: Record<CompanyId, AuditSettings>
+  companies: Record<CompanyId, CompanyData>
+  companyAuditProfiles: Record<CompanyId, CompanyAuditProfile>
+  externalAuditPrep: ExternalAuditPrepState
+  externalAuditSchedule?: ExternalAuditDaySchedule
+  dataSource?: DataSource
+  companyRelationships: CompanyRelationship[]
+  people: Person[]
+  annualPersonnelAssignments: AnnualPersonnelAssignment[]
+  yearArchives: Record<string, YearArchiveEntryV14>
+  prepArchives?: Record<string, ExternalAuditPrepState>
+  sharedPlanRows?: SharedPlanRow[]
+  legacyCompanyPlanBackup?: Record<CompanyId, PlanRow[]>
+  sharedChecklistTemplates?: Record<string, SharedChecklistQuestion[]>
+  trash?: TrashEntry[]
+  permanentlyDeletedGeneratedRecords?: PermanentlyDeletedGeneratedRecord[]
+  workspaceMigrationConflicts?: WorkspaceMigrationConflict[]
+  version: number
+  settings?: AuditSettings
+}
+
+export interface YearArchiveEntryV14 {
   companies: Partial<Record<CompanyId, CompanyData>>
   companySettings: Partial<Record<CompanyId, AuditSettings>>
 }
@@ -539,29 +568,24 @@ export interface WorkspaceMigrationConflict {
 }
 
 export interface AppState {
-  activeCompanyId: CompanyId
-  companySettings: Record<CompanyId, AuditSettings>
-  companies: Record<CompanyId, CompanyData>
+  workspace: CompanyData
+  settings: AuditSettings
+  auditProfile: CompanyAuditProfile
   externalAuditPrep: ExternalAuditPrepState
   externalAuditSchedule?: ExternalAuditDaySchedule
   dataSource?: DataSource
   companyRelationships: CompanyRelationship[]
   people: Person[]
   annualPersonnelAssignments: AnnualPersonnelAssignment[]
-  companyAuditProfiles: Record<CompanyId, CompanyAuditProfile>
   yearArchives: Record<string, YearArchiveEntry>
   prepArchives?: Record<string, ExternalAuditPrepState>
   sharedPlanRows?: SharedPlanRow[]
-  /** 舊計畫有差異時保留兩份原值，供人工核對與 JSON 匯出。 */
   legacyCompanyPlanBackup?: Record<CompanyId, PlanRow[]>
   sharedChecklistTemplates?: Record<string, SharedChecklistQuestion[]>
   trash?: TrashEntry[]
   permanentlyDeletedGeneratedRecords?: PermanentlyDeletedGeneratedRecord[]
-  /** Unresolved field conflicts found while consolidating the former company partitions. */
   workspaceMigrationConflicts?: WorkspaceMigrationConflict[]
   version: number
-  /** v6 legacy — migration only; not persisted in v8 */
-  settings?: AuditSettings
 }
 
 export function relationshipCheckKey(
@@ -572,8 +596,8 @@ export function relationshipCheckKey(
   return `${from}:${to}:${relation}`
 }
 
-export function companySettingsFor(state: AppState, companyId: CompanyId = state.activeCompanyId): AuditSettings {
-  return state.companySettings[companyId]
+export function companySettingsFor(state: AppState, _companyId?: CompanyId): AuditSettings {
+  return state.settings
 }
 
 export const COMPANY_IDS: CompanyId[] = ['jiurun', 'zhenglongxing']

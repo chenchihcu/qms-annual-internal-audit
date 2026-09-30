@@ -35,7 +35,7 @@ describe('departmentOwner', () => {
       state,
       'dept-qa',
       '新主管',
-      state.companySettings.jiurun.scoringRules,
+      state.settings.scoringRules,
     )
     expect(preview).not.toBeNull()
     expect(preview!.planRowCount).toBeGreaterThan(0)
@@ -55,7 +55,7 @@ describe('departmentOwner', () => {
     }
     const openItem = { id: 'i2', category: 'c', no: 1, content: 'y', judgment: null, description: '' }
 
-    state.companies.jiurun.audits.push(
+    state.workspace.audits.push(
       makeAudit('audit-scored', 'dept-qa', '陳智富', [scoredItem]),
       makeAudit('audit-open', 'dept-qa', '陳智富', [openItem]),
     )
@@ -64,43 +64,43 @@ describe('departmentOwner', () => {
       state,
       'dept-qa',
       '王小明',
-      state.companySettings.jiurun.scoringRules,
+      state.settings.scoringRules,
     )
 
-    const dept = next.companies.jiurun.departments.find((d) => d.id === 'dept-qa')
+    const dept = next.workspace.departments.find((d) => d.id === 'dept-qa')
     expect(dept?.owner).toBe('王小明')
-    expect(next.companies.jiurun.planRows.every((r) => r.departmentId !== 'dept-qa' || r.owner === '王小明')).toBe(
+    expect(next.workspace.planRows.every((r) => r.departmentId !== 'dept-qa' || r.owner === '王小明')).toBe(
       true,
     )
 
-    const scored = next.companies.jiurun.audits.find((a) => a.id === 'audit-scored')
-    const open = next.companies.jiurun.audits.find((a) => a.id === 'audit-open')
+    const scored = next.workspace.audits.find((a) => a.id === 'audit-scored')
+    const open = next.workspace.audits.find((a) => a.id === 'audit-open')
     expect(scored?.departmentManager).toBe('陳智富')
     expect(open?.departmentManager).toBe('王小明')
   })
 
   it('no-op when trimmed owner unchanged', () => {
     const state = createDemoState()
-    const dept = state.companies.jiurun.departments.find((d) => d.id === 'dept-qa')!
+    const dept = state.workspace.departments.find((d) => d.id === 'dept-qa')!
     const next = applyDepartmentOwnerChange(
       state,
       'dept-qa',
       `  ${dept.owner}  `,
-      state.companySettings.jiurun.scoringRules,
+      state.settings.scoringRules,
     )
     expect(next).toBe(state)
   })
 
   it('does not affect other departments', () => {
     const state = createDemoState()
-    const adminBefore = state.companies.jiurun.departments.find((d) => d.id === 'dept-admin')!.owner
+    const adminBefore = state.workspace.departments.find((d) => d.id === 'dept-admin')!.owner
     const next = applyDepartmentOwnerChange(
       state,
       'dept-qa',
       '新主管',
-      state.companySettings.jiurun.scoringRules,
+      state.settings.scoringRules,
     )
-    const adminAfter = next.companies.jiurun.departments.find((d) => d.id === 'dept-admin')!.owner
+    const adminAfter = next.workspace.departments.find((d) => d.id === 'dept-admin')!.owner
     expect(adminAfter).toBe(adminBefore)
   })
 })

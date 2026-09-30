@@ -1,16 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
-import {
-  createDemoState,
-  migrateToV8,
-  STORAGE_KEY,
-} from '../../data/demoData'
-import { migrateState } from '../../lib/migrate'
-import { migrateToSingleWorkspace } from '../../lib/singleWorkspaceMigration'
+import { createDemoState, STORAGE_KEY } from '../../data/demoData'
 import { useAuditStore } from '../useAuditStore'
 
 function seedCurrentDemo() {
-  const demo = migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  const demo = createDemoState()
   localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
 }
 

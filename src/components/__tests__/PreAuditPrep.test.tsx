@@ -12,7 +12,7 @@ function makeStore(
   if (prepPatch) prepPatch(base)
   const state = {
     ...base,
-    settings: companySettingsFor(base, base.activeCompanyId),
+    settings: companySettingsFor(base),
   }
   return {
     state,
@@ -105,8 +105,8 @@ describe('PreAuditPrep', () => {
   it('shows date-order warnings from the preparation page without changing saved dates', () => {
     const store = makeStore((state) => {
       state.externalAuditPrep.externalAuditDate = '2026-09-15'
-      state.companySettings[state.activeCompanyId].managementReviewDate = '2026-12-10'
-      state.companySettings[state.activeCompanyId].externalAuditDate = undefined
+      state.settings.managementReviewDate = '2026-12-10'
+      state.settings.externalAuditDate = undefined
     })
     render(<PreAuditPrep store={store} />)
 
@@ -122,8 +122,8 @@ describe('PreAuditPrep', () => {
     const store = makeStore((state) => {
       state.externalAuditPrep.externalAuditDate = '2026-09-15'
       state.externalAuditPrep.managementReviewComplete = true
-      state.companySettings[state.activeCompanyId].managementReviewDate = '2026-12-10'
-      state.companySettings[state.activeCompanyId].externalAuditDate = undefined
+      state.settings.managementReviewDate = '2026-12-10'
+      state.settings.externalAuditDate = undefined
     })
     render(<PreAuditPrep store={store} />)
 

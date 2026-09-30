@@ -17,9 +17,9 @@ describe('workflowStatus', () => {
 
   it('routes procedure readiness gaps to system settings', () => {
     const state = createDemoState()
-    state.companyAuditProfiles.jiurun.applicableStandards[0].confirmationStatus = 'pending'
-    state.companyAuditProfiles.jiurun.certificateScope = ''
-    state.companyAuditProfiles.jiurun.certificateReference = ''
+    state.auditProfile.applicableStandards[0].confirmationStatus = 'pending'
+    state.auditProfile.certificateScope = ''
+    state.auditProfile.certificateReference = ''
     const overview = getPdcaOverview(state, 'jiurun')
     expect(overview.plan.gaps.some((gap) => gap.message === '適用標準與證書依據未完整')).toBe(false)
     expect(overview.plan.gaps.filter((gap) => /程序來源/.test(gap.message)).every((gap) => gap.tab === 'system-settings')).toBe(true)
@@ -31,7 +31,7 @@ describe('workflowStatus', () => {
 
   it('requires persisted inherent risk for risk tab exit', () => {
     const state = createDemoState()
-    state.companies.jiurun.procedureRisks = []
+    state.workspace.procedureRisks = []
     expect(canProceedToNextTab(state, 'risk')).toBe(false)
     const status = getTabWorkflowStatus(state, 'risk')
     expect(status.gaps).toHaveLength(1)
@@ -42,7 +42,7 @@ describe('workflowStatus', () => {
     const state = createDemoState()
     expect(stakeholdersReady(state, 'jiurun')).toBe(true)
     expect(canProceedToNextTab(state, 'stakeholders')).toBe(true)
-    state.companies.jiurun.departments[0].stakeholders = []
+    state.workspace.departments[0].stakeholders = []
     expect(stakeholdersReady(state, 'jiurun')).toBe(false)
     expect(canProceedToNextTab(state, 'stakeholders')).toBe(false)
     const status = getTabWorkflowStatus(state, 'stakeholders')
@@ -54,7 +54,7 @@ describe('workflowStatus', () => {
 
   it('blocks complete report when pending checklist items remain', () => {
     const state = createDemoState()
-    const audit = state.companies.jiurun.audits[0]
+    const audit = state.workspace.audits[0]
     audit.reportReference = 'RPT-001'
     const pending = audit.items.find((item) => !item.judgment)
     if (pending) pending.judgment = null
@@ -131,7 +131,7 @@ describe('workflowStatus', () => {
 
   it('keeps standard readiness when certificate text is blank', () => {
     const state = createDemoState()
-    const profile = state.companyAuditProfiles.jiurun
+    const profile = state.auditProfile
     profile.applicableStandards[0].confirmationStatus = 'pending'
     profile.applicableStandards[1].confirmationStatus = 'pending'
     profile.certificateScope = ''

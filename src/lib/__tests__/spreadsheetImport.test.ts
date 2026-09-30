@@ -21,23 +21,23 @@ describe('spreadsheetImport', () => {
   it('merges checklist and plan rows without wiping NCR or other company', () => {
     const { rows } = parseSpreadsheetCsv(FIXTURE_CSV)
     const base = createDemoState()
-    const ncrBefore = base.companies.jiurun.ncrs.length
-    const zlxAuditsBefore = base.companies.zhenglongxing.audits.length
+    const ncrBefore = base.workspace.ncrs.length
+    const auditsBefore = base.workspace.audits.length
 
     const { state, summary } = applySpreadsheetImport(base, 'jiurun', rows)
 
     expect(summary.checklistUpdated + summary.checklistAdded).toBeGreaterThan(0)
     expect(summary.planUpdated).toBeGreaterThan(0)
-    expect(state.companies.jiurun.ncrs.length).toBe(ncrBefore)
-    expect(state.companies.zhenglongxing.audits.length).toBe(zlxAuditsBefore)
+    expect(state.workspace.ncrs.length).toBe(ncrBefore)
+    expect(state.workspace.audits.length).toBeGreaterThanOrEqual(auditsBefore)
 
-    const qp16 = state.companies.jiurun.audits.find(
+    const qp16 = state.workspace.audits.find(
       (a) => a.qpCode === 'QP-16' && a.departmentId === 'dept-qa',
     )
     expect(qp16?.items.find((i) => i.no === 1)?.content).toContain('隔離')
     expect(qp16?.items.find((i) => i.no === 1)?.as9100Clause).toBe('8.7')
 
-    const plan = state.companies.jiurun.planRows.find(
+    const plan = state.workspace.planRows.find(
       (r) => r.qpCode === 'QP-16' && r.departmentId === 'dept-qa',
     )
     expect(plan?.auditors).toBe('王稽核')

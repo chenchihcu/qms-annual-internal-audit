@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { AnnualPersonnelAssignment, Person, PersonnelRole, QualificationRecord, RoleAppointment, ValidityMode } from '../types'
@@ -146,11 +147,11 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const today = new Date().toISOString().slice(0, 10)
 
   const standardOptions = useMemo(
-    () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards.map((standard) => ({
+    () => state.auditProfile.applicableStandards.map((standard) => ({
       value: `${standard.name}:${standard.version}`,
       label: `${standard.name} ${standard.version}`,
     })),
-    [state.companyAuditProfiles, state.activeCompanyId],
+    [state.auditProfile],
   )
 
   const procedureOptions = useMemo(
@@ -363,7 +364,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   }
 
   const exportExcel = () => {
-    exportPersonnelExcel(state, state.activeCompanyId)
+    exportPersonnelExcel(state, WORKSPACE_COMPANY_ID)
   }
 
   const showExternalOrg = editing?.type === 'external'
@@ -375,12 +376,12 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const verifierPeople = useMemo(
     () => verifierCandidates(
       state.people,
-      state.activeCompanyId,
+      WORKSPACE_COMPANY_ID,
       state.settings.auditYear,
       state.annualPersonnelAssignments,
       editing?.effectiveFrom || `${state.settings.auditYear}-12-31`,
     ),
-    [state.people, state.activeCompanyId, state.settings.auditYear, state.annualPersonnelAssignments, editing?.effectiveFrom],
+    [state.people, state.settings.auditYear, state.annualPersonnelAssignments, editing?.effectiveFrom],
   )
 
   const pagination = useTablePagination(rows.length, 10, undefined, String(state.settings.auditYear))

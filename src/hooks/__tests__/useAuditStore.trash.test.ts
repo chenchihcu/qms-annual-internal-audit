@@ -1,12 +1,13 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDemoState, STORAGE_KEY } from '../../data/demoData'
+import { WORKSPACE_COMPANY_ID } from '../../lib/singleWorkspaceMigration'
 import { useAuditStore } from '../useAuditStore'
 
 beforeEach(() => {
   localStorage.clear()
   const demo = createDemoState()
-  demo.companies.jiurun.audits[0].status = '執行中'
+  demo.workspace.audits[0].status = '執行中'
   localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
 })
 
@@ -36,7 +37,7 @@ describe('useAuditStore recycle bin actions', () => {
     expect(result.current.state.permanentlyDeletedGeneratedRecords).toContainEqual({
       kind: 'ncr',
       recordId: generatedNcrId,
-      companyId: result.current.state.activeCompanyId,
+      companyId: WORKSPACE_COMPANY_ID,
       year: result.current.state.settings.auditYear,
     })
   })

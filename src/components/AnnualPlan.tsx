@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
@@ -126,7 +127,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
   const [regenConfirm, setRegenConfirm] = useState(false)
   const [openMonth, setOpenMonth] = useState<{ key: string; rect: DOMRect } | null>(null)
   const closeMonthMenu = useCallback(() => setOpenMonth(null), [])
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${settings.auditYear}`)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`)
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptOwner = (departmentId: string) =>
@@ -135,21 +136,21 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
   const leadAuditorName = useMemo(() => {
     const personId = resolveLeadAuditorPersonId(
       state.people,
-      state.activeCompanyId,
+      WORKSPACE_COMPANY_ID,
       settings.auditYear,
       state.annualPersonnelAssignments,
       settings.planWindowEnd || `${settings.auditYear}-12-31`,
     )
     return state.people.find((person) => person.id === personId)?.name ?? '主任稽核員任命未完成'
-  }, [state.people, state.activeCompanyId, state.annualPersonnelAssignments, settings.auditYear, settings.planWindowEnd])
+  }, [state.people, state.annualPersonnelAssignments, settings.auditYear, settings.planWindowEnd])
 
   const externalAuditDate = state.externalAuditPrep.externalAuditDate ?? settings.externalAuditDate ?? ''
 
   const requiredStandards = useMemo(
-    () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards
+    () => state.auditProfile.applicableStandards
       .filter((standard) => standard.confirmationStatus === 'confirmed')
       .map((standard) => `${standard.name}:${standard.version}`),
-    [state.companyAuditProfiles, state.activeCompanyId],
+    [state.auditProfile],
   )
 
   const referenceDate = settings.planWindowEnd || `${settings.auditYear}-12-31`
@@ -327,7 +328,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                       onChange={(auditors) => updatePlanRow(row.id, { auditors })}
                       candidates={auditorCandidates(
                         state.people,
-                        state.activeCompanyId,
+                        WORKSPACE_COMPANY_ID,
                         row.qpCode,
                         row.departmentId,
                         referenceDate,
@@ -393,7 +394,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                             displayOwner={row.owner}
                             ariaLabel={`${row.qpCode} ${row.department} 負責人`}
                             onSaveRequest={ownerConfirm.requestChange}
-                            candidates={departmentMemberCandidates(state.people, state.activeCompanyId, row.departmentId, referenceDate)}
+                            candidates={departmentMemberCandidates(state.people, WORKSPACE_COMPANY_ID, row.departmentId, referenceDate)}
                           />
                         </div>
                         <div><span className="block text-xs text-muted">稽核類型</span>{row.auditCategory}</div>

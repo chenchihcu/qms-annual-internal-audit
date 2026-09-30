@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
@@ -35,7 +36,7 @@ export function NCRList({
 
   const [showForm, setShowForm] = useState(false)
   const { triggerRef, formRef } = useInlineFormFocus(showForm)
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${state.activeCompanyId}:${settings.auditYear}`, highlightRecordId)
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`, highlightRecordId)
   const [closeErrors, setCloseErrors] = useState<Record<string, string>>({})
   const [newNcr, setNewNcr] = useState({
     qpCode: company.planRows[0]?.qpCode ?? 'QP-01',
@@ -68,7 +69,7 @@ export function NCRList({
 
   const verifierPeople = verifierCandidates(
     state.people,
-    state.activeCompanyId,
+    WORKSPACE_COMPANY_ID,
     settings.auditYear,
     state.annualPersonnelAssignments,
     referenceDate,
@@ -287,7 +288,7 @@ export function NCRList({
                                 onChange={(v) => updateNCR(ncr.id, { responsiblePerson: v })}
                                 candidates={departmentMemberCandidates(
                                   state.people,
-                                  state.activeCompanyId,
+                                  WORKSPACE_COMPANY_ID,
                                   ncr.departmentId,
                                   referenceDate,
                                 )}

@@ -6,11 +6,10 @@ import { Dashboard } from '../Dashboard'
 
 function syncedDemoState() {
   const base = createDemoState()
-  const companyId = base.activeCompanyId
   return {
     ...base,
-    settings: companySettingsFor(base, companyId),
-    company: base.companies[companyId],
+    settings: companySettingsFor(base),
+    company: base.workspace,
   }
 }
 

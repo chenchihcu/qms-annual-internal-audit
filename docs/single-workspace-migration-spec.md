@@ -22,8 +22,8 @@
 
 ## 遷移與回復
 
-1. 遷移前匯出目前完整 JSON 備份；此備份留在使用者本機，不上傳。
-2. 從現行儲存版本升級至下一版單一工作區格式。舊資料只有在新格式寫入成功、讀回並完成結構驗證後才切換使用。
+1. 升級後請由設定頁匯出 v15 完整 JSON 備份；備份留在使用者本機，不上傳。
+2. 從現行儲存版本升級至 v15 時，在瀏覽器內完成轉換；只有寫入 `qms-annual-internal-audit-v15` 成功、讀回並通過 `validateV15State` 後才切換使用。原始 `localStorage` 鍵不刪除。
 3. 遷移只自動合併沒有歧義的資料。矛盾的人員、計畫或判定顯示精簡的覆核清單，保留原值供比較；未覆核的判定不得納入分數或標為已完成。
 4. 原始備份可透過既有 JSON 匯入流程還原；不在程式中清除舊台帳或既有行程資料。
 5. 既有公司名稱與公司別狀態只作為匯出備份中的歷史來源資訊，不出現在新工作區的導覽、表格、篩選或列印表頭。
@@ -44,4 +44,12 @@
 
 ## 已核准的執行規則
 
-無衝突資料自動合併；計畫或人員等欄位衝突列為待覆核；相異查檢判定不自動決定；外稽準備只有滿足原完成條件才轉為完成；遷移前先下載本機 JSON 備份。使用者已核准此規則，再實作儲存格式升級與全站單一工作區切換。
+無衝突資料自動合併；計畫或人員等欄位衝突列為待覆核；相異查檢判定不自動決定；外稽準備只有滿足原完成條件才轉為完成；v15 寫入成功後由設定頁提供完整備份。使用者已核准此規則，再實作儲存格式升級與全站單一工作區切換。
+
+## v15 儲存結構（2026-09）
+
+- **目前鍵**：`localStorage` `qms-annual-internal-audit-v15`；`AppState.version === 15`。
+- **頂層**：`workspace`（原活動公司資料）、`settings`（原 `companySettings.jiurun`）、`auditProfile`（原 `companyAuditProfiles.jiurun`）；不再持久化 `companies`／`activeCompanyId`／雙公司設定映射。
+- **年度封存**：`yearArchives[year]` 為 `{ workspace, settings }`（非 v14 的 `companies`／`companySettings`）。
+- **載入**：讀 v15 直接驗證 `validateV15State`；讀 v14 或更舊鍵／備份經 `migrateToSingleWorkspace` → `migrateV14ToV15` 後立即寫入 v15 鍵並讀回驗證；較新版本拒絕降版載入。
+- **相容**：v14 與更舊備份匯入仍經 `backup.parseBackupJson` 升級至 v15；`singleWorkspaceMigration.ts` 仍負責 v14 語意與衝突覆核，v15 轉換在 `workspaceSchemaV15.ts`。

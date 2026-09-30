@@ -16,7 +16,7 @@ describe('demoMode', () => {
 
   it('keeps banner while editing demo until user dismisses or imports', () => {
     const state = createDemoState()
-    state.companySettings.jiurun.leadAuditor = '正式稽核員'
+    state.settings.leadAuditor = '正式稽核員'
     expect(shouldShowDemoBanner(state)).toBe(true)
   })
 })

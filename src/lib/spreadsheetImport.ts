@@ -309,10 +309,10 @@ function applyPlanRow(
 
 export function applySpreadsheetImport(
   state: AppState,
-  companyId: CompanyId,
+  _companyId: CompanyId,
   rows: SpreadsheetRow[],
 ): { state: AppState; summary: SpreadsheetApplySummary } {
-  const company = structuredClone(state.companies[companyId])
+  const company = structuredClone(state.workspace)
   const summary: SpreadsheetApplySummary = {
     checklistUpdated: 0,
     checklistAdded: 0,
@@ -342,7 +342,7 @@ export function applySpreadsheetImport(
   return {
     state: {
       ...state,
-      companies: { ...state.companies, [companyId]: company },
+      workspace: company,
       dataSource: 'user',
     },
     summary,

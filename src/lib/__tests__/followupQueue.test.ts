@@ -5,14 +5,14 @@ import { buildCarryForwardSummary, buildFollowupQueue, countOpenFollowups, isFol
 describe('followupQueue', () => {
   it('merges open NCR, observations and suggestions', () => {
     const state = createDemoState()
-    const rows = buildFollowupQueue(state.companies.jiurun)
+    const rows = buildFollowupQueue(state.workspace)
     expect(rows.length).toBeGreaterThan(0)
-    expect(countOpenFollowups(state.companies.jiurun)).toBe(rows.length)
+    expect(countOpenFollowups(state.workspace)).toBe(rows.length)
     expect(rows.some((row) => row.kind === 'ncr' || row.kind === 'observation' || row.kind === 'suggestion')).toBe(true)
   })
 
   it('uses an NCR due date instead of its issue date in the follow-up queue', () => {
-    const company = createDemoState().companies.jiurun
+    const company = createDemoState().workspace
     const ncr = company.ncrs.find((item) => item.status !== '結案')
     expect(ncr).toBeTruthy()
     ncr!.date = '2026-03-15'

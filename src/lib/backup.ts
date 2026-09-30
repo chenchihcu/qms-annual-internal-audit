@@ -1,4 +1,5 @@
 import {
+  buildDemoLegacySeed,
   createDemoState,
   migrateToV6,
   migrateToV7,
@@ -6,15 +7,19 @@ import {
   migrateV1State,
   STORAGE_KEY,
 } from '../data/demoData'
-import type { AppState } from '../types'
+import type { AppState, AppStateV14Legacy } from '../types'
 import { COMPANY_IDS, companySettingsFor } from '../types'
 import { migrateState } from './migrate'
 import {
   migrateToSingleWorkspace,
-  SINGLE_WORKSPACE_STORAGE_VERSION,
   validateSingleWorkspaceState,
-  WORKSPACE_COMPANY_ID,
 } from './singleWorkspaceMigration'
+import {
+  isAppStateV14Legacy,
+  migrateV14ToV15,
+  SINGLE_WORKSPACE_STORAGE_VERSION,
+  validateV15State,
+} from './workspaceSchemaV15'
 
 export const BACKUP_FORMAT = 'qms-annual-internal-audit-backup' as const
 export const MIN_BACKUP_VERSION = 1
@@ -31,11 +36,12 @@ function isObject(v: unknown): v is Record<string, unknown> {
 }
 
 /** Structural validation before restore (no throw on invalid — returns false). */
-export function validateAppState(raw: unknown): raw is AppState {
+export function validateAppState(raw: unknown): raw is AppState | AppStateV14Legacy {
   if (!isObject(raw)) return false
   if (typeof raw.version !== 'number' || raw.version < MIN_BACKUP_VERSION) return false
   if (raw.version > SINGLE_WORKSPACE_STORAGE_VERSION) return false
-  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION) return validateSingleWorkspaceState(raw)
+  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION) return validateV15State(raw)
+  if (raw.version === 14 && isAppStateV14Legacy(raw)) return validateSingleWorkspaceState(raw)
   if (!isObject(raw.companies)) return false
   for (const id of COMPANY_IDS) {
     const co = raw.companies[id]
@@ -57,27 +63,30 @@ export function validateAppState(raw: unknown): raw is AppState {
   return true
 }
 
-export function migrateImportedState(raw: AppState): AppState {
-  if (raw.version > SINGLE_WORKSPACE_STORAGE_VERSION) throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
-  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION) {
-    if (!validateSingleWorkspaceState(raw)) throw new Error('單一工作區備份結構不完整')
-    return raw
-  }
-  let v8: AppState
-  if (raw.version >= 8 && raw.companySettings) {
-    v8 = migrateToV8(raw)
-  } else if (raw.version >= 7 && raw.companySettings) {
-    v8 = migrateToV8(migrateToV7(raw))
-  } else if (raw.version >= 6 && raw.externalAuditPrep) {
-    v8 = migrateToV8(migrateToV7(migrateToV6(raw)))
-  } else if (raw.version === 1) {
-    const migrated = migrateV1State(raw)
-    if (!migrated) throw new Error('備份內容不完整或版本不支援')
-    v8 = migrateToV8(migrateToV7(migrateToV6(migrated)))
+function toV15(raw: AppState | AppStateV14Legacy): AppState {
+  if (raw.version === SINGLE_WORKSPACE_STORAGE_VERSION && validateV15State(raw)) return raw
+  if (isAppStateV14Legacy(raw)) return migrateV14ToV15(raw)
+  let v8: AppStateV14Legacy
+  const legacy = raw as unknown as AppStateV14Legacy
+  if (legacy.version >= 8 && legacy.companySettings) {
+    v8 = migrateToV8(legacy) as AppStateV14Legacy
+  } else if (legacy.version >= 7 && legacy.companySettings) {
+    v8 = migrateToV8(migrateToV7(legacy)) as AppStateV14Legacy
+  } else if (legacy.version >= 6 && legacy.externalAuditPrep) {
+    v8 = migrateToV8(migrateToV7(migrateToV6(legacy))) as AppStateV14Legacy
   } else {
-    v8 = migrateToV8(migrateToV7(migrateToV6(raw)))
+    v8 = migrateToV8(migrateToV7(migrateToV6(legacy))) as AppStateV14Legacy
   }
-  return migrateToSingleWorkspace(migrateState(v8))
+  return migrateV14ToV15(migrateToSingleWorkspace(migrateState(v8)))
+}
+
+export function migrateImportedState(raw: AppState | AppStateV14Legacy): AppState {
+  if (raw.version > SINGLE_WORKSPACE_STORAGE_VERSION) {
+    throw new Error(`備份版本 v${raw.version} 較目前系統新，已拒絕降版還原`)
+  }
+  const migrated = toV15(raw)
+  if (!validateV15State(migrated)) throw new Error('單一工作區備份結構不完整')
+  return migrated
 }
 
 export function parseBackupJson(json: string): AppState {
@@ -104,7 +113,9 @@ export function parseBackupJson(json: string): AppState {
   if (isObject(stateRaw) && stateRaw.version === 1) {
     const migrated = migrateV1State(stateRaw)
     if (!migrated) throw new Error('備份內容不完整或版本不支援')
-    return migrateToSingleWorkspace(migrateState(migrateToV8(migrateToV7(migrateToV6(migrated)))))
+    return migrateV14ToV15(
+      migrateToSingleWorkspace(migrateState(migrateToV8(migrateToV7(migrateToV6(migrated)) as AppStateV14Legacy))),
+    )
   }
 
   if (!validateAppState(stateRaw)) {
@@ -115,12 +126,11 @@ export function parseBackupJson(json: string): AppState {
 }
 
 export function serializeBackup(state: AppState): string {
-  const { settings: _legacy, ...persisted } = state
   const envelope: BackupEnvelope = {
     _format: BACKUP_FORMAT,
     exportedAt: new Date().toISOString(),
     storageKey: STORAGE_KEY,
-    state: persisted as AppState,
+    state,
   }
   return JSON.stringify(envelope, null, 2)
 }
@@ -137,7 +147,7 @@ export function backupRoundTrip(state: AppState): AppState {
 }
 
 export function describeBackup(state: AppState): string {
-  const workspace = state.companies[WORKSPACE_COMPANY_ID]
+  const workspace = state.workspace
   const year = companySettingsFor(state).auditYear
   const unresolved = state.workspaceMigrationConflicts?.length ?? 0
   return `${year} 年度 · ${workspace.audits.length} 筆查檢 · ${unresolved} 項待覆核 · v${state.version}`
@@ -153,4 +163,4 @@ export function describeRestorePreview(sourceVersion: number | undefined, migrat
 }
 
 /** Demo fallback must remain valid after failed parse in loadState. */
-export { createDemoState }
+export { createDemoState, buildDemoLegacySeed }

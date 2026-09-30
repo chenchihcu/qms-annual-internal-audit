@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'lint', 'tests', 'build', 'browser-smoke', 'migration-backup', 'local-backup')]
+    [ValidateSet('all', 'lint', 'tests', 'build', 'browser-smoke', 'local-backup')]
     [string]$Mode = 'all',
     [ValidatePattern('^src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.tsx?$')]
     [ValidateScript({ Test-Path -LiteralPath $_ -PathType Leaf })]
@@ -11,7 +11,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if ($Mode -eq 'migration-backup' -or $Mode -eq 'local-backup') {
+if ($Mode -eq 'local-backup') {
     $downloadsRegistryPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders'
     $downloadsGuid = '{374DE290-123F-4565-9164-39C4925E467B}'
     $downloadsValue = (Get-ItemProperty -LiteralPath $downloadsRegistryPath).PSObject.Properties[$downloadsGuid].Value
@@ -29,17 +29,8 @@ if ($Mode -eq 'migration-backup' -or $Mode -eq 'local-backup') {
     # Build non-ASCII prefixes from code points so Windows PowerShell 5.1 can
     # read this UTF-8 script without mis-decoding the backup name patterns.
     $localBackupPrefix = [string]::Concat([char]0x0051, [char]0x004D, [char]0x0053, [char]0x5099, [char]0x4EFD)
-    $migrationBackupPrefix = [string]::Concat(
-        [char]0x0051, [char]0x004D, [char]0x0053,
-        [char]0x9077, [char]0x79FB, [char]0x524D, [char]0x5099, [char]0x4EFD
-    )
-    $backupPrefix = if ($Mode -eq 'local-backup') { $localBackupPrefix } else { $migrationBackupPrefix }
-    $backupPattern = "${backupPrefix}_*.json"
-    $backupNamePattern = if ($Mode -eq 'local-backup') {
-        '^' + [regex]::Escape($localBackupPrefix) + '_\d{4}_\d{4}-\d{2}-\d{2}(?:T\d{2}-\d{2}-\d{2}-\d{3}Z)?\.json$'
-    } else {
-        '^' + [regex]::Escape($migrationBackupPrefix) + '_.*\.json$'
-    }
+    $backupPattern = "${localBackupPrefix}_*.json"
+    $backupNamePattern = '^' + [regex]::Escape($localBackupPrefix) + '_\d{4}_\d{4}-\d{2}-\d{2}(?:T\d{2}-\d{2}-\d{2}-\d{3}Z)?\.json$'
     $matchingBackups = @(Get-ChildItem -LiteralPath $downloadsPath -Filter $backupPattern -File)
     if ($BackupPath) {
         if (-not (Test-Path -LiteralPath $BackupPath -PathType Leaf)) {
@@ -74,7 +65,7 @@ if ($Mode -eq 'migration-backup' -or $Mode -eq 'local-backup') {
         Write-Output 'backup_verification result=not_pass reason=backup-empty'
         exit 1
     }
-    if ($backup.LastWriteTime -lt $cutoff) {
+    if (-not $BackupPath -and $backup.LastWriteTime -lt $cutoff) {
         Write-Output 'backup_verification result=not_pass reason=backup-too-old'
         exit 1
     }
@@ -86,20 +77,33 @@ if ($Mode -eq 'migration-backup' -or $Mode -eq 'local-backup') {
         Write-Output 'backup_verification result=not_pass reason=backup-json-invalid'
         exit 1
     }
-    $backupVersion = if ($Mode -eq 'local-backup') { $parsedBackup.state.version } else { $parsedBackup.version }
-    if ($Mode -eq 'local-backup' -and $parsedBackup._format -ne 'qms-annual-internal-audit-backup') {
+    if ($parsedBackup._format -ne 'qms-annual-internal-audit-backup') {
         Write-Output 'backup_verification result=not_pass reason=backup-format-invalid'
         exit 1
     }
-    $maximumVersion = if ($Mode -eq 'local-backup') { 14 } else { 13 }
-    if ($null -eq $parsedBackup -or $backupVersion -isnot [ValueType] -or
-        $backupVersion -lt 1 -or $backupVersion -gt $maximumVersion) {
+    $state = $parsedBackup.state
+    $backupVersion = $state.version
+    if ($null -eq $parsedBackup -or $backupVersion -isnot [ValueType] -or $backupVersion -ne 15) {
         Write-Output 'backup_verification result=not_pass reason=backup-version-invalid'
         exit 1
     }
+    if ($null -eq $state -or $state -isnot [System.Collections.IDictionary]) {
+        Write-Output 'backup_verification result=not_pass reason=backup-state-invalid'
+        exit 1
+    }
+    if ($state.Contains('companies')) {
+        Write-Output 'backup_verification result=not_pass reason=backup-legacy-companies-present'
+        exit 1
+    }
+    foreach ($requiredKey in @('workspace', 'settings', 'auditProfile')) {
+        if (-not $state.Contains($requiredKey) -or $null -eq $state[$requiredKey]) {
+            Write-Output "backup_verification result=not_pass reason=backup-missing-$requiredKey"
+            exit 1
+        }
+    }
 
     $hash = Get-FileHash -LiteralPath $backup.FullName -Algorithm SHA256
-    Write-Output "backup_verification result=ok scope=$Mode version=$backupVersion bytes=$($backup.Length) sha256=$($hash.Hash)"
+    Write-Output "backup_verification result=ok scope=local-backup version=$backupVersion bytes=$($backup.Length) sha256=$($hash.Hash)"
     exit 0
 }
 
@@ -112,8 +116,8 @@ $checks = @(
 if (($TestFile -or $TestName) -and $Mode -ne 'tests') {
     throw '-TestFile and -TestName can only be used with -Mode tests.'
 }
-if ($BackupPath -and $Mode -ne 'migration-backup' -and $Mode -ne 'local-backup') {
-    throw '-BackupPath can only be used with -Mode migration-backup or -Mode local-backup.'
+if ($BackupPath -and $Mode -ne 'local-backup') {
+    throw '-BackupPath can only be used with -Mode local-backup.'
 }
 
 $selectedChecks = if ($Mode -eq 'all') { $checks } else { @($checks | Where-Object { $_.Name -eq $Mode }) }

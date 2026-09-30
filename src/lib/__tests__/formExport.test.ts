@@ -15,7 +15,7 @@ describe('form export smoke', () => {
 
   it('annual plan sheet has header row matching UI columns', () => {
     const state = createDemoState()
-    const ws = buildAnnualPlanSheet(state.companies.jiurun, state.companySettings.jiurun)
+    const ws = buildAnnualPlanSheet(state.workspace, state.settings)
     const rows = ws.rows
     const header = rows.find((r) => r[0] === '項次')
     expect(header).toBeDefined()
@@ -25,7 +25,7 @@ describe('form export smoke', () => {
 
   it('NCR sheet includes demo NCR row', () => {
     const state = createDemoState()
-    const ws = buildNcrSheet(state.companies.jiurun, state.companySettings.jiurun)
+    const ws = buildNcrSheet(state.workspace, state.settings)
     const text = sheetToCsv(ws)
     expect(text).toContain('NCR-2026-001')
     expect(text).toContain('QR-28-03')
@@ -43,7 +43,7 @@ describe('form export smoke', () => {
 
   it('builds risk assessment sheet from plan rows', () => {
     const state = createDemoState()
-    const ws = buildRiskSheet(state.companies.jiurun)
+    const ws = buildRiskSheet(state.workspace)
     const text = sheetToCsv(ws)
     expect(text).toContain('QR-02-01')
     expect(text).toContain('QP')
@@ -59,7 +59,7 @@ describe('form export smoke', () => {
   })
 
   it('exports one shared certificate record separately from standard applicability', () => {
-    const profile = createDemoState().companyAuditProfiles.jiurun
+    const profile = createDemoState().auditProfile
     profile.certificateScope = '精密零件設計與製造'
     profile.certificateReference = 'CERT-001'
 
@@ -93,8 +93,8 @@ describe('form export smoke', () => {
 
   it('keeps worksheet names unique for repeated audit events', () => {
     const state = createDemoState()
-    const duplicate = { ...state.companies.jiurun.audits[0], id: 'event-repeat', auditDate: '2026-04-01' }
-    state.companies.jiurun.audits.push(duplicate)
+    const duplicate = { ...state.workspace.audits[0], id: 'event-repeat', auditDate: '2026-04-01' }
+    state.workspace.audits.push(duplicate)
     const workbook = buildAllFormsWorkbook(state, 'jiurun')
     expect(new Set(workbook.SheetNames).size).toBe(workbook.SheetNames.length)
     expect(workbook.SheetNames.filter((name) => name.startsWith('02_QP-28')).length).toBe(2)

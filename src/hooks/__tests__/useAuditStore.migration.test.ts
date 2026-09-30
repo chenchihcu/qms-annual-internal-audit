@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import {
+  buildDemoLegacySeed,
   createDemoState,
   migrateToV8,
   migrateToV6,
@@ -10,8 +11,6 @@ import {
   STORAGE_KEY,
   LEGACY_STORAGE_KEY_V6,
 } from '../../data/demoData'
-import { migrateState } from '../../lib/migrate'
-import { migrateToSingleWorkspace } from '../../lib/singleWorkspaceMigration'
 import { ncrNumberLabel } from '../../lib/ncr'
 import { useAuditStore } from '../useAuditStore'
 
@@ -21,13 +20,13 @@ beforeEach(() => {
 })
 
 function createCurrentDemoState() {
-  return migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  return createDemoState()
 }
 
 describe('migrateToV7', () => {
   it('preserves state and exposes per-company settings', () => {
-    const demo = createDemoState()
-    const migrated = migrateToV7(migrateToV6({ ...demo, version: 6, settings: demo.companySettings.jiurun } as typeof demo))
+    const demo = migrateToV8(buildDemoLegacySeed())
+    const migrated = migrateToV7(migrateToV6({ ...demo, version: 6, settings: demo.companySettings.jiurun }))
     expect(migrated.version).toBe(7)
     expect(migrated.companySettings.jiurun.auditYear).toBe(demo.companySettings.jiurun.auditYear)
     expect(migrated.companySettings.zhenglongxing.auditYear).toBe(demo.companySettings.zhenglongxing.auditYear)
@@ -40,7 +39,7 @@ describe('migrateToV7', () => {
   })
 
   it('upgrades v4-shaped state to version 7', () => {
-    const demo = createDemoState()
+    const demo = migrateToV8(buildDemoLegacySeed())
     const v4Like = { ...demo, version: 4 as const, settings: demo.companySettings.jiurun }
     const migrated = migrateToV7(migrateToV6(v4Like))
     expect(migrated.version).toBe(7)
@@ -48,7 +47,7 @@ describe('migrateToV7', () => {
   })
 
   it('keeps legacy names pending without inferring qualifications', () => {
-    const demo = createDemoState()
+    const demo = migrateToV8(buildDemoLegacySeed())
     const legacy = { ...demo, version: 5, people: undefined, annualPersonnelAssignments: undefined, companyAuditProfiles: undefined, yearArchives: undefined, settings: demo.companySettings.jiurun } as unknown as Parameters<typeof migrateToV6>[0]
     const migrated = migrateToV7(migrateToV6(legacy))
     expect(migrated.people.length).toBeGreaterThan(0)
@@ -58,19 +57,18 @@ describe('migrateToV7', () => {
 })
 
 describe('localStorage load and single-workspace migration', () => {
-  it('loads a validated v14 workspace directly', () => {
+  it('loads a validated v15 workspace directly', () => {
     const demo = createCurrentDemoState()
     localStorage.setItem(STORAGE_KEY, JSON.stringify(demo))
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.settings.auditYear).toBe(demo.companySettings.jiurun.auditYear)
-    expect(result.current.state.version).toBe(14)
+    expect(result.current.state.settings.auditYear).toBe(demo.settings.auditYear)
+    expect(result.current.state.version).toBe(15)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
-    expect(result.current.migrationRequired).toBe(false)
   })
 
-  it('keeps v7 source data unchanged until the backup-gated migration is confirmed', () => {
-    const demo = createDemoState()
+  it('auto-writes v15 from v7 legacy key and keeps the source key', () => {
+    const demo = migrateToV8(buildDemoLegacySeed())
     demo.version = 7
     demo.dataSource = 'user'
     delete demo.trash
@@ -80,10 +78,10 @@ describe('localStorage load and single-workspace migration', () => {
     localStorage.setItem(LEGACY_STORAGE_KEY_V7, raw)
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.version).toBe(14)
+    expect(result.current.state.version).toBe(15)
     expect(result.current.state.company.ncrs[0].description).toBe('既有 v7 使用者描述')
-    expect(result.current.migrationRequired).toBe(true)
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as { version: number }
+    expect(stored.version).toBe(15)
     expect(localStorage.getItem(LEGACY_STORAGE_KEY_V7)).toBe(raw)
   })
 
@@ -92,114 +90,54 @@ describe('localStorage load and single-workspace migration', () => {
     ['v5', 'qms-annual-internal-audit-v5', 5],
     ['v6', LEGACY_STORAGE_KEY_V6, 6],
     ['v8', LEGACY_STORAGE_KEY_V8, 8],
-  ])('routes %s data through the backup gate without rewriting its source key', (_label, key, version) => {
-    const demo = { ...createDemoState(), version }
+  ])('auto-writes v15 from %s without removing its source key', (_label, key, version) => {
+    const demo = { ...migrateToV8(buildDemoLegacySeed()), version }
     const raw = JSON.stringify(demo)
     localStorage.setItem(key, raw)
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.version).toBe(14)
+    expect(result.current.state.version).toBe(15)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
-    expect(result.current.migrationRequired).toBe(true)
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(15)
     expect(localStorage.getItem(key)).toBe(raw)
   })
 
-  it('routes v1 data through the backup gate', () => {
+  it('auto-writes v15 from v1 legacy key', () => {
     const demo = createDemoState()
     const legacy = {
       version: 1,
-      settings: { ...demo.companySettings.jiurun, auditYear: 2024 },
-      departments: demo.companies.jiurun.departments,
-      planRows: demo.companies.jiurun.planRows,
-      audits: demo.companies.jiurun.audits,
-      ncrs: demo.companies.jiurun.ncrs,
-      observations: demo.companies.jiurun.observations,
+      settings: { ...demo.settings, auditYear: 2024 },
+      departments: demo.workspace.departments,
+      planRows: demo.workspace.planRows,
+      audits: demo.workspace.audits,
+      ncrs: demo.workspace.ncrs,
+      observations: demo.workspace.observations,
     }
     const raw = JSON.stringify(legacy)
     localStorage.setItem('qms-annual-internal-audit-v1', raw)
 
     const { result } = renderHook(() => useAuditStore())
-    expect(result.current.state.version).toBe(14)
+    expect(result.current.state.version).toBe(15)
     expect(result.current.state.settings.auditYear).toBe(2024)
     expect(result.current.state.company.audits.length).toBeGreaterThan(0)
-    expect(result.current.migrationRequired).toBe(true)
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).version).toBe(15)
     expect(localStorage.getItem('qms-annual-internal-audit-v1')).toBe(raw)
   })
 
-  it('requires a downloaded backup before writing v14 and keeps the legacy key', async () => {
-    const demo = createDemoState()
+  it('does not leave a partial v15 key when persistence fails', () => {
+    const demo = migrateToV8(buildDemoLegacySeed())
     const raw = JSON.stringify(demo)
     localStorage.setItem(LEGACY_STORAGE_KEY_V8, raw)
-    const priorCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
-    const priorRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:backup') })
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const originalSetItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key: string, value: string) {
+      if (key === STORAGE_KEY) throw new Error('quota exceeded')
+      return originalSetItem.call(this, key, value)
+    })
 
     const { result } = renderHook(() => useAuditStore())
-    act(() => expect(result.current.completeMigration()).toBe(false))
+    expect(result.current.storageWarning).toContain('新版資料寫入失敗')
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
-    act(() => expect(result.current.downloadMigrationBackup()).toBe(true))
-    expect(result.current.migrationBackupRequested).toBe(true)
-    expect(result.current.migrationBackupConfirmed).toBe(false)
-    act(() => expect(result.current.completeMigration()).toBe(false))
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
-    await act(async () => {
-      expect(await result.current.verifyMigrationBackup({ text: async () => '{"version":8}' } as File)).toBe(false)
-    })
-    expect(result.current.migrationBackupConfirmed).toBe(false)
-    act(() => expect(result.current.completeMigration()).toBe(false))
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
-
-    await act(async () => {
-      expect(await result.current.verifyMigrationBackup({ text: async () => '{invalid-json' } as File)).toBe(false)
-    })
-    expect(result.current.storageWarning).toContain('不是有效 JSON')
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
-
-    await act(async () => {
-      expect(await result.current.verifyMigrationBackup({ text: async () => raw } as File)).toBe(true)
-    })
-    expect(result.current.migrationBackupConfirmed).toBe(true)
-    act(() => expect(result.current.completeMigration()).toBe(true))
-
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as { version: number }
-    expect(stored.version).toBe(14)
     expect(localStorage.getItem(LEGACY_STORAGE_KEY_V8)).toBe(raw)
-    if (priorCreate) Object.defineProperty(URL, 'createObjectURL', priorCreate)
-    else Reflect.deleteProperty(URL, 'createObjectURL')
-    if (priorRevoke) Object.defineProperty(URL, 'revokeObjectURL', priorRevoke)
-    else Reflect.deleteProperty(URL, 'revokeObjectURL')
-  })
-
-  it('refuses to migrate if source data changed after backup verification', async () => {
-    const raw = JSON.stringify(createDemoState())
-    localStorage.setItem(LEGACY_STORAGE_KEY_V8, raw)
-    const priorCreate = Object.getOwnPropertyDescriptor(URL, 'createObjectURL')
-    const priorRevoke = Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL')
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:backup') })
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
-
-    const { result } = renderHook(() => useAuditStore())
-    act(() => expect(result.current.downloadMigrationBackup()).toBe(true))
-    await act(async () => {
-      expect(await result.current.verifyMigrationBackup({ text: async () => raw } as File)).toBe(true)
-    })
-
-    const changedSource = `${raw} `
-    localStorage.setItem(LEGACY_STORAGE_KEY_V8, changedSource)
-    act(() => expect(result.current.completeMigration()).toBe(false))
-
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
-    expect(localStorage.getItem(LEGACY_STORAGE_KEY_V8)).toBe(changedSource)
-    expect(result.current.storageWarning).toContain('原始資料在備份後已有變動')
-    if (priorCreate) Object.defineProperty(URL, 'createObjectURL', priorCreate)
-    else Reflect.deleteProperty(URL, 'createObjectURL')
-    if (priorRevoke) Object.defineProperty(URL, 'revokeObjectURL', priorRevoke)
-    else Reflect.deleteProperty(URL, 'revokeObjectURL')
   })
 
   it('preserves corrupt stored JSON and blocks persistence', () => {
@@ -212,7 +150,7 @@ describe('localStorage load and single-workspace migration', () => {
   })
 
   it('refuses a newer storage version without overwriting it', () => {
-    const newer = { ...createCurrentDemoState(), version: 15 }
+    const newer = { ...createCurrentDemoState(), version: 16 }
     const raw = JSON.stringify(newer)
     localStorage.setItem(STORAGE_KEY, raw)
 
@@ -306,7 +244,7 @@ describe('year datasets', () => {
     const prepBefore = result.current.state.externalAuditPrep.items[0].completed
     act(() => result.current.switchAuditYear(2027))
     expect(result.current.state.company.audits).toHaveLength(0)
-    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.audits).toHaveLength(currentAudits)
+    expect(result.current.state.yearArchives['2026']?.workspace?.audits).toHaveLength(currentAudits)
     expect(result.current.state.externalAuditPrep.items[0].completed).toBe(prepBefore)
   })
 })
@@ -321,7 +259,7 @@ describe('audit event records', () => {
     }))
     const id = result.current.state.company.observations.at(-1)!.id
     act(() => result.current.switchAuditYear(2027))
-    const jiurun2026 = result.current.state.yearArchives['2026']?.companies.jiurun
+    const jiurun2026 = result.current.state.yearArchives['2026']?.workspace
     expect(jiurun2026).toBeDefined()
     const priorNcr = jiurun2026!.ncrs.find((item) => item.status !== '結案')
     expect(priorNcr).toBeDefined()
@@ -330,11 +268,11 @@ describe('audit event records', () => {
     expect(carriedNcrItem).toBeDefined()
     expect(carriedNcrItem?.content).toContain(ncrNumberLabel(priorNcr!.ncrNumber))
     expect(carriedNcrItem?.content).not.toContain(priorNcr!.ncrNumber)
-    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.ncrs.find((item) => item.id === priorNcr!.id)?.ncrNumber).toBe(priorNcr!.ncrNumber)
+    expect(result.current.state.yearArchives['2026']?.workspace?.ncrs.find((item) => item.id === priorNcr!.id)?.ncrNumber).toBe(priorNcr!.ncrNumber)
     act(() => result.current.addObservationFollowUp(id, '2027-01-10', '第一次追蹤'))
     act(() => result.current.carryForwardObservation(id, 'QP-28', 'dept-qa'))
     act(() => result.current.carryForwardObservation(id, 'QP-28', 'dept-qa'))
-    const prior = result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)
+    const prior = result.current.state.yearArchives['2026']?.workspace?.observations.find((item) => item.id === id)
     expect(prior).toBeDefined()
     if (!prior) throw new Error('missing prior observation')
     expect(prior.followUps).toHaveLength(1)
@@ -342,10 +280,10 @@ describe('audit event records', () => {
     expect(prior.carryForwards?.[0].year).toBe(2027)
     expect(result.current.state.company.audits.flatMap((audit) => audit.items).filter((item) => item.carriedFromId === id)).toHaveLength(1)
     act(() => result.current.updateObservation(id, { status: 'closed' }))
-    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.status).toBe('open')
+    expect(result.current.state.yearArchives['2026']?.workspace?.observations.find((item) => item.id === id)?.status).toBe('open')
     act(() => result.current.updateObservation(id, { status: 'closed', closedAt: '2027-02-01', closeEvidence: 'CAPA-102' }))
-    expect(result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.status).toBe('closed')
-    const revisions = result.current.state.yearArchives['2026']?.companies.jiurun?.observations.find((item) => item.id === id)?.revisions
+    expect(result.current.state.yearArchives['2026']?.workspace?.observations.find((item) => item.id === id)?.status).toBe('closed')
+    const revisions = result.current.state.yearArchives['2026']?.workspace?.observations.find((item) => item.id === id)?.revisions
     expect(revisions).toHaveLength(1)
     expect(revisions?.[0].before.status).toBe('open')
     expect(revisions?.[0].after.closeEvidence).toBe('CAPA-102')

@@ -42,6 +42,7 @@ export function StakeholderEditDialog({
 
   useEffect(() => {
     if (!open || !dept) return
+    const returnTarget = returnFocusRef?.current
     const previouslyFocused = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null
@@ -81,11 +82,10 @@ export function StakeholderEditDialog({
       document.removeEventListener('keydown', onKey)
       if (appRoot) appRoot.inert = wasInert
       document.body.style.overflow = previousOverflow
-      const returnTarget = returnFocusRef?.current
       if (returnTarget?.isConnected) returnTarget.focus()
       else if (previouslyFocused?.isConnected) previouslyFocused.focus()
     }
-  }, [open, dept?.id, returnFocusRef])
+  }, [open, dept, returnFocusRef])
 
   if (!open || !dept) return null
 

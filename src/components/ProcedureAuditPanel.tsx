@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
@@ -27,6 +28,7 @@ import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import type { ChecklistItem, Judgment, TabId } from '../types'
 import { auditorCandidates, departmentMemberCandidates } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
+import { FormalRecordLocationDialog } from './FormalRecordLocationDialog'
 import { Badge, Button, Input, Select } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { PrintDocHeader } from './ui/PrintDocHeader'
@@ -66,6 +68,7 @@ export function ProcedureAuditPanel({
     getProcedureTitle,
     startAudit,
     validateAuditStart,
+    updateCompanyAuditProfile,
   } = store
 
   const { company, settings } = state
@@ -92,6 +95,7 @@ export function ProcedureAuditPanel({
     Record<string, Partial<Record<EvidenceField, boolean>>>
   >({})
   const ownerConfirm = useDepartmentOwnerConfirm(store)
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false)
 
   const [qpCode, departmentId] = selectedKey.split('|')
   const persistedAudit =
@@ -157,10 +161,10 @@ export function ProcedureAuditPanel({
   }, [qpCode, departmentId, persistedAudit, getOrCreateAudit, updateAudit])
 
   const requiredStandards = useMemo(
-    () => state.companyAuditProfiles[state.activeCompanyId].applicableStandards
+    () => state.auditProfile.applicableStandards
       .filter((standard) => standard.confirmationStatus === 'confirmed')
       .map((standard) => `${standard.name}:${standard.version}`),
-    [state.companyAuditProfiles, state.activeCompanyId],
+    [state.auditProfile],
   )
 
   const referenceDate = persistedAudit?.auditDate
@@ -172,22 +176,22 @@ export function ProcedureAuditPanel({
       if (!qpCode || !departmentId) return []
       return auditorCandidates(
         state.people,
-        state.activeCompanyId,
+        WORKSPACE_COMPANY_ID,
         qpCode,
         departmentId,
         referenceDate,
         requiredStandards,
       )
     },
-    [state.people, state.activeCompanyId, qpCode, departmentId, referenceDate, requiredStandards],
+    [state.people, qpCode, departmentId, referenceDate, requiredStandards],
   )
 
   const ownerCandidates = useMemo(
     () => {
       if (!departmentId) return []
-      return departmentMemberCandidates(state.people, state.activeCompanyId, departmentId, referenceDate)
+      return departmentMemberCandidates(state.people, WORKSPACE_COMPANY_ID, departmentId, referenceDate)
     },
-    [state.people, state.activeCompanyId, departmentId, referenceDate],
+    [state.people, departmentId, referenceDate],
   )
 
   const auditForPage = qpCode && departmentId
@@ -248,10 +252,27 @@ export function ProcedureAuditPanel({
   })
   const showImpartialityConfirm = validateAuditStart(audit).warnings.length > 0
 
+  const handleConfirmLocationAndStart = (location: string) => {
+    updateCompanyAuditProfile(WORKSPACE_COMPANY_ID, { formalRecordLocation: location })
+    setShowLocationPrompt(false)
+    const result = startAudit(audit.id)
+    if (!result.canStart) {
+      setStartErrors(result.errors)
+      revealSetupError()
+      return
+    }
+    setStartErrors([])
+    setStartSuccess(true)
+  }
+
   const handleStartAudit = () => {
     if (!audit.auditDate?.trim()) {
       setStartErrors(['開始稽核前須填寫稽核日期'])
       revealSetupError(true)
+      return
+    }
+    if (!state.auditProfile.formalRecordLocation?.trim()) {
+      setShowLocationPrompt(true)
       return
     }
     const preview = validateAuditStart(audit)
@@ -448,11 +469,11 @@ export function ProcedureAuditPanel({
                 />
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-fit shrink-0 flex-wrap items-center gap-2">
               <Badge label={auditStatus} />
               {audit.notifySent && <span className="text-xs text-muted">已標記通知</span>}
               {audit.reportReference && <span className="text-sm">正式紀錄：{audit.reportReference}</span>}
-              {auditStatus === '規劃中' && <Button onClick={handleStartAudit}>開始稽核</Button>}
+              {auditStatus === '規劃中' && <Button className="shrink-0 whitespace-nowrap" onClick={handleStartAudit}>開始稽核</Button>}
               {auditStatus === '執行中' && (
                 <>
                   <Input label="正式紀錄編號" value={reportReferenceDraft} onChange={setReportReferenceDraft} />
@@ -462,6 +483,7 @@ export function ProcedureAuditPanel({
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
               <Button
+                className="shrink-0 whitespace-nowrap"
                 variant="secondary"
                 aria-label={`${audit.qpCode} ${audit.department} 稽核設定`}
                 aria-expanded={setupOpen}
@@ -730,6 +752,15 @@ export function ProcedureAuditPanel({
         </ScrollRegion>
         <TablePagination pagination={pagination} label="查檢表" />
       </div>
+
+      <FormalRecordLocationDialog
+        open={showLocationPrompt}
+        currentLocation={state.auditProfile.formalRecordLocation}
+        title="請先指定正式紀錄保存位置以開始稽核"
+        description="開始稽核前須確認本年度稽核紀錄之受控存放位置。指定後將自動解鎖並啟動稽核："
+        onConfirm={handleConfirmLocationAndStart}
+        onCancel={() => setShowLocationPrompt(false)}
+      />
     </div>
   )
 }

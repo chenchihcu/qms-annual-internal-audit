@@ -98,51 +98,51 @@ describe('recycle bin data lifecycle', () => {
   it('moves an NCR out of the active list and restores it to the original index', () => {
     const state = createDemoState()
     const records = [ncr('before'), ncr('target'), ncr('after')]
-    state.companies.jiurun.ncrs = records
+    state.workspace.ncrs = records
 
     const removed = moveCompanyRecordToTrash(state, 'ncr', 'target', 'jiurun', 'trash-1', '2026-09-24T01:00:00.000Z')
-    expect(removed.companies.jiurun.ncrs.map((item) => item.id)).toEqual(['before', 'after'])
+    expect(removed.workspace.ncrs.map((item) => item.id)).toEqual(['before', 'after'])
     expect(removed.trash?.[0]).toMatchObject({ kind: 'ncr', recordId: 'target', originalIndex: 1 })
 
     const restored = restoreTrashRecord(removed, 'trash-1')
     expect(restored.ok).toBe(true)
-    expect(restored.state.companies.jiurun.ncrs).toEqual(records)
+    expect(restored.state.workspace.ncrs).toEqual(records)
     expect(restored.state.trash).toEqual([])
   })
 
   it('remembers archive year and company when restoring a prior-year observation', () => {
     const state = createDemoState()
     const archiveCompany = {
-      ...state.companies.jiurun,
+      ...state.workspace,
       observations: [observation('before'), observation('archived-target'), observation('after')],
     }
     state.yearArchives['2024'] = {
-      companies: { jiurun: archiveCompany },
-      companySettings: { jiurun: { ...state.companySettings.jiurun, auditYear: 2024 } },
+      workspace: archiveCompany,
+      settings: { ...state.settings, auditYear: 2024 },
     }
 
     const removed = moveCompanyRecordToTrash(state, 'observation', 'archived-target', 'jiurun', 'trash-archive', '2026-09-24T01:00:00.000Z')
-    expect(removed.yearArchives['2024'].companies.jiurun?.observations.map((item) => item.id)).toEqual(['before', 'after'])
+    expect(removed.yearArchives['2024'].workspace?.observations.map((item) => item.id)).toEqual(['before', 'after'])
     expect(removed.trash?.[0]).toMatchObject({ location: { companyId: 'jiurun', year: 2024, archiveYear: '2024' } })
 
     const restored = restoreTrashRecord(removed, 'trash-archive')
     expect(restored.ok).toBe(true)
-    expect(restored.state.yearArchives['2024'].companies.jiurun?.observations.map((item) => item.id))
+    expect(restored.state.yearArchives['2024'].workspace?.observations.map((item) => item.id))
       .toEqual(['before', 'archived-target', 'after'])
   })
 
   it('restores third-party suggestions without changing other company data', () => {
     const state = createDemoState()
-    state.companies.jiurun.suggestions = [suggestion('suggestion-before'), suggestion('suggestion-target')]
-    const otherCompanyBefore = state.companies.zhenglongxing
+    state.workspace.suggestions = [suggestion('suggestion-before'), suggestion('suggestion-target')]
+    const departmentsBefore = state.workspace.departments
 
     const removed = moveCompanyRecordToTrash(state, 'suggestion', 'suggestion-target', 'jiurun', 'trash-suggestion', '2026-09-24T01:00:00.000Z')
-    expect(removed.companies.jiurun.suggestions.map((item) => item.id)).toEqual(['suggestion-before'])
-    expect(removed.companies.zhenglongxing).toBe(otherCompanyBefore)
+    expect(removed.workspace.suggestions.map((item) => item.id)).toEqual(['suggestion-before'])
+    expect(removed.workspace.departments).toBe(departmentsBefore)
 
     const restored = restoreTrashRecord(removed, 'trash-suggestion')
     expect(restored.ok).toBe(true)
-    expect(restored.state.companies.jiurun.suggestions.map((item) => item.id))
+    expect(restored.state.workspace.suggestions.map((item) => item.id))
       .toEqual(['suggestion-before', 'suggestion-target'])
   })
 
@@ -166,25 +166,25 @@ describe('recycle bin data lifecycle', () => {
 
   it('restores custom checklist items in place and does not alter submitted audits', () => {
     const state = createDemoState()
-    const audit = state.companies.jiurun.audits[0]
+    const audit = state.workspace.audits[0]
     audit.status = '執行中'
     audit.items = [checklistItem('item-before', 1), checklistItem('item-target', 2), checklistItem('item-after', 3)]
 
     const removed = moveChecklistItemToTrash(state, audit.id, 'item-target', 'trash-checklist', '2026-09-24T01:00:00.000Z')
-    expect(removed.companies.jiurun.audits[0].items.map((item) => item.id)).toEqual(['item-before', 'item-after'])
+    expect(removed.workspace.audits[0].items.map((item) => item.id)).toEqual(['item-before', 'item-after'])
     const restored = restoreTrashRecord(removed, 'trash-checklist')
     expect(restored.ok).toBe(true)
-    expect(restored.state.companies.jiurun.audits[0].items.map((item) => item.id)).toEqual(['item-before', 'item-target', 'item-after'])
+    expect(restored.state.workspace.audits[0].items.map((item) => item.id)).toEqual(['item-before', 'item-target', 'item-after'])
 
     const submitted = structuredClone(state)
-    submitted.companies.jiurun.audits[0].status = '已回報'
+    submitted.workspace.audits[0].status = '已回報'
     const unchanged = moveChecklistItemToTrash(submitted, audit.id, 'item-target', 'trash-submitted', '2026-09-24T01:00:00.000Z')
     expect(unchanged).toBe(submitted)
   })
 
   it('permanently removes generated NCR data but keeps a minimal no-resync marker', () => {
     const state = createDemoState()
-    state.companies.jiurun.ncrs = [{ ...ncr('generated-ncr'), sourceAuditId: 'audit-1', checklistItemId: 'item-1' }]
+    state.workspace.ncrs = [{ ...ncr('generated-ncr'), sourceAuditId: 'audit-1', checklistItemId: 'item-1' }]
     const inTrash = moveCompanyRecordToTrash(state, 'ncr', 'generated-ncr', 'jiurun', 'trash-generated', '2026-09-24T01:00:00.000Z')
     const cleared = permanentlyDeleteTrashRecord(inTrash, 'trash-generated')
 

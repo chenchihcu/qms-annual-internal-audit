@@ -1,6 +1,7 @@
 import type { AppState, CompanyData, CompanyId, TabId } from '../types'
 import { companySettingsFor } from '../types'
 import { ncrNumberLabels } from './ncr'
+import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
 
 export type FollowupKind = 'ncr' | 'observation' | 'suggestion'
 export type FollowupFilter = 'all' | FollowupKind
@@ -89,20 +90,20 @@ export function countOpenFollowups(company: CompanyData): number {
   return buildFollowupQueue(company).length
 }
 
-export function buildCarryForwardSummary(state: AppState, companyId: CompanyId = state.activeCompanyId): CarryForwardSummary {
-  const company = state.companies[companyId]
+export function buildCarryForwardSummary(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): CarryForwardSummary {
+  const company = state.workspace
   const currentYear = companySettingsFor(state, companyId).auditYear
 
   const priorObs = [
     ...company.observations,
     ...Object.entries(state.yearArchives)
       .filter(([year]) => year !== String(currentYear))
-      .flatMap(([, archive]) => archive.companies[companyId]?.observations ?? []),
+      .flatMap(([, archive]) => archive.workspace?.observations ?? []),
   ].filter((item) => item.year < currentYear && item.status === 'open')
 
   const openPriorNcr = Object.entries(state.yearArchives)
     .filter(([year]) => year !== String(currentYear))
-    .flatMap(([, archive]) => archive.companies[companyId]?.ncrs ?? [])
+    .flatMap(([, archive]) => archive.workspace?.ncrs ?? [])
     .filter((item) => item.status !== '結案')
 
   const importableObservations = priorObs.filter(

@@ -11,7 +11,7 @@ describe('resolveCarryForwardTarget', () => {
   it('maps demo observation QP-01 dept-admin to plan row dept-qa (jiurun)', () => {
     const state = createDemoState()
     const target = resolveCarryForwardTarget(
-      state.companies.jiurun,
+      state.workspace,
       'QP-01',
       'dept-admin',
     )
@@ -23,7 +23,7 @@ describe('resolveCarryForwardTarget', () => {
   it('maps demo observation QP-22 dept-prod to plan row dept-qa (jiurun)', () => {
     const state = createDemoState()
     const target = resolveCarryForwardTarget(
-      state.companies.jiurun,
+      state.workspace,
       'QP-22',
       'dept-prod',
     )
@@ -31,10 +31,10 @@ describe('resolveCarryForwardTarget', () => {
     expect(target!.departmentId).toBe('dept-qa')
   })
 
-  it('resolves zhenglongxing QP-12 observation', () => {
+  it('resolves workspace QP-12 observation', () => {
     const state = createDemoState()
     const target = resolveCarryForwardTarget(
-      state.companies.zhenglongxing,
+      state.workspace,
       'QP-12',
       'dept-qa',
     )
@@ -46,14 +46,14 @@ describe('resolveCarryForwardTarget', () => {
 describe('applyObservationCarryForward', () => {
   it('adds 跨年追蹤 checklist row and marks observation carried for jiurun', () => {
     const state = createDemoState()
-    const company = state.companies.jiurun
+    const company = state.workspace
     const obs = company.observations[0]
     const next = applyObservationCarryForward(
       company,
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.companySettings.jiurun.auditYear,
+      state.settings.auditYear,
       'chk-cf-test-1',
     )
     expect(next).not.toBeNull()
@@ -72,16 +72,16 @@ describe('applyObservationCarryForward', () => {
     expect(updatedObs?.carriedToChecklistId).toBe('chk-cf-test-1')
   })
 
-  it('adds carry row for zhenglongxing demo observation', () => {
+  it('adds carry row for workspace demo observation', () => {
     const state = createDemoState()
-    const company = state.companies.zhenglongxing
+    const company = state.workspace
     const obs = company.observations[0]
     const next = applyObservationCarryForward(
       company,
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.companySettings.jiurun.auditYear,
+      state.settings.auditYear,
       'chk-cf-test-zlx',
     )
     expect(next).not.toBeNull()
@@ -90,14 +90,14 @@ describe('applyObservationCarryForward', () => {
 
   it('does not carry twice', () => {
     const state = createDemoState()
-    const company = state.companies.jiurun
+    const company = state.workspace
     const obs = company.observations[0]
     const once = applyObservationCarryForward(
       company,
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.companySettings.jiurun.auditYear,
+      state.settings.auditYear,
       'chk-cf-test-2',
     )
     const twice = applyObservationCarryForward(
@@ -105,7 +105,7 @@ describe('applyObservationCarryForward', () => {
       obs.id,
       obs.qpCode,
       obs.departmentId,
-      state.companySettings.jiurun.auditYear,
+      state.settings.auditYear,
       'chk-cf-test-3',
     )
     expect(twice).toBeNull()
@@ -115,7 +115,7 @@ describe('applyObservationCarryForward', () => {
 describe('carry-forward does not break convertObservationToNcr path', () => {
   it('findNcrForObservation still works independently', () => {
     const state = createDemoState()
-    const obs = state.companies.jiurun.observations[0]
-    expect(findNcrForObservation(state.companies.jiurun.ncrs, obs)).toBeUndefined()
+    const obs = state.workspace.observations[0]
+    expect(findNcrForObservation(state.workspace.ncrs, obs)).toBeUndefined()
   })
 })

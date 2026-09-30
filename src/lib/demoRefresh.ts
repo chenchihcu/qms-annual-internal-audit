@@ -1,4 +1,4 @@
-import type { AppState, CompanyData } from '../types'
+import type { AppState, AppStateV14Legacy, CompanyData } from '../types'
 
 function auditSignature(company: CompanyData): string {
   return company.audits
@@ -8,7 +8,8 @@ function auditSignature(company: CompanyData): string {
 }
 
 /** 舊版示範：兩公司複製同一套稽核／NCR，切換後 KPI 相同 */
-export function isOldClonedDemo(state: AppState): boolean {
+export function isOldClonedDemo(state: AppState | AppStateV14Legacy): boolean {
+  if (!('companies' in state) || !state.companies) return false
   const { jiurun, zhenglongxing } = state.companies
   if (!jiurun || !zhenglongxing) return false
 
@@ -29,7 +30,7 @@ export function isOldClonedDemo(state: AppState): boolean {
  * - user 且非舊克隆：保留
  * - demo、缺 dataSource、或舊克隆：刷新
  */
-export function shouldRefreshToCurrentDemo(state: AppState): boolean {
+export function shouldRefreshToCurrentDemo(state: AppState | AppStateV14Legacy): boolean {
   if (state.dataSource === 'user' && !isOldClonedDemo(state)) return false
   if (state.dataSource === 'demo') return true
   if (state.dataSource == null) return true
@@ -37,6 +38,6 @@ export function shouldRefreshToCurrentDemo(state: AppState): boolean {
   return false
 }
 
-export function companiesAreDifferentiated(state: AppState): boolean {
+export function companiesAreDifferentiated(state: AppState | AppStateV14Legacy): boolean {
   return !isOldClonedDemo(state)
 }

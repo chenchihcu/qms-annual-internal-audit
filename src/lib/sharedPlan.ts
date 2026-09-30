@@ -1,6 +1,14 @@
-import type { AppState, CompanyId, MonthStatus, PlanRow, SharedPlanRow } from '../types'
+import type { AppState, AppStateV14Legacy, CompanyId, MonthStatus, PlanRow, SharedPlanRow } from '../types'
 
 export const COMPANY_IDS: CompanyId[] = ['jiurun', 'zhenglongxing']
+
+type DualCompanyPlanState = AppStateV14Legacy
+
+type PlanState = AppState | AppStateV14Legacy
+
+function isDualCompanyState(state: PlanState): state is DualCompanyPlanState {
+  return 'companies' in state && state.companies != null
+}
 
 type SharedField = Exclude<keyof PlanRow, 'id' | 'months' | 'manualOverride'>
 
@@ -44,7 +52,7 @@ function monthPositions(row: PlanRow): string {
   return scheduledMonths(row).map((status) => status ? '1' : '0').join('')
 }
 
-function candidates(state: AppState): Map<string, Partial<Record<CompanyId, PlanRow>>> {
+function candidates(state: DualCompanyPlanState): Map<string, Partial<Record<CompanyId, PlanRow>>> {
   const rows = new Map<string, Partial<Record<CompanyId, PlanRow>>>()
   for (const companyId of COMPANY_IDS) {
     for (const row of state.companies[companyId].planRows) {
@@ -54,7 +62,8 @@ function candidates(state: AppState): Map<string, Partial<Record<CompanyId, Plan
   return rows
 }
 
-export function getLegacyPlanConflicts(state: AppState): PlanConflict[] {
+export function getLegacyPlanConflicts(state: PlanState): PlanConflict[] {
+  if (!isDualCompanyState(state)) return []
   if (state.sharedPlanRows) return []
   const conflicts: PlanConflict[] = []
   for (const [id, pair] of candidates(state)) {
@@ -83,13 +92,12 @@ function mergeMonthResults(previous: PlanRow | undefined, plan: SharedPlanRow): 
   return Array.from({ length: 12 }, (_, index) => {
     const previousStatus = previous ? monthValue(previous, index) : null
     if (monthValue(plan, index)) return previousStatus ?? '擬定'
-    // 排程移除後只清除沒有執行意義的「擬定」；歷史結果仍保留。
     return previousStatus === '擬定' ? null : previousStatus
   })
 }
 
 /** 將唯一計畫投影給舊版公司別 consumer，保留各公司月格結果。 */
-export function projectSharedPlan(state: AppState, sharedPlanRows: SharedPlanRow[]): AppState {
+export function projectSharedPlan(state: DualCompanyPlanState, sharedPlanRows: SharedPlanRow[]): DualCompanyPlanState {
   const companies = { ...state.companies }
   for (const companyId of COMPANY_IDS) {
     const company = state.companies[companyId]
@@ -112,7 +120,7 @@ export function projectSharedPlan(state: AppState, sharedPlanRows: SharedPlanRow
 }
 
 function buildRows(
-  state: AppState,
+  state: DualCompanyPlanState,
   choices: Record<string, CompanyId> = {},
 ): SharedPlanRow[] {
   const rows: SharedPlanRow[] = []
@@ -130,16 +138,17 @@ function buildRows(
 }
 
 /** 相同的舊計畫可自動提升；有差異時原封保留，等待逐列選擇。 */
-export function hydrateSharedPlan(state: AppState): AppState {
+export function hydrateSharedPlan(state: PlanState): PlanState {
+  if (!isDualCompanyState(state)) return state
   if (state.sharedPlanRows) return state
   if (getLegacyPlanConflicts(state).length) return state
   return projectSharedPlan(state, buildRows(state))
 }
 
 export function resolveLegacyPlanConflicts(
-  state: AppState,
+  state: DualCompanyPlanState,
   choices: Record<string, CompanyId>,
-): AppState {
+): DualCompanyPlanState {
   const conflicts = getLegacyPlanConflicts(state)
   if (conflicts.some((conflict) => !choices[conflict.id])) {
     throw new Error('每一筆不同的舊計畫列都必須先選擇來源公司')
@@ -155,10 +164,11 @@ export function resolveLegacyPlanConflicts(
 }
 
 export function canRemoveCompanyFromPlanRow(
-  state: AppState,
+  state: PlanState,
   rowId: string,
   companyId: CompanyId,
 ): boolean {
+  if (!isDualCompanyState(state)) return true
   const company = state.companies[companyId]
   const row = company.planRows.find((candidate) => candidate.id === rowId)
   if (!row) return true

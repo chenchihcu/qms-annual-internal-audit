@@ -14,8 +14,8 @@ describe('buildYearSwitchDescription', () => {
   it('says an archived year is restored', () => {
     const state = createDemoState()
     state.yearArchives['2031'] = {
-      companies: { jiurun: state.companies.jiurun },
-      companySettings: { jiurun: state.companySettings.jiurun },
+      workspace: state.workspace,
+      settings: state.settings,
     }
     expect(buildYearSwitchDescription(state, 2031)).toContain('將還原 2031 年已封存的計畫與事件')
   })

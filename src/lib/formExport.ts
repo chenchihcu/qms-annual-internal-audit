@@ -24,7 +24,7 @@ function monthLabel(status: string | null | undefined): string {
 }
 
 function companyLabel(state: AppState, companyId: CompanyId): string {
-  return state.companies[companyId].name || COMPANY_LABELS[companyId]
+  return state.workspace.name || COMPANY_LABELS[companyId]
 }
 
 function writeWorkbook(wb: SpreadsheetWorkbook, filename: string): void {
@@ -80,7 +80,7 @@ export function buildAnnualPlanSheet(co: CompanyData, settings: AuditSettings): 
 }
 
 export function exportAnnualPlanExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-01'))
   const fn = safeFilename([
@@ -151,7 +151,7 @@ export function exportAuditExcel(
 }
 
 export function exportAllAuditsExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   const label = companyLabel(state, companyId)
   for (const audit of co.audits) {
@@ -198,7 +198,7 @@ export function buildNcrSheet(co: CompanyData, settings: AuditSettings): Spreads
 }
 
 export function exportNcrExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-03'))
   const fn = safeFilename([
@@ -311,21 +311,21 @@ export function exportPersonnelExcel(state: AppState, companyId: CompanyId): voi
 }
 
 export function exportRiskExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
   writeWorkbook(wb, safeFilename(['QR-02-01_方案風險', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function exportObservationsExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   writeWorkbook(wb, safeFilename(['觀察事項台帳', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
 export function exportSuggestionsExcel(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
   writeWorkbook(wb, safeFilename(['建議追蹤', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
@@ -338,7 +338,7 @@ export function exportPrepExcel(state: AppState): void {
 }
 
 export function exportStandardExcel(state: AppState, companyId: CompanyId): void {
-  const profile = state.companyAuditProfiles[companyId]
+  const profile = state.auditProfile
   const wb = createWorkbook()
   appendSheet(wb, buildStandardSheet(profile, companyLabel(state, companyId)), sheetName('適用標準'))
   writeWorkbook(wb, safeFilename(['適用標準', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
@@ -400,7 +400,7 @@ export function exportAllFormsExcel(state: AppState, companyId: CompanyId): void
 }
 
 export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): SpreadsheetWorkbook {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-01'))
   for (const audit of co.audits) {
@@ -412,7 +412,7 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
   }
   appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-03'))
   appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
-  appendSheet(wb, buildStandardSheet(state.companyAuditProfiles[companyId], companyLabel(state, companyId)), sheetName('適用標準'))
+  appendSheet(wb, buildStandardSheet(state.auditProfile, companyLabel(state, companyId)), sheetName('適用標準'))
   appendSheet(wb, buildPersonnelSheet(state, companyId), sheetName('人員合格名單'))
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))
   appendSheet(wb, buildSuggestionsSheet(co), sheetName('建議追蹤'))
@@ -462,7 +462,7 @@ function esc(s: string): string {
 
 /** Print-ready HTML for annual plan */
 export function exportAnnualPlanHtml(state: AppState, companyId: CompanyId): void {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const settings = companySettingsFor(state, companyId)
   const monthHeaders = MONTHS.map((m) => `<th>${m}</th>`).join('')
   const body = co.planRows
@@ -488,7 +488,7 @@ export function exportAnnualPlanHtml(state: AppState, companyId: CompanyId): voi
 
 /** Smoke helper — build workbook in memory without download */
 export function buildExportWorkbookSmoke(state: AppState, companyId: CompanyId): SpreadsheetWorkbook {
-  const co = state.companies[companyId]
+  const co = state.workspace
   const wb = createWorkbook()
   appendSheet(wb, buildAnnualPlanSheet(co, companySettingsFor(state, companyId)), 'QR-28-01')
   appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), 'QR-28-03')

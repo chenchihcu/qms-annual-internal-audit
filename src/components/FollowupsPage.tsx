@@ -1,3 +1,4 @@
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { useMemo, useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import {
@@ -27,7 +28,7 @@ interface FollowupsPageProps {
 export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
   const { state } = store
   const { company } = state
-  const auditYear = companySettingsFor(state, state.activeCompanyId).auditYear
+  const auditYear = companySettingsFor(state, WORKSPACE_COMPANY_ID).auditYear
   const [today] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10))
   const rows = useMemo(() => buildFollowupQueue(company), [company])
   const [filter, setFilter] = useState<FollowupFilter>('all')

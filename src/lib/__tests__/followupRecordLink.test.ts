@@ -1,18 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { createDemoState, migrateToV8 } from '../../data/demoData'
-import { migrateState } from '../migrate'
-import { migrateToSingleWorkspace, WORKSPACE_COMPANY_ID } from '../singleWorkspaceMigration'
+import { createDemoState } from '../../data/demoData'
+import { WORKSPACE_COMPANY_ID } from '../singleWorkspaceMigration'
 import { moveCompanyRecordToTrash } from '../trash'
 import { resolveFollowupRecordLink } from '../followupRecordLink'
 
 function demoState() {
-  return migrateToSingleWorkspace(migrateState(migrateToV8(createDemoState())))
+  return createDemoState()
 }
 
 describe('resolveFollowupRecordLink', () => {
   it('returns found for a current-year observation on the ledger', () => {
     const state = demoState()
-    const observation = state.companies[WORKSPACE_COMPANY_ID].observations[0]
+    const observation = state.workspace.observations[0]
     expect(observation).toBeDefined()
     const result = resolveFollowupRecordLink(state, observation.id, 'observation')
     expect(result.status).toBe('found')
@@ -20,7 +19,7 @@ describe('resolveFollowupRecordLink', () => {
 
   it('returns trash when the record is in recycle bin', () => {
     const state = demoState()
-    const observation = state.companies[WORKSPACE_COMPANY_ID].observations[0]
+    const observation = state.workspace.observations[0]
     const trashed = moveCompanyRecordToTrash(
       state,
       'observation',
