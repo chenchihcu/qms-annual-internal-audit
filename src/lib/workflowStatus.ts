@@ -269,6 +269,12 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       if (!co.planRows.some((row) => row.months.some(Boolean))) {
         gaps.push({ message: '至少須排定一個程序月格' })
       }
+      
+      const openSug = co.suggestions.filter((s) => s.status === 'open').length
+      if (openSug > 0) {
+        advisories.push({ message: `有 ${openSug} 件第三方建議未結案，請於規劃時納入考量`, tab: 'suggestions' })
+      }
+      
       ready = gaps.length === 0
       break
     }

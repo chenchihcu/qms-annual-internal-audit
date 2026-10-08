@@ -13,8 +13,9 @@ import {
   workspacePrepText,
 } from '../lib/externalAuditPrep'
 import { buildMergedCertificateCoverage } from '../lib/coverage'
-import { exportPrepExcel } from '../lib/formExport'
+import { exportAllFormsExcel, exportPrepExcel } from '../lib/formExport'
 import { ACTION_ICONS } from '../lib/uiIcons'
+import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import { Button, Input } from './ui/Badge'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ConfirmDialog } from './ui/ConfirmDialog'
@@ -201,6 +202,18 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
             </div>
           </div>
         </div>
+
+        {derivedInternalComplete && !externalAuditPrep.managementReviewComplete && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 no-print">
+            <p className="font-medium">提示：內部稽核已完成</p>
+            <p className="mt-1">請匯出內部稽核總結報告（包含所有稽核紀錄與表單），提交管理階層進行審查；落實後請於上方勾選「2 管審」。</p>
+            <div className="mt-3">
+              <Button onClick={() => exportAllFormsExcel(state, WORKSPACE_COMPANY_ID)}>
+                匯出內部稽核總結報告 (全表單)
+              </Button>
+            </div>
+          </div>
+        )}
 
         <PrintDocHeader
           companyName="年度內部稽核工作區"
