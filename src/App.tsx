@@ -125,11 +125,11 @@ function AppShell() {
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800 shadow-sm ring-1 ring-inset ring-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
             aria-current={tab === item.id ? 'page' : undefined}
             aria-controls={item.formId}
           >
-            <Icon name={item.icon} className="mt-0.5" />
+            <Icon name={item.icon} className="mt-0.5 shrink-0" />
             <span>{item.label}</span>
           </button>
         ))}

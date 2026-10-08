@@ -1,0 +1,156 @@
+# AS9100 Internal Audit System — Existing System Review & Enhancement
+
+## Role
+Act as a Senior Software Architect, AS9100 Quality Management System Consultant, and QA Test Engineer.
+
+## Objective
+Review and enhance the existing AS9100 Internal Audit Management System based on the provided Software Design & Development Manual v1.0.
+
+**This is an existing production-oriented web application, NOT a new development project.**
+
+Preserve existing functionality, data, UI consistency, and architecture wherever practical.
+
+## Phase 1 — Existing System Assessment
+
+Inspect the complete existing project, including:
+
+- Application architecture and source code
+- Existing modules, pages, and navigation
+- Database schema and entity relationships
+- Current workflows and business rules
+- Authentication and role-based permissions
+- Existing automated tests
+- Deployment configuration
+
+Compare the implementation against all 12 modules (M01–M12) and Acceptance Gates (G-01–G-12).
+
+For each requirement, classify:
+
+- **Implemented & Verified:** Implemented with supporting test evidence.
+- **Implemented but Unverified:** Functionality exists but lacks sufficient verification.
+- **Partially Implemented:** Some requirements are missing.
+- **Not Implemented:** Required functionality does not exist.
+- **Not Applicable:** Not applicable, with documented justification.
+
+Do not classify a feature as verified based solely on the presence of source code.
+
+## Phase 2 — Gap Analysis
+
+Produce a Requirements Traceability Matrix containing:
+
+| Field | Description |
+|---|---|
+| Requirement ID | M01–M12 / G-01–G-12 |
+| Expected Behavior | Required system behavior |
+| Current Implementation | Actual observed behavior |
+| Evidence | Code references and test results |
+| Gap | Missing or incorrect functionality |
+| Priority | Critical / High / Medium / Low |
+| Proposed Action | Keep / Fix / Enhance / Add |
+| Acceptance Criteria | Measurable verification criteria |
+
+Focus particularly on:
+
+1. AS9100 Requirement Coverage
+2. Process-Based Audit Management
+3. Risk-Based Audit Planning
+4. Auditor Competence and Independence
+5. Objective Evidence Traceability
+6. Audit Findings
+7. Root Cause and Corrective Action
+8. Effectiveness Verification
+9. Document Revision Control
+10. Audit History and Data Integrity
+11. Dashboard KPI Accuracy
+12. Management Review Reporting
+
+Distinguish mandatory AS9100 controls from recommended software enhancements.
+
+## Phase 3 — Improvement Planning
+
+Prioritize gaps using:
+
+1. Compliance risk
+2. Data integrity risk
+3. Workflow failure risk
+4. Operational impact
+5. Implementation dependencies
+6. Development complexity
+
+Define an incremental implementation plan.
+
+Avoid unnecessary refactoring, UI redesign, database restructuring, or new dependencies.
+
+For every planned change, specify:
+
+- Scope
+- Affected modules
+- Database impact
+- Risks
+- Acceptance criteria
+- Required tests
+- Rollback approach
+
+## Phase 4 — Controlled Implementation
+
+Implement improvements in dependency order.
+
+Requirements:
+
+- Preserve existing records.
+- Use database migrations where necessary.
+- Maintain backward compatibility where practical.
+- Enforce critical business rules server-side.
+- Preserve audit event history.
+- Prevent unauthorized workflow transitions.
+- Avoid duplicating existing functionality.
+- Do not introduce fabricated audit records.
+
+Run relevant tests after each implementation group.
+
+## Phase 5 — Verification & Acceptance
+
+Validate:
+
+- Functional behavior
+- Data integrity
+- Requirements traceability
+- Auditor impartiality
+- Evidence and finding relationships
+- Corrective action workflow
+- Effectiveness verification
+- Permissions
+- KPI calculations
+- Regression stability
+
+Use browser-based end-to-end tests for critical workflows when a suitable test environment is available.
+
+Record actual test results. Do not treat simulated tests as production acceptance.
+
+## Final Deliverables
+
+Provide:
+
+1. Existing System Assessment
+2. Requirements Traceability Matrix
+3. Prioritized Gap List
+4. Implemented Improvements
+5. Test Execution Report
+6. G-01–G-12 Acceptance Gate Matrix
+7. Remaining Risks and Limitations
+
+## Critical Constraints
+
+- Do not rebuild the existing application.
+- Do not replace working functionality without justification.
+- Do not overwrite or delete historical audit records.
+- Do not redesign the entire UI unnecessarily.
+- Do not invent AS9100 requirements.
+- Do not declare compliance without evidence.
+- Do not deploy to production automatically without authorization.
+
+**Execution Sequence:**
+
+First establish the current baseline and document gaps. Then perform only justified, incremental enhancements, followed by verification.
+
+**Final Goal:** Improve the existing system's AS9100 internal audit coverage, traceability, corrective action effectiveness, operational efficiency, and maintainability.
