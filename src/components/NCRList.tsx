@@ -11,6 +11,7 @@ import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
 
 import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
+import { isFollowupOverdue } from '../lib/followupQueue'
 
 import {
 
@@ -85,6 +86,8 @@ export function NCRList({
   const { company, settings } = state
 
   const { confirmIfUnsaved } = useNcrUnsavedGuardActions()
+
+  const [today] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10))
 
 
 
@@ -540,6 +543,8 @@ export function NCRList({
 
                     const progress = ncrReportProgress(ncr)
 
+                    const isOverdue = ncr.status !== '結案' && isFollowupOverdue(ncr.dueDate, today)
+
                     return (
 
                       <tr
@@ -550,7 +555,7 @@ export function NCRList({
 
                         data-ncr-id={ncr.id}
 
-                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20' : ''}${expanded ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''}`}
+                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20 ' : ''}${isOverdue ? 'bg-red-50/50 dark:bg-red-950/20 ' : ''}${expanded ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''}`}
 
                       >
 

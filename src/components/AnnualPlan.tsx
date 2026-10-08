@@ -96,7 +96,7 @@ function MonthChoiceMenu({
       ref={menuRef}
       role="menu"
       aria-label={label}
-      className="fixed z-40 min-w-28 rounded-lg border border-line bg-surface p-1"
+      className="fixed z-40 min-w-28 rounded-lg border border-line bg-surface p-1 shadow-lg animate-in fade-in zoom-in-95 duration-100"
       style={{ top, left }}
     >
       {MONTH_CELL_CHOICES.map((item) => (

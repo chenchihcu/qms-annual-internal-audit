@@ -76,8 +76,10 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {visibleRows.map((row, index) => (
-                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}`}>
+                {visibleRows.map((row, index) => {
+                  const overdue = isFollowupOverdue(row.dueDate, today)
+                  return (
+                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${overdue ? 'bg-red-50/50 dark:bg-red-950/20 ' : ''}`}>
                     <td ><Badge label={FOLLOWUP_KIND_LABELS[row.kind]} /></td>
                     <td >
                       <button
@@ -110,7 +112,8 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                     </td>
                     <td>{row.dueDate || '—'}</td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </ScrollRegion>

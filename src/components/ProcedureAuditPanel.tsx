@@ -356,16 +356,16 @@ export function ProcedureAuditPanel({
             />
           ))}
           {optionalFields.length > 0 && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <div className="flex flex-wrap gap-2">
               {optionalFields.map((field) => (
                 <button
                   key={field}
                   type="button"
-                  className={`text-xs text-link hover:underline ${FOCUS_RING}`}
+                  className={`inline-flex items-center rounded border border-transparent px-2 py-1 text-xs font-medium text-link hover:bg-slate-100 ${FOCUS_RING}`}
                   aria-label={`${audit.qpCode} NO ${item.no} 加${EVIDENCE_FIELD_LABELS[field]}`}
                   onClick={() => revealEvidenceField(item.id, field)}
                 >
-                  加{EVIDENCE_FIELD_LABELS[field]}
+                  + 加{EVIDENCE_FIELD_LABELS[field]}
                 </button>
               ))}
             </div>
