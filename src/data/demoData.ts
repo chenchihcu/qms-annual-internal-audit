@@ -260,7 +260,7 @@ function createDemoPeople(): Person[] {
       : index === 1
         ? [demoQualification('internal_auditor', item.companyId, { id: 'qual-demo-wang-audit', procedureScopes: ['QP-28'] })]
         : index === 2
-          ? [demoQualification('trainee_auditor', item.companyId, { id: 'qual-demo-li', qualificationStatus: 'suspended' as const })]
+          ? [demoQualification('trainee_auditor', item.companyId, { id: 'qual-demo-li' })]
           : [],
     appointments: [],
     active: true,

@@ -52,8 +52,11 @@ const OTHER_ROLE_OPTIONS: { value: PersonnelRole; label: string }[] = [
   { value: 'internal_lead_auditor', label: '主任稽核員任命' },
   { value: 'management_representative', label: PERSONNEL_ROLE_LABELS.management_representative },
   { value: 'annual_escort', label: PERSONNEL_ROLE_LABELS.annual_escort },
-  { value: 'third_party_lead_auditor', label: PERSONNEL_ROLE_LABELS.third_party_lead_auditor },
-  { value: 'third_party_auditor', label: PERSONNEL_ROLE_LABELS.third_party_auditor },
+]
+
+const QUALIFICATION_STATUS_OPTIONS: { value: ManagedQualificationStatus; label: string }[] = [
+  { value: 'effective', label: '有效' },
+  { value: 'invalid', label: '失效' },
 ]
 
 const OTHER_PERSONNEL_ROLES = new Set<PersonnelRole>(OTHER_ROLE_OPTIONS.map((item) => item.value))
@@ -460,11 +463,11 @@ function legacyManagedStatus(
                 label="資格狀態 *"
                 value={auditorEditing.qualificationStatus}
                 onChange={(v) => patchAuditorForm({ qualificationStatus: v as ManagedQualificationStatus })}
-                options={[
-                  { value: 'effective', label: '有效' },
-                  { value: 'suspended', label: '暫停' },
-                  { value: 'invalid', label: '失效' },
-                ]}
+                options={
+                  auditorEditing.qualificationStatus === 'suspended'
+                    ? [...QUALIFICATION_STATUS_OPTIONS, { value: 'suspended', label: '暫停' }]
+                    : QUALIFICATION_STATUS_OPTIONS
+                }
               />
               <Input
                 label="資格取得日"
@@ -516,7 +519,6 @@ function legacyManagedStatus(
             options={[
               { value: '', label: '全部' },
               { value: '有效', label: '有效' },
-              { value: '暫停', label: '暫停' },
               { value: '失效', label: '失效' },
             ]}
           />
@@ -650,7 +652,7 @@ function legacyManagedStatus(
           </Button>
         </div>
         {otherRows.length === 0 ? (
-          <EmptyState message="尚無管理代表、陪稽、第三方或主任稽核員任命。" />
+          <EmptyState message="尚無管理代表、陪稽或主任稽核員任命。" />
         ) : (
           <ScrollRegion ariaLabel="其他角色與任命清單">
             <table className="worksheet-table min-w-[32rem]">

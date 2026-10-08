@@ -1,0 +1,76 @@
+
+> qms-annual-internal-audit@1.0.0 test
+> vitest run --pool=forks --maxWorkers=1
+
+
+ RUN  v5.0.0 C:/Users/user/Documents/qms-annual-internal-audit
+
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+Not implemented: Window's scrollTo() method
+ ❯ src/components/__tests__/PersonnelPage.test.tsx (1 test | 1 failed) 406ms
+   ❯ Personnel list columns (1)
+     × shows simplified auditor columns and edit form without QP scope fields 382ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/__tests__/PersonnelPage.test.tsx > Personnel list columns > shows simplified auditor columns and edit form without QP scope fields
+AssertionError: expected <th></th> to be null
+
+- Expected:
+null
+
++ Received:
+<th>
+  適用標準
+</th>
+
+ ❯ src/components/__tests__/PersonnelPage.test.tsx:22:47
+     20|     const table = await screen.findByRole('region', { name: '內部稽核人員清單'…
+     21|     expect(within(table).getByText('稽核資格')).toBeTruthy()
+     22|     expect(within(table).queryByText('適用標準')).toBeNull()
+       |                                               ^
+     23|     expect(within(table).queryByText('可稽核程序（QP）')).toBeNull()
+     24|     const trash = within(table).getByRole('button', { name: '移至回收區：王大明…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯⎯⎯ Unhandled Error ⎯⎯⎯⎯⎯⎯⎯
+Error: [vitest-pool]: Worker forks emitted error.
+ ❯ EventEmitter.onTaskError node_modules/vitest/dist/chunks/index.B89dZ0-N.js:11463:21
+ ❯ EventEmitter.emit node:events:508:28
+ ❯ ChildProcess.emitUnexpectedExit node_modules/vitest/dist/chunks/index.B89dZ0-N.js:10940:22
+ ❯ ChildProcess.emit node:events:508:28
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+Caused by: Error: Worker exited unexpectedly with exit code 4294967295 during started state while running test file C:/Users/user/Documents/qms-annual-internal-audit/src/components/ProcedureAuditPanel.test.tsx
+ ❯ ChildProcess.emitUnexpectedExit node_modules/vitest/dist/chunks/index.B89dZ0-N.js:10938:33
+ ❯ ChildProcess.emit node:events:508:28
+ ❯ Process.ChildProcess._handle.onexit node:internal/child_process:294:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  1 failed | 64 passed (66)
+      Tests  1 failed | 367 passed (378)
+     Errors  1 error
+   Start at  13:28:54
+   Duration  3754.51s (environment 74%, tests 16%, import 8%, transform 2%, worker 1%)
+
+    Isolate  66 workers spawned · ~1.48s startup each (spawn + environment, per file)
+             at least ~96.50s faster with isolate: false — reuses workers across files instead of one per file
+

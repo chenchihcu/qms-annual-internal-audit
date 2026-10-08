@@ -202,14 +202,14 @@ export function Suggestions({
         ) : (
           <>
           <ScrollRegion ariaLabel="第三方建議一覽">
-            <table className="worksheet-table min-w-[48rem]">
+            <table className="worksheet-table print-suggestions-table min-w-[48rem]">
               <colgroup>
-                <col className="col-year" />
-                <col />
-                <col className="col-code" />
-                <col className="col-name" />
-                <col />
-                <col className="col-status" />
+                <col className="col-year col-print-year" />
+                <col className="col-print-summary" />
+                <col className="col-code col-print-code" />
+                <col className="col-name col-print-name" />
+                <col className="col-print-progress" />
+                <col className="col-status col-print-status" />
                 <col className="col-action no-print" />
               </colgroup>
               <thead>

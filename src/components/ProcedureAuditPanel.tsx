@@ -643,13 +643,13 @@ export function ProcedureAuditPanel({
         </div>
 
         <ScrollRegion ariaLabel="查檢表項目清單">
-          <table className="qr-checklist worksheet-table min-w-[42rem]">
+          <table className="qr-checklist worksheet-table print-checklist min-w-[42rem]">
             <colgroup>
-              <col className="col-name" />
-              <col className="col-seq" />
-              <col />
-              <col className="col-judge" />
-              <col />
+              <col className="col-name col-print-category" />
+              <col className="col-seq col-print-seq" />
+              <col className="col-print-audit-content" />
+              <col className="col-judge col-print-judge" />
+              <col className="col-print-evidence" />
               <col className="col-action no-print" />
             </colgroup>
             <thead>

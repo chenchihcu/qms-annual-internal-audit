@@ -374,21 +374,21 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
           <ScrollRegion ariaLabel="程序風險評估一覽">
 
-            <table className="worksheet-table min-w-[52rem]">
+            <table className="worksheet-table print-risk-table min-w-[52rem]">
 
               <colgroup>
 
-                <col className="col-code" />
+                <col className="col-code col-print-code" />
 
-                <col className="col-name" />
+                <col className="col-name col-print-name" />
 
-                <col className="col-inherent" />
+                <col className="col-inherent col-print-inherent-print" />
 
-                <col className="col-status" />
+                <col className="col-status col-print-status" />
 
-                <col className="col-status" />
+                <col className="col-status col-print-status" />
 
-                <col />
+                <col className="col-print-evidence-ref" />
 
                 <col className="col-action no-print" />
 

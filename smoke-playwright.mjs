@@ -175,10 +175,14 @@ for (const width of widths) {
       workflowStage = '人員新增與儲存'
       await navigateTab('人員合格名單')
       const personName = `Smoke驗收${Date.now()}`
-      await page.getByRole('button', { name: '新增人員', exact: true }).click()
+      await page.getByRole('button', { name: '新增稽核員', exact: true }).click()
       await page.getByLabel('姓名 *', { exact: true }).fill(personName)
+      const departmentSelect = page.getByLabel('所屬單位 *', { exact: true })
+      const departmentValue = await departmentSelect.locator('option').nth(1).getAttribute('value')
+      if (!departmentValue) throw new Error('人員表單缺少可選部門')
+      await departmentSelect.selectOption(departmentValue)
       await page.getByRole('button', { name: '儲存', exact: true }).click()
-      await page.getByRole('status').filter({ hasText: '已儲存' }).waitFor({ state: 'visible', timeout: 5000 })
+      await page.getByText('已儲存', { exact: true }).waitFor({ state: 'visible', timeout: 5000 })
       await page.waitForFunction(
         (name) => Object.keys(localStorage).some((key) => key.startsWith('qms-annual-internal-audit') && localStorage.getItem(key)?.includes(name)),
         personName,
@@ -374,23 +378,39 @@ for (const width of widths) {
         const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
         return params.get('tab') === 'ncr' && params.get('record') === expectedId
       }, ncrRecordId, { timeout: 5000 })
-      const ncrDetailRow = page.locator(`[data-ncr-id="${ncrRecordId}"] + tr`)
-      await ncrDetailRow.getByLabel('根本原因', { exact: true }).waitFor({ state: 'visible', timeout: 5000 })
+      const ncrReport = page.locator('.qr-ncr-report')
+      await ncrReport.getByLabel(`${ncrFollowupLabel} 原因分析`, { exact: true }).waitFor({ state: 'visible', timeout: 5000 })
       workflowChecks.push('待改善追蹤 NCR 深連結定位與展開')
 
-      const ncrStatus = ncrRow.getByRole('combobox')
+      const ncrStatus = ncrReport.getByLabel('狀態', { exact: true })
       if (await ncrStatus.count() !== 1) throw new Error('新增 NCR 未呈現唯一狀態欄位')
       await ncrStatus.selectOption('結案')
-      const ncrCloseError = ncrRow.getByRole('alert')
+      await ncrReport.getByRole('button', { name: '存檔', exact: true }).click()
+      const ncrCloseError = ncrReport.getByRole('alert')
       await ncrCloseError.waitFor({ state: 'visible', timeout: 5000 })
       const closeMessage = await ncrCloseError.innerText()
       for (const requiredField of ['矯正措施引用', '效果確認引用', '確認人', '確認日']) {
         if (!closeMessage.includes(requiredField)) throw new Error(`NCR 結案錯誤訊息未指出「${requiredField}」`)
       }
-      if (await ncrStatus.evaluate((element) => element.value) === '結案') {
+      const persistedNcrStatus = await page.evaluate((id) => {
+        const stored = JSON.parse(localStorage.getItem('qms-annual-internal-audit-v15'))
+        return stored.workspace.ncrs.find((record) => record.id === id)?.status
+      }, ncrRecordId)
+      if (persistedNcrStatus !== '開立') {
         throw new Error('NCR 必要結案欄位未完成時仍被標記為結案')
       }
       workflowChecks.push('NCR 結案必填防呆')
+      const leaveDialogPromise = page.waitForEvent('dialog')
+      const leaveAttempt = page.getByRole('button', { name: '觀察事項', exact: true }).click()
+      const leaveDialog = await leaveDialogPromise
+      if (!leaveDialog.message().includes('未存檔')) throw new Error('NCR 未存檔離開缺少確認訊息')
+      await leaveDialog.dismiss()
+      await leaveAttempt
+      await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('tab') === 'ncr')
+      workflowChecks.push('NCR 未存檔防護取消離開')
+      page.once('dialog', (dialog) => dialog.accept())
+      await ncrReport.getByRole('button', { name: '收合', exact: true }).click()
+
 
       workflowStage = '觀察事項新增與讀回'
       await navigateTab('觀察事項')
@@ -547,8 +567,8 @@ for (const width of widths) {
       await restoreInput.setInputFiles(backupPath)
       const cancelRestoreDialog = page.getByRole('alertdialog', { name: '確定還原備份？' })
       await cancelRestoreDialog.waitFor({ state: 'visible', timeout: 5000 })
-      if (!(await cancelRestoreDialog.innerText()).includes('目前資料將被覆寫。')) {
-        throw new Error('還原確認未說明目前資料會被覆寫')
+      if (!(await cancelRestoreDialog.innerText()).includes('目前工作區資料將被覆寫。')) {
+        throw new Error('還原確認未說明目前工作區資料會被覆寫')
       }
       await cancelRestoreDialog.getByRole('button', { name: '取消', exact: true }).click()
       await cancelRestoreDialog.waitFor({ state: 'detached', timeout: 5000 })

@@ -1,0 +1,5217 @@
+[
+  {
+    "id": "dashboard",
+    "label": "稽核總覽",
+    "text": "項目\t結果\t說明\t操作\n年度總分\t未完成\t已回報 0/5 件\t開啟\n已排月格\t66\t計畫項目 31/31 列\t開啟\n未結 NCR\t1\t\t開啟\n外稽準備\t1/23\t\t開啟\n查檢判定觀察\t1\t\t開啟\n本年度待追蹤觀察\t0\t\t開啟\n前年度未結觀察\t3\t\t開啟\n待追蹤建議\t3\t\t開啟",
+    "buttons": [
+      {
+        "text": "開啟",
+        "label": "前往：年度總分",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：已排月格",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：未結 NCR",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：外稽準備",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：查檢判定觀察",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：本年度待追蹤觀察",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：前年度未結觀察",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "開啟",
+        "label": "前往：待追蹤建議",
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": []
+  },
+  {
+    "id": "stakeholders",
+    "label": "利害關係人",
+    "text": "部門\t負責人\t利害關係人\t風險\t優先\t建議安排\t操作\n\n管理代表\n\t管理代表\t\n客戶\n法規/認證\n經營層\n\t中\t62\t\n\n本部門 QP · 優先 62 · 年約 2 次 · 偏早\n\n\t\n編輯\n\n品保部\n\t品保部經理\t\n客戶\n法規/認證\n供應商\n\t中\t60\t\n\n本部門 QP · 優先 60 · 年約 2 次 · 偏早\n\n\t\n編輯\n\n生產製造部\n\t生產部經理\t\n客戶\n員工\n供應商\n\t高\t56\t\n\n本部門 QP · 優先 56 · 年約 3 次 · 偏早\n\n\t\n編輯\n\n開發工程\n\t工程部經理\t\n客戶\n法規/認證\n\t中\t52\t\n\n本部門 QP · 優先 52 · 年約 2 次 · 偏早\n\n\t\n編輯\n\n業務部\n\t業務部經理\t\n客戶\n經營層\n\t中\t43\t\n\n本部門 QP · 優先 43 · 年約 2 次 · 偏早\n\n\t\n編輯\n\n管理部\n\t管理部主任\t\n法規/認證\n經營層\n\t中\t40\t\n\n本部門 QP · 優先 40 · 年約 2 次 · 偏早\n\n\t\n編輯",
+    "buttons": [
+      {
+        "text": "編輯",
+        "label": "編輯 管理代表 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": "編輯 品保部 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": "編輯 生產製造部 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": "編輯 開發工程 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": "編輯 業務部 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": "編輯 管理部 利害關係人與風險",
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": []
+  },
+  {
+    "id": "risk",
+    "label": "方案風險",
+    "text": "尚有 31 列方案風險未按「存檔」寫入；PDCA 就緒仍只計已存檔列。\n\nQP\t部門\t固有風險\t優先分\t等級\t證據引用\t操作\nQP-03\t品保部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-05\t品保部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-16\t品保部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-04\t生產製造部\t\n高\n其他因素（可暫定）\n\t66暫定\t中\t\n\t存檔\nQP-26\t生產製造部\t\n高\n其他因素（可暫定）\n\t66暫定\t中\t\n\t存檔\nQR-28-04\t生產製造部\t\n高\n其他因素（可暫定）\n\t66暫定\t中\t\n\t存檔\nQP-16\t業務部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-17\t管理部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-18\t管理部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\nQP-01\t品保部\t\n中\n其他因素（可暫定）\n\t60暫定\t中\t\n\t存檔\n\n顯示 1–10 筆，共 31 筆\n\n每頁\n10 筆\n20 筆\n50 筆\n上一頁\n1\n2\n3\n4\n下一頁",
+    "buttons": [
+      {
+        "text": "中",
+        "label": "QP-03 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-05 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-16 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "高",
+        "label": "QP-04 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "高",
+        "label": "QP-26 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "高",
+        "label": "QR-28-04 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-16 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-17 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-18 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-01 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-02 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-08 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-09 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-12 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-19 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-22 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-25 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-27 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-28 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QR-28-05 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "高",
+        "label": "QP-21 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-10 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-11 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-13 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-14 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-15 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-23 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-06 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-07 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-20 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "中",
+        "label": "QP-24 固有風險",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "—",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "存檔",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "上一頁",
+        "label": "方案風險上一頁",
+        "expanded": null,
+        "disabled": true
+      },
+      {
+        "text": "1",
+        "label": "方案風險第 1 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "2",
+        "label": "方案風險第 2 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "3",
+        "label": "方案風險第 3 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "4",
+        "label": "方案風險第 4 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "下一頁",
+        "label": "方案風險下一頁",
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）",
+      "其他因素（可暫定）"
+    ],
+    "selects": [
+      {
+        "label": "方案風險每頁筆數",
+        "id": "",
+        "options": [
+          {
+            "text": "10 筆",
+            "value": "10"
+          },
+          {
+            "text": "20 筆",
+            "value": "20"
+          },
+          {
+            "text": "50 筆",
+            "value": "50"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "personnel",
+    "label": "人員合格名單",
+    "text": "待完成：主任稽核員任命未完成\n新增人員\n匯出名單\n姓名／編號\t所屬單位\t責任單位\t角色\t狀態\t有效日期\t操作\n王大明\nJR-001\n\t公司內部\t管理部\t待確認\t待確認\t—\t\n編輯\n停用\n\n王稽核\nJR-QA-01\n\t公司內部\t品保部\t待確認\t待確認\t—\t\n編輯\n停用\n\n李稽核\nJR-PR-01\n\t公司內部\t生產製造部\t待確認\t待確認\t—\t\n編輯\n停用\n\n陳稽核\nZLX-001\n\t公司內部\t管理部\t待確認\t待確認\t—\t\n編輯\n停用",
+    "buttons": [
+      {
+        "text": "新增人員",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "匯出名單",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "停用",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "移至回收區：王大明",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "停用",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "移至回收區：王稽核",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "停用",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "移至回收區：李稽核",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "編輯",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "停用",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "移至回收區：陳稽核",
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": []
+  },
+  {
+    "id": "plan",
+    "label": "年度稽核計畫",
+    "text": "擬定\n滿意\n不滿意\n矯正中\n矯正圓滿\n（點月格可選排程或滿意／不滿意／矯正中／矯正圓滿；未手選時仍由查檢與 NCR 推導）\n依日期與利害關係人自動編排\n計畫窗口與日期設定\n項次\t風險\tQP／流程\t被稽核部門\t稽核人員\t1\t2\t3\t4\t5\t6\t7\t8\t9\t10\t11\t12\n1\t中\t\nQP-03\n明細\n品質目標及管理審查管理程序\n\t品保部\t\n王稽核\n\t\t擬\t擬\t\t\t\t\t\t\t\t\t\n2\t中\t\nQP-05\n明細\n量測儀器及設備管理程序\n\t品保部\t\n品保部經理\n\t\t\t\t擬\t擬\t\t\t\t\t\t\t\n3\t中\t\nQP-16\n明細\n客戶服務管理程序\n\t品保部\t\n王稽核\n\t\t\t\t\t\t矯\t矯\t\t\t\t\t\n4\t高\t\nQP-04\n明細\n設備設施及環境管理程序\n\t生產製造部\t\n陳稽核\n\t\t\t\t\t\t\t\t擬\t擬\t擬\t\t\n5\t高\t\nQP-26\n明細\n不合格品管理程序\n\t生產製造部\t\n陳稽核\n\t\t擬\t擬\t\t\t\t\t\t\t\t擬\t\n6\t高\t\nQR-28-04\n明細\n製程稽核查檢表\n\t生產製造部\t\n陳稽核\n\t\t\t\t擬\t擬\t擬\t\t\t\t\t\t\n7\t中\t\nQP-16\n明細\n客戶服務管理程序\n\t業務部\t\n李稽核\n\t\t\t\t\t\t\t擬\t擬\t\t\t\t\n8\t中\t\nQP-17\n明細\n供應商管理程序\n\t管理部\t\n王稽核\n\t\t\t\t\t\t\t\t\t擬\t擬\t\t\n9\t中\t\nQP-18\n明細\n採購及外包管理程序\n\t管理部\t\n王稽核\n\t\t擬\t\t\t\t\t\t\t\t\t擬\t\n10\t中\t\nQP-01\n明細\n公司組織及職責管理程序\n\t品保部\t\n王稽核\n\t\t\t擬\t擬\t\t\t\t\t\t\t\t\n\n顯示 1–10 筆，共 31 筆\n\n每頁\n10 筆\n20 筆\n50 筆\n上一頁\n1\n2\n3\n4\n下一頁\n待完成：主任稽核員任命未完成 至人員合格名單\n\n⚠ 管理審查日期應早於外部稽核日期（內稽 → 管審 → 外稽）。\n\n⚠ 年度計畫窗口結束月（11 月）晚於外部稽核月（9 月），請調整計畫或外稽日期。",
+    "buttons": [
+      {
+        "text": "依日期與利害關係人自動編排",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-03 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-03 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-03 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-03 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-05 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-05 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-05 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-05 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-16 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "矯",
+        "label": "QP-16 6 月：矯正中",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "矯",
+        "label": "QP-16 7 月：矯正中",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-04 生產製造部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-04 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-04 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-04 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-04 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-26 生產製造部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-26 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-26 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-26 11 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-26 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QR-28-04 生產製造部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QR-28-04 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QR-28-04 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QR-28-04 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-04 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-16 業務部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-16 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-16 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-16 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-17 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-17 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-17 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-17 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-18 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-18 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-18 11 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-18 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-01 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-01 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-01 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-01 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-02 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-02 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-02 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-02 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-08 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-08 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-08 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-08 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-09 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-09 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-09 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-09 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-12 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-12 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-12 11 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-12 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-19 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-19 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-19 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-19 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-22 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-22 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-22 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-22 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-25 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-25 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-25 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-25 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-27 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-27 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-27 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-27 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-28 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "滿",
+        "label": "QP-28 2 月：滿意",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "滿",
+        "label": "QP-28 11 月：滿意",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-28 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QR-28-05 品保部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QR-28-05 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QR-28-05 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QR-28-05 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-21 生產製造部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-21 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-21 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-21 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-21 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-10 開發工程部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-10 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-10 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-10 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-11 開發工程部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-11 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-11 11 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-11 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-13 開發工程部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-13 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-13 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-13 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-14 開發工程部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-14 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-14 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-14 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-15 開發工程部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-15 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-15 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-15 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-23 業務部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-23 8 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-23 9 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-23 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-06 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-06 10 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-06 11 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-06 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-07 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-07 2 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-07 3 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-07 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-20 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-20 4 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-20 5 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 6 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 7 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-20 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "QP-24 管理部 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 1 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 2 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 3 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 4 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 5 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-24 6 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "擬",
+        "label": "QP-24 7 月：擬定",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 8 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 9 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 10 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 11 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": "QP-24 12 月：空白",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "上一頁",
+        "label": "年度稽核計畫上一頁",
+        "expanded": null,
+        "disabled": true
+      },
+      {
+        "text": "1",
+        "label": "年度稽核計畫第 1 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "2",
+        "label": "年度稽核計畫第 2 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "3",
+        "label": "年度稽核計畫第 3 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "4",
+        "label": "年度稽核計畫第 4 頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "下一頁",
+        "label": "年度稽核計畫下一頁",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "至人員合格名單",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [
+      "計畫窗口與日期設定",
+      "王稽核",
+      "品保部經理",
+      "王稽核",
+      "陳稽核",
+      "陳稽核",
+      "陳稽核",
+      "李稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "陳稽核",
+      "李稽核",
+      "李稽核",
+      "李稽核",
+      "李稽核",
+      "李稽核",
+      "李稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核",
+      "王稽核"
+    ],
+    "selects": [
+      {
+        "label": "年度稽核計畫每頁筆數",
+        "id": "",
+        "options": [
+          {
+            "text": "10 筆",
+            "value": "10"
+          },
+          {
+            "text": "20 筆",
+            "value": "20"
+          },
+          {
+            "text": "50 筆",
+            "value": "50"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "audit",
+    "label": "查檢表",
+    "text": "查檢表\nQP-03 品質目標及管理審查管理程序 · 品保部\nQP-05 量測儀器及設備管理程序 · 品保部\nQP-16 客戶服務管理程序 · 品保部\nQP-04 設備設施及環境管理程序 · 生產製造部\nQP-26 不合格品管理程序 · 生產製造部\nQR-28-04 製程稽核查檢表 · 生產製造部\nQP-16 客戶服務管理程序 · 業務部\nQP-17 供應商管理程序 · 管理部\nQP-18 採購及外包管理程序 · 管理部\nQP-01 公司組織及職責管理程序 · 品保部\nQP-02 風險與機會管理程序 · 品保部\nQP-08 文件管制管理程序 · 品保部\nQP-09 紀錄文件管理程序 · 品保部\nQP-12 矯正與改善管理程序 · 品保部\nQP-19 進料檢驗管理程序 · 品保部\nQP-22 印鑑章管制管理程序 · 品保部\nQP-25 成品檢驗管理程序 · 品保部\nQP-27 統計分析管理程序 · 品保部\nQP-28 內部稽核管理程序 · 品保部\nQR-28-05 型態稽核查檢表 · 品保部\nQP-21 製程與檢驗管理程序 · 生產製造部\nQP-10 圖面與技術資料管理程序 · 開發工程部\nQP-11 新產品規劃管理程序 · 開發工程部\nQP-13 風險作業管理程序 · 開發工程部\nQP-14 工程變更與型態管制管理程序 · 開發工程部\nQP-15 產品安全及仿冒件管理程序 · 開發工程部\nQP-23 客戶與供應商財產管理程序 · 業務部\nQP-06 教育訓練管理程序 · 管理部\nQP-07 溝通管理程序 · 管理部\nQP-20 生產製造管理程序 · 管理部\nQP-24 倉儲與出貨管理程序 · 管理部\n規劃中\n開始稽核\n稽核設定\n\nQP-03 · 品保部 · 未填稽核日期 · 王稽核\n\n稽核日期\n被稽核部門主管\n請選擇\n品保部經理（目前值）\n王稽核\n其他（手填）\n稽核人員\n\n目前沒有符合此次稽核範圍與日期的可指派人員。\n\n請確認人員資格、適用範圍與有效期間。\n\n前往人員合格名單\n\n目前記錄：王稽核\n\n標記已通知\n程序得分\n未評\n總項數\n10\n符合\n0\n不符\n0\n觀察\n0\n不適用\n0\n未判定\n10\n項目\tNO\t稽核內容\t判定\t發現／證據\t操作\n品質政策\t1\t未判定品質政策應公佈於員工、供應廠商、客戶易於看到的資訊公佈區，如建築牆面、公佈欄、公司對外網頁、公司型錄等。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n品質目標制定表\t2\t未判定由管理代表召集各部門主管於年度結束前，是否已擬訂下年度品質目標，在審查會議中提出討論，決議後彙整於『QR-03-03 年度品質目標制定表』\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n品質政策公告\t3\t未判定品質目標項目是否則依管理審查會議之決議並公告之。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n品質目標要求項目\t4\t未判定品質目標項目是否有包含：降低客戶退貨率、製程與成品檢驗不良率、製程報廢率、客戶抱怨件數、生產效率、客戶滿意度、供應商品質、公司營業績效。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n品質目標統計\t5\t未判定各部門品質目標統計是否至外部稽核前一個月；初次稽核至少 3 個月統計資料。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n未達標處置\t6\t未判定品質目標未達成時，是否有因應處置並留存紀錄。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n前一年度目標\t7\t未判定前一年度 QR-03-01 年度品質目標管制表是否完整填寫至 12 月底。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n開發件準時達交\t8\t未判定開發件準時達交率是否以量產前送樣批數統計，並列入年度目標管理。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n管審輸入\t9\t未判定前次外部稽核追蹤事項、內部稽核結果、客戶抱怨、風險評估等管審輸入是否齊全，並於管理審查會議紀錄中彙整陳述。\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t\n管理審查紀錄\t10\t未判定組織是否保存管理審查會議紀錄，並涵蓋管理審查輸入事項與決議？\t\n未判定\n符合\n不符\n觀察\n不適用\n\t\n\t",
+    "buttons": [
+      {
+        "text": "開始稽核",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "稽核設定",
+        "label": "QP-03 品保部 稽核設定",
+        "expanded": "true",
+        "disabled": false
+      },
+      {
+        "text": "標記已通知",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": [
+      {
+        "label": null,
+        "id": "procedure-audit-select",
+        "options": [
+          {
+            "text": "QP-03 品質目標及管理審查管理程序 · 品保部",
+            "value": "QP-03|dept-qa"
+          },
+          {
+            "text": "QP-05 量測儀器及設備管理程序 · 品保部",
+            "value": "QP-05|dept-qa"
+          },
+          {
+            "text": "QP-16 客戶服務管理程序 · 品保部",
+            "value": "QP-16|dept-qa"
+          },
+          {
+            "text": "QP-04 設備設施及環境管理程序 · 生產製造部",
+            "value": "QP-04|dept-prod"
+          },
+          {
+            "text": "QP-26 不合格品管理程序 · 生產製造部",
+            "value": "QP-26|dept-prod"
+          },
+          {
+            "text": "QR-28-04 製程稽核查檢表 · 生產製造部",
+            "value": "QR-28-04|dept-prod"
+          },
+          {
+            "text": "QP-16 客戶服務管理程序 · 業務部",
+            "value": "QP-16|dept-sales"
+          },
+          {
+            "text": "QP-17 供應商管理程序 · 管理部",
+            "value": "QP-17|dept-admin"
+          },
+          {
+            "text": "QP-18 採購及外包管理程序 · 管理部",
+            "value": "QP-18|dept-admin"
+          },
+          {
+            "text": "QP-01 公司組織及職責管理程序 · 品保部",
+            "value": "QP-01|dept-qa"
+          },
+          {
+            "text": "QP-02 風險與機會管理程序 · 品保部",
+            "value": "QP-02|dept-qa"
+          },
+          {
+            "text": "QP-08 文件管制管理程序 · 品保部",
+            "value": "QP-08|dept-qa"
+          },
+          {
+            "text": "QP-09 紀錄文件管理程序 · 品保部",
+            "value": "QP-09|dept-qa"
+          },
+          {
+            "text": "QP-12 矯正與改善管理程序 · 品保部",
+            "value": "QP-12|dept-qa"
+          },
+          {
+            "text": "QP-19 進料檢驗管理程序 · 品保部",
+            "value": "QP-19|dept-qa"
+          },
+          {
+            "text": "QP-22 印鑑章管制管理程序 · 品保部",
+            "value": "QP-22|dept-qa"
+          },
+          {
+            "text": "QP-25 成品檢驗管理程序 · 品保部",
+            "value": "QP-25|dept-qa"
+          },
+          {
+            "text": "QP-27 統計分析管理程序 · 品保部",
+            "value": "QP-27|dept-qa"
+          },
+          {
+            "text": "QP-28 內部稽核管理程序 · 品保部",
+            "value": "QP-28|dept-qa"
+          },
+          {
+            "text": "QR-28-05 型態稽核查檢表 · 品保部",
+            "value": "QR-28-05|dept-qa"
+          },
+          {
+            "text": "QP-21 製程與檢驗管理程序 · 生產製造部",
+            "value": "QP-21|dept-prod"
+          },
+          {
+            "text": "QP-10 圖面與技術資料管理程序 · 開發工程部",
+            "value": "QP-10|dept-eng"
+          },
+          {
+            "text": "QP-11 新產品規劃管理程序 · 開發工程部",
+            "value": "QP-11|dept-eng"
+          },
+          {
+            "text": "QP-13 風險作業管理程序 · 開發工程部",
+            "value": "QP-13|dept-eng"
+          },
+          {
+            "text": "QP-14 工程變更與型態管制管理程序 · 開發工程部",
+            "value": "QP-14|dept-eng"
+          },
+          {
+            "text": "QP-15 產品安全及仿冒件管理程序 · 開發工程部",
+            "value": "QP-15|dept-eng"
+          },
+          {
+            "text": "QP-23 客戶與供應商財產管理程序 · 業務部",
+            "value": "QP-23|dept-sales"
+          },
+          {
+            "text": "QP-06 教育訓練管理程序 · 管理部",
+            "value": "QP-06|dept-admin"
+          },
+          {
+            "text": "QP-07 溝通管理程序 · 管理部",
+            "value": "QP-07|dept-admin"
+          },
+          {
+            "text": "QP-20 生產製造管理程序 · 管理部",
+            "value": "QP-20|dept-admin"
+          },
+          {
+            "text": "QP-24 倉儲與出貨管理程序 · 管理部",
+            "value": "QP-24|dept-admin"
+          }
+        ]
+      },
+      {
+        "label": "被稽核部門主管",
+        "id": "select-_r_1g_",
+        "options": [
+          {
+            "text": "請選擇",
+            "value": ""
+          },
+          {
+            "text": "品保部經理（目前值）",
+            "value": "品保部經理"
+          },
+          {
+            "text": "王稽核",
+            "value": "王稽核"
+          },
+          {
+            "text": "其他（手填）",
+            "value": "__custom__"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      },
+      {
+        "label": "判定",
+        "id": "",
+        "options": [
+          {
+            "text": "未判定",
+            "value": ""
+          },
+          {
+            "text": "符合",
+            "value": "符合"
+          },
+          {
+            "text": "不符",
+            "value": "不符"
+          },
+          {
+            "text": "觀察",
+            "value": "觀察"
+          },
+          {
+            "text": "不適用",
+            "value": "不適用"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "observations",
+    "label": "觀察事項",
+    "text": "待帶入 觀察 3、NCR 0\n\n逐筆\n全部帶入\n待追蹤\n已結案\n已轉 NCR\n全部\n未同步 0\n登錄觀察事項\n匯出 Excel\n更多篩選\n年度\t來源\t摘要\tQP\t部門\t責任\t狀態\t到期\t操作\n2026\t內部稽核\t根據5.6.1 產品類別對應檢驗紀錄表,檢驗紀錄表的抽樣數有無依『5.6 抽樣計畫』作業\tQP-21\t生產製造部\t—\t待追蹤\t—\t\n編輯／結案\n轉為 NCR\n\n2025\t內部稽核\t文件回收舊版時，部分部門未簽收確認\tQP-01\t管理部\t—\t待追蹤\t—\t\n編輯／結案\n轉為 NCR\n\n2025\t內部稽核\t工單與現場實際用料偶有不一致\tQP-22\t生產製造部\t—\t待追蹤\t—\t\n編輯／結案\n轉為 NCR\n\n2025\t內部稽核\t供應商材質證明更新不及時\tQP-12\t品保部\t—\t待追蹤\t—\t\n編輯／結案\n轉為 NCR",
+    "buttons": [
+      {
+        "text": "全部帶入",
+        "label": "匯入全部待追蹤項目",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "待追蹤",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "已結案",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "已轉 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "全部",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "未同步 0",
+        "label": "查檢未同步 0",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "登錄觀察事項",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "匯出 Excel",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "根據5.6.1 產品類別對應檢驗紀錄表,檢驗紀錄表的抽樣數有無依『5.6 抽樣計畫』作業",
+        "label": null,
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "編輯／結案",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "轉為 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "文件回收舊版時，部分部門未簽收確認",
+        "label": null,
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "編輯／結案",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "轉為 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "工單與現場實際用料偶有不一致",
+        "label": null,
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "編輯／結案",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "轉為 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "供應商材質證明更新不及時",
+        "label": null,
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "編輯／結案",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "轉為 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [
+      "逐筆",
+      "更多篩選"
+    ],
+    "selects": []
+  },
+  {
+    "id": "ncr",
+    "label": "不符合",
+    "text": "不符合事項一覽（2）\n手動新增 NCR\nNCR#\tQP\t部門\t公司\t摘要\t狀態\t日期\t到期\t操作\nNCR-2026-001\tQP-16\t品保部\t—\t\t\n開立\n矯正中\n結案\n\t2026-03-15\t2026-04-15\t\n明細\n\nNCR-2026-002\tQP-16\t品保部\t—\t\t\n開立\n矯正中\n結案\n\t2026-06-15\t—\t\n明細",
+    "buttons": [
+      {
+        "text": "手動新增 NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "NCR-2026-001 明細",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "NCR-2026-002 明細",
+        "expanded": "false",
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": [
+      {
+        "label": "NCR-2026-001 狀態",
+        "id": "select-_r_1l_",
+        "options": [
+          {
+            "text": "開立",
+            "value": "開立"
+          },
+          {
+            "text": "矯正中",
+            "value": "矯正中"
+          },
+          {
+            "text": "結案",
+            "value": "結案"
+          }
+        ]
+      },
+      {
+        "label": "NCR-2026-002 狀態",
+        "id": "select-_r_1m_",
+        "options": [
+          {
+            "text": "開立",
+            "value": "開立"
+          },
+          {
+            "text": "矯正中",
+            "value": "矯正中"
+          },
+          {
+            "text": "結案",
+            "value": "結案"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "suggestions",
+    "label": "第三方建議",
+    "text": "登錄建議\n匯出 Excel\n年度\t摘要\tQP\t負責單位\t進度\t狀態\t操作\n2025\t部分量測設備校正標籤資訊不完整\tQP-18\t品保部\t\t\n待追蹤\n已結案\n\t\n帶入\n明細\n\n2025\t合約審查紀錄缺少客戶特殊要求欄位\tQP-09\t業務部\t\t\n待追蹤\n已結案\n\t\n帶入\n明細\n\n2025\t教育訓練矩陣未含新進人員\tQP-07\t管理部\t\t\n待追蹤\n已結案\n\t\n帶入\n明細",
+    "buttons": [
+      {
+        "text": "登錄建議",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "匯出 Excel",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "帶入",
+        "label": "帶入 2026 年",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "2025 QP-18 建議明細：部分量測設備校正標籤資訊不完整",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "帶入",
+        "label": "帶入 2026 年",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "2025 QP-09 建議明細：合約審查紀錄缺少客戶特殊要求欄位",
+        "expanded": "false",
+        "disabled": false
+      },
+      {
+        "text": "帶入",
+        "label": "帶入 2026 年",
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "明細",
+        "label": "2025 QP-07 建議明細：教育訓練矩陣未含新進人員",
+        "expanded": "false",
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": [
+      {
+        "label": "2025 QP-18 建議狀態",
+        "id": "select-_r_1p_",
+        "options": [
+          {
+            "text": "待追蹤",
+            "value": "open"
+          },
+          {
+            "text": "已結案",
+            "value": "closed"
+          }
+        ]
+      },
+      {
+        "label": "2025 QP-09 建議狀態",
+        "id": "select-_r_1q_",
+        "options": [
+          {
+            "text": "待追蹤",
+            "value": "open"
+          },
+          {
+            "text": "已結案",
+            "value": "closed"
+          }
+        ]
+      },
+      {
+        "label": "2025 QP-07 建議狀態",
+        "id": "select-_r_1r_",
+        "options": [
+          {
+            "text": "待追蹤",
+            "value": "open"
+          },
+          {
+            "text": "已結案",
+            "value": "closed"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "followups",
+    "label": "待改善追蹤",
+    "text": "全部\nNCR\n觀察\n建議\n類型\t摘要\tQP\t部門／單位\t狀態\t到期\nNCR\tNCR-2026-002\tQP-16\t品保部\t開立\t—\n觀察\t根據5.6.1 產品類別對應檢驗紀錄表,檢驗紀錄表的抽樣數有無依『5.6 抽樣計畫』作業\tQP-21\t生產製造部\t待追蹤\t—\nNCR\tNCR-2026-001\tQP-16\t品保部\t矯正中逾期\t2026-04-15\n觀察\t文件回收舊版時，部分部門未簽收確認\tQP-01\t管理部\t待追蹤\t—\n觀察\t工單與現場實際用料偶有不一致\tQP-22\t生產製造部\t待追蹤\t—\n觀察\t供應商材質證明更新不及時\tQP-12\t品保部\t待追蹤\t—\n建議\t部分量測設備校正標籤資訊不完整\tQP-18\t品保部\t待追蹤\t—\n建議\t合約審查紀錄缺少客戶特殊要求欄位\tQP-09\t業務部\t待追蹤\t—\n建議\t教育訓練矩陣未含新進人員\tQP-07\t管理部\t待追蹤\t—",
+    "buttons": [
+      {
+        "text": "全部",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "NCR",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "觀察",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "建議",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "NCR-2026-002",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "根據5.6.1 產品類別對應檢驗紀錄表,檢驗紀錄表的抽樣數有無依『5.6 抽樣計畫』作業",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "NCR-2026-001",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "文件回收舊版時，部分部門未簽收確認",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "工單與現場實際用料偶有不一致",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "供應商材質證明更新不及時",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "部分量測設備校正標籤資訊不完整",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "合約審查紀錄缺少客戶特殊要求欄位",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "教育訓練矩陣未含新進人員",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": []
+  },
+  {
+    "id": "prep",
+    "label": "外稽準備",
+    "text": "稽核序位\n1 內稽缺口 30\n2 管審\n3 外稽2026-09-15\n\n內部稽核進度（唯讀）：尚有 30 項缺口至稽核總覽\n\n管審日期：2026-12-10至年度稽核計畫\n\n尚缺：完成當年度內部稽核；將管審日期調整至外稽日期前。\n\n管理審查日期應早於外部稽核日期（內稽 → 管審 → 外稽）。\n\n年度計畫窗口結束月（11 月）晚於外部稽核月（9 月），請調整計畫或外稽日期。\n\n改準備表年度\n外部稽核日期\n匯出 Excel\n準備清單 1/23\n項次\t稽核前準備事項\t負責人\t完成\t備註/表單\n1\t\n品質手冊、相關程序修訂完成並頒佈發行（首次認證）／往後年度確認法規改版\n\n往後年度稽核前，確認有無因法規而修訂內容改版。\n\n\t品保/管理代表\t\n\t\n2\t\n年度內部稽核計畫／查檢表紀錄／稽核缺失彙整\n\n含年度內部稽核計畫／查檢表紀錄／稽核缺失。\n\n\t品保彙整／各部門繳交\t\n\t\n3\t\nQR-28-03 稽核矯正報告\n\n盡量內部 NCR 於外部稽核前完成。\n\n\t稽核員\t\n\t\n4\t\nQR-28-07 內外部稽核報告書\n\t稽核員\t\n\t\n5\t\n各部門年度目標訂定及統計分析完成／公告\n\nQR-03-01 年度品質目標管制表\n\n品質目標統計至稽核前一個月；初次稽核至少要 3 個月統計資料（沒有統計目標達成情況會開缺失）。未達成要有因應處置。前一年目標統計完成至 12 月底；當年注意未達標指標。目標管理每月更新；當年度稽核時去年度內容要完整。開發件準時達交率＝量產前送樣批數準時達交率。\n\n品質目標統計須至稽核前一個月；初次稽核至少 3 個月資料；未達成須有因應處置。\n\n\t品保彙整／管理代表／各責任部門\t\n\t\n6\t\n管理審查會議召開、會議記錄完成\n\n時間順序：內部稽核需先完成，才能召開管審。需將外部稽核追蹤事項彙整陳述於會議記錄。\n\n\t管理代表／品保\t\n\t\n7\t\n品質系統風險與機會管理表完成\n\nQR-02-01 風險與機會監控評估表\n\n氣候變遷要加入風險評估。今年風險評估之改善措施評估結果不要直接填寫，隔年稽核時再填。\n\n氣候變遷須納入風險評估；當年改善措施評估結果隔年再填。\n\n\t責任單位／品保\t\n\t\n8\t\n品質政策／品質目標之宣導及公告\n\t品保/各主管\t\n\t\n9\t\n管理代表任用令公告\n\t管理代表\t\n\t\n10\t\n品質文件 1-4 階均確認完成並歸檔\n\t品保(文管)\t\n\t\n11\t\n報表、記錄等各部門確認\n\t各部門\t\n\t\n12\t\n機器設備保養記錄／相關指導書／標示等確認／模具區整理及標示確認\n\t生產製造部\t\n\t\n13\t\n各區域之標示區隔（進料／退貨／不合格品…等）\n\t全廠區\t\n\t\n14\t\n教育訓練記錄整理確認（能力鑑定、人員意識、三次元特定人員）\n\nQR-06-04 員工教育訓練紀錄表\n\n每年度都要執行人員意識教育訓練；三次元特定人員訓練紀錄要完成。含年度教育訓練計畫、QR-06-04 員工教育訓練紀錄表。\n\n\t各部門/人資\t\n\t\n15\t\n新產品送樣資料整理（MOT SOP／SIP／圖面／試製工單／首件／客戶核准樣品）\n\n含工程變更、產品風險評估、產品型態管制。\n\n\t開發工程\t\n\t\n16\t\n客戶滿意度調查統計及分析／客訴退貨異常／圖面合約\n\nQR-16-07 客戶滿意度調查表\n\n滿意度調查沒執行會開缺失。客訴抱怨／退貨／內部品質異常要整理備查。客戶圖面與外來文件納入文件管制（含版次變更）。航太合約審查管理。\n\n保留適用客戶、調查期間、結果分析及必要改善的佐證。\n\n\t業務部\t\n\t\n17\t\n供應商評鑑完成／委外加工單填具完整\n\n供應商年度評核未執行會開缺失。材質證明與採購文件核對，不符合會開缺失。\n\n\t外包/採購/開發工程\t\n\t\n18\t\n庫房／樣品之整理標示／記錄\n\n依稽核廠區範圍。\n\n\t倉儲\t\n\t\n19\t\n現場區域整齊清潔、製令與產品對應、刀具與不合格品管理\n\n製令單與產品放置在一起；不同產品類別區隔不混儲；機台前規範／作業指導書／首件確認表定位。\n\n\t生產製造\t\n\t\n20\t\n切削油檢驗紀錄（稽核前一個月）\n\n注意稽核前一個月的紀錄。\n\n\t生產製造\t\n\t\n21\t\n量規儀器校驗／異常矯正／檢驗記錄備查\n\n年度校正項目別勿漏校；客戶抱怨及異常矯正措施處理完成；品保各項檢驗記錄備查。進料／出貨檢驗放行見項 21 分開備查。\n\n\t品保\t\n\t\n22\t\n技術知識一覽表更新（檢驗規範、工程圖面版本）\n\n客戶有更新需登錄，需定期與客戶確認索取。\n\n\t業務/開發工程\t\n\t\n23\t\n出貨檢驗紀錄、進料檢驗紀錄、ECOA 報告\n\n與 PDF 準備表一致。\n\n\t品保\t\n\t\n稽核要點",
+    "buttons": [
+      {
+        "text": "改準備表年度",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "匯出 Excel",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [
+      "稽核要點"
+    ],
+    "selects": []
+  },
+  {
+    "id": "system-settings",
+    "label": "系統設定",
+    "text": "稽核資料\n備份與匯出\n回收區\n系統流程\n程序與紀錄\n進階評分設定\n正式紀錄保存位置\n\n組織受控之內部稽核查檢表與年度結案報告存檔路徑（各程序文件依現行受控版本執行稽核）。\n\n目前設定：尚未指定保存位置\n指定保存位置",
+    "buttons": [
+      {
+        "text": "程序與紀錄",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "進階評分設定",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      },
+      {
+        "text": "指定保存位置",
+        "label": null,
+        "expanded": null,
+        "disabled": false
+      }
+    ],
+    "summaries": [],
+    "selects": []
+  }
+]

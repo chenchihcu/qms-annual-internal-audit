@@ -24,9 +24,9 @@ describe('RiskAssessment matrix layout', () => {
 
     expect(within(table).queryByText('未存檔')).toBeNull()
     const cols = table.querySelectorAll('colgroup col')
-    expect(cols[2]?.className).toBe('col-inherent')
-    expect(cols[3]?.className).toBe('col-status')
-    expect(cols[5]?.className).toBe('')
+    expect(cols[2]?.className).toBe('col-inherent col-print-inherent-print')
+    expect(cols[3]?.className).toBe('col-status col-print-status')
+    expect(cols[5]?.className).toBe('col-print-evidence-ref')
     const inherentButton = within(table).getAllByRole('button', { name: /固有風險$/ })[0]
     const factorSummary = within(table).getAllByText('其他因素（可暫定）')[0]
     expect(inherentButton.parentElement).toBe(factorSummary.closest('div'))

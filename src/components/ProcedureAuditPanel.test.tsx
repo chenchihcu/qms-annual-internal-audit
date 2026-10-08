@@ -105,6 +105,11 @@ describe('ProcedureAuditPanel', () => {
       expect(screen.getAllByText('組織是否保存管理審查會議紀錄，並涵蓋管理審查輸入事項與決議？').length).toBeGreaterThan(0)
       expect(screen.queryByText(/九潤精密、正隆興精密是否各有一份管理審查會議紀錄/)).toBeNull()
     })
+
+    const persistedState = JSON.parse(localStorage.getItem(STORAGE_KEY)!) as AppState
+    expect(persistedState.workspace.audits.map((audit) => audit.id)).toEqual([
+      'audit-qp03-single-workspace',
+    ])
   })
 
   it.each([

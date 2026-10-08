@@ -94,17 +94,19 @@ describe('App tab smoke', () => {
     expect(screen.getByRole('button', { name: '稽核總覽' })).toBeTruthy()
   })
 
-  it('keeps dashboard concise and preserves tracking drill-down controls', async () => {
+  it('keeps dashboard as a single-level overview and opens observations from the sidebar', async () => {
     render(<App />)
     const guide = document.querySelector('[data-workflow-guide="top"]')
     expect(guide).toBeNull()
     expect(document.querySelector('[data-workflow-guide="bottom"]')).toBeNull()
-    expect(screen.getByRole('region', { name: '稽核總覽' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: '追蹤清單' })).toBeNull()
-    await screen.findByRole('button', { name: '前往：前年度未結觀察' })
-    fireEvent.click(screen.getByRole('button', { name: '前往：前年度未結觀察' }))
+    const overview = screen.getByRole('region', { name: '稽核總覽' })
+    expect(within(overview).queryByRole('columnheader', { name: '操作' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /前往：/ })).toBeNull()
+    expect(within(overview).getByRole('columnheader', { name: '項目' })).toBeTruthy()
+    expect(within(overview).getByText('查檢判定觀察')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '觀察事項' }))
     await waitFor(() => {
-      expect(screen.getByText(/前年度觀察事項/)).toBeTruthy()
+      expect(screen.getByRole('region', { name: '觀察事項紀錄一覽' })).toBeTruthy()
     }, { timeout: 5000 })
   })
 
@@ -200,7 +202,7 @@ describe('App tab smoke', () => {
     expect(screen.queryByText(/查檢表判定「不符」時自動匯入/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '手動新增 NCR' }))
     expect(
-      screen.getByText(/查檢表判定「不符」時自動匯入。描述為發現文字，不會被查檢覆寫；矯正內容請填「矯正措施」。此處可登錄會議或現場發現。/),
+      screen.getByText(/查檢表判定「不符」時自動匯入。描述為發現文字，不會被查檢覆寫；矯正內容請填 QR-28-03 報告。此處可登錄會議或現場發現。/),
     ).toBeTruthy()
   })
 

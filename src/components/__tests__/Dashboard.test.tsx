@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { createDemoState } from '../../data/demoData'
 import { companySettingsFor } from '../../types'
 import { Dashboard } from '../Dashboard'
@@ -13,13 +13,8 @@ function syncedDemoState() {
   }
 }
 
-function renderDashboard(onNavigate: (tab: string) => void = () => {}) {
-  return render(
-    <Dashboard
-      state={syncedDemoState()}
-      onNavigate={onNavigate}
-    />,
-  )
+function renderDashboard() {
+  return render(<Dashboard state={syncedDemoState()} />)
 }
 
 describe('Dashboard attention list', () => {
@@ -35,21 +30,44 @@ describe('Dashboard attention list', () => {
     })
 
     expect(screen.getByRole('columnheader', { name: '項目' })).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: '追蹤清單' })).toBeNull()
-    expect(screen.getByRole('button', { name: '前往：查檢判定觀察' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '前往：本年度待追蹤觀察' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '前往：前年度未結觀察' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '前往：待追蹤建議' })).toBeTruthy()
-
+    expect(screen.getByRole('columnheader', { name: '結果' })).toBeTruthy()
+    expect(screen.getByText('查檢判定觀察')).toBeTruthy()
+    expect(screen.getByText('本年度待追蹤觀察')).toBeTruthy()
+    expect(screen.getByText('前年度未結觀察')).toBeTruthy()
+    expect(screen.getByText('待追蹤建議')).toBeTruthy()
+    expect(screen.getByText('內部稽核')).toBeTruthy()
+    expect(screen.getByText('管審日期')).toBeTruthy()
+    expect(screen.getByText('管審前置')).toBeTruthy()
+    expect(screen.queryByRole('columnheader', { name: '操作' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '至稽核總覽' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '至年度稽核計畫' })).toBeNull()
     expect(screen.getByText(/已回報 \d+\/\d+ 件/)).toBeTruthy()
     expect(screen.getByText(/計畫項目 \d+\/\d+ 列/)).toBeTruthy()
-    for (const label of ['查檢判定觀察', '本年度待追蹤觀察', '前年度未結觀察', '待追蹤建議']) {
-      const row = screen.getByRole('button', { name: `前往：${label}` }).closest('tr')
-      expect(row?.querySelectorAll('td')[2]?.textContent).toBe('')
-    }
     expect(screen.queryByText(/各程序稽核得分/)).toBeNull()
     expect(screen.queryByText(/雙證查檢未判定/)).toBeNull()
-    expect(screen.queryByRole('region', { name: '各程序稽核得分統計表' })).toBeNull()
+  })
+
+  it('shows management-review gaps on the overview without page shortcuts', () => {
+    const base = createDemoState()
+    base.externalAuditPrep.externalAuditDate = '2026-09-15'
+    base.settings.managementReviewDate = '2026-12-10'
+    base.settings.externalAuditDate = undefined
+    render(
+      <Dashboard
+        state={{
+          ...base,
+          settings: { ...companySettingsFor(base), managementReviewDate: '2026-12-10', externalAuditDate: undefined },
+          company: base.workspace,
+        }}
+      />,
+    )
+
+    const overview = screen.getByRole('region', { name: '稽核總覽' })
+    expect(within(overview).getByText('2026-12-10')).toBeTruthy()
+    expect(within(overview).getByText('尚缺')).toBeTruthy()
+    expect(within(overview).getByText('完成當年度內部稽核；將管審日期調整至外稽日期前')).toBeTruthy()
+    expect(within(overview).queryByRole('link', { name: '至年度稽核計畫' })).toBeNull()
+    expect(within(overview).queryByRole('link', { name: '至稽核總覽' })).toBeNull()
   })
 
   it('does not send dashboard data to a local debug collector', () => {
@@ -62,17 +80,5 @@ describe('Dashboard attention list', () => {
     } finally {
       vi.unstubAllGlobals()
     }
-  })
-
-  it('keeps each tracking metric linked to its own operational page', async () => {
-    const onNavigate = vi.fn()
-    renderDashboard(onNavigate)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '前往：前年度未結觀察' })).toBeTruthy()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: '前往：前年度未結觀察' }))
-    expect(onNavigate).toHaveBeenCalledWith('observations', { section: 'prior' })
   })
 })

@@ -71,8 +71,8 @@ if ($Mode -eq 'local-backup') {
     }
 
     try {
-        $rawBackup = Get-Content -LiteralPath $backup.FullName -Raw
-        $parsedBackup = ConvertFrom-Json -InputObject $rawBackup -AsHashtable -ErrorAction Stop
+        $rawBackup = Get-Content -LiteralPath $backup.FullName -Raw -Encoding UTF8
+        $parsedBackup = ConvertFrom-Json -InputObject $rawBackup -ErrorAction Stop
     } catch {
         Write-Output 'backup_verification result=not_pass reason=backup-json-invalid'
         exit 1
@@ -82,21 +82,21 @@ if ($Mode -eq 'local-backup') {
         exit 1
     }
     $state = $parsedBackup.state
-    $backupVersion = $state.version
-    if ($null -eq $parsedBackup -or $backupVersion -isnot [ValueType] -or $backupVersion -ne 15) {
-        Write-Output 'backup_verification result=not_pass reason=backup-version-invalid'
-        exit 1
-    }
-    if ($null -eq $state -or $state -isnot [System.Collections.IDictionary]) {
+    if ($null -eq $state) {
         Write-Output 'backup_verification result=not_pass reason=backup-state-invalid'
         exit 1
     }
-    if ($state.Contains('companies')) {
+    $backupVersion = $state.version
+    if ($backupVersion -isnot [ValueType] -or $backupVersion -ne 15) {
+        Write-Output 'backup_verification result=not_pass reason=backup-version-invalid'
+        exit 1
+    }
+    if ($null -ne $state.companies) {
         Write-Output 'backup_verification result=not_pass reason=backup-legacy-companies-present'
         exit 1
     }
     foreach ($requiredKey in @('workspace', 'settings', 'auditProfile')) {
-        if (-not $state.Contains($requiredKey) -or $null -eq $state[$requiredKey]) {
+        if ($null -eq $state.$requiredKey) {
             Write-Output "backup_verification result=not_pass reason=backup-missing-$requiredKey"
             exit 1
         }

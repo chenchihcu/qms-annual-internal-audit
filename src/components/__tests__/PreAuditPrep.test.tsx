@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { PreAuditPrep } from '../PreAuditPrep'
 import { createDemoState } from '../../data/demoData'
@@ -73,15 +73,18 @@ describe('PreAuditPrep', () => {
     expect(screen.getByText(/進料／出貨檢驗放行見項 21 分開備查/)).toBeTruthy()
     expect(screen.queryByText(/校驗帳可合併/)).toBeNull()
     expect(screen.queryByText('其他注意事項')).toBeNull()
-    const points = screen.getByText('稽核要點').closest('details')
-    expect(points?.textContent).toContain('忌諱塗改任何紀錄或文件')
+    const points = screen.getByRole('table', { name: '稽核要點' })
+    expect(points.textContent).toContain('忌諱塗改任何紀錄或文件')
+    expect(within(points).getByRole('columnheader', { name: '項次' })).toBeTruthy()
+    expect(within(points).getByRole('columnheader', { name: '要點' })).toBeTruthy()
   })
 
   it('uses one continuous display sequence and accessible controls', () => {
     const store = makeStore()
     render(<PreAuditPrep store={store} />)
 
-    const itemNumbers = screen.getAllByRole('row')
+    const checklist = screen.getByRole('region', { name: '外部稽核前準備清單' })
+    const itemNumbers = within(checklist).getAllByRole('row')
       .slice(1)
       .map((row) => row.querySelector('td')?.textContent?.trim())
       .filter(Boolean)
@@ -110,10 +113,15 @@ describe('PreAuditPrep', () => {
     })
     render(<PreAuditPrep store={store} />)
 
-    expect(screen.getByRole('alert').textContent).toContain('管理審查日期應早於外部稽核日期')
-    expect(screen.getByRole('alert').textContent).toContain('年度計畫窗口結束月（11 月）')
+    const points = screen.getByRole('table', { name: '稽核要點' })
+    expect(points.textContent).toContain('管理審查日期應早於外部稽核日期')
+    expect(points.textContent).toContain('年度計畫窗口結束月（11 月）')
+    expect(screen.queryByRole('link', { name: '至稽核總覽' })).toBeNull()
+    expect(screen.queryByRole('link', { name: '至年度稽核計畫' })).toBeNull()
+    expect(screen.queryByText(/內部稽核進度（唯讀）/)).toBeNull()
+    expect(screen.queryByText(/^管審日期：/)).toBeNull()
+    expect(screen.queryByText(/^尚缺：/)).toBeNull()
     expect(screen.getByRole('checkbox', { name: /2 管審/ }).hasAttribute('disabled')).toBe(true)
-    expect(screen.getByText('尚缺：完成當年度內部稽核；將管審日期調整至外稽日期前。')).toBeTruthy()
     expect(store.state.externalAuditPrep.externalAuditDate).toBe('2026-09-15')
     expect(store.state.settings.managementReviewDate).toBe('2026-12-10')
   })

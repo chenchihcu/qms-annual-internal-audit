@@ -54,12 +54,12 @@ export function TrashPanel({ store }: { store: AuditStore }) {
       ) : (
         <>
         <ScrollRegion ariaLabel="回收區資料清單">
-          <table className="worksheet-table min-w-[40.5rem]">
+          <table className="worksheet-table print-trash-table min-w-[40.5rem]">
             <colgroup>
-              <col className="col-status" />
-              <col />
-              <col />
-              <col className="col-datetime" />
+              <col className="col-status col-print-status" />
+              <col className="col-print-trash-data" />
+              <col className="col-print-trash-context" />
+              <col className="col-datetime col-print-datetime" />
               <col className="col-action no-print" />
             </colgroup>
             <thead>

@@ -12,6 +12,8 @@ import {
   ncrNumberLabel,
   ncrNumberLabels,
   validateNcrClose,
+  ncrReportProgress,
+  ncrDraftEquals,
 } from '../ncr'
 import type { ChecklistItem, NCR, Observation, ProcedureAudit } from '../../types'
 
@@ -238,5 +240,65 @@ describe('validateNcrClose', () => {
       effectivenessVerifiedAt: '2026-04-01',
     }
     expect(canTransitionNcrStatus(ncr, '結案').ok).toBe(true)
+  })
+})
+
+describe('ncrReportProgress', () => {
+  const base: NCR = normalizeNCR({
+    id: 'n1',
+    ncrNumber: 'NCR-2026-001',
+    qpCode: 'QP-01',
+    departmentId: 'd1',
+    department: '管理部',
+    process: 'p',
+    description: '',
+    date: '',
+    status: '開立',
+  })
+
+  it('marks all stages incomplete for empty draft', () => {
+    const stages = ncrReportProgress(base)
+    expect(stages.map((s) => s.complete)).toEqual([false, false, false, false])
+    expect(stages.map((s) => s.statusLabel)).toEqual(['未填', '未填', '未填', '未結'])
+  })
+
+  it('evaluates each stage independently', () => {
+    const stages = ncrReportProgress({
+      ...base,
+      description: '發現',
+      rootCause: '原因',
+      correctiveAction: '措施',
+      status: '矯正中',
+    })
+    expect(stages.map((s) => s.complete)).toEqual([true, true, true, false])
+  })
+
+  it('marks closed only when status is 結案', () => {
+    const stages = ncrReportProgress({ ...base, description: 'x', status: '結案' })
+    expect(stages.find((s) => s.id === 'closed')).toEqual({
+      id: 'closed',
+      label: '結案',
+      complete: true,
+      statusLabel: '已結',
+    })
+  })
+})
+
+describe('ncrDraftEquals', () => {
+  it('detects field changes', () => {
+    const a = normalizeNCR({
+      id: 'n1',
+      ncrNumber: 'NCR-2026-001',
+      qpCode: 'QP-01',
+      departmentId: 'd1',
+      department: '管理部',
+      process: 'p',
+      description: 'a',
+      date: '',
+      status: '開立',
+    })
+    const b = { ...a, rootCause: 'new' }
+    expect(ncrDraftEquals(a, a)).toBe(true)
+    expect(ncrDraftEquals(a, b)).toBe(false)
   })
 })

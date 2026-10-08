@@ -14,7 +14,6 @@ import {
 } from '../lib/externalAuditPrep'
 import { buildMergedCertificateCoverage } from '../lib/coverage'
 import { exportPrepExcel } from '../lib/formExport'
-import { buildAppHash } from '../lib/navigation'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Button, Input } from './ui/Badge'
 import { PrintDocHeader } from './ui/PrintDocHeader'
@@ -130,11 +129,15 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
     managementReviewDate,
     externalAuditDate: effectiveExternalAuditDate,
   })
-  const sequenceHasDetail =
-    !derivedInternalComplete
-    || managementReviewCompletionBlockers.length > 0
-    || sequenceWarnings.sequenceMessages.length > 0
-    || (externalAuditPrep.managementReviewComplete && !managementReviewDate)
+  const auditPointRows = [
+    ...seed.sequenceRules
+      .filter((rule) => !isLegacyCompanySpecificPrepText(rule))
+      .map((rule) => workspacePrepText(rule)),
+    ...seed.otherNotes
+      .filter((note) => !isLegacyCompanySpecificPrepText(note))
+      .map((note) => workspacePrepText(note)),
+    ...sequenceWarnings.sequenceMessages,
+  ].filter((text) => text.length > 0)
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -153,10 +156,10 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
                 className="h-4 w-4"
                 checked={externalAuditPrep.managementReviewComplete}
                 disabled={!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0}
-                aria-describedby={
+                aria-label={
                   !externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0
-                    ? 'management-review-completion-help'
-                    : undefined
+                    ? `2 管審，尚缺：${managementReviewCompletionBlockers.join('；')}`
+                    : '2 管審'
                 }
                 onChange={(e) =>
                   updateExternalPrepSequence({ managementReviewComplete: e.target.checked })
@@ -169,45 +172,6 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
               {effectiveExternalAuditDate || '日期待填'}
             </span>
           </div>
-          {sequenceHasDetail && (
-            <div className="mt-2 space-y-1 text-xs text-slate-600">
-              {!derivedInternalComplete && (
-                <p>
-                  內部稽核進度（唯讀）：
-                  {`尚有 ${internalGapCount} 項缺口`}
-                  <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('dashboard')}>
-                    至稽核總覽
-                  </a>
-                </p>
-              )}
-              <p>
-                管審日期：
-                {managementReviewDate || '尚未填寫'}
-                <a className="ml-1 font-medium text-blue-700 underline" href={buildAppHash('plan')}>
-                  至年度稽核計畫
-                </a>
-              </p>
-              {externalAuditPrep.managementReviewComplete && !managementReviewDate && (
-                <p className="font-medium text-amber-800" role="status">
-                  已勾選管審，但年度計畫尚未填管審日期
-                </p>
-              )}
-              {!externalAuditPrep.managementReviewComplete && managementReviewCompletionBlockers.length > 0 && (
-                <p
-                  id="management-review-completion-help"
-                  className="text-amber-800"
-                  role="status"
-                >
-                  尚缺：{managementReviewCompletionBlockers.join('；')}。
-                </p>
-              )}
-              {sequenceWarnings.sequenceMessages.length > 0 && (
-                <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-900" role="alert">
-                  {sequenceWarnings.sequenceMessages.map((message) => <p key={message}>{message}</p>)}
-                </div>
-              )}
-            </div>
-          )}
         </div>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-wrap items-end gap-3">
@@ -245,13 +209,13 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         />
 
         <ScrollRegion ariaLabel="外部稽核前準備清單">
-          <table className="qr-checklist worksheet-table min-w-[31rem]">
+          <table className="qr-checklist worksheet-table print-prep-checklist min-w-[31rem]">
             <colgroup>
-              <col className="col-seq" />
-              <col />
-              <col className="col-name" />
-              <col className="col-done" />
-              <col />
+              <col className="col-seq col-print-seq" />
+              <col className="col-print-prep-title" />
+              <col className="col-name col-print-name" />
+              <col className="col-done col-print-done" />
+              <col className="col-print-prep-remark" />
             </colgroup>
             <thead>
               <tr>
@@ -316,17 +280,29 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
           </table>
         </ScrollRegion>
 
-        <details className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-600">稽核要點</summary>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
-            {seed.sequenceRules.filter((rule) => !isLegacyCompanySpecificPrepText(rule)).map((rule) => (
-              <li key={`rule-${rule}`}>{workspacePrepText(rule)}</li>
-            ))}
-            {seed.otherNotes.filter((note) => !isLegacyCompanySpecificPrepText(note)).map((note) => (
-              <li key={`note-${note}`}>{workspacePrepText(note)}</li>
-            ))}
-          </ul>
-        </details>
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold">稽核要點</h3>
+          <table className="worksheet-table min-w-[11rem]" aria-label="稽核要點">
+            <colgroup>
+              <col className="col-seq" />
+              <col />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>項次</th>
+                <th>要點</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditPointRows.map((text, index) => (
+                <tr key={`${index}-${text}`}>
+                  <td className="text-center">{index + 1}</td>
+                  <td>{text}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       {pendingPrepYear != null && (
         <ConfirmDialog

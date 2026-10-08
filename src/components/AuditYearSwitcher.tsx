@@ -3,6 +3,7 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { buildYearSwitchDescription, parseAuditYearDraft } from '../lib/auditYearSwitch'
 import { getPdcaOverview } from '../lib/workflowStatus'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { useNcrUnsavedGuardActions } from '../context/NcrUnsavedGuardContext'
 
 interface AuditYearSwitcherProps {
   store: AuditStore
@@ -14,6 +15,7 @@ interface AuditYearSwitcherProps {
 export function AuditYearSwitcher({ store, compact = false, hideLabel = false, inputAriaLabel = '內稽年度' }: AuditYearSwitcherProps) {
   const { state, switchAuditYear } = store
   const { settings } = state
+  const { confirmIfUnsaved, peekUnsaved } = useNcrUnsavedGuardActions()
   const [yearOverride, setYearOverride] = useState<string | null>(null)
   const [pendingYear, setPendingYear] = useState<number | null>(null)
   const yearDraft = yearOverride ?? String(settings.auditYear)
@@ -30,6 +32,7 @@ export function AuditYearSwitcher({ store, compact = false, hideLabel = false, i
 
   const confirmYearSwitch = () => {
     if (pendingYear == null) return
+    if (!confirmIfUnsaved()) return
     switchAuditYear(pendingYear)
     setPendingYear(null)
     setYearOverride(null)
@@ -62,7 +65,7 @@ export function AuditYearSwitcher({ store, compact = false, hideLabel = false, i
         <ConfirmDialog
           open
           title={`切換至 ${pendingYear} 年？`}
-          description={buildYearSwitchDescription(state, pendingYear)}
+          description={`${buildYearSwitchDescription(state, pendingYear)}${peekUnsaved() ? '\n\nQR-28-03 報告有未存檔變更；切換年度將捨棄未存檔內容。' : ''}`}
           confirmLabel="確認切換"
           variant={getPdcaOverview(state).annualCloseReady ? 'primary' : 'danger'}
           onConfirm={confirmYearSwitch}

@@ -1,0 +1,134 @@
+[
+  {
+    "index": "001",
+    "file": "01_稽核總覽/001_稽核總覽_主頁.png",
+    "label": "稽核總覽_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=dashboard",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 80693,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "002",
+    "file": "02_利害關係人/002_利害關係人_主頁.png",
+    "label": "利害關係人_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=stakeholders",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 130437,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "003",
+    "file": "03_方案風險/003_方案風險_主頁.png",
+    "label": "方案風險_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=risk",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 151163,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "004",
+    "file": "04_人員合格名單/004_人員合格名單_主頁.png",
+    "label": "人員合格名單_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=personnel",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 98139,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "005",
+    "file": "05_年度稽核計畫/005_年度稽核計畫_主頁.png",
+    "label": "年度稽核計畫_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=plan",
+    "width": 1536,
+    "height": 1164,
+    "bytes": 190118,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "006",
+    "file": "06_查檢表/006_查檢表_主頁.png",
+    "label": "查檢表_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=audit",
+    "width": 1536,
+    "height": 1084,
+    "bytes": 254901,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "007",
+    "file": "07_觀察事項/007_觀察事項_主頁.png",
+    "label": "觀察事項_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=observations",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 145698,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "008",
+    "file": "08_不符合/008_不符合_主頁.png",
+    "label": "不符合_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=ncr",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 76095,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "009",
+    "file": "09_第三方建議/009_第三方建議_主頁.png",
+    "label": "第三方建議_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=suggestions",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 95072,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "010",
+    "file": "10_待改善追蹤/010_待改善追蹤_主頁.png",
+    "label": "待改善追蹤_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=followups",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 144612,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "011",
+    "file": "11_外稽準備/011_外稽準備_主頁.png",
+    "label": "外稽準備_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=prep",
+    "width": 1536,
+    "height": 1925,
+    "bytes": 470838,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  },
+  {
+    "index": "012",
+    "file": "12_系統設定/012_系統設定_主頁.png",
+    "label": "系統設定_主頁",
+    "level": 1,
+    "url": "http://127.0.0.1:43124/#tab=system-settings",
+    "width": 1536,
+    "height": 1000,
+    "bytes": 78268,
+    "source": "系統內建示範資料（隔離瀏覽器）"
+  }
+]

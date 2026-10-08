@@ -14,8 +14,6 @@ export const PERSONNEL_ROLE_LABELS: Record<PersonnelRole, string> = {
   trainee_auditor: '實習稽核員',
   management_representative: '管理代表',
   annual_escort: '本年度陪稽核員',
-  third_party_lead_auditor: '第三方主任稽核員',
-  third_party_auditor: '第三方稽核員',
 }
 
 /** 內部稽核人員資格表單用標籤 */

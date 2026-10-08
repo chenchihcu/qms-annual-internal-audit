@@ -175,6 +175,30 @@ describe('getOrCreateAudit', () => {
     expect(audit!.items).toEqual([])
   })
 
+  it('reuses a persisted audit with a legacy ID for the same procedure and department', () => {
+    const state = createCurrentDemoState()
+    const sourceAudit = state.workspace.audits[0]
+    const persistedAudit = {
+      ...sourceAudit,
+      id: 'audit-qp03-single-workspace',
+      qpCode: 'QP-03',
+      department: '品保部',
+      departmentId: 'dept-qa',
+    }
+    state.workspace.audits = [persistedAudit]
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    const { result } = renderHook(() => useAuditStore())
+    const loadedAudit = result.current.state.workspace.audits[0]
+    let resolvedAudit: ReturnType<typeof result.current.getOrCreateAudit> | undefined
+    act(() => {
+      resolvedAudit = result.current.getOrCreateAudit('QP-03', 'dept-qa')
+    })
+
+    expect(resolvedAudit).toBe(loadedAudit)
+    expect(result.current.state.workspace.audits).toEqual([persistedAudit])
+  })
+
   it('creates audit for valid template entry', () => {
     const { result } = renderHook(() => useAuditStore())
 

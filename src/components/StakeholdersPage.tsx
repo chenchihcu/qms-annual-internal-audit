@@ -105,14 +105,14 @@ export function StakeholdersPage({ store }: { store: AuditStore }) {
     <div className="space-y-6">
       <div>
         <ScrollRegion ariaLabel="部門利害關係人一覽">
-          <table className="worksheet-table min-w-[48rem]">
+          <table className="worksheet-table print-stakeholders-table min-w-[48rem]">
             <colgroup>
-              <col className="col-name" />
-              <col className="col-name" />
-              <col />
-              <col className="col-status" />
-              <col className="col-status" />
-              <col />
+              <col className="col-name col-print-dept" />
+              <col className="col-name col-print-owner" />
+              <col className="col-print-stakeholders" />
+              <col className="col-status col-print-risk" />
+              <col className="col-status col-print-priority" />
+              <col className="col-print-arrangement" />
               <col className="col-action no-print" />
             </colgroup>
             <thead>

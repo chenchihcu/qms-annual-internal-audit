@@ -585,7 +585,11 @@ export function useAuditStore() {
     (qpCode: string, departmentId: string): ProcedureAudit => {
       const co = activeCompany
       const auditId = `audit-${qpCode}-${departmentId}`
-      const existing = co.audits.find((a) => a.id === auditId)
+      // ProcedureAuditPanel selects persisted records by this pair. Resolve the
+      // same record here so legacy or event-specific IDs are not duplicated.
+      const existing =
+        co.audits.find((a) => a.qpCode === qpCode && a.departmentId === departmentId) ??
+        co.audits.find((a) => a.id === auditId)
       const entry =
         PROCEDURE_PLAN_TEMPLATE.find(
           (e) => e.qpCode === qpCode && e.departmentId === departmentId,

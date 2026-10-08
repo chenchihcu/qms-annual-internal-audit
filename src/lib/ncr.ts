@@ -283,3 +283,59 @@ export function canTransitionNcrStatus(ncr: NCR, nextStatus: NCRStatus): NcrClos
   if (nextStatus !== '結案') return { ok: true, missing: [] }
   return validateNcrClose(ncr)
 }
+
+export type NcrReportStageId = 'filing' | 'rootCause' | 'corrective' | 'closed'
+
+export interface NcrReportStageProgress {
+  id: NcrReportStageId
+  label: string
+  complete: boolean
+  statusLabel: string
+}
+
+/** QR-28-03 報告四段進度（推導值，不入庫） */
+export function ncrReportProgress(
+  ncr: Pick<NCR, 'description' | 'rootCause' | 'correctiveAction' | 'status'>,
+): NcrReportStageProgress[] {
+  const filing = Boolean(ncr.description?.trim())
+  const rootCause = Boolean(ncr.rootCause?.trim())
+  const corrective = Boolean(ncr.correctiveAction?.trim())
+  const closed = ncr.status === '結案'
+  return [
+    { id: 'filing', label: 'NCR立案', complete: filing, statusLabel: filing ? '已填' : '未填' },
+    { id: 'rootCause', label: '原因分析', complete: rootCause, statusLabel: rootCause ? '已填' : '未填' },
+    { id: 'corrective', label: '矯正措施', complete: corrective, statusLabel: corrective ? '已填' : '未填' },
+    { id: 'closed', label: '結案', complete: closed, statusLabel: closed ? '已結' : '未結' },
+  ]
+}
+
+const NCR_DRAFT_COMPARE_KEYS: Array<keyof NCR> = [
+  'date',
+  'dueDate',
+  'description',
+  'process',
+  'rootCause',
+  'correctiveAction',
+  'correctiveActionReference',
+  'verificationEvidence',
+  'effectivenessReference',
+  'effectivenessVerifiedBy',
+  'effectivenessVerifiedAt',
+  'responsiblePerson',
+  'status',
+  'containment',
+  'classification',
+]
+
+export function ncrDraftEquals(a: NCR, b: NCR): boolean {
+  return NCR_DRAFT_COMPARE_KEYS.every((key) => String(a[key] ?? '') === String(b[key] ?? ''))
+}
+
+export function cloneNcrDraft(ncr: NCR): NCR {
+  return { ...ncr }
+}
+
+export function resolveNcrSourceAuditors(ncr: NCR, audits: ProcedureAudit[]): string {
+  if (!ncr.sourceAuditId) return ''
+  return audits.find((audit) => audit.id === ncr.sourceAuditId)?.auditors ?? ''
+}

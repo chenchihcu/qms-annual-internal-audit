@@ -26,9 +26,22 @@ describe('Personnel list columns', () => {
     expect(trash.textContent).toBe('')
     expect(trash.getAttribute('title')).toBe('移至回收區')
 
+    const statusFilter = screen.getByLabelText('資格狀態')
+    expect(within(statusFilter).queryByRole('option', { name: '暫停' })).toBeNull()
+    expect(within(statusFilter).getByRole('option', { name: '有效' })).toBeTruthy()
+    expect(within(statusFilter).getByRole('option', { name: '失效' })).toBeTruthy()
+
     fireEvent.click(within(table).getAllByRole('button', { name: '編輯' })[0])
     expect(screen.getByLabelText('稽核資格 *')).toBeTruthy()
     expect(screen.getByLabelText('所屬單位 *')).toBeTruthy()
     expect(screen.queryByText('可稽核程序（QP）')).toBeNull()
+    const qualificationStatus = screen.getByLabelText('資格狀態 *')
+    expect(within(qualificationStatus).queryByRole('option', { name: '暫停' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '新增' }))
+    const role = screen.getByLabelText('角色／任命')
+    expect(within(role).queryByRole('option', { name: '第三方主任稽核員' })).toBeNull()
+    expect(within(role).queryByRole('option', { name: '第三方稽核員' })).toBeNull()
+    expect(within(role).getByRole('option', { name: '主任稽核員任命' })).toBeTruthy()
   }, 15000)
 })

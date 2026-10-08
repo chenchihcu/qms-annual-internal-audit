@@ -28,22 +28,24 @@ export function FormalRecordLocationDialog({
 }: FormalRecordLocationDialogProps) {
   const [draft, setDraft] = useState(currentLocation)
   const [error, setError] = useState('')
+  const [previousProps, setPreviousProps] = useState({ open, currentLocation })
   const titleId = useId()
   const descId = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const cancelHandlerRef = useRef(onCancel)
 
-  useEffect(() => {
-    cancelHandlerRef.current = onCancel
-  }, [onCancel])
-
-  useEffect(() => {
+  if (previousProps.open !== open || previousProps.currentLocation !== currentLocation) {
+    setPreviousProps({ open, currentLocation })
     if (open) {
       setDraft(currentLocation)
       setError('')
     }
-  }, [open, currentLocation])
+  }
+
+  useEffect(() => {
+    cancelHandlerRef.current = onCancel
+  }, [onCancel])
 
   useEffect(() => {
     if (!open) return

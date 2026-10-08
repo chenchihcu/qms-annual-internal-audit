@@ -7,6 +7,8 @@ import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
 import { ALL_TABS, parseAppHash, syncHash, type NavigateOptions } from './lib/navigation'
 import { Icon } from './components/ui/Icon'
+import { useNcrUnsavedGuardActions } from './context/NcrUnsavedGuardContext'
+import { NcrUnsavedGuardProvider } from './context/NcrUnsavedGuardProvider'
 const AnnualPlan = lazy(() => import('./components/AnnualPlan').then((module) => ({ default: module.AnnualPlan })))
 const ProcedureAuditPanel = lazy(() => import('./components/ProcedureAuditPanel').then((module) => ({ default: module.ProcedureAuditPanel })))
 const NCRList = lazy(() => import('./components/NCRList').then((module) => ({ default: module.NCRList })))
@@ -49,7 +51,7 @@ class TabErrorBoundary extends Component<
   }
 }
 
-function App() {
+function AppShell() {
   const store = useAuditStore()
   const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
   const { tab, auditKey, section, recordId } = hashState
@@ -58,10 +60,11 @@ function App() {
   const sidebarNavRef = useRef<HTMLElement>(null)
   const mainRef = useRef<HTMLElement>(null)
   const { settings, externalAuditPrep } = store.state
+  const { confirmIfUnsaved } = useNcrUnsavedGuardActions()
   const headerScope = tab === 'prep'
     ? `外稽準備 · ${externalAuditPrep.year} 年`
     : `年度稽核 · ${settings.auditYear} 年`
-  const setTab = (next: TabId, options?: NavigateOptions | string) => {
+  const applyTab = (next: TabId, options?: NavigateOptions | string) => {
     const resolved: NavigateOptions | undefined =
       typeof options === 'string' ? { auditKey: options } : options
     setHashState({
@@ -73,11 +76,22 @@ function App() {
     syncHash(next, options)
     setMobileMenuOpen(false)
   }
+  const setTab = (next: TabId, options?: NavigateOptions | string) => {
+    if (tab === 'ncr' && next !== 'ncr' && !confirmIfUnsaved()) return
+    applyTab(next, options)
+  }
   useEffect(() => {
-    const update = () => setHashState(parseAppHash(window.location.hash))
+    const update = () => {
+      const parsed = parseAppHash(window.location.hash)
+      if (tab === 'ncr' && parsed.tab !== 'ncr' && !confirmIfUnsaved()) {
+        syncHash(tab)
+        return
+      }
+      setHashState(parsed)
+    }
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
-  }, [])
+  }, [tab, confirmIfUnsaved])
   useEffect(() => {
     const activeEntry = ALL_TABS.find((item) => item.id === tab)
     document.title = activeEntry
@@ -259,10 +273,7 @@ function App() {
           </ProcessForm>
         ) : (
           <TabErrorBoundary tabLabel="稽核總覽">
-            <Dashboard
-              state={store.state}
-              onNavigate={setTab}
-            />
+            <Dashboard state={store.state} />
           </TabErrorBoundary>
         )}
         </Suspense>
@@ -272,4 +283,10 @@ function App() {
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <NcrUnsavedGuardProvider>
+      <AppShell />
+    </NcrUnsavedGuardProvider>
+  )
+}
