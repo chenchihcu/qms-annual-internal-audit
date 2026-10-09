@@ -148,6 +148,8 @@ describe('ensureNcrFromChecklistObservation', () => {
     const { ncrs, ncrId } = ensureNcrFromChecklistObservation(audit, itemId, [], 2026)
     expect(ncrId).toBe(`ncr-obs-chk-${itemId}`)
     expect(ncrs).toHaveLength(1)
+    expect(ncrs[0].sourceYear).toBe(2026)
+    expect(ncrs[0].sourceAuditId).toBe(audit.id)
     expect(ncrs[0].status).toBe('開立')
     expect(ncrs[0].checklistItemId).toBe(itemId)
     expect(findNcrForChecklistItem(ncrs, itemId)?.ncrNumber).toMatch(/^NCR-2026-/)

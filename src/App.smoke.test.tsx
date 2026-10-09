@@ -5,6 +5,7 @@ import App from './App'
 const TAB_LABELS = [
   '稽核總覽',
   '利害關係人',
+  '風險來源登錄',
   '方案風險',
   '人員合格名單',
   '年度稽核計畫',
@@ -36,6 +37,7 @@ describe('App tab smoke', () => {
       import('./components/Suggestions'),
       import('./components/PreAuditPrep'),
       import('./components/RiskAssessment'),
+      import('./components/RiskSourcesPage'),
       import('./components/StakeholdersPage'),
       import('./components/SettingsPanel'),
       import('./components/PersonnelPage'),
@@ -50,7 +52,7 @@ describe('App tab smoke', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('renders all eleven sidebar pages and the prep view without crashing', async () => {
+  it('renders all twelve sidebar pages and the prep view without crashing', async () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
@@ -68,7 +70,7 @@ describe('App tab smoke', () => {
     expect(screen.queryByText('外稽準備 無法顯示')).toBeNull()
   }, 30000)
 
-  it('lists eleven tabs without PDCA group headings; prep is a checklist view', () => {
+  it('lists twelve tabs without PDCA group headings; prep is a checklist view', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
     for (const heading of SIDEBAR_GROUP_LABELS) {
@@ -77,7 +79,7 @@ describe('App tab smoke', () => {
     for (const label of TAB_LABELS) {
       expect(within(nav).getByRole('button', { name: label })).toBeTruthy()
     }
-    expect(within(nav).getAllByRole('button')).toHaveLength(11)
+    expect(within(nav).getAllByRole('button')).toHaveLength(12)
     expect(within(nav).queryByRole('button', { name: '外稽準備' })).toBeNull()
   })
 

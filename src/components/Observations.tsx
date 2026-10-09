@@ -6,7 +6,6 @@ import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 import { FOCUS_RING } from '../lib/focusRing'
 import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
 import { exportObservationsExcel } from '../lib/formExport'
-import { MANUAL_OVERRIDE_PLAN_NOTE } from '../lib/planner'
 import { ncrNumberLabel, ncrNumberLabels } from '../lib/ncr'
 import type { ObservationSection } from '../lib/navigation'
 import type { ObservationStatus } from '../types'
@@ -46,7 +45,6 @@ export function Observations({
     addObservationFollowUp,
     carryForwardObservation,
     carryForwardNCR,
-    regeneratePlan,
     moveObservationToTrash,
   } = store
   const { company, settings } = state
@@ -246,7 +244,6 @@ export function Observations({
     for (const ncr of importableNCR) {
       carryForwardNCR(ncr.id, ncr.qpCode, ncr.departmentId)
     }
-    regeneratePlan()
     setShowImportDialog(false)
   }
 
@@ -649,7 +646,7 @@ export function Observations({
         <ConfirmDialog
           open
           title="匯入全部待追蹤項目？"
-          description={`將帶入 ${importableObs.length} 筆前年度觀察事項與 ${importableNCR.length} 筆未結案 NCR 至本年度查檢表，並重新自動編排年度計畫（${MANUAL_OVERRIDE_PLAN_NOTE}）`}
+          description={`將帶入 ${importableObs.length} 筆前年度觀察事項與 ${importableNCR.length} 筆未結案 NCR 至本年度查檢表。年度計畫不會自動重排；需要調整時請至年度計畫頁預覽自動編排。`}
           confirmLabel="確認匯入"
           variant="danger"
           onConfirm={importAllOpen}

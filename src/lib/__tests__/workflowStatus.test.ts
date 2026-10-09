@@ -5,6 +5,7 @@ import {
   canProceedToNextTab,
   getPdcaOverview,
   getTabWorkflowStatus,
+  riskSourceGaps,
   standardReady,
   stakeholdersReady,
 } from '../workflowStatus'
@@ -29,13 +30,59 @@ describe('workflowStatus', () => {
     expect(canProceedToNextTab(state, 'suggestions')).toBe(true)
   })
 
-  it('requires persisted inherent risk for risk tab exit', () => {
+  it('requires confirmed risk assessments of the current year for risk tab exit', () => {
     const state = createDemoState()
     state.workspace.procedureRisks = []
     expect(canProceedToNextTab(state, 'risk')).toBe(false)
     const status = getTabWorkflowStatus(state, 'risk')
     expect(status.gaps).toHaveLength(1)
-    expect(status.gaps[0].message).toMatch(/固有風險已存檔 \d+\/\d+/)
+    expect(status.gaps[0].message).toMatch(/方案風險已確認 0\/\d+/)
+
+    const year = state.settings.auditYear
+    const full = { previousInternalNcrCount: 1, previousThirdPartyNcrCount: 1, overdueOpenNcrCount: 1, customerComplaintLevel: 1, changeImpact: 1, monthsSinceLastAudit: 1 }
+    state.workspace.procedureRisks = state.workspace.planRows.map((row, index) => ({
+      id: `r-${index}`,
+      qpCode: row.qpCode,
+      departmentId: row.departmentId,
+      inherentRisk: 1,
+      ...full,
+      evidenceReference: '',
+      updatedAt: 'x',
+      assessmentYear: year,
+      status: 'draft' as const,
+    }))
+    expect(canProceedToNextTab(state, 'risk')).toBe(false)
+
+    state.workspace.procedureRisks = state.workspace.procedureRisks.map((record) => ({ ...record, status: 'confirmed' as const }))
+    expect(canProceedToNextTab(state, 'risk')).toBe(true)
+
+    state.workspace.procedureRisks = state.workspace.procedureRisks.map((record) => ({ ...record, assessmentYear: year - 1 }))
+    expect(canProceedToNextTab(state, 'risk')).toBe(false)
+  })
+
+  it('reports risk-source gaps on the tab and in the PDCA plan overview', () => {
+    const state = createDemoState()
+    const co = state.workspace
+    co.riskSourceCoverage = {}
+    expect(riskSourceGaps(co, '2026-03-31')).toEqual([
+      '客戶抱怨尚未勾選「已全部登錄」',
+      '重大變更尚未勾選「已全部登錄」',
+      '第三方稽核缺失尚未勾選「已全部登錄」',
+    ])
+    const declared = { checkedThrough: '2026-03-31', reference: 'x', recordedAt: 'x' }
+    co.riskSourceCoverage = { customer_complaint: declared, major_change: declared, third_party_audit: declared }
+    expect(riskSourceGaps(co, '2026-03-31')).toEqual([])
+    expect(riskSourceGaps(co, '2026-04-01')[0]).toContain('只到 2026-03-31')
+    co.riskSourceEvents = [{
+      id: 'e', kind: 'customer_complaint', externalReference: 'CC-1', date: '2026-02-01', summary: '', createdAt: 'x',
+      targets: [{ qpCode: 'QP-01', departmentId: 'dept-qa', linkStatus: 'pending' }],
+    }]
+    expect(riskSourceGaps(co, '2026-03-31')).toEqual(['關聯待確認 1 筆'])
+
+    co.riskSourceCoverage = {}
+    const plan = getPdcaOverview(state).plan
+    expect(plan.ready).toBe(false)
+    expect(plan.gaps.filter((gap) => gap.tab === 'risk-sources').length).toBeGreaterThan(0)
   })
 
   it('requires stakeholder tags for stakeholders tab exit', () => {

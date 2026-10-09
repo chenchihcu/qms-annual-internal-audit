@@ -172,6 +172,8 @@ function emptyYearWorkspace(company: CompanyData): CompanyData {
     ncrs: [],
     observations: [],
     suggestions: [],
+    riskSourceEvents: [],
+    riskSourceCoverage: undefined,
   }
 }
 
@@ -205,6 +207,9 @@ export function switchWorkspaceYear(state: AppState, year: number): AppState {
     planWindowStart: replaceYearInDate(currentSettings.planWindowStart, year)!,
     planWindowEnd: replaceYearInDate(currentSettings.planWindowEnd, year)!,
     managementReviewDate: replaceYearInDate(currentSettings.managementReviewDate, year),
+    planApprovedAt: undefined,
+    planApprovedBy: undefined,
+    planApprovedSignature: undefined,
   }
 
   return {

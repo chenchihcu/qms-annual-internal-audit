@@ -200,6 +200,11 @@ export interface AuditSettings {
   externalAuditDate?: string
   viewRole?: ViewRole
   scoringRules: ScoringRules
+  /** 年度計畫核准（只記錄，不做權限）；重新自動編排會撤銷。 */
+  planApprovedAt?: string
+  planApprovedBy?: string
+  /** 核准當下的計畫內容簽章；之後任何計畫修改使簽章不符，視為未核准。 */
+  planApprovedSignature?: string
 }
 
 export type CompanyRelationshipKind = 'primary_customer'
@@ -532,6 +537,121 @@ export interface CompanyData {
   observations: Observation[]
   suggestions: ThirdPartySuggestion[]
   procedureRisks?: ProcedureRiskRecord[]
+  /** 方案風險的外部來源登錄（客訴／重大變更）；只作風險輸入，不取代原系統的正式紀錄。 */
+  riskSourceEvents?: RiskSourceEvent[]
+  /** 已盤點外部來源的聲明；未盤點時無事件的 QP 視為資料不足，不當作無事件。 */
+  riskSourceCoverage?: Partial<Record<RiskCoverageKind, RiskSourceCoverage>>
+  /** 程序類型（qpCode|departmentId → 類型），由使用者指定；用於引導事件關聯，跨年度沿用。 */
+  procedureProcessTypes?: Partial<Record<string, ProcessType>>
+}
+
+export type ProcessType = 'design' | 'purchasing' | 'production' | 'quality' | 'equipment' | 'document' | 'management'
+
+export type RiskSourceKind = 'customer_complaint' | 'major_change'
+
+/** 「已全部登錄」聲明的類別：兩類外部來源，加上第三方稽核缺失（觀察台帳）。 */
+export type RiskCoverageKind = RiskSourceKind | 'third_party_audit'
+
+export const RISK_COVERAGE_KIND_LABELS: Record<RiskCoverageKind, string> = {
+  customer_complaint: '客戶抱怨',
+  major_change: '重大變更',
+  third_party_audit: '第三方稽核缺失',
+}
+
+export const RISK_SOURCE_KIND_LABELS: Record<RiskSourceKind, string> = {
+  customer_complaint: '客戶抱怨',
+  major_change: '重大變更',
+}
+
+/** 事件與程序的關聯類型：主要控制（發生原因所在）、逃逸控制（未攔截）、其他影響。 */
+export type RiskSourceLinkType = 'primary' | 'escape' | 'other'
+
+/** 關聯確認狀態：只有已確認才計入風險；調查未完成先標待確認。 */
+export type RiskSourceLinkStatus = 'pending' | 'confirmed' | 'not_applicable'
+
+export const RISK_SOURCE_LINK_TYPE_LABELS: Record<RiskSourceLinkType, string> = {
+  primary: '主要控制',
+  escape: '逃逸控制',
+  other: '其他影響',
+}
+
+export const RISK_SOURCE_LINK_STATUS_LABELS: Record<RiskSourceLinkStatus, string> = {
+  pending: '待確認',
+  confirmed: '已確認',
+  not_applicable: '不適用',
+}
+
+/** 事件→程序關聯；不是新的品質事件，原始事件只維護一筆。 */
+export interface RiskSourceTarget {
+  qpCode: string
+  departmentId: string
+  linkType?: RiskSourceLinkType
+  /** 舊資料無此欄視為已確認（當時為明確勾選）。 */
+  linkStatus?: RiskSourceLinkStatus
+  /** 關聯判定依據；確認或判定不適用時必填。 */
+  linkReason?: string
+  linkUpdatedAt?: string
+}
+
+export interface RiskSourceEvent {
+  id: string
+  kind: RiskSourceKind
+  /** 外部系統或表單的紀錄編號（例：客訴登錄表、ECN 編號）。 */
+  externalReference: string
+  date: string
+  summary: string
+  targets: RiskSourceTarget[]
+  createdAt: string
+  updatedAt?: string
+  /** 作廢取代刪除，保留追溯；作廢後不計入風險。 */
+  voidedAt?: string
+  voidReason?: string
+}
+
+export interface RiskSourceCoverage {
+  /** 已盤點至此日期。 */
+  checkedThrough: string
+  /** 盤點依據（例：客訴登錄表 2026-03 版）。 */
+  reference: string
+  recordedAt: string
+}
+
+export type ProcedureRiskFactorKey =
+  | 'inherentRisk'
+  | 'previousInternalNcrCount'
+  | 'previousThirdPartyNcrCount'
+  | 'overdueOpenNcrCount'
+  | 'customerComplaintLevel'
+  | 'changeImpact'
+  | 'monthsSinceLastAudit'
+
+/** 草稿 → 已確認（因子皆有值或已註明未取得）→ 已核准（凍結快照入 revisions）。 */
+export type ProcedureRiskStatus = 'draft' | 'confirmed' | 'approved'
+
+/** 人工值與系統建議（或種子固有風險）不同時的理由紀錄。 */
+export interface ProcedureRiskOverride {
+  factor: ProcedureRiskFactorKey
+  suggested?: number
+  value: number
+  reason: string
+  at: string
+}
+
+export interface ProcedureRiskSnapshot {
+  factors: Partial<Record<ProcedureRiskFactorKey, number>>
+  unavailableFactors: Partial<Record<ProcedureRiskFactorKey, string>>
+  score: number
+  level: RiskLevel | null
+  evidenceReference: string
+}
+
+export interface ProcedureRiskRevision {
+  id: string
+  changedAt: string
+  status: ProcedureRiskStatus
+  assessmentYear: number
+  approvedBy?: string
+  snapshot: ProcedureRiskSnapshot
 }
 
 export interface ProcedureRiskRecord {
@@ -547,6 +667,22 @@ export interface ProcedureRiskRecord {
   monthsSinceLastAudit?: number
   evidenceReference: string
   updatedAt: string
+  /** 舊紀錄無此欄：視為年度待確認，不參與編排。 */
+  assessmentYear?: number
+  status?: ProcedureRiskStatus
+  /** 已查證但無法取得資料的因子 → 理由；以中位數 3 保守計分，不當作零風險。 */
+  unavailableFactors?: Partial<Record<ProcedureRiskFactorKey, string>>
+  /** 客訴／變更等無系統來源因子的外部紀錄依據（例：客訴登錄表編號）。 */
+  factorBasis?: Partial<Record<ProcedureRiskFactorKey, string>>
+  /** 採用系統建議時的來源紀錄 ID（NCR／稽核），供追溯。 */
+  factorSources?: Partial<Record<ProcedureRiskFactorKey, string[]>>
+  /** 人工改值的因子；其餘有系統來源的因子自動帶入。舊紀錄無此欄時，與系統值不同者視為人工。 */
+  manualFactors?: ProcedureRiskFactorKey[]
+  overrides?: ProcedureRiskOverride[]
+  confirmedAt?: string
+  approvedAt?: string
+  approvedBy?: string
+  revisions?: ProcedureRiskRevision[]
 }
 
 export type DataSource = 'demo' | 'user'
@@ -626,6 +762,7 @@ export type TabId =
   | 'prep'
   | 'risk'
   | 'stakeholders'
+  | 'risk-sources'
   | 'personnel'
   | 'system-settings'
 

@@ -18,6 +18,7 @@ const Observations = lazy(() => import('./components/Observations').then((module
 const Suggestions = lazy(() => import('./components/Suggestions').then((module) => ({ default: module.Suggestions })))
 const PreAuditPrep = lazy(() => import('./components/PreAuditPrep').then((module) => ({ default: module.PreAuditPrep })))
 const RiskAssessment = lazy(() => import('./components/RiskAssessment').then((module) => ({ default: module.RiskAssessment })))
+const RiskSourcesPage = lazy(() => import('./components/RiskSourcesPage').then((module) => ({ default: module.RiskSourcesPage })))
 const StakeholdersPage = lazy(() => import('./components/StakeholdersPage').then((module) => ({ default: module.StakeholdersPage })))
 const SettingsPanel = lazy(() => import('./components/SettingsPanel').then((module) => ({ default: module.SettingsPanel })))
 const PersonnelPage = lazy(() => import('./components/PersonnelPage').then((module) => ({ default: module.PersonnelPage })))
@@ -266,6 +267,11 @@ function AppShell() {
             {tab === 'stakeholders' && (
               <TabErrorBoundary tabLabel="利害關係人">
                 <StakeholdersPage store={store} />
+              </TabErrorBoundary>
+            )}
+            {tab === 'risk-sources' && (
+              <TabErrorBoundary tabLabel="風險來源登錄">
+                <RiskSourcesPage store={store} />
               </TabErrorBoundary>
             )}
             {tab === 'risk' && (
