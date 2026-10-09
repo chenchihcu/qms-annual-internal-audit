@@ -98,11 +98,11 @@ export function Suggestions({
     const rows = planRowsForProcedure(sug.procedure)
     const deptId = carryDept[sug.id] ?? sug.departmentId ?? rows[0]?.departmentId ?? ''
     const canCarry = sug.status === 'open' && !sug.carriedToYear && rows.length > 0
+    if (!canCarry) return null
     return (
-      <>
-        {sug.carriedToYear && <span className="w-full text-xs text-tone-info-fg">已帶入 {sug.carriedToYear}</span>}
-        {canCarry && rows.length > 1 && (
-          <div className="w-full">
+      <div className="flex w-full flex-wrap items-end gap-2">
+        {rows.length > 1 && (
+          <div className="w-48">
             <Select
               label="帶入部門"
               value={deptId}
@@ -111,19 +111,17 @@ export function Suggestions({
             />
           </div>
         )}
-        {canCarry && (
-          <Button
-            variant="secondary"
-            className="w-fit shrink-0 whitespace-nowrap"
-            disabled={!deptId}
-            aria-label={`帶入 ${currentYear} 年`}
-            title={`帶入 ${currentYear} 年`}
-            onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
-          >
-            帶入
-          </Button>
-        )}
-      </>
+        <Button
+          variant="secondary"
+          className="w-fit shrink-0 whitespace-nowrap"
+          disabled={!deptId}
+          aria-label={`帶入 ${currentYear} 年`}
+          title={`帶入 ${currentYear} 年`}
+          onClick={() => carryForwardSuggestion(sug.id, sug.procedure, deptId)}
+        >
+          帶入
+        </Button>
+      </div>
     )
   }
 
@@ -235,25 +233,26 @@ export function Suggestions({
                     <td className="font-normal break-words">{sug.procedure}</td>
                     <td className="break-words">{sug.responsibleUnit}</td>
                     <td className="whitespace-pre-wrap break-words">{sug.progress || '—'}</td>
-                    <td><Badge label={statusLabel[sug.status]} /></td>
+                    <td>
+                      <Badge label={statusLabel[sug.status]} />
+                      {sug.carriedToYear && <span className="mt-1 block text-xs text-tone-info-fg">已帶入 {sug.carriedToYear}</span>}
+                    </td>
                     <td className="no-print">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {renderCarryActions(sug)}
-                        <Button
-                          variant="secondary"
-                          className="w-fit shrink-0 whitespace-nowrap px-3"
-                          aria-label={`${sug.year} ${sug.procedure} 建議明細：${sug.issue}`}
-                          aria-expanded={expandedId === sug.id}
-                          aria-controls={`suggestion-detail-${sug.id}`}
-                          onClick={() => setExpandedId(expandedId === sug.id ? null : sug.id)}
-                        >{expandedId === sug.id ? '收合' : '明細'}</Button>
-                      </div>
+                      <Button
+                        variant="secondary"
+                        className="w-fit shrink-0 whitespace-nowrap px-3"
+                        aria-label={`${sug.year} ${sug.procedure} 建議明細：${sug.issue}`}
+                        aria-expanded={expandedId === sug.id}
+                        aria-controls={`suggestion-detail-${sug.id}`}
+                        onClick={() => setExpandedId(expandedId === sug.id ? null : sug.id)}
+                      >{expandedId === sug.id ? '收合' : '明細'}</Button>
                     </td>
                   </tr>
                   <tr id={`suggestion-detail-${sug.id}`} hidden={expandedId !== sug.id || !pagination.isVisible(index)} className="no-print bg-page">
                     <td colSpan={7} className="border p-3">
                       {expandedId === sug.id && (
                         <div className="flex flex-wrap items-end gap-3">
+                          {renderCarryActions(sug)}
                           <div className="min-w-[min(100%,20rem)] flex-1">
                             <label className="mb-1 block text-sm font-bold text-ink" htmlFor={`suggestion-progress-${sug.id}`}>進度</label>
                             <textarea

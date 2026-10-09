@@ -47,10 +47,10 @@ describe('Personnel list columns', () => {
     expect(within(table).getByText('稽核資格')).toBeTruthy()
     expect(within(table).queryByText('適用標準')).toBeNull()
     expect(within(table).queryByText('可稽核程序（QP）')).toBeNull()
-    const trash = within(table).getByRole('button', { name: '移至回收區：王大明' })
-    expect(trash.querySelector('svg')).toBeTruthy()
-    expect(trash.textContent).toBe('')
-    expect(trash.getAttribute('title')).toBe('移至回收區')
+    const firstRow = within(table).getAllByRole('row')[1]
+    expect(within(firstRow).getAllByRole('button').map((button) => button.textContent)).toEqual(['編輯'])
+    expect(within(table).queryByRole('button', { name: /移至回收區/ })).toBeNull()
+    expect(within(table).queryByRole('button', { name: '停用' })).toBeNull()
 
     expect(screen.queryByLabelText('搜尋姓名')).toBeNull()
     expect(screen.queryByLabelText('資格狀態')).toBeNull()
@@ -66,6 +66,30 @@ describe('Personnel list columns', () => {
     const auditorRole = screen.getByRole('checkbox', { name: '內部稽核員' }) as HTMLInputElement
     expect(auditorRole.checked).toBe(true)
     expect(auditorRole.disabled).toBe(true)
+  }, 15000)
+
+  it('keeps deactivate and trash in the edit card, blocked while the form has changes', async () => {
+    const table = await openPersonnel()
+    const row = within(table).getByText('王大明').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: '編輯' }))
+    const trash = screen.getByRole('button', { name: '移至回收區：王大明' })
+    const deactivate = screen.getByRole('button', { name: '停用' })
+    expect(trash.textContent).toBe('移至回收區')
+    expect((trash as HTMLButtonElement).disabled).toBe(false)
+
+    fireEvent.change(screen.getByLabelText('姓名 *'), { target: { value: '王大明二' } })
+    expect((trash as HTMLButtonElement).disabled).toBe(true)
+    expect((deactivate as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText('姓名 *'), { target: { value: '王大明' } })
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    const confirmCancel = screen.queryByRole('button', { name: '放棄變更' })
+    if (confirmCancel) fireEvent.click(confirmCancel)
+    fireEvent.click(within(row).getByRole('button', { name: '編輯' }))
+    fireEvent.click(screen.getByRole('button', { name: '停用' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '停用' }))
+    expect(screen.queryByRole('heading', { name: '編輯人員' })).toBeNull()
+    expect(storedState().people.find((person) => person.name === '王大明')?.active).toBe(false)
   }, 15000)
 
   it('has a single add entry whose fields follow the selected roles', async () => {

@@ -281,8 +281,12 @@ describe('ProcedureAuditPanel', () => {
 
     render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
     const toggle = await screen.findByRole('button', { name: / 稽核設定$/ })
+    const summary = /^(未填稽核日期|\d{4}-\d{2}-\d{2}) · /
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.queryByText(summary)).toBeNull()
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByText(summary)).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: '標記已通知' }))
     await waitFor(() => {
@@ -379,14 +383,18 @@ describe('ProcedureAuditPanel', () => {
     expect(screen.queryByLabelText('發現說明')).toBeNull()
     expect(screen.queryByRole('button', { name: /標不適用/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /移至回收區/ })).toBeNull()
+    expect(screen.queryByRole('columnheader', { name: '操作' })).toBeNull()
+    expect(screen.queryByText('缺客觀證據')).toBeNull()
 
     fireEvent.change(judgment, { target: { value: '符合' } })
     expect(await screen.findByLabelText('客觀證據')).toBeTruthy()
     expect(screen.queryByLabelText('發現說明')).toBeNull()
+    expect(screen.getByText('缺客觀證據')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'QP-28 NO 1 加發現說明' }))
     fireEvent.change(await screen.findByLabelText('發現說明'), { target: { value: '現場說明' } })
     fireEvent.change(screen.getByLabelText('客觀證據'), { target: { value: 'QR-01' } })
+    expect(screen.queryByText('缺客觀證據')).toBeNull()
 
     fireEvent.change(screen.getByLabelText('判定'), { target: { value: '觀察' } })
     expect(await screen.findByLabelText('發現說明')).toHaveProperty('value', '現場說明')

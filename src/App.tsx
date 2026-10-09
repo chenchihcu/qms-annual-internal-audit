@@ -207,8 +207,8 @@ function AppShell() {
             </div>
           </div>
         )}
-        {(store.state.workspaceMigrationConflicts?.length ?? 0) > 0 && (
-          <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        {tab !== 'system-settings' && (store.state.workspaceMigrationConflicts?.length ?? 0) > 0 && (
+          <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-tone-warning-line bg-tone-warning-bg px-4 py-3 text-sm text-tone-warning-fg">
             <span>有 {store.state.workspaceMigrationConflicts?.length} 項資料待覆核；判定衝突不會計分。</span>
             <button type="button" className="font-bold underline underline-offset-2" onClick={() => setTab('system-settings')}>查看待覆核資料</button>
           </div>

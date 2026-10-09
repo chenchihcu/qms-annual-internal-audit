@@ -50,10 +50,10 @@ describe('PreAuditPrep', () => {
     expect(screen.queryByText(/九潤|正隆興|法人與共用兩類|兩家公司|兩家各自|兩張證書|兩證|合併抬頭|適用公司/)).toBeNull()
   })
 
-  it('shows visible prep checklist progress without toolbar year meta', () => {
+  it('leaves prep progress to the view switch and keeps toolbar year meta off', () => {
     const store = makeStore()
     render(<PreAuditPrep store={store} />)
-    expect(screen.getByText(/準備清單 \d+\/\d+/)).toBeTruthy()
+    expect(screen.queryByText(/準備清單 \d+\/\d+/)).toBeNull()
     expect(screen.queryByText(/\d{4} 年 · 外稽/)).toBeNull()
   })
 

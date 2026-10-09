@@ -3,7 +3,6 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import type { TabId } from '../types'
 import {
   EXTERNAL_AUDIT_PREP_SEED,
-  countPrepProgress,
   effectiveExternalAuditDate,
   evaluatePrepSequence,
   hasManagementReviewMismatch,
@@ -40,7 +39,6 @@ export function PreAuditPrep({
     switchPrepYear,
   } = store
   const { settings, externalAuditPrep } = state
-  const { done, total } = countPrepProgress(externalAuditPrep)
   const seed = EXTERNAL_AUDIT_PREP_SEED
   const [prepYearDraft, setPrepYearDraft] = useState<string | null>(null)
   const [pendingPrepYear, setPendingPrepYear] = useState<number | null>(null)
@@ -148,7 +146,6 @@ export function PreAuditPrep({
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportPrepExcel(state)}>匯出 Excel</Button>
-              <span className="text-sm text-muted">準備清單 {done}/{total}</span>
             </div>
           </div>
         </div>

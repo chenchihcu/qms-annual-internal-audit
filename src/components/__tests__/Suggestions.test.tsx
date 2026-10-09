@@ -20,10 +20,13 @@ describe('Suggestions 一覽', () => {
     const firstRow = within(table).getAllByRole('row')[1]
     expect(within(firstRow).queryByRole('textbox')).toBeNull()
     expect(within(firstRow).queryByRole('combobox')).toBeNull()
+    expect(within(firstRow).getAllByRole('button')).toHaveLength(1)
 
     const detail = within(firstRow).getByRole('button', { name: /建議明細/ })
     fireEvent.click(detail)
     expect(detail.getAttribute('aria-expanded')).toBe('true')
+    const detailRow = document.getElementById(detail.getAttribute('aria-controls') ?? '')!
+    expect(within(detailRow).getByRole('button', { name: /^帶入 \d{4} 年$/ })).toBeTruthy()
     const progress = within(table).getByRole('textbox', { name: /建議進度/ })
     fireEvent.change(progress, { target: { value: '已完成複查' } })
     expect(within(firstRow).getByText('已完成複查')).toBeTruthy()

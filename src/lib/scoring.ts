@@ -18,20 +18,24 @@ export interface ScoreResult {
   }
 }
 
-function isJudgmentSidePending(judgment: Judgment | null | undefined, item: ChecklistItem): boolean {
-  if (!judgment) return true
+export type ChecklistPendingReason = '未判定' | '缺客觀證據' | '缺不適用理由'
+
+/** 查檢項尚不可計分的原因；可計分時回傳 null */
+export function checklistPendingReason(item: ChecklistItem): ChecklistPendingReason | null {
+  const { judgment } = item
+  if (!judgment) return '未判定'
   if (judgment === '不適用') {
-    return !item.notApplicableReason?.trim() && !item.description?.trim()
+    return !item.notApplicableReason?.trim() && !item.description?.trim() ? '缺不適用理由' : null
   }
   if (itemNeedsObjectiveEvidence({ ...item, judgment })) {
-    return !itemHasObjectiveEvidence(item)
+    return itemHasObjectiveEvidence(item) ? null : '缺客觀證據'
   }
-  return false
+  return null
 }
 
 /** 未判定、缺客觀證據，或不適用但未填理由 */
 export function isChecklistItemPending(item: ChecklistItem): boolean {
-  return isJudgmentSidePending(item.judgment, item)
+  return checklistPendingReason(item) !== null
 }
 
 function applyJudgmentToBreakdown(

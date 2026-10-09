@@ -101,7 +101,7 @@ export function PrepTaskTable({
             return (
               <tr
                 key={itemState.id}
-                className={`${hidden ? 'pagination-hidden-row ' : ''}${done ? 'bg-green-50/30' : ''}`}
+                className={hidden ? 'pagination-hidden-row' : undefined}
               >
                 <td className="text-center align-top font-normal">{displayNo}</td>
                 <td className="align-top">

@@ -285,9 +285,13 @@ describe('App tab smoke', () => {
     expect((screen.getByLabelText('內稽年度') as HTMLInputElement).value).toBe('2026')
   })
 
-  it('asks before converting observation to NCR', async () => {
+  it('asks before converting observation to NCR from the expanded record', async () => {
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: '觀察事項' }))
+    const list = await screen.findByRole('region', { name: '觀察事項紀錄一覽' }, { timeout: 10000 })
+    const firstRow = within(list).getAllByRole('row')[1]
+    expect(within(firstRow).queryByRole('button', { name: '轉為 NCR' })).toBeNull()
+    fireEvent.click(within(firstRow).getAllByRole('button', { expanded: false })[0])
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: '轉為 NCR' }).length).toBeGreaterThan(0)
     })
