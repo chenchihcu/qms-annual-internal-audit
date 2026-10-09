@@ -128,6 +128,31 @@ describe('deriveRiskFactors', () => {
     expect(result.monthsSinceLastAudit.sources[0].id).toBe('a-2025')
   })
 
+  it('needs third-party evidence for this procedure or a current declaration before scoring 0 件', () => {
+    const otherProcedureFinding: Observation = {
+      id: 'o-other',
+      year: 2026,
+      qpCode: 'QP-03',
+      departmentId: DEPT,
+      department: '品保部',
+      process: '',
+      content: '外稽觀察',
+      description: '',
+      status: 'open',
+      sourceType: 'third_party_audit',
+    }
+    const unrelated = buildRiskDerivationPool({ workspace: workspace({ observations: [otherProcedureFinding] }), settings, yearArchives: {} }, '2026-03-31')
+    expect(deriveRiskFactors(unrelated, QP, DEPT).previousThirdPartyNcrCount.status).toBe('no_data')
+    expect(deriveRiskFactors(unrelated, 'QP-03', DEPT).previousThirdPartyNcrCount.status).toBe('no_events')
+
+    const declared = buildRiskDerivationPool({
+      workspace: workspace({ riskSourceCoverage: { third_party_audit: { checkedThrough: '2026-03-31', reference: '觀察台帳', recordedAt: 'x' } } }),
+      settings,
+      yearArchives: {},
+    }, '2026-03-31')
+    expect(deriveRiskFactors(declared, QP, DEPT).previousThirdPartyNcrCount.status).toBe('no_events')
+  })
+
   it('distinguishes no events (audited) from no data (never audited in period)', () => {
     const audited = buildRiskDerivationPool({
       workspace: workspace({ audits: [audit('a', '2026-01-15', [])] }),
@@ -157,6 +182,8 @@ describe('deriveRiskFactors', () => {
 })
 
 describe('external source register → complaint／change factors', () => {
+  const poolAt = (state: Parameters<typeof buildRiskDerivationPool>[0]) => buildRiskDerivationPool(state, '2026-03-31')
+
   const event = (id: string, extra: Partial<RiskSourceEvent> = {}): RiskSourceEvent => ({
     id,
     kind: 'customer_complaint',
@@ -168,13 +195,19 @@ describe('external source register → complaint／change factors', () => {
     ...extra,
   })
 
-  it('counts non-voided events in the period (previous year + this year) as a quantity', () => {
-    const pool = buildRiskDerivationPool({
-      workspace: workspace({ riskSourceEvents: [event('a'), event('v', { voidedAt: 'x', voidReason: '誤登' })] }),
+  it('counts non-voided events dated in the period (previous year + this year) as a quantity', () => {
+    const pool = poolAt({
+      workspace: workspace({
+        riskSourceEvents: [
+          event('a'),
+          event('v', { voidedAt: 'x', voidReason: '誤登' }),
+          event('late-entry-old-date', { date: '2024-12-31' }),
+        ],
+      }),
       settings,
       yearArchives: {
-        2025: { workspace: workspace({ riskSourceEvents: [event('p')] }), settings },
-        2024: { workspace: workspace({ riskSourceEvents: [event('old')] }), settings },
+        2025: { workspace: workspace({ riskSourceEvents: [event('p', { date: '2025-06-01' })] }), settings },
+        2024: { workspace: workspace({ riskSourceEvents: [event('old', { date: '2024-05-01' })] }), settings },
       },
     })
     const result = deriveRiskFactors(pool, QP, DEPT).customerComplaintLevel
@@ -185,7 +218,7 @@ describe('external source register → complaint／change factors', () => {
   })
 
   it('counts the same external reference only once', () => {
-    const pool = buildRiskDerivationPool({
+    const pool = poolAt({
       workspace: workspace({ riskSourceEvents: [event('a', { externalReference: 'CC-1' }), event('b', { externalReference: ' cc-1 ' })] }),
       settings,
       yearArchives: {},
@@ -194,7 +227,7 @@ describe('external source register → complaint／change factors', () => {
   })
 
   it('treats a declared coverage with no events as 無, and no declaration as no data', () => {
-    const declared = buildRiskDerivationPool({
+    const declared = poolAt({
       workspace: workspace({ riskSourceCoverage: { major_change: { checkedThrough: '2026-03-31', reference: 'ECN 清冊', recordedAt: 'x' } } }),
       settings,
       yearArchives: {},
@@ -208,7 +241,7 @@ describe('external source register → complaint／change factors', () => {
   it('counts only confirmed links; pending links block a 無事件 conclusion', () => {
     const coverage = { customer_complaint: { checkedThrough: '2026-03-31', reference: '客訴登錄表', recordedAt: 'x' } }
     const target = (linkStatus: 'pending' | 'confirmed' | 'not_applicable') => [{ qpCode: QP, departmentId: DEPT, linkStatus }]
-    const pending = buildRiskDerivationPool({
+    const pending = poolAt({
       workspace: workspace({ riskSourceCoverage: coverage, riskSourceEvents: [event('a', { targets: target('pending') })] }),
       settings,
       yearArchives: {},
@@ -217,7 +250,7 @@ describe('external source register → complaint／change factors', () => {
     expect(blocked.status).toBe('no_data')
     expect(blocked.note).toContain('1 件關聯待確認')
 
-    const mixed = buildRiskDerivationPool({
+    const mixed = poolAt({
       workspace: workspace({
         riskSourceEvents: [
           event('a', { externalReference: 'CC-1', targets: target('confirmed') }),
@@ -232,7 +265,7 @@ describe('external source register → complaint／change factors', () => {
     expect(counted.count).toBe(1)
     expect(counted.note).toContain('另有 1 件關聯待確認')
 
-    const notApplicable = buildRiskDerivationPool({
+    const notApplicable = poolAt({
       workspace: workspace({ riskSourceCoverage: coverage, riskSourceEvents: [event('c', { targets: target('not_applicable') })] }),
       settings,
       yearArchives: {},
@@ -240,8 +273,20 @@ describe('external source register → complaint／change factors', () => {
     expect(deriveRiskFactors(notApplicable, QP, DEPT).customerComplaintLevel.status).toBe('no_events')
   })
 
+  it('does not treat stale coverage as 0 件 once the assessment date passes the cutoff', () => {
+    const state = {
+      workspace: workspace({ riskSourceCoverage: { customer_complaint: { checkedThrough: '2026-03-31', reference: '清冊', recordedAt: 'x' } } }),
+      settings,
+      yearArchives: {},
+    }
+    expect(deriveRiskFactors(buildRiskDerivationPool(state, '2026-03-31'), QP, DEPT).customerComplaintLevel.status).toBe('no_events')
+    const stale = deriveRiskFactors(buildRiskDerivationPool(state, '2026-10-09'), QP, DEPT).customerComplaintLevel
+    expect(stale.status).toBe('no_data')
+    expect(stale.note).toContain('只到 2026-03-31')
+  })
+
   it('does not attribute an event to unrelated QP rows', () => {
-    const pool = buildRiskDerivationPool({ workspace: workspace({ riskSourceEvents: [event('a')] }), settings, yearArchives: {} })
+    const pool = poolAt({ workspace: workspace({ riskSourceEvents: [event('a')] }), settings, yearArchives: {} })
     expect(deriveRiskFactors(pool, 'QP-03', DEPT).customerComplaintLevel.status).toBe('no_data')
   })
 })

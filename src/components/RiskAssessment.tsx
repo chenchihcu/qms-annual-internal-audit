@@ -11,6 +11,7 @@ import {
   RISK_FACTOR_KEYS,
   RISK_STATUS_LABELS,
   assessProcedurePriority,
+  assessRiskRecord,
   effectiveRiskStatus,
   factorKind,
   factorNames,
@@ -71,18 +72,54 @@ function buildDraft(saved: ProcedureRiskRecord | undefined, derived: DerivedRisk
 }
 
 /** 與已存內容比較用（不含理由暫存）。 */
+type FactorSources = Partial<Record<ProcedureRiskFactorKey, string[]>>
+
+function isManualDraft(draft: RowDraft, derived: DerivedRiskFactors, key: ProcedureRiskFactorKey): boolean {
+  const value = draft.values[key]
+  return draft.manual.includes(key) && value != null && value !== derived[key].suggested
+}
+
+/** 自動帶入因子的來源紀錄 ID；存檔與未存判斷共用，來源增減（即使分級不變）也會標示未存。 */
+function draftSources(draft: RowDraft, derived: DerivedRiskFactors): FactorSources {
+  const sources: FactorSources = {}
+  for (const key of RISK_FACTOR_KEYS) {
+    if (isManualDraft(draft, derived, key) || draft.values[key] == null || derived[key].sources.length === 0) continue
+    sources[key] = derived[key].sources.map((source) => source.id)
+  }
+  return sources
+}
+
+function normalizedSources(sources: FactorSources | undefined): FactorSources {
+  const result: FactorSources = {}
+  for (const key of RISK_FACTOR_KEYS) {
+    const ids = sources?.[key]
+    if (ids && ids.length > 0) result[key] = [...ids].sort()
+  }
+  return result
+}
+
 function storedSignature(saved: ProcedureRiskRecord): string {
   const values: FactorValues = {}
   for (const key of RISK_FACTOR_KEYS) if (saved[key] != null) values[key] = saved[key]
-  return JSON.stringify({ values, unavailable: saved.unavailableFactors ?? {}, evidence: saved.evidenceReference ?? '' })
+  return JSON.stringify({
+    values,
+    unavailable: saved.unavailableFactors ?? {},
+    sources: normalizedSources(saved.factorSources),
+    evidence: saved.evidenceReference ?? '',
+  })
 }
 
-function draftSignature(draft: RowDraft): string {
+function draftSignature(draft: RowDraft, derived: DerivedRiskFactors): string {
   const values: FactorValues = {}
   for (const key of RISK_FACTOR_KEYS) if (draft.values[key] != null) values[key] = draft.values[key]
   const unavailable: FactorText = {}
   for (const key of RISK_FACTOR_KEYS) if (draft.values[key] == null && key in draft.unavailable) unavailable[key] = draft.unavailable[key] ?? ''
-  return JSON.stringify({ values, unavailable, evidence: draft.evidenceReference.trim() })
+  return JSON.stringify({
+    values,
+    unavailable,
+    sources: normalizedSources(draftSources(draft, derived)),
+    evidence: draft.evidenceReference.trim(),
+  })
 }
 
 /** 人工值與系統值不同（或系統無值）且為本次新改 → 須選理由。 */
@@ -113,7 +150,6 @@ function buildSavePlan(
   const patch: Partial<ProcedureRiskRecord> = { evidenceReference: draft.evidenceReference.trim(), inherentRisk: draft.values.inherentRisk }
   const overrides: ProcedureRiskOverride[] = []
   const unavailableFactors: FactorText = {}
-  const factorSources: Partial<Record<ProcedureRiskFactorKey, string[]>> = {}
   const manualFactors: ProcedureRiskFactorKey[] = []
 
   for (const key of RISK_FACTOR_KEYS) {
@@ -123,18 +159,14 @@ function buildSavePlan(
       if (!isReasonFilled(draft.unavailable[key])) return { ok: false, error: `${factorNames[key]}勾選未取得時須選理由。` }
       unavailableFactors[key] = draft.unavailable[key]!.trim()
     }
-    const isManual = draft.manual.includes(key) && value != null && value !== derived[key].suggested
-    if (isManual) manualFactors.push(key)
+    if (isManualDraft(draft, derived, key)) manualFactors.push(key)
     if (reasonRequired(key, draft, saved, derived)) {
       if (!isReasonFilled(draft.reasons[key])) return { ok: false, error: `${factorNames[key]}為人工值，須選調整理由。` }
       overrides.push({ factor: key, suggested: derived[key].suggested, value: value!, reason: draft.reasons[key]!.trim(), at: now })
     }
-    if (!isManual && value != null && derived[key].sources.length > 0) {
-      factorSources[key] = derived[key].sources.map((source) => source.id)
-    }
   }
   patch.unavailableFactors = unavailableFactors
-  patch.factorSources = factorSources
+  patch.factorSources = draftSources(draft, derived)
   patch.manualFactors = manualFactors
   return { ok: true, plan: { patch, overrides } }
 }
@@ -410,10 +442,12 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     const draft = getDraft(row)
     const savedThisYear = savedThisYearStatus(status)
     /** 已存列：工作值（含自動帶入的新來源）與已存值不同即待存檔。 */
-    const dirty = savedThisYear ? draftSignature(draft) !== storedSignature(saved!) : false
+    const dirty = savedThisYear ? draftSignature(draft, derivedFor(row)) !== storedSignature(saved!) : false
+    /** 列印只呈現已存（本年度）的值，避免未存或未核准的畫面值被印成正式結果。 */
+    const printed = savedThisYear ? assessRiskRecord(saved!) : null
     const blockers = saved ? riskConfirmBlockers(saved) : []
     const assessment = assessProcedurePriority(workingInput(draft.values), workingUnavailable(draft))
-    return { row, saved, status, draft, dirty, savedThisYear, blockers, assessment }
+    return { row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }
   })
   const pendingRows = rowStates.filter((item) => !item.savedThisYear || item.dirty)
   const confirmable = rowStates.filter((item) => item.status === 'draft' && !item.dirty && item.blockers.length === 0)
@@ -545,7 +579,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 </tr>
               </thead>
               <tbody>
-                {rowStates.map(({ row, saved, status, draft, dirty, savedThisYear, blockers, assessment }, rowIndex) => {
+                {rowStates.map(({ row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }, rowIndex) => {
                   const key = rowKey(row)
                   const derived = derivedFor(row)
                   const hiddenClass = !pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''
@@ -576,14 +610,23 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                               <span className="text-xs font-bold text-ink">{label}</span>
                               <span className={`text-xs ${marker.tone}`}>{marker.text}</span>
                             </button>
-                            <span className="print-only text-xs">{label}</span>
+                            <span className="print-only text-xs">
+                              {!savedThisYear || !saved
+                                ? '—'
+                                : saved[factor] != null
+                                  ? formatFactorLabel(factor, saved[factor])
+                                  : saved.unavailableFactors?.[factor] ? '未取得' : '—'}
+                            </span>
                           </td>
                         )
                       })}
                       <td className="align-top">
-                        <span className="font-bold">{assessment.score}</span>
-                        {assessment.provisional && <span className="ml-1 text-xs text-muted">暫估</span>}
-                        <span className="mt-1 block">
+                        <span className="print-only text-xs">
+                          {printed ? `${printed.score} ${printed.level ?? '資料不足'}` : '未存檔'}
+                        </span>
+                        <span className="no-print font-bold">{assessment.score}</span>
+                        {assessment.provisional && <span className="no-print ml-1 text-xs text-muted">暫估</span>}
+                        <span className="no-print mt-1 block">
                           {assessment.level ? (
                             <span className="inline-flex flex-wrap items-center gap-1">
                               <Badge label={assessment.level} />
@@ -615,7 +658,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                           className="no-print min-w-[6rem]"
                           ariaLabel={`${row.qpCode} 證據引用`}
                         />
-                        <span className="print-only text-xs">{draft.evidenceReference || '—'}</span>
+                        <span className="print-only text-xs">{(savedThisYear && saved?.evidenceReference) || '—'}</span>
                       </td>
                       <td className="align-top no-print">
                         {errors[key] && <p className="mb-1 text-xs font-bold text-danger" role="alert">{errors[key]}</p>}

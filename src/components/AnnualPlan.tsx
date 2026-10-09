@@ -11,7 +11,7 @@ import { effectiveExternalAuditDate } from '../lib/externalAuditPrep'
 import { FOCUS_RING } from '../lib/focusRing'
 import { buildAppHash } from '../lib/navigation'
 import { getDisplayMonthStatus, type MonthCellChoice } from '../lib/planStatus'
-import { buildRegeneratedPlanRows, describePlanChanges, type PlanChangeRow } from '../lib/planRegeneration'
+import { buildRegeneratedPlanRows, describePlanChanges, isPlanApprovalCurrent, type PlanChangeRow } from '../lib/planRegeneration'
 import { isRiskConfirmedForYear } from '../lib/risk'
 import { auditorCandidates, departmentMemberCandidates, resolveLeadAuditorPersonId } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
@@ -163,6 +163,8 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
     settings.auditYear,
   )).length
   const planApprovedAt = settings.planApprovedAt?.slice(0, 10)
+  /** 核准後若計畫或窗口被修改（簽章不符），顯示需重新核准。 */
+  const approvalCurrent = isPlanApprovalCurrent(state)
   const hasScheduledMonth = company.planRows.some((row) => row.months.some(Boolean))
 
   const openRegenPreview = () => {
@@ -199,12 +201,14 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
             <span className="text-muted">（點月格可選排程或滿意／不滿意／矯正中／矯正圓滿；未手選時仍由查檢與 NCR 推導）</span>
           </div>
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-            <span className="text-sm text-muted" role="status">
-              {planApprovedAt
+            <span className={`text-sm ${planApprovedAt && !approvalCurrent ? 'text-tone-warning-fg' : 'text-muted'}`} role="status">
+              {approvalCurrent
                 ? `計畫已核准 ${planApprovedAt}${settings.planApprovedBy ? `・${settings.planApprovedBy}` : ''}`
-                : '計畫尚未核准'}
+                : planApprovedAt
+                  ? `計畫於 ${planApprovedAt} 核准後已修改，需重新核准`
+                  : '計畫尚未核准'}
             </span>
-            {!planApprovedAt && (
+            {!approvalCurrent && (
               <Button
                 variant="secondary"
                 disabled={!hasScheduledMonth || !appointedLeadAuditor}
@@ -224,7 +228,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
             description={`未手動調整的計畫列，將依日期、利害關係人與風險重排月格（寫入擬定）。已手動調整的列會保留。方案風險已確認 ${riskConfirmedCount}/${company.planRows.length} 列，其餘以程序種子與部門 O×S 估算。`}
             rows={regenPreview}
             applyLabel="套用編排"
-            onApply={() => (planApprovedAt ? setRevokeConfirm(true) : applyRegeneration())}
+            onApply={() => (approvalCurrent ? setRevokeConfirm(true) : applyRegeneration())}
             onCancel={() => setRegenPreview(null)}
           />
         )}

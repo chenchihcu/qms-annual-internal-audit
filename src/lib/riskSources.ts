@@ -1,4 +1,4 @@
-import type { RiskSourceEvent, RiskSourceKind, RiskSourceLinkStatus, RiskSourceTarget } from '../types'
+import type { RiskSourceCoverage, RiskSourceEvent, RiskSourceKind, RiskSourceLinkStatus, RiskSourceTarget } from '../types'
 import { isReasonFilled } from './reasonOptions'
 
 export interface RiskSourceEventDraft {
@@ -10,6 +10,11 @@ export interface RiskSourceEventDraft {
 }
 
 export type RiskSourceDraftErrors = Partial<Record<'externalReference' | 'date' | 'summary' | 'targets', string>>
+
+/** 「已全部登錄」只在盤點日期涵蓋到評估日（今天）時有效；之後的紀錄尚未盤點。 */
+export function isCoverageCurrent(coverage: RiskSourceCoverage | undefined, today: string): boolean {
+  return Boolean(coverage && coverage.checkedThrough >= today)
+}
 
 export function targetKey(target: Pick<RiskSourceTarget, 'qpCode' | 'departmentId'>): string {
   return `${target.qpCode}|${target.departmentId}`

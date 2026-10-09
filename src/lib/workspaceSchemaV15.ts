@@ -209,6 +209,7 @@ export function switchWorkspaceYear(state: AppState, year: number): AppState {
     managementReviewDate: replaceYearInDate(currentSettings.managementReviewDate, year),
     planApprovedAt: undefined,
     planApprovedBy: undefined,
+    planApprovedSignature: undefined,
   }
 
   return {

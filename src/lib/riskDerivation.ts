@@ -6,12 +6,14 @@ import type {
   Observation,
   ProcedureAudit,
   ProcedureRiskFactorKey,
+  RiskCoverageKind,
   RiskSourceCoverage,
   RiskSourceEvent,
   RiskSourceKind,
 } from '../types'
+import { localIsoDate } from './localDate'
 import { countToScale, monthsToScale, seedInherentScale, scaleToInherentLabel } from './risk'
-import { effectiveLinkStatus } from './riskSources'
+import { effectiveLinkStatus, isCoverageCurrent } from './riskSources'
 
 /**
  * 方案風險因子建議值：只讀既有紀錄，不寫入 procedureRisks。
@@ -58,19 +60,21 @@ export interface RiskDerivationPool {
   ncrById: Map<string, Located<NCR>>
   itemById: Map<string, LocatedItem>
   observationById: Map<string, Located<Observation>>
-  hasThirdPartyRecordsInPeriod: boolean
   windowStart: string
-  /** 期間內（前一年度＋本年度）未作廢的外部來源登錄。 */
+  /** 評估日（本地日期）；「已全部登錄」須涵蓋到此日才有效。 */
+  today: string
+  /** 事件日期落在期間內（前一年度 1/1 起）且未作廢的外部來源登錄。 */
   sourceEvents: Located<RiskSourceEvent>[]
   /** 只採本年度工作區的盤點聲明。 */
-  sourceCoverage: Partial<Record<RiskSourceKind, RiskSourceCoverage>>
+  sourceCoverage: Partial<Record<RiskCoverageKind, RiskSourceCoverage>>
 }
 
 type PoolSource = Pick<AppState, 'workspace' | 'yearArchives' | 'settings'>
 
 /** 本年度一律讀工作區；封存中同年度的鍵是切換年度時留下的舊副本，略過。 */
-export function buildRiskDerivationPool(state: PoolSource): RiskDerivationPool {
+export function buildRiskDerivationPool(state: PoolSource, today: string = localIsoDate()): RiskDerivationPool {
   const auditYear = state.settings.auditYear
+  const periodStart = `${auditYear - 1}-01-01`
   const sources: Array<{ year: number; workspace: PoolSource['workspace'] }> = [
     { year: auditYear, workspace: state.workspace },
   ]
@@ -91,7 +95,7 @@ export function buildRiskDerivationPool(state: PoolSource): RiskDerivationPool {
 
   for (const { year, workspace } of sources) {
     for (const event of workspace.riskSourceEvents ?? []) {
-      if (event.voidedAt || seenEvents.has(event.id) || year < auditYear - 1) continue
+      if (event.voidedAt || seenEvents.has(event.id) || !event.date || event.date < periodStart) continue
       seenEvents.add(event.id)
       sourceEvents.push({ record: event, year })
     }
@@ -126,10 +130,8 @@ export function buildRiskDerivationPool(state: PoolSource): RiskDerivationPool {
     ncrById,
     itemById,
     observationById,
-    hasThirdPartyRecordsInPeriod: observations.some(
-      (o) => o.record.sourceType === 'third_party_audit' && o.year >= previousYear,
-    ),
     windowStart: state.settings.planWindowStart || `${auditYear}-01-01`,
+    today,
     sourceEvents,
     sourceCoverage: state.workspace.riskSourceCoverage ?? {},
   }
@@ -292,14 +294,17 @@ function sourceEventFactor(
     return { status: 'no_data', sources: [], note: `${pendingCount} 件關聯待確認，確認前不判定為無事件` }
   }
   const coverage = pool.sourceCoverage[kind]
-  if (coverage) {
+  if (isCoverageCurrent(coverage, pool.today)) {
     return {
       status: 'no_events',
       count: 0,
       suggested: countToScale(0),
       sources: [],
-      note: `已全部登錄至 ${coverage.checkedThrough}，期間內無關聯此程序的紀錄`,
+      note: `已全部登錄至 ${coverage!.checkedThrough}，期間內無關聯此程序的紀錄`,
     }
+  }
+  if (coverage) {
+    return { status: 'no_data', sources: [], note: `「已全部登錄」只到 ${coverage.checkedThrough}，之後尚未盤點，無法判定為 0 件` }
   }
   return { status: 'no_data', sources: [], note: '尚無登錄，也未勾選「已全部登錄」，無法判定為 0 件' }
 }
@@ -310,7 +315,7 @@ export function deriveRiskFactors(
   departmentId: string,
   options: { today?: string; seedFallback?: RiskLevel } = {},
 ): DerivedRiskFactors {
-  const today = options.today ?? new Date().toISOString().slice(0, 10)
+  const today = options.today ?? pool.today
   const keyNcrs = pool.ncrs.filter((located) => matchesKey(located.record, qpCode, departmentId))
   const periodNcrs = keyNcrs.filter((located) => located.year >= pool.previousYear)
   const periodEvents = groupEvents(pool, periodNcrs, today)
@@ -325,10 +330,15 @@ export function deriveRiskFactors(
     `${periodNote} 無此程序的稽核紀錄，無法判定`,
     periodNote,
   )
+  // 第三方：此程序在期間內有第三方稽核觀察，或已聲明第三方缺失「已全部登錄」到今天，才可判為 0 件。
+  const keyThirdPartyRecords = pool.observations.some((located) =>
+    located.record.sourceType === 'third_party_audit'
+    && located.year >= pool.previousYear
+    && matchesKey(located.record, qpCode, departmentId))
   const thirdParty = countFactor(
     periodEvents.filter((event) => event.thirdParty),
-    pool.hasThirdPartyRecordsInPeriod,
-    `${periodNote} 系統內無第三方稽核登錄（只以觀察登錄、未轉 NCR 者不計）`,
+    keyThirdPartyRecords || isCoverageCurrent(pool.sourceCoverage.third_party_audit, pool.today),
+    `${periodNote} 此程序無第三方稽核紀錄，且第三方缺失未勾選「已全部登錄」`,
     periodNote,
   )
 

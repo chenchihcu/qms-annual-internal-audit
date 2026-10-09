@@ -203,6 +203,8 @@ export interface AuditSettings {
   /** 年度計畫核准（只記錄，不做權限）；重新自動編排會撤銷。 */
   planApprovedAt?: string
   planApprovedBy?: string
+  /** 核准當下的計畫內容簽章；之後任何計畫修改使簽章不符，視為未核准。 */
+  planApprovedSignature?: string
 }
 
 export type CompanyRelationshipKind = 'primary_customer'
@@ -538,7 +540,7 @@ export interface CompanyData {
   /** 方案風險的外部來源登錄（客訴／重大變更）；只作風險輸入，不取代原系統的正式紀錄。 */
   riskSourceEvents?: RiskSourceEvent[]
   /** 已盤點外部來源的聲明；未盤點時無事件的 QP 視為資料不足，不當作無事件。 */
-  riskSourceCoverage?: Partial<Record<RiskSourceKind, RiskSourceCoverage>>
+  riskSourceCoverage?: Partial<Record<RiskCoverageKind, RiskSourceCoverage>>
   /** 程序類型（qpCode|departmentId → 類型），由使用者指定；用於引導事件關聯，跨年度沿用。 */
   procedureProcessTypes?: Partial<Record<string, ProcessType>>
 }
@@ -546,6 +548,15 @@ export interface CompanyData {
 export type ProcessType = 'design' | 'purchasing' | 'production' | 'quality' | 'equipment' | 'document' | 'management'
 
 export type RiskSourceKind = 'customer_complaint' | 'major_change'
+
+/** 「已全部登錄」聲明的類別：兩類外部來源，加上第三方稽核缺失（觀察台帳）。 */
+export type RiskCoverageKind = RiskSourceKind | 'third_party_audit'
+
+export const RISK_COVERAGE_KIND_LABELS: Record<RiskCoverageKind, string> = {
+  customer_complaint: '客戶抱怨',
+  major_change: '重大變更',
+  third_party_audit: '第三方稽核缺失',
+}
 
 export const RISK_SOURCE_KIND_LABELS: Record<RiskSourceKind, string> = {
   customer_complaint: '客戶抱怨',

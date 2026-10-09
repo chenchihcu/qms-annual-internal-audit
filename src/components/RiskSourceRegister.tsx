@@ -1,21 +1,26 @@
 import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
+import { useTablePagination } from '../hooks/useTablePagination'
 import { FOCUS_RING } from '../lib/focusRing'
+import { localIsoDate } from '../lib/localDate'
 import { isSuggestedTarget } from '../lib/processTypes'
 import { NOT_APPLICABLE_REASONS, isReasonFilled } from '../lib/reasonOptions'
 import { FACTOR_DEFINITIONS } from '../lib/risk'
 import {
   effectiveLinkStatus,
+  isCoverageCurrent,
   targetKey,
   validateCoverageDraft,
   type RiskSourceDraftErrors,
   type RiskSourceEventDraft,
 } from '../lib/riskSources'
 import {
+  RISK_COVERAGE_KIND_LABELS,
   RISK_SOURCE_KIND_LABELS,
   RISK_SOURCE_LINK_STATUS_LABELS,
   RISK_SOURCE_LINK_TYPE_LABELS,
   type PlanRow,
+  type RiskCoverageKind,
   type RiskSourceKind,
   type RiskSourceLinkStatus,
   type RiskSourceLinkType,
@@ -27,8 +32,10 @@ import { Button, Input, Select } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { ReasonSelect } from './ui/ReasonSelect'
 import { ScrollRegion } from './ui/ScrollRegion'
+import { TablePagination } from './ui/TablePagination'
 
 const KINDS: RiskSourceKind[] = ['customer_complaint', 'major_change']
+const COVERAGE_KINDS: RiskCoverageKind[] = ['customer_complaint', 'major_change', 'third_party_audit']
 const KIND_FACTOR = { customer_complaint: 'customerComplaintLevel', major_change: 'changeImpact' } as const
 const VOID_REASONS = ['登錄錯誤', '重複登錄', '其他'] as const
 /** 是否計入風險：只有已確認的關聯計入。 */
@@ -56,15 +63,16 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
   const coverage = company.riskSourceCoverage ?? {}
   const previousCount = (state.yearArchives[String(settings.auditYear - 1)]?.workspace.riskSourceEvents ?? [])
     .filter((event) => !event.voidedAt).length
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localIsoDate()
 
   const [showForm, setShowForm] = useState(false)
   const [draft, setDraft] = useState<RiskSourceEventDraft>(emptyDraft)
   const [errors, setErrors] = useState<RiskSourceDraftErrors>({})
   const [voiding, setVoiding] = useState<{ id: string; reason: string } | null>(null)
   const [rejecting, setRejecting] = useState<{ eventId: string; key: string; reason: string } | null>(null)
-  const [coverageDate, setCoverageDate] = useState<Partial<Record<RiskSourceKind, string>>>({})
-  const [coverageError, setCoverageError] = useState<Partial<Record<RiskSourceKind, string>>>({})
+  const [coverageDate, setCoverageDate] = useState<Partial<Record<RiskCoverageKind, string>>>({})
+  const [coverageError, setCoverageError] = useState<Partial<Record<RiskCoverageKind, string>>>({})
+  const pagination = useTablePagination(events.length, 10, undefined, String(settings.auditYear))
 
   const rowFor = (target: Pick<RiskSourceTarget, 'qpCode' | 'departmentId'>) =>
     company.planRows.find((row) => row.qpCode === target.qpCode && row.departmentId === target.departmentId)
@@ -102,7 +110,7 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
     }
   }
 
-  const toggleCoverage = (kind: RiskSourceKind, checked: boolean) => {
+  const toggleCoverage = (kind: RiskCoverageKind, checked: boolean) => {
     if (!checked) {
       setRiskSourceCoverage(kind, null)
       return
@@ -132,8 +140,9 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
       </p>
 
       <ul className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-        {KINDS.map((kind) => {
+        {COVERAGE_KINDS.map((kind) => {
           const declared = coverage[kind]
+          const current = isCoverageCurrent(declared, today)
           return (
             <li key={kind} className="flex flex-wrap items-center gap-2">
               <label className="inline-flex min-h-11 items-center gap-2">
@@ -143,14 +152,25 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
                   checked={Boolean(declared)}
                   onChange={(event) => toggleCoverage(kind, event.target.checked)}
                 />
-                {RISK_SOURCE_KIND_LABELS[kind]}已全部登錄至
+                {RISK_COVERAGE_KIND_LABELS[kind]}已全部登錄至
               </label>
-              {declared ? (
-                <span className="text-ink">{declared.checkedThrough}</span>
-              ) : (
+              {declared && current && <span className="text-ink">{declared.checkedThrough}</span>}
+              {declared && !current && (
+                <span className="inline-flex flex-wrap items-center gap-2 text-tone-warning-fg">
+                  {declared.checkedThrough}（之後未盤點，視為待確認）
+                  <Button
+                    variant="secondary"
+                    className="min-h-9 px-2 py-1"
+                    onClick={() => setRiskSourceCoverage(kind, { checkedThrough: today, reference: declared.reference })}
+                  >
+                    更新為今天
+                  </Button>
+                </span>
+              )}
+              {!declared && (
                 <Input
                   type="date"
-                  ariaLabel={`${RISK_SOURCE_KIND_LABELS[kind]}已全部登錄日期`}
+                  ariaLabel={`${RISK_COVERAGE_KIND_LABELS[kind]}已全部登錄日期`}
                   value={coverageDate[kind] ?? today}
                   onChange={(value) => setCoverageDate((prev) => ({ ...prev, [kind]: value }))}
                 />
@@ -160,7 +180,7 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
           )
         })}
       </ul>
-      <p className="text-xs text-muted">勾選「已全部登錄」後，沒有關聯的程序才會算 0 件；未勾選則顯示待確認。</p>
+      <p className="text-xs text-muted">勾選「已全部登錄」且日期涵蓋到今天，沒有關聯的程序才會算 0 件；未勾選或日期過舊則顯示待確認。第三方稽核缺失來自觀察台帳（來源＝第三方稽核）。</p>
 
       {showForm && (
         <div className="space-y-3 rounded-lg border border-line p-3">
@@ -292,8 +312,11 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
               </tr>
             </thead>
             <tbody>
-              {events.map((event) => (
-                <tr key={event.id} className={event.voidedAt ? 'text-muted' : ''}>
+              {events.map((event, eventIndex) => (
+                <tr
+                  key={event.id}
+                  className={`${!pagination.isVisible(eventIndex) ? 'pagination-hidden-row ' : ''}${event.voidedAt ? 'text-muted' : ''}`}
+                >
                   <td>{RISK_SOURCE_KIND_LABELS[event.kind]}</td>
                   <td className="break-words">{event.externalReference}</td>
                   <td>{event.date}</td>
@@ -389,6 +412,7 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
           </table>
         </ScrollRegion>
       )}
+      {events.length > 0 && <TablePagination pagination={pagination} label="外部來源登錄" />}
     </section>
   )
 }

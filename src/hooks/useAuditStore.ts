@@ -20,7 +20,7 @@ import type {
   ProcedureRiskOverride,
   ProcedureRiskRecord,
   RiskSourceCoverage,
-  RiskSourceKind,
+  RiskCoverageKind,
   RiskSourceLinkStatus,
   ProcessType,
   TrashCompanyRecordKind,
@@ -60,7 +60,8 @@ import {
   switchWorkspaceYear,
   validateV15State,
 } from '../lib/workspaceSchemaV15'
-import { buildRegeneratedPlanRows } from '../lib/planRegeneration'
+import { buildRegeneratedPlanRows, planApprovalSignature } from '../lib/planRegeneration'
+import { localIsoDate } from '../lib/localDate'
 import {
   applyRiskApprove,
   applyRiskConfirm,
@@ -556,7 +557,7 @@ export function useAuditStore() {
     const errors = validateRiskSourceDraft(draft, {
       existing: state.workspace.riskSourceEvents ?? [],
       auditYear: state.settings.auditYear,
-      today: new Date().toISOString().slice(0, 10),
+      today: localIsoDate(),
       planKeys: state.workspace.planRows.map((row) => `${row.qpCode}|${row.departmentId}`),
     })
     if (Object.keys(errors).length > 0) return { ok: false, errors }
@@ -588,7 +589,7 @@ export function useAuditStore() {
     })
   }, [])
 
-  const setRiskSourceCoverage = useCallback((kind: RiskSourceKind, coverage: Omit<RiskSourceCoverage, 'recordedAt'> | null) => {
+  const setRiskSourceCoverage = useCallback((kind: RiskCoverageKind, coverage: Omit<RiskSourceCoverage, 'recordedAt'> | null) => {
     setState((s) => {
       const next = { ...(s.workspace.riskSourceCoverage ?? {}) }
       if (coverage) next[kind] = { ...coverage, recordedAt: new Date().toISOString() }
@@ -603,7 +604,7 @@ export function useAuditStore() {
       const next = patchWorkspace(s, { planRows: buildRegeneratedPlanRows(s) })
       return {
         ...next,
-        settings: { ...next.settings, planApprovedAt: undefined, planApprovedBy: undefined },
+        settings: { ...next.settings, planApprovedAt: undefined, planApprovedBy: undefined, planApprovedSignature: undefined },
       }
     })
   }, [])
@@ -611,7 +612,12 @@ export function useAuditStore() {
   const approvePlan = useCallback((approvedBy: string) => {
     setState((s) => ({
       ...s,
-      settings: { ...s.settings, planApprovedAt: new Date().toISOString(), planApprovedBy: approvedBy },
+      settings: {
+        ...s.settings,
+        planApprovedAt: new Date().toISOString(),
+        planApprovedBy: approvedBy,
+        planApprovedSignature: planApprovalSignature(s),
+      },
     }))
   }, [])
 
