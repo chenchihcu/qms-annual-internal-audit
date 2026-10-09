@@ -6,7 +6,7 @@ import {
   getProceduresRaw,
   isSeedFinalized,
 } from '../data/checklistLoader'
-import { calculateProcedurePriority, calculateRiskLevel, clampRiskValue } from './risk'
+import { assessProcedurePriority, calculateRiskLevel, clampRiskValue, recordPriorityInput } from './risk'
 
 export type OsBand = 'low' | 'mid' | 'high'
 
@@ -64,7 +64,11 @@ export interface PlannerInput {
   managementReviewDate?: string
   externalAuditDate?: string
   existingRows?: PlanRow[]
+  /** @deprecated 全域件數 >2 時所有列加頻；改用 openCarryForwardByKey。 */
   openCarryForwardCount?: number
+  /** `qpCode|departmentId` → 該列跨年未結件數；有值時只對該列加頻。 */
+  openCarryForwardByKey?: Record<string, number>
+  /** 只傳本年度已確認／已核准的紀錄（plannerReadyRisks）。 */
   procedureRisks?: ProcedureRiskRecord[]
 }
 
@@ -133,9 +137,9 @@ export const MANUAL_OVERRIDE_PLAN_NOTE = '手動覆寫的計畫列會保留。'
 
 export const ARRANGEMENT_IMPACT_RULES = {
   scope: '此部門底下各 QP 在年度計畫的「順序」與「月格次數／早晚」。',
-  trigger: '僅在方案風險或年度計畫頁按「預覽自動編排」時套用。',
-  excludes: 'QR-02-01 已存檔的 QP 改以方案風險為準；已手動覆寫的月格不會被改寫。',
-  columnNote: '本欄為各部門在「尚未存 QR-02-01」時的估算；實際以自動編排結果為準。',
+  trigger: '僅在年度計畫頁按「依日期與利害關係人自動編排」，檢視預覽並確認套用時生效。',
+  excludes: 'QR-02-01 本年度已確認或已核准的 QP 改以方案風險為準；已手動覆寫的月格不會被改寫。',
+  columnNote: '本欄為各部門 QP 在「QR-02-01 尚未確認」時的估算；實際以自動編排結果為準。',
 } as const
 
 /** 利害關係人工作流與紙本／標準對照（本頁無獨立 QR 匯出） */
@@ -240,6 +244,7 @@ export function autoArrangePlan(
     externalAuditDate,
     existingRows,
     openCarryForwardCount = 0,
+    openCarryForwardByKey,
     procedureRisks = [],
   } = input
 
@@ -248,20 +253,14 @@ export function autoArrangePlan(
     procedureRisks.map((r) => [`${r.qpCode}|${r.departmentId}`, r]),
   )
 
-  function resolveRiskLevel(entry: ProcedurePlanEntry, dept: DepartmentProfile): RiskLevel {
+  function assessSaved(entry: ProcedurePlanEntry) {
     const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
-    if (saved) {
-      const values = {
-        inherentRisk: saved.inherentRisk,
-        previousInternalNcrCount: saved.previousInternalNcrCount,
-        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
-        overdueOpenNcrCount: saved.overdueOpenNcrCount,
-        customerComplaintLevel: saved.customerComplaintLevel,
-        changeImpact: saved.changeImpact,
-        monthsSinceLastAudit: saved.monthsSinceLastAudit,
-      }
-      return calculateProcedurePriority(values).level
-    }
+    return saved ? assessProcedurePriority(recordPriorityInput(saved), saved.unavailableFactors) : null
+  }
+
+  function resolveRiskLevel(entry: ProcedurePlanEntry, dept: DepartmentProfile): RiskLevel {
+    const assessed = assessSaved(entry)
+    if (assessed) return assessed.level ?? assessed.formulaLevel
     const seedRisk = entry.riskLevel ?? '低'
     const { level } = calculateRiskLevel(dept.riskOccurrence, dept.riskSeverity)
     if (seedRisk === '高' || level === '高') return '高'
@@ -270,22 +269,17 @@ export function autoArrangePlan(
   }
 
   function priorityScore(entry: ProcedurePlanEntry, dept: DepartmentProfile): number {
-    const saved = riskMap.get(`${entry.qpCode}|${entry.departmentId}`)
-    if (saved) {
-      return calculateProcedurePriority({
-        inherentRisk: saved.inherentRisk,
-        previousInternalNcrCount: saved.previousInternalNcrCount,
-        previousThirdPartyNcrCount: saved.previousThirdPartyNcrCount,
-        overdueOpenNcrCount: saved.overdueOpenNcrCount,
-        customerComplaintLevel: saved.customerComplaintLevel,
-        changeImpact: saved.changeImpact,
-        monthsSinceLastAudit: saved.monthsSinceLastAudit,
-      }).score * 100
-    }
+    const assessed = assessSaved(entry)
+    if (assessed) return assessed.score * 100
     const riskOrder = { 高: 3, 中: 2, 低: 1 }
     const seedRisk = riskOrder[entry.riskLevel ?? '低']
     const deptPri = calculateDepartmentPriority(dept)
     return seedRisk * 100 + deptPri
+  }
+
+  function carryBoostFor(entry: ProcedurePlanEntry): number {
+    if (openCarryForwardByKey) return (openCarryForwardByKey[`${entry.qpCode}|${entry.departmentId}`] ?? 0) > 0 ? 1 : 0
+    return openCarryForwardCount > 2 ? 1 : 0
   }
   const availableMonths = getWindowMonths(
     auditYear,
@@ -328,7 +322,7 @@ export function autoArrangePlan(
 
     const riskLevel = resolveRiskLevel(entry, dept)
 
-    const freq = frequencyForRisk(riskLevel, openCarryForwardCount > 2 ? 1 : 0)
+    const freq = frequencyForRisk(riskLevel, carryBoostFor(entry))
     const preferEarly =
       riskLevel === '高' || dept.stakeholders.some((s) => s === '客戶' || s === '法規/認證')
 

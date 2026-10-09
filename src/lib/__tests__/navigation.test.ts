@@ -6,16 +6,16 @@ describe('workflow navigation/form mapping', () => {
     const entries = ALL_TABS.filter((entry) => entry.id !== 'dashboard')
     const formIds = entries.map((entry) => entry.formId)
 
-    expect(entries).toHaveLength(11)
+    expect(entries).toHaveLength(12)
     expect(formIds.every((id): id is string => Boolean(id))).toBe(true)
     expect(new Set(formIds).size).toBe(entries.length)
-    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(12)
+    expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(13)
     expect(ALL_TABS.every((entry) => Boolean(entry.icon))).toBe(true)
     expect(TAB_GROUPS.every((group) => Boolean(group.icon))).toBe(true)
   })
 
   it('folds the external prep view into the checklist sidebar entry', () => {
-    expect(SIDEBAR_TABS).toHaveLength(11)
+    expect(SIDEBAR_TABS).toHaveLength(12)
     expect(SIDEBAR_TABS.some((entry) => entry.id === 'prep')).toBe(false)
     expect(sidebarTabFor('prep')).toBe('audit')
     expect(sidebarTabFor('ncr')).toBe('ncr')
@@ -38,6 +38,7 @@ describe('workflow navigation/form mapping', () => {
     expect(ALL_TABS.map((entry) => entry.label)).toEqual([
       '稽核總覽',
       '利害關係人',
+      '風險來源登錄',
       '方案風險',
       '人員合格名單',
       '年度稽核計畫',
@@ -84,10 +85,12 @@ describe('workflow navigation/form mapping', () => {
   })
 
   it('defines workflow metadata for every tab in PDCA order', () => {
-    expect(TAB_WORKFLOW).toHaveLength(12)
+    expect(TAB_WORKFLOW).toHaveLength(13)
     expect(TAB_WORKFLOW.map((entry) => entry.id)).toEqual(ALL_TABS.map((entry) => entry.id))
-    expect(getTabWorkflow('stakeholders')?.nextTab).toBe('risk')
-    expect(getTabWorkflow('risk')?.prevTab).toBe('stakeholders')
+    expect(getTabWorkflow('stakeholders')?.nextTab).toBe('risk-sources')
+    expect(getTabWorkflow('risk-sources')?.prevTab).toBe('stakeholders')
+    expect(getTabWorkflow('risk-sources')?.nextTab).toBe('risk')
+    expect(getTabWorkflow('risk')?.prevTab).toBe('risk-sources')
     expect(getTabWorkflow('risk')?.nextTab).toBe('personnel')
     expect(getTabWorkflow('personnel')?.prevTab).toBe('risk')
     expect(getTabWorkflow('personnel')?.nextTab).toBe('plan')

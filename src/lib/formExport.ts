@@ -2,7 +2,7 @@ import { EXTERNAL_AUDIT_PREP_SEED, prepItemCompleted, workspacePrepText } from '
 import { prepLinkedAudits } from './prepLinks'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
-import { calculateProcedurePriority, inherentScaleFromSeed } from './risk'
+import { RISK_STATUS_LABELS, assessProcedurePriority, effectiveRiskStatus, factorNames, seedInherentScale } from './risk'
 import { formatQualificationScopeSummary, PERSONNEL_ROLE_LABELS, personRoles, qualificationState } from './personnel'
 import type {
   AppState,
@@ -224,15 +224,16 @@ export function buildSuggestionsSheet(co: CompanyData): SpreadsheetSheet {
   return createSheet([['第三方稽核建議事項一覽表'], [], header, ...rows])
 }
 
-export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
+export function buildRiskSheet(co: CompanyData, auditYear?: number): SpreadsheetSheet {
   const legend = [
-    '對照：NCR 0/1/2/3/≥4件→1–5；客訴／變更 無／中／高→1/3/5；距上次 ＜6/6–11/12–17/18–23/≥24月→1–5；固有 低／中／高→1/3/5；空白暫估3',
+    '對照：NCR／客訴／重大變更 0/1/2/3/≥4件→1–5；距上次 ＜6/6–11/12–17/18–23/≥24月→1–5；固有 低／中／高→1/3/5（預設取程序種子）',
+    '空白＝資料不足（不給等級、不參與編排）；未取得須註明理由並以 3 計分；固有高者等級至少為中（公司自訂規則，非標準要求）',
   ]
-  const header = ['QP', '部門', '固有風險', '上次內稽NCR', '上次第三方NCR', '未結NCR', '客戶抱怨', '重大變更', '距上次稽核', '優先分數', '等級', '暫定', '證據']
+  const header = ['QP', '部門', '固有風險', '上次內稽NCR', '上次第三方NCR', '未結NCR', '客戶抱怨件數', '重大變更件數', '距上次稽核', '優先分數', '等級', '暫定', '證據', '狀態', '評估年度', '未取得因子', '固有地板']
   const rows = co.planRows.map((plan) => {
     const saved = co.procedureRisks?.find((item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId)
     const values = {
-      inherentRisk: saved?.inherentRisk ?? inherentScaleFromSeed(plan.riskLevel),
+      inherentRisk: saved?.inherentRisk ?? seedInherentScale(plan.qpCode, plan.departmentId, plan.riskLevel),
       previousInternalNcrCount: saved?.previousInternalNcrCount,
       previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
       overdueOpenNcrCount: saved?.overdueOpenNcrCount,
@@ -240,7 +241,10 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
       changeImpact: saved?.changeImpact,
       monthsSinceLastAudit: saved?.monthsSinceLastAudit,
     }
-    const result = calculateProcedurePriority(values)
+    const result = assessProcedurePriority(values, saved?.unavailableFactors)
+    const unavailable = result.unavailableKeys
+      .map((key) => `${factorNames[key]}：${saved?.unavailableFactors?.[key] ?? ''}`)
+      .join('；')
     return [
       plan.qpCode,
       plan.department,
@@ -252,12 +256,16 @@ export function buildRiskSheet(co: CompanyData): SpreadsheetSheet {
       values.changeImpact ?? '',
       values.monthsSinceLastAudit ?? '',
       result.score,
-      result.level,
+      result.level ?? '資料不足',
       result.provisional ? '是' : '否',
       saved?.evidenceReference ?? '',
+      auditYear == null ? (saved?.status ?? '') : RISK_STATUS_LABELS[effectiveRiskStatus(saved, auditYear)],
+      saved?.assessmentYear ?? '',
+      unavailable,
+      result.floorApplied ? `是（公式 ${result.formulaLevel}）` : '',
     ]
   })
-  return createSheet([['方案風險與優先順序 QR-02-01'], legend, [], header, ...rows])
+  return createSheet([['方案風險與優先順序 QR-02-01'], ...legend.map((line) => [line]), [], header, ...rows])
 }
 
 export function buildPersonnelSheet(state: AppState, companyId: CompanyId): SpreadsheetSheet {
@@ -314,7 +322,7 @@ export function exportPersonnelExcel(state: AppState, companyId: CompanyId): voi
 export function exportRiskExcel(state: AppState, companyId: CompanyId): void {
   const co = state.workspace
   const wb = createWorkbook()
-  appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
+  appendSheet(wb, buildRiskSheet(co, companySettingsFor(state, companyId).auditYear), sheetName('QR-02-01'))
   writeWorkbook(wb, safeFilename(['QR-02-01_方案風險', companyLabel(state, companyId), String(companySettingsFor(state, companyId).auditYear)]) + '.xlsx')
 }
 
@@ -415,7 +423,7 @@ export function buildAllFormsWorkbook(state: AppState, companyId: CompanyId): Sp
     )
   }
   appendSheet(wb, buildNcrSheet(co, companySettingsFor(state, companyId)), sheetName('QR-28-03'))
-  appendSheet(wb, buildRiskSheet(co), sheetName('QR-02-01'))
+  appendSheet(wb, buildRiskSheet(co, companySettingsFor(state, companyId).auditYear), sheetName('QR-02-01'))
   appendSheet(wb, buildStandardSheet(state.auditProfile, companyLabel(state, companyId)), sheetName('適用標準'))
   appendSheet(wb, buildPersonnelSheet(state, companyId), sheetName('人員合格名單'))
   appendSheet(wb, buildObservationsSheet(co), sheetName('觀察事項'))

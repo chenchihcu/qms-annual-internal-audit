@@ -17,7 +17,12 @@ import type {
   AnnualPersonnelAssignment,
   CompanyAuditProfile,
   AuditTeamSnapshot,
+  ProcedureRiskOverride,
   ProcedureRiskRecord,
+  RiskSourceCoverage,
+  RiskCoverageKind,
+  RiskSourceLinkStatus,
+  ProcessType,
   TrashCompanyRecordKind,
 } from '../types'
 import { MANAGEMENT_REVIEW_PREP_ITEM_ID, createDefaultPrepState } from '../lib/externalAuditPrep'
@@ -55,8 +60,22 @@ import {
   switchWorkspaceYear,
   validateV15State,
 } from '../lib/workspaceSchemaV15'
-import { autoArrangePlan } from '../lib/planner'
-import { buildEffectiveProcedureRisks } from '../lib/risk'
+import { buildRegeneratedPlanRows, planApprovalSignature } from '../lib/planRegeneration'
+import { localIsoDate } from '../lib/localDate'
+import {
+  applyRiskApprove,
+  applyRiskConfirm,
+  applyRiskSave,
+  type RiskRecordKey,
+} from '../lib/procedureRiskRecords'
+import {
+  applyAddRiskSource,
+  applyRiskSourceLinkStatus,
+  applyVoidRiskSource,
+  validateRiskSourceDraft,
+  type RiskSourceDraftErrors,
+  type RiskSourceEventDraft,
+} from '../lib/riskSources'
 import {
   canTransitionNcrStatus,
   collectNCRsFromAudits,
@@ -492,52 +511,114 @@ export function useAuditStore() {
     setState((s) => applyDepartmentOwnerChange(s, departmentId, newOwner, settingsFor(s).scoringRules, WORKSPACE_COMPANY_ID))
   }, [])
 
-  const updateProcedureRisk = useCallback((qpCode: string, departmentId: string, patch: Partial<ProcedureRiskRecord>) => {
-    setState((s) => {
-      const company = s.workspace
-      const current = company.procedureRisks ?? []
-      const existing = current.find((item) => item.qpCode === qpCode && item.departmentId === departmentId)
-      const next: ProcedureRiskRecord = {
-        id: existing?.id ?? nextId('risk'),
+  const saveProcedureRisk = useCallback((
+    qpCode: string,
+    departmentId: string,
+    patch: Partial<ProcedureRiskRecord>,
+    overrides: ProcedureRiskOverride[] = [],
+  ) => {
+    setState((s) => patchWorkspace(s, {
+      procedureRisks: applyRiskSave(s.workspace.procedureRisks ?? [], {
         qpCode,
         departmentId,
-        inherentRisk: existing?.inherentRisk ?? 3,
-        evidenceReference: existing?.evidenceReference ?? '',
-        updatedAt: new Date().toISOString(),
-        ...existing,
-        ...patch,
-      }
-      return patchWorkspace(s, {
-        procedureRisks: existing
-          ? current.map((item) => item.id === existing.id ? next : item)
-          : [...current, next],
-      })
+        patch,
+        overrides,
+        auditYear: settingsFor(s).auditYear,
+        now: new Date().toISOString(),
+        newId: nextId('risk'),
+      }),
+    }))
+  }, [])
+
+  const confirmProcedureRisks = useCallback((keys: RiskRecordKey[]) => {
+    setState((s) => patchWorkspace(s, {
+      procedureRisks: applyRiskConfirm(
+        s.workspace.procedureRisks ?? [],
+        keys,
+        settingsFor(s).auditYear,
+        new Date().toISOString(),
+      ),
+    }))
+  }, [])
+
+  const approveProcedureRisks = useCallback((approvedBy: string) => {
+    setState((s) => patchWorkspace(s, {
+      procedureRisks: applyRiskApprove(
+        s.workspace.procedureRisks ?? [],
+        settingsFor(s).auditYear,
+        approvedBy,
+        new Date().toISOString(),
+        () => nextId('risk-revision'),
+      ),
+    }))
+  }, [])
+
+  const addRiskSourceEvent = useCallback((draft: RiskSourceEventDraft): { ok: boolean; errors: RiskSourceDraftErrors } => {
+    const errors = validateRiskSourceDraft(draft, {
+      existing: state.workspace.riskSourceEvents ?? [],
+      auditYear: state.settings.auditYear,
+      today: localIsoDate(),
+      planKeys: state.workspace.planRows.map((row) => `${row.qpCode}|${row.departmentId}`),
+    })
+    if (Object.keys(errors).length > 0) return { ok: false, errors }
+    setState((s) => patchWorkspace(s, {
+      riskSourceEvents: applyAddRiskSource(s.workspace.riskSourceEvents ?? [], draft, nextId('risk-source'), new Date().toISOString()),
+    }))
+    return { ok: true, errors: {} }
+  }, [state])
+
+  const voidRiskSourceEvent = useCallback((id: string, reason: string) => {
+    setState((s) => patchWorkspace(s, {
+      riskSourceEvents: applyVoidRiskSource(s.workspace.riskSourceEvents ?? [], id, reason, new Date().toISOString()),
+    }))
+  }, [])
+
+  const setRiskSourceLinkStatus = useCallback((eventId: string, key: string, status: RiskSourceLinkStatus, reason: string) => {
+    setState((s) => patchWorkspace(s, {
+      riskSourceEvents: applyRiskSourceLinkStatus(s.workspace.riskSourceEvents ?? [], eventId, key, status, reason, new Date().toISOString()),
+    }))
+  }, [])
+
+  const setProcedureProcessType = useCallback((qpCode: string, departmentId: string, type: ProcessType | null) => {
+    setState((s) => {
+      const next = { ...(s.workspace.procedureProcessTypes ?? {}) }
+      const key = `${qpCode}|${departmentId}`
+      if (type) next[key] = type
+      else delete next[key]
+      return patchWorkspace(s, { procedureProcessTypes: next })
     })
   }, [])
 
+  const setRiskSourceCoverage = useCallback((kind: RiskCoverageKind, coverage: Omit<RiskSourceCoverage, 'recordedAt'> | null) => {
+    setState((s) => {
+      const next = { ...(s.workspace.riskSourceCoverage ?? {}) }
+      if (coverage) next[kind] = { ...coverage, recordedAt: new Date().toISOString() }
+      else delete next[kind]
+      return patchWorkspace(s, { riskSourceCoverage: next })
+    })
+  }, [])
+
+  /** 自動編排會改寫未手動調整的月格，因此撤銷既有計畫核准，需重新核准。 */
   const regeneratePlan = useCallback(() => {
     setState((s) => {
-      const co = s.workspace
-      const openCount =
-        co.observations.filter((o) => o.status === 'open').length +
-        co.suggestions.filter((sg) => sg.status === 'open').length +
-        co.ncrs.filter((n) => n.status !== '結案').length
-      const planRows = autoArrangePlan(
-        {
-          departments: co.departments,
-          planEntries: PROCEDURE_PLAN_TEMPLATE,
-          auditYear: settingsFor(s).auditYear,
-          planWindowStart: settingsFor(s).planWindowStart,
-          planWindowEnd: settingsFor(s).planWindowEnd,
-          managementReviewDate: settingsFor(s).managementReviewDate,
-          existingRows: co.planRows,
-          openCarryForwardCount: openCount,
-          procedureRisks: buildEffectiveProcedureRisks(co),
-        },
-        { leadAuditor: settingsFor(s).leadAuditor },
-      )
-      return patchWorkspace(s, { planRows })
+      const next = patchWorkspace(s, { planRows: buildRegeneratedPlanRows(s) })
+      return {
+        ...next,
+        settings: { ...next.settings, planApprovedAt: undefined, planApprovedBy: undefined, planApprovedSignature: undefined },
+      }
     })
+  }, [])
+
+  const approvePlan = useCallback((approvedBy: string) => {
+    setState((s) => ({
+      ...s,
+      settings: {
+        ...s.settings,
+        planApprovedAt: new Date().toISOString(),
+        planApprovedBy: approvedBy,
+        planApprovedSignature: planApprovalSignature(s),
+      },
+    }))
   }, [])
 
   const replacePlanRows = useCallback((planRows: PlanRow[]) => {
@@ -1481,8 +1562,16 @@ export function useAuditStore() {
     switchAuditYear,
     updateDepartment,
     updateDepartmentOwner,
-    updateProcedureRisk,
+    saveProcedureRisk,
+    confirmProcedureRisks,
+    approveProcedureRisks,
+    addRiskSourceEvent,
+    voidRiskSourceEvent,
+    setRiskSourceLinkStatus,
+    setRiskSourceCoverage,
+    setProcedureProcessType,
     regeneratePlan,
+    approvePlan,
     replacePlanRows,
     updatePlanRow,
     setPlanMonthStatus,

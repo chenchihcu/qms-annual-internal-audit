@@ -135,6 +135,15 @@
       width: 7.5rem;
     }
 
+    /* 方案風險矩陣：7 個因素欄與部門欄固定寬，證據欄吸收剩餘寬度 */
+    col.col-risk-factor {
+      width: 4.75rem;
+    }
+
+    col.col-risk-dept {
+      width: 6rem;
+    }
+
     col.col-person-name {
       width: 6.25rem;
     }
@@ -487,23 +496,23 @@
   }
 
   .print-risk-table col.col-print-code {
-    width: 10%;
+    width: 7%;
   }
 
   .print-risk-table col.col-print-name {
-    width: 10%;
-  }
-
-  .print-risk-table col.col-print-inherent-print {
-    width: 24%;
-  }
-
-  .print-risk-table col.col-print-status {
     width: 8%;
   }
 
+  .print-risk-table col.col-print-factor {
+    width: 6%;
+  }
+
+  .print-risk-table col.col-print-status {
+    width: 7.5%;
+  }
+
   .print-risk-table col.col-print-evidence-ref {
-    width: 32%;
+    width: 28%;
   }
 
   body {
