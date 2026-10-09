@@ -1,4 +1,5 @@
-import { EXTERNAL_AUDIT_PREP_SEED, workspacePrepText } from './externalAuditPrep'
+import { EXTERNAL_AUDIT_PREP_SEED, prepItemCompleted, workspacePrepText } from './externalAuditPrep'
+import { prepLinkedAudits } from './prepLinks'
 import { downloadBlob, safeFilename } from './download'
 import { appendSheet, createSheet, createWorkbook, writeWorkbook as encodeWorkbook, type SpreadsheetSheet, type SpreadsheetWorkbook } from './simpleXlsx'
 import { calculateProcedurePriority, inherentScaleFromSeed } from './risk'
@@ -352,7 +353,7 @@ export function buildObservationsSheet(co: CompanyData): SpreadsheetSheet {
 
 /** 稽核前準備（optional sheet） */
 export function buildPrepSheet(state: AppState): SpreadsheetSheet {
-  const header = ['項次', '稽核前準備事項', '負責人', '完成', '備註']
+  const header = ['項次', '稽核前準備事項', '負責人', '關聯查檢', '完成', '備註']
   const statesById = new Map(state.externalAuditPrep.items.map((item) => [item.id, item]))
   const statesByNo = new Map<number, ExternalAuditPrepItemState[]>()
   for (const item of state.externalAuditPrep.items) {
@@ -375,7 +376,10 @@ export function buildPrepSheet(state: AppState): SpreadsheetSheet {
       index + 1,
       workspacePrepText(tpl.title),
       tpl.owner,
-      item?.completed ? '是' : '',
+      prepLinkedAudits(tpl, state.workspace.planRows)
+        .map((link) => `${link.qpCode} ${link.department}`.trim())
+        .join('、'),
+      item && prepItemCompleted(state.externalAuditPrep, item) ? '是' : '',
       item?.remark ?? '',
     ]
   })

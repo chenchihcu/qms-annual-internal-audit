@@ -23,6 +23,10 @@ export interface PrepTemplateItem {
   scope: { mode: PrepScopeMode }
   notes: string
   forms: string[]
+  /** 種子對應的年度計畫程序；未帶部門時對應該 QP 的所有部門列。 */
+  linkedQp?: Array<{ qpCode: string; department?: string }>
+  /** `open_any`：有未結 NCR 時提示（不改變完成狀態）。 */
+  ncrGate?: 'open_any'
 }
 
 export const EXTERNAL_AUDIT_PREP_SEED = prepSeed as {
@@ -79,6 +83,36 @@ export function migratePrepState(
     items: old.items ?? createDefaultPrepState(year).items,
     onsiteSlots: old.onsiteSlots ?? [],
   }
+}
+
+/** 第 4 項「管理審查會議召開、會議記錄完成」與序位「2 管審」共用單一控制。 */
+export const MANAGEMENT_REVIEW_PREP_ITEM_ID = 'prep-4'
+
+/** 外稽日期讀取規則：準備表日期優先，空白時才用設定值。 */
+export function effectiveExternalAuditDate(
+  prep: Pick<ExternalAuditPrepState, 'externalAuditDate'>,
+  settings: Pick<AuditSettings, 'externalAuditDate'>,
+): string {
+  return prep.externalAuditDate?.trim() || settings.externalAuditDate?.trim() || ''
+}
+
+/** 第 4 項舊勾選與序位管審旗標不一致時回傳 true（待覆核，不自動修正）。 */
+export function hasManagementReviewMismatch(prep: ExternalAuditPrepState): boolean {
+  const item = prep.items.find((entry) => entry.id === MANAGEMENT_REVIEW_PREP_ITEM_ID)
+  if (!item) return false
+  return Boolean(item.completed) !== Boolean(prep.managementReviewComplete)
+}
+
+/**
+ * 準備事項完成狀態的單一讀取規則：第 4 項以序位管審旗標為準（與單一控制一致），
+ * 其餘看各項 `completed`。畫面、進度與匯出共用。
+ */
+export function prepItemCompleted(
+  prep: Pick<ExternalAuditPrepState, 'managementReviewComplete'>,
+  itemState: ExternalAuditPrepItemState,
+): boolean {
+  if (itemState.id === MANAGEMENT_REVIEW_PREP_ITEM_ID) return Boolean(prep.managementReviewComplete)
+  return Boolean(itemState.completed)
 }
 
 export function getPrepTemplate(no: number): PrepTemplateItem | undefined {
@@ -145,7 +179,7 @@ export function countPrepProgress(prep: ExternalAuditPrepState): {
   let done = 0
   for (const itemState of prep.items) {
     const template = getPrepTemplateForState(itemState)
-    if (template && isItemDone(template, itemState)) done++
+    if (template && prepItemCompleted(prep, itemState)) done++
   }
   return { done, total: prep.items.length }
 }
@@ -217,10 +251,9 @@ export function evaluatePrepSequence(context: PrepSequenceContext): PrepSequence
   const rules = settings.scoringRules ?? { conform: 100, nonConform: 0, observation: 50 }
   const internalComplete = buildMergedCertificateCoverage(workspace, settings.auditYear, rules).allInternalAuditComplete
   const completionSequenceWarning = prep.managementReviewComplete && !internalComplete
-  const effectiveExternalAuditDate = prep.externalAuditDate?.trim() || settings.externalAuditDate
   const dateSequenceMessages = evaluateDateSequence({
     ...settings,
-    externalAuditDate: effectiveExternalAuditDate,
+    externalAuditDate: effectiveExternalAuditDate(prep, settings) || undefined,
   })
   const sequenceMessages = [...dateSequenceMessages]
   if (completionSequenceWarning) {

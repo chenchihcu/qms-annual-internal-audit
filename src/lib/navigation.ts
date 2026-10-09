@@ -7,6 +7,8 @@ export interface TabEntry {
   icon: IconName
   /** Each workflow page owns one semantic form and one sidebar item. */
   formId?: string
+  /** 檢視模式：不另佔側欄，與宿主頁共用入口（例：外稽準備 → 查檢表）。 */
+  viewOf?: TabId
 }
 
 export interface TabGroup {
@@ -15,8 +17,8 @@ export interface TabGroup {
   tabs: TabEntry[]
 }
 
-function tab(id: TabId, label: string, formId?: string): TabEntry {
-  return { id, label, icon: TAB_ICONS[id], formId }
+function tab(id: TabId, label: string, formId?: string, viewOf?: TabId): TabEntry {
+  return { id, label, icon: TAB_ICONS[id], formId, ...(viewOf ? { viewOf } : {}) }
 }
 
 export const TAB_GROUPS: TabGroup[] = [
@@ -56,7 +58,7 @@ export const TAB_GROUPS: TabGroup[] = [
     label: 'A · 結案與改進',
     icon: TAB_GROUP_ICONS.A,
     tabs: [
-      tab('prep', '外稽準備', 'pre-audit-prep-form'),
+      tab('prep', '外稽準備', 'pre-audit-prep-form', 'audit'),
     ],
   },
   {
@@ -67,6 +69,14 @@ export const TAB_GROUPS: TabGroup[] = [
 ]
 
 export const ALL_TABS: TabEntry[] = TAB_GROUPS.flatMap((g) => g.tabs)
+
+/** 側欄入口：檢視模式（`viewOf`）併入宿主頁，不另列。 */
+export const SIDEBAR_TABS: TabEntry[] = ALL_TABS.filter((entry) => !entry.viewOf)
+
+/** 目前分頁對應的側欄項目（檢視模式回到宿主頁）。 */
+export function sidebarTabFor(id: TabId): TabId {
+  return ALL_TABS.find((entry) => entry.id === id)?.viewOf ?? id
+}
 
 const TAB_LABEL_BY_ID = new Map<TabId, string>(ALL_TABS.map((entry) => [entry.id, entry.label]))
 

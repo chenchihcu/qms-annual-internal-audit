@@ -18,6 +18,7 @@ function makeStore(
     state,
     updateExternalPrepItem: vi.fn(),
     updateExternalPrepSequence: vi.fn(),
+    setManagementReviewComplete: vi.fn(),
     lastSavedAt: null,
     loadWarning: null,
     saveError: null,
@@ -73,10 +74,11 @@ describe('PreAuditPrep', () => {
     expect(screen.getByText(/進料／出貨檢驗放行見項 21 分開備查/)).toBeTruthy()
     expect(screen.queryByText(/校驗帳可合併/)).toBeNull()
     expect(screen.queryByText('其他注意事項')).toBeNull()
-    const points = screen.getByRole('table', { name: '稽核要點' })
-    expect(points.textContent).toContain('忌諱塗改任何紀錄或文件')
-    expect(within(points).getByRole('columnheader', { name: '項次' })).toBeTruthy()
-    expect(within(points).getByRole('columnheader', { name: '要點' })).toBeTruthy()
+    expect(screen.queryByRole('table', { name: '稽核要點' })).toBeNull()
+    const notes = screen.getByRole('list', { name: '外稽通則' })
+    expect(notes.textContent).toContain('忌諱塗改任何紀錄或文件')
+    expect(notes.textContent).toContain('內部稽核完成 → 再召開管理審查（有時間順序要求）。')
+    expect(within(notes).getAllByRole('listitem')).toHaveLength(8)
   })
 
   it('uses one continuous display sequence and accessible controls', () => {
@@ -113,15 +115,18 @@ describe('PreAuditPrep', () => {
     })
     render(<PreAuditPrep store={store} />)
 
-    const points = screen.getByRole('table', { name: '稽核要點' })
-    expect(points.textContent).toContain('管理審查日期應早於外部稽核日期')
-    expect(points.textContent).toContain('年度計畫窗口結束月（11 月）')
+    const sequence = screen.getAllByRole('status').map((node) => node.textContent).join('\n')
+    expect(sequence).toContain('管理審查日期應早於外部稽核日期')
+    expect(sequence).toContain('年度計畫窗口結束月（11 月）')
     expect(screen.queryByRole('link', { name: '至稽核總覽' })).toBeNull()
     expect(screen.queryByRole('link', { name: '至年度稽核計畫' })).toBeNull()
     expect(screen.queryByText(/內部稽核進度（唯讀）/)).toBeNull()
     expect(screen.queryByText(/^管審日期：/)).toBeNull()
     expect(screen.queryByText(/^尚缺：/)).toBeNull()
-    expect(screen.getByRole('checkbox', { name: /2 管審/ }).hasAttribute('disabled')).toBe(true)
+    expect(screen.queryByRole('checkbox', { name: /2 管審/ })).toBeNull()
+    const managementReview = screen.getByRole('checkbox', { name: /管理審查會議召開、會議記錄完成 已完成/ })
+    expect(managementReview.hasAttribute('disabled')).toBe(true)
+    expect(managementReview.getAttribute('aria-label')).toContain('將管審日期調整至外稽日期前')
     expect(store.state.externalAuditPrep.externalAuditDate).toBe('2026-09-15')
     expect(store.state.settings.managementReviewDate).toBe('2026-12-10')
   })
@@ -135,9 +140,43 @@ describe('PreAuditPrep', () => {
     })
     render(<PreAuditPrep store={store} />)
 
-    const checkbox = screen.getByRole('checkbox', { name: /2 管審/ })
+    const checkbox = screen.getByRole('checkbox', { name: /管理審查會議召開、會議記錄完成 已完成/ })
     expect(checkbox.hasAttribute('disabled')).toBe(false)
+    expect((checkbox as HTMLInputElement).checked).toBe(true)
     fireEvent.click(checkbox)
-    expect(store.updateExternalPrepSequence).toHaveBeenCalledWith({ managementReviewComplete: false })
+    expect(store.setManagementReviewComplete).toHaveBeenCalledWith(false)
+    expect(store.updateExternalPrepItem).not.toHaveBeenCalled()
+  })
+
+  it('flags legacy data where item 4 and the sequence flag disagree instead of guessing', () => {
+    const store = makeStore((state) => {
+      state.externalAuditPrep.managementReviewComplete = false
+      state.externalAuditPrep.items.find((item) => item.id === 'prep-4')!.completed = true
+    })
+    render(<PreAuditPrep store={store} />)
+    expect(screen.getByText(/2 管審 待覆核/)).toBeTruthy()
+    expect(screen.getByText(/待覆核：舊資料第 4 項為「已完成」、序位管審為「未完成」/)).toBeTruthy()
+  })
+
+  it('shows linked checklist rows and live NCR checks without writing completion', () => {
+    const store = makeStore()
+    render(<PreAuditPrep store={store} />)
+    const checklist = screen.getByRole('region', { name: '外部稽核前準備清單' })
+    expect(within(checklist).getByRole('columnheader', { name: '關聯查檢／系統檢核' })).toBeTruthy()
+    expect(within(checklist).getAllByText(/未結 NCR/)).toHaveLength(2)
+    expect(store.updateExternalPrepItem).not.toHaveBeenCalled()
+  })
+
+  it('filters open items on screen but keeps every row for print', () => {
+    const store = makeStore((state) => {
+      state.externalAuditPrep.items[0].completed = true
+    })
+    render(<PreAuditPrep store={store} />)
+    fireEvent.click(screen.getByRole('button', { name: '未完成' }))
+    const checklist = screen.getByRole('region', { name: '外部稽核前準備清單' })
+    const rows = within(checklist).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(store.state.externalAuditPrep.items.length)
+    expect(rows[0].className).toContain('pagination-hidden-row')
+    expect(rows[1].className).not.toContain('pagination-hidden-row')
   })
 })

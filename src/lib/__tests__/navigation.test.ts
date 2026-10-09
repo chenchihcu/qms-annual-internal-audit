@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ALL_TABS, TAB_GROUPS, buildAppHash, getTabWorkflow, parseAppHash, TAB_WORKFLOW } from '../navigation'
+import { ALL_TABS, SIDEBAR_TABS, TAB_GROUPS, buildAppHash, getTabWorkflow, parseAppHash, sidebarTabFor, TAB_WORKFLOW } from '../navigation'
 
 describe('workflow navigation/form mapping', () => {
   it('keeps one sidebar entry and one semantic form for each workflow page', () => {
@@ -12,6 +12,14 @@ describe('workflow navigation/form mapping', () => {
     expect(TAB_GROUPS.flatMap((group) => group.tabs)).toHaveLength(12)
     expect(ALL_TABS.every((entry) => Boolean(entry.icon))).toBe(true)
     expect(TAB_GROUPS.every((group) => Boolean(group.icon))).toBe(true)
+  })
+
+  it('folds the external prep view into the checklist sidebar entry', () => {
+    expect(SIDEBAR_TABS).toHaveLength(11)
+    expect(SIDEBAR_TABS.some((entry) => entry.id === 'prep')).toBe(false)
+    expect(sidebarTabFor('prep')).toBe('audit')
+    expect(sidebarTabFor('ncr')).toBe('ncr')
+    expect(parseAppHash('#tab=prep').tab).toBe('prep')
   })
 
   it('keeps the dashboard as the overview entry without a workflow form', () => {
