@@ -4,6 +4,7 @@ import {
   calculateAnnualScore,
   formatScoreDisplay,
   isChecklistItemPending,
+  checklistPendingReason,
 } from '../scoring'
 import type { ChecklistItem, ProcedureAudit } from '../../types'
 
@@ -29,6 +30,16 @@ describe('isChecklistItemPending', () => {
   it('treats 不適用 without description as pending', () => {
     expect(isChecklistItemPending(item('不適用', ''))).toBe(true)
     expect(isChecklistItemPending(item('不適用', '本證書無此客戶'))).toBe(false)
+  })
+})
+
+describe('checklistPendingReason', () => {
+  it('names why an item cannot be scored yet', () => {
+    expect(checklistPendingReason(item(null))).toBe('未判定')
+    expect(checklistPendingReason({ ...item('符合'), objectiveEvidence: '' })).toBe('缺客觀證據')
+    expect(checklistPendingReason(item('不適用', ''))).toBe('缺不適用理由')
+    expect(checklistPendingReason(item('符合'))).toBeNull()
+    expect(checklistPendingReason(item('觀察', '觀察說明'))).toBeNull()
   })
 })
 

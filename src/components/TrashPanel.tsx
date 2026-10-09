@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { AuditStore } from '../hooks/useAuditStore'
 import type { TrashEntry } from '../types'
 import { TRASH_KIND_LABELS, trashEntrySummary } from '../lib/trash'
-import { Badge, Button, Card } from './ui/Badge'
+import { Button, Card } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { EmptyState } from './ui/EmptyState'
 import { ScrollRegion } from './ui/ScrollRegion'
@@ -43,12 +43,8 @@ export function TrashPanel({ store }: { store: AuditStore }) {
 
   return (
     <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-bold">回收區</h2>
-        <Badge label={`${entries.length} 筆`} />
-      </div>
       <p className="mb-4 text-sm text-muted">刪除的自建資料會先移至此處。還原會回到原年度或查檢表位置；永久清除後無法復原。</p>
-      {feedback && <p className="mb-3 text-sm text-slate-700" role="status">{feedback}</p>}
+      {feedback && <p className="mb-3 text-sm text-ink" role="status">{feedback}</p>}
       {entries.length === 0 ? (
         <EmptyState message="回收區目前是空的。" />
       ) : (

@@ -45,6 +45,7 @@ describe('Dashboard attention list', () => {
     expect(screen.getByText(/計畫項目 \d+\/\d+ 列/)).toBeTruthy()
     expect(screen.queryByText(/各程序稽核得分/)).toBeNull()
     expect(screen.queryByText(/雙證查檢未判定/)).toBeNull()
+    expect(screen.queryByText(/尚有 \d+ 項缺口/)).toBeNull()
   })
 
   it('shows management-review gaps on the overview without page shortcuts', () => {

@@ -1,0 +1,254 @@
+{
+  "audit@1536": {
+    "pageOverflow": false,
+    "auditTableTop": 387,
+    "auditRegionOverflow": false,
+    "pendingPills": 10,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "prep@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "observations@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": 109,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "personnel@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": 61,
+    "suggestionRowHeight": null
+  },
+  "suggestions@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": 61
+  },
+  "dashboard@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "system-settings@1536": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "audit@1280": {
+    "pageOverflow": false,
+    "auditTableTop": 325,
+    "auditRegionOverflow": false,
+    "pendingPills": 10,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "prep@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "observations@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": 109,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "personnel@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": 61,
+    "suggestionRowHeight": null
+  },
+  "suggestions@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": 61
+  },
+  "dashboard@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "system-settings@1280": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "audit@768": {
+    "pageOverflow": false,
+    "auditTableTop": 491,
+    "auditRegionOverflow": false,
+    "pendingPills": 10,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "prep@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "observations@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": 177,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "personnel@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": 61,
+    "suggestionRowHeight": null
+  },
+  "suggestions@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": 77
+  },
+  "dashboard@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "system-settings@768": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "audit@375": {
+    "pageOverflow": false,
+    "auditTableTop": 661,
+    "auditRegionOverflow": true,
+    "pendingPills": 10,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "prep@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "observations@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": 177,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "personnel@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": 109,
+    "suggestionRowHeight": null
+  },
+  "suggestions@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": 77
+  },
+  "dashboard@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  },
+  "system-settings@375": {
+    "pageOverflow": false,
+    "auditTableTop": null,
+    "auditRegionOverflow": null,
+    "pendingPills": 0,
+    "observationRowHeight": null,
+    "personnelRowHeight": null,
+    "suggestionRowHeight": null
+  }
+}

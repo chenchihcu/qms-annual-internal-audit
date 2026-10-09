@@ -160,11 +160,11 @@
     }
 
     col.col-person-action {
-      width: 14.125rem;
+      width: 6.75rem;
     }
 
     col.col-observation-action {
-      width: 10.5rem;
+      width: 9rem;
     }
 
     col.col-month {
@@ -184,9 +184,9 @@
       width: 5.5rem;
     }
 
-    /* 第三方建議：「帶入」「明細」同列不折行 */
+    /* 第三方建議：列上只留「明細」；帶入在明細區 */
     col.col-suggestion-action {
-      width: 9.5rem;
+      width: 5.5rem;
     }
 
     /* 年度計畫：1280px 工作面可見 1–12 月 */

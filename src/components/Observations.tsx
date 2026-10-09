@@ -282,17 +282,19 @@ export function Observations({
               tone="slate"
             />
           )}
-          <Button
-            variant={showUnsyncedView ? 'primary' : 'secondary'}
-            className="shrink-0 whitespace-nowrap"
-            onClick={() => setShowUnsyncedView((value) => !value)}
-            aria-pressed={showUnsyncedView}
-            aria-label={`查檢未同步 ${auditObservations.length}`}
-          >
-            未同步 {auditObservations.length}
-          </Button>
+          {(showUnsyncedView || auditObservations.length > 0) && (
+            <Button
+              variant={showUnsyncedView ? 'primary' : 'secondary'}
+              className="shrink-0 whitespace-nowrap"
+              onClick={() => setShowUnsyncedView((value) => !value)}
+              aria-pressed={showUnsyncedView}
+              aria-label={`查檢未同步 ${auditObservations.length}`}
+            >
+              未同步 {auditObservations.length}
+            </Button>
+          )}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="ml-auto flex shrink-0 flex-wrap items-center gap-2">
           {!showForm && <Button ref={triggerRef} variant="secondary" icon={ACTION_ICONS.add} onClick={() => setShowForm(true)}>登錄觀察事項</Button>}
           <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={() => exportObservationsExcel(state, WORKSPACE_COMPANY_ID)}>匯出 Excel</Button>
         </div>
@@ -510,34 +512,26 @@ export function Observations({
                       <td><Badge label={statusLabel[item.status]} /></td>
                       <td>{item.dueDate || '—'}</td>
                       <td className="no-print">
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            variant="secondary"
-                            icon={ACTION_ICONS.edit}
-                            className="w-full shrink-0 whitespace-nowrap"
-                            disabled={item.status === 'became_ncr'}
-                            onClick={() => {
-                              setExpandedId(item.id)
-                              setEditId(item.id)
-                              setEditDraft({
-                                content: item.content,
-                                description: item.description,
-                                owner: item.owner ?? '',
-                                dueDate: item.dueDate ?? '',
-                                closedAt: item.closedAt || todayLocal,
-                                closeEvidence: item.closeEvidence ?? '',
-                              })
-                            }}
-                          >
-                            編輯／結案
-                          </Button>
-                          {item.status === 'open' && (
-                            <Button variant="secondary" icon={ACTION_ICONS.convertNcr} className="w-full shrink-0 whitespace-nowrap" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button>
-                          )}
-                          {item.status === 'closed' && (
-                            <Button variant="secondary" className="w-full shrink-0 whitespace-nowrap" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
-                          )}
-                        </div>
+                        <Button
+                          variant="secondary"
+                          icon={ACTION_ICONS.edit}
+                          className="shrink-0 whitespace-nowrap"
+                          disabled={item.status === 'became_ncr'}
+                          onClick={() => {
+                            setExpandedId(item.id)
+                            setEditId(item.id)
+                            setEditDraft({
+                              content: item.content,
+                              description: item.description,
+                              owner: item.owner ?? '',
+                              dueDate: item.dueDate ?? '',
+                              closedAt: item.closedAt || todayLocal,
+                              closeEvidence: item.closeEvidence ?? '',
+                            })
+                          }}
+                        >
+                          編輯／結案
+                        </Button>
                       </td>
                     </tr>
                       {expanded && (
@@ -607,13 +601,20 @@ export function Observations({
                           {item.status === 'closed' && <p className="mt-2 text-xs text-tone-success-fg">結案：{item.closedAt} · {item.closeEvidence}</p>}
                           {item.convertedNcrId && <p className="mt-2 text-xs text-tone-info-fg">關聯 NCR：{currentNcrDisplayNumbers.get(item.convertedNcrId) ?? item.convertedNcrId}</p>}
                           {item.carriedToYear && <p className="mt-2 text-xs text-tone-info-fg">已帶入 {item.carriedToYear} 年查檢表</p>}
-                          <Button
-                            variant="dangerGhost"
-                            icon={ACTION_ICONS.delete}
-                            className="mt-3 no-print"
-                            aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
-                            onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
-                          >移至回收區</Button>
+                          <div className="mt-3 flex flex-wrap gap-2 no-print">
+                            {item.status === 'open' && (
+                              <Button variant="secondary" icon={ACTION_ICONS.convertNcr} className="shrink-0 whitespace-nowrap" onClick={() => setPendingNcrId(item.id)}>轉為 NCR</Button>
+                            )}
+                            {item.status === 'closed' && (
+                              <Button variant="secondary" className="shrink-0 whitespace-nowrap" onClick={() => updateObservation(item.id, { status: 'open' })}>重新開啟</Button>
+                            )}
+                            <Button
+                              variant="dangerGhost"
+                              icon={ACTION_ICONS.delete}
+                              aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
+                              onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
+                            >移至回收區</Button>
+                          </div>
                         </td>
                         </tr>
                       )}

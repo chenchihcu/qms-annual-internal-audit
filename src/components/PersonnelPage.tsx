@@ -210,9 +210,10 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       ].filter(Boolean)
     : []
   const canSave = missingFields.length === 0 && !duplicatePerson
-  const editingInactivePerson = editing?.id
-    ? state.people.find((person) => person.id === editing.id)?.active === false
-    : false
+  const editingPerson = editing?.id ? state.people.find((person) => person.id === editing.id) : undefined
+  const editingInactivePerson = editingPerson?.active === false
+  /** 停用／移至回收區只開放給稽核人員清單上的人員（與原列上操作同範圍） */
+  const editingRetirable = editingPerson && currentAuditorQualification(editingPerson, today) ? editingPerson : undefined
 
   const patchForm = (patch: Partial<PersonFormState>) => {
     setEditing((current) => current ? { ...current, ...patch } : current)
@@ -606,6 +607,27 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
               {missingFields.length > 0 && (
                 <p className="text-xs text-muted" role="status">尚需填寫：{missingFields.join('、')}</p>
               )}
+              {editingRetirable && (
+                <div className="ml-auto flex flex-wrap gap-2">
+                  {editingRetirable.active && (
+                    <Button
+                      variant="secondary"
+                      icon="minusCircle"
+                      disabled={dirty}
+                      title={dirty ? '請先儲存或取消修改' : undefined}
+                      onClick={() => setPendingDeactivate(editingRetirable)}
+                    >停用</Button>
+                  )}
+                  <Button
+                    variant="dangerGhost"
+                    icon={ACTION_ICONS.delete}
+                    disabled={dirty}
+                    aria-label={`移至回收區：${editingRetirable.name}`}
+                    title={dirty ? '請先儲存或取消修改' : '移至回收區'}
+                    onClick={() => setDeleteTarget({ id: editingRetirable.id, label: editingRetirable.name })}
+                  >移至回收區</Button>
+                </div>
+              )}
             </div>
           </Card>
         </div>
@@ -653,20 +675,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                         </td>
                         <td><Badge label={statusLabel} /></td>
                         <td className="no-print">
-                          <div className="flex flex-wrap gap-1">
-                            <Button variant="secondary" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openEdit(person)}>編輯</Button>
-                            {person.active && (
-                              <Button variant="secondary" icon="minusCircle" className="shrink-0 whitespace-nowrap" onClick={() => setPendingDeactivate(person)}>停用</Button>
-                            )}
-                            <Button
-                              variant="dangerOutline"
-                              icon={ACTION_ICONS.delete}
-                              className="shrink-0"
-                              aria-label={`移至回收區：${person.name}`}
-                              title="移至回收區"
-                              onClick={() => setDeleteTarget({ id: person.id, label: person.name })}
-                            />
-                          </div>
+                          <Button variant="secondary" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openEdit(person)}>編輯</Button>
                         </td>
                       </tr>
                     )
@@ -733,6 +742,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
           onConfirm={() => {
             deactivatePerson(pendingDeactivate.id)
             setPendingDeactivate(null)
+            closeForm()
           }}
           onCancel={() => setPendingDeactivate(null)}
         />
@@ -742,6 +752,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         onConfirm={() => {
           if (deleteTarget) movePersonToTrash(deleteTarget.id)
           setDeleteTarget(null)
+          closeForm()
         }}
         onCancel={() => setDeleteTarget(null)}
       />

@@ -236,7 +236,8 @@ for (const width of widths) {
       await navigateTab('人員合格名單')
       personRow = await findPersonRow()
       workflowStage = '人員回收與還原'
-      await personRow.getByRole('button', { name: '移至回收區', exact: false }).click()
+      await personRow.getByRole('button', { name: '編輯', exact: true }).click()
+      await page.getByRole('button', { name: `移至回收區：${personName}`, exact: true }).click()
       await page.getByRole('button', { name: '移入回收區', exact: true }).click()
       await personRow.waitFor({ state: 'detached', timeout: 5000 })
 
@@ -255,7 +256,8 @@ for (const width of widths) {
       personRow = await findPersonRow()
 
       workflowStage = '人員永久清除二次確認'
-      await personRow.getByRole('button', { name: `移至回收區：${personName}`, exact: true }).click()
+      await personRow.getByRole('button', { name: '編輯', exact: true }).click()
+      await page.getByRole('button', { name: `移至回收區：${personName}`, exact: true }).click()
       await page.getByRole('button', { name: '移入回收區', exact: true }).click()
       await personRow.waitFor({ state: 'detached', timeout: 5000 })
       await navigateTab('系統設定')

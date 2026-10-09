@@ -19,13 +19,15 @@ describe('WorkflowGuide', () => {
     expect(onNavigate).toHaveBeenCalledWith('personnel')
   })
 
-  it('keeps the top guide off prep and followups', () => {
+  it('keeps the top guide off audit, prep and followups', () => {
     const state = createDemoState()
     const { container, rerender } = render(
       <WorkflowGuide tab="prep" state={state} onNavigate={() => {}} />,
     )
     expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
     rerender(<WorkflowGuide tab="followups" state={state} onNavigate={() => {}} />)
+    expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
+    rerender(<WorkflowGuide tab="audit" state={{ ...state, workspace: { ...state.workspace, audits: [] } }} onNavigate={() => {}} />)
     expect(container.querySelector('[data-workflow-guide="top"]')).toBeNull()
   })
 

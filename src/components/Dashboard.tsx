@@ -86,7 +86,6 @@ export function Dashboard({ state }: DashboardProps) {
       key: 'internal-audit',
       label: '內部稽核',
       value: coverage.allInternalAuditComplete ? '已覆蓋' : `缺口 ${internalGapCount}`,
-      hint: coverage.allInternalAuditComplete ? undefined : `尚有 ${internalGapCount} 項缺口`,
     },
     {
       key: 'management-review-date',
