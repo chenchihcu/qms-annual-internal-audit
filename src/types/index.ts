@@ -541,8 +541,6 @@ export interface CompanyData {
   riskSourceEvents?: RiskSourceEvent[]
   /** 已盤點外部來源的聲明；未盤點時無事件的 QP 視為資料不足，不當作無事件。 */
   riskSourceCoverage?: Partial<Record<RiskCoverageKind, RiskSourceCoverage>>
-  /** 程序類型（qpCode|departmentId → 類型），由使用者指定；用於引導事件關聯，跨年度沿用。 */
-  procedureProcessTypes?: Partial<Record<string, ProcessType>>
 }
 
 export type ProcessType = 'design' | 'purchasing' | 'production' | 'quality' | 'equipment' | 'document' | 'management'

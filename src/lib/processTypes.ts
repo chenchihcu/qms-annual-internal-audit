@@ -20,17 +20,46 @@ export const PROCESS_TYPE_DEFINITIONS: Record<ProcessType, ProcessTypeDefinition
   management: { label: '管理系統／其他', concerns: ['稽核缺失'], watchedKinds: [] },
 }
 
-export function processTypeKey(qpCode: string, departmentId: string): string {
-  return `${qpCode}|${departmentId}`
+/**
+ * 各 QP 的固定程序類型（使用者 2026-10-10 逐項確認）；以 QP 為鍵，不分部門。
+ * QR-28-04／QR-28-05 為查檢表單，不列入。未列於此者不提示建議關聯。
+ */
+export const QP_PROCESS_TYPES: Readonly<Record<string, readonly ProcessType[]>> = {
+  'QP-01': ['management'],
+  'QP-02': ['management'],
+  'QP-03': ['management'],
+  'QP-04': ['equipment'],
+  'QP-05': ['equipment'],
+  'QP-06': ['management'],
+  'QP-07': ['management'],
+  'QP-08': ['document'],
+  'QP-09': ['document'],
+  'QP-10': ['design'],
+  'QP-11': ['design'],
+  'QP-12': ['quality'],
+  'QP-13': ['management'],
+  'QP-14': ['design'],
+  'QP-15': ['design', 'purchasing'],
+  'QP-16': ['quality'],
+  'QP-17': ['purchasing'],
+  'QP-18': ['purchasing'],
+  'QP-19': ['quality'],
+  'QP-20': ['production'],
+  'QP-21': ['production'],
+  'QP-22': ['management'],
+  'QP-23': ['production'],
+  'QP-24': ['production'],
+  'QP-25': ['quality'],
+  'QP-26': ['quality'],
+  'QP-27': ['quality'],
+  'QP-28': ['management'],
 }
 
-/** 依程序類型判斷是否為此來源類別的建議關聯對象；未分類者不提示。 */
-export function isSuggestedTarget(
-  types: Partial<Record<string, ProcessType>> | undefined,
-  qpCode: string,
-  departmentId: string,
-  kind: RiskSourceKind,
-): boolean {
-  const type = types?.[processTypeKey(qpCode, departmentId)]
-  return type != null && PROCESS_TYPE_DEFINITIONS[type].watchedKinds.includes(kind)
+export function processTypesFor(qpCode: string): readonly ProcessType[] {
+  return QP_PROCESS_TYPES[qpCode] ?? []
+}
+
+/** 依固定程序類型判斷是否為此來源類別的建議關聯對象；未列入者不提示。 */
+export function isSuggestedTarget(qpCode: string, kind: RiskSourceKind): boolean {
+  return processTypesFor(qpCode).some((type) => PROCESS_TYPE_DEFINITIONS[type].watchedKinds.includes(kind))
 }

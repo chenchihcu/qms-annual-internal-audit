@@ -73,10 +73,9 @@ describe('Risk sources page', () => {
     fireEvent.click(coverage)
     expect((coverage as HTMLInputElement).checked).toBe(true)
 
-    fireEvent.change(within(register).getByLabelText(/QP-21 .* 程序類型/), { target: { value: 'production' } })
-    expect(within(register).getByText(/已分類 1\//)).toBeTruthy()
     fireEvent.click(within(register).getByRole('button', { name: '登錄來源' }))
     expect(checkboxByLabelStart(register, 'QP-21').closest('label')?.textContent).toContain('建議關聯')
-    expect(within(register).getByText(/1 個程序標示「建議關聯」/)).toBeTruthy()
+    expect(within(register).getByText(/\d+ 個程序標示「建議關聯」/)).toBeTruthy()
+    expect(within(register).queryByRole('combobox', { name: /程序類型/ })).toBeNull()
   }, 20000)
 })
