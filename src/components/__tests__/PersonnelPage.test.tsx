@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import App from '../../App'
-import { STORAGE_KEY } from '../../data/demoData'
+import { createDemoState, STORAGE_KEY } from '../../data/demoData'
+import { WORKSPACE_COMPANY_ID } from '../../lib/singleWorkspaceMigration'
+import type { AppState } from '../../types'
 
 async function openPersonnel() {
   render(<App />)
@@ -12,6 +14,16 @@ async function openPersonnel() {
 function storedPeopleCount(name: string): number {
   const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as { people?: Array<{ name: string }> }
   return (stored.people ?? []).filter((person) => person.name === name).length
+}
+
+function storedState(): AppState {
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as AppState
+}
+
+function seedState(mutate: (state: AppState) => void) {
+  const state = createDemoState()
+  mutate(state)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
 }
 
 function selectFirstDepartment(label: string) {
@@ -139,5 +151,55 @@ describe('Personnel list columns', () => {
     const otherTable = screen.getByRole('region', { name: '其他角色與任命清單' })
     expect(within(otherTable).getByText('王大明')).toBeTruthy()
     await waitFor(() => expect(storedPeopleCount('王大明')).toBe(1))
+  }, 15000)
+
+  it('keeps an annual-only lead assignment from becoming a standing appointment on unrelated saves', async () => {
+    let personId = ''
+    seedState((state) => {
+      const person = state.people.find((item) => item.name === '王大明')!
+      personId = person.id
+      person.appointments = person.appointments.filter((item) => item.role !== 'internal_lead_auditor')
+      state.annualPersonnelAssignments = [{
+        id: 'annual-lead-test',
+        year: state.settings.auditYear,
+        companyId: WORKSPACE_COMPANY_ID,
+        personId: person.id,
+        role: 'internal_lead_auditor',
+      }]
+    })
+    const table = await openPersonnel()
+    const row = within(table).getByText('王大明').closest('tr')!
+    fireEvent.click(within(row).getByRole('button', { name: '編輯' }))
+    expect((screen.getByRole('checkbox', { name: '主任稽核員' }) as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }))
+
+    expect(await screen.findByText('已儲存')).toBeTruthy()
+    await waitFor(() => {
+      const person = storedState().people.find((item) => item.id === personId)!
+      expect(person.appointments.filter((item) => item.role === 'internal_lead_auditor')).toEqual([])
+    })
+  }, 15000)
+
+  it('offers explicit reactivation when loading an inactive duplicate', async () => {
+    let personId = ''
+    seedState((state) => {
+      const person = state.people.find((item) => item.name === '王大明')!
+      personId = person.id
+      person.active = false
+    })
+    await openPersonnel()
+    fireEvent.click(screen.getByRole('button', { name: '新增人員' }))
+    fireEvent.change(screen.getByLabelText('姓名 *'), { target: { value: '王大明' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: '陪稽人員' }))
+    fireEvent.click(screen.getByRole('button', { name: '載入既有人員' }))
+
+    const reactivate = screen.getByRole('checkbox', { name: /重新啟用此人員/ }) as HTMLInputElement
+    expect(reactivate.checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }))
+
+    expect(await screen.findByText('已儲存')).toBeTruthy()
+    await waitFor(() => {
+      expect(storedState().people.find((item) => item.id === personId)?.active).toBe(true)
+    })
   }, 15000)
 })

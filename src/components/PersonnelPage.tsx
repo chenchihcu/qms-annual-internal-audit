@@ -75,6 +75,8 @@ interface PersonFormState {
   leadTo: string
   mrFrom: string
   mrTo: string
+  /** 停用人員儲存時重新啟用 */
+  reactivate?: boolean
 }
 
 const blankPersonForm = (): PersonFormState => ({
@@ -225,6 +227,9 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       ].filter(Boolean)
     : []
   const canSave = missingFields.length === 0 && !duplicatePerson
+  const editingInactivePerson = editing?.id
+    ? state.people.find((person) => person.id === editing.id)?.active === false
+    : false
 
   const patchForm = (patch: Partial<PersonFormState>) => {
     setEditing((current) => current ? { ...current, ...patch } : current)
@@ -309,6 +314,8 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
         : {}),
       ...(!base.roles.includes('lead_appointment') ? { leadFrom: editing.leadFrom, leadTo: editing.leadTo } : {}),
       ...(!base.roles.includes('management_representative') ? { mrFrom: editing.mrFrom, mrTo: editing.mrTo } : {}),
+      // 為停用人員加角色時，預設勾選重新啟用（畫面可取消）
+      reactivate: !person.active,
     }
     setEditing(merged)
     setInitialForm(base)
@@ -390,12 +397,13 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       to: string,
       initialFrom: string | undefined,
       initialTo: string | undefined,
+      hadRoleBefore: boolean,
     ) => {
       const current = appointments.toReversed().find((item) => (
         item.role === role && item.companyId === companyId && (!item.supersededAt || item.supersededAt > today)
       ))
-      // 既有任命且日期未改：不產生空修訂
-      if (current && from === initialFrom && to === initialTo) return
+      // 既有角色且日期未改：不產生空修訂，也不把僅年度指派的角色升格為長期任命
+      if (hadRoleBefore && from === initialFrom && to === initialTo) return
       const effectiveFrom = from || today
       if (current) {
         appointments = appointments.map((item) => item.id === current.id ? { ...item, supersededAt: effectiveFrom } : item)
@@ -413,10 +421,10 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       })
     }
     if (hasRole('lead_appointment')) {
-      reviseAppointment('internal_lead_auditor', form.leadFrom, form.leadTo, initialForm?.leadFrom, initialForm?.leadTo)
+      reviseAppointment('internal_lead_auditor', form.leadFrom, form.leadTo, initialForm?.leadFrom, initialForm?.leadTo, hadRole('lead_appointment'))
     }
     if (hasRole('management_representative')) {
-      reviseAppointment('management_representative', form.mrFrom, form.mrTo, initialForm?.mrFrom, initialForm?.mrTo)
+      reviseAppointment('management_representative', form.mrFrom, form.mrTo, initialForm?.mrFrom, initialForm?.mrTo, hadRole('management_representative'))
     }
 
     const person: Omit<Person, 'id'> = {
@@ -426,7 +434,7 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
       affiliations: [affiliation],
       qualifications,
       appointments,
-      active: existing?.active ?? true,
+      active: existing ? existing.active || form.reactivate === true : true,
       notes: existing?.notes ?? '',
     }
     const savedId = existing ? (updatePerson(existing.id, person), existing.id) : addPerson(person)
@@ -498,6 +506,17 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
                   <Button variant="secondary" className="mt-2" onClick={() => loadExistingPerson(duplicatePerson)}>
                     載入既有人員
                   </Button>
+                )}
+                {editingInactivePerson && (
+                  <label className="mt-2 flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={editing.reactivate === true}
+                      onChange={(event) => patchForm({ reactivate: event.target.checked })}
+                    />
+                    <span>重新啟用此人員（目前停用；未啟用時不會出現在稽核指派名單）</span>
+                  </label>
                 )}
               </div>
               <CheckboxList
