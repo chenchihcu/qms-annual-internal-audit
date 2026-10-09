@@ -45,7 +45,7 @@ export function CheckboxList({
 
   return (
     <div className={className}>
-      {label && <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>}
+      {label && <p className="mb-2 text-sm font-bold text-slate-700">{label}</p>}
       <div
         className={
           inline
@@ -55,7 +55,7 @@ export function CheckboxList({
         aria-label={ariaLabel ?? label}
       >
         {allLabel && onToggleAll && (
-          <label className="flex min-h-8 items-center gap-2 border-b border-slate-100 pb-2 text-sm font-medium">
+          <label className="flex min-h-8 items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold">
             <input
               type="checkbox"
               checked={allSelected}

@@ -359,7 +359,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
       />
 
       {unsavedRiskRowCount > 0 && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950 no-print" role="status">
+        <p className="rounded-lg border border-tone-warning-line bg-row-warning px-3 py-2 text-sm text-tone-warning-fg no-print" role="status">
           尚有 {unsavedRiskRowCount} 列方案風險未按「存檔」寫入；PDCA 就緒仍只計已存檔列。
         </p>
       )}
@@ -466,11 +466,11 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                       key={key}
 
-                      className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${!persisted ? 'bg-amber-50/50' : ''}`}
+                      className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${!persisted ? 'bg-row-warning/50' : ''}`}
 
                     >
 
-                      <td className="font-medium text-slate-900">{row.qpCode}</td>
+                      <td className="font-normal text-ink">{row.qpCode}</td>
 
                       <td>{row.department}</td>
 
@@ -482,7 +482,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                             type="button"
 
-                            className={`min-h-9 w-fit shrink-0 whitespace-nowrap rounded border border-slate-300 px-2 text-xs font-medium no-print ${FOCUS_RING}`}
+                            className={`min-h-9 w-fit shrink-0 whitespace-nowrap rounded border border-line px-2 text-xs font-normal no-print ${FOCUS_RING}`}
 
                             onClick={() => cycleFactor(row, 'inherentRisk')}
 
@@ -498,7 +498,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                           <details className="no-print shrink-0">
 
-                            <summary className="cursor-pointer whitespace-nowrap text-sm text-blue-800">其他因素（可暫定）</summary>
+                            <summary className="cursor-pointer whitespace-nowrap text-sm text-tone-info-fg">其他因素（可暫定）</summary>
 
                             <ul className="mt-1 space-y-1 text-xs">
 
@@ -506,13 +506,13 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                                 <li key={field} className="flex flex-wrap items-center gap-2">
 
-                                  <span className="min-w-[8rem] text-slate-600">{factorNames[field]}</span>
+                                  <span className="min-w-[8rem] text-muted">{factorNames[field]}</span>
 
                                   <button
 
                                     type="button"
 
-                                    className={`rounded border border-slate-300 px-1.5 py-0.5 ${FOCUS_RING}`}
+                                    className={`rounded border border-line px-1.5 py-0.5 ${FOCUS_RING}`}
 
                                     onClick={() => cycleFactor(row, field)}
 
@@ -534,13 +534,13 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                       </td>
 
-                      <td className="align-top font-semibold">
+                      <td className="align-top font-bold">
 
                         {priority.score}
 
                         {priority.provisional && (
 
-                          <span className="ml-1.5 font-normal text-slate-500">暫定</span>
+                          <span className="ml-1.5 font-normal text-muted">暫定</span>
 
                         )}
 
@@ -574,7 +574,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
 
                         {errors[key] && (
 
-                          <p className="mb-1 text-xs font-medium text-red-700" role="alert">{errors[key]}</p>
+                          <p className="mb-1 text-xs font-bold text-danger" role="alert">{errors[key]}</p>
 
                         )}
 

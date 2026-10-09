@@ -66,7 +66,7 @@ export const TAB_ICONS: Record<TabId, IconName> = {
   ncr: 'xCircle',
   observations: 'eye',
   suggestions: 'lightbulb',
-  prep: 'listChecks',
+  prep: 'shieldCheck',
   'system-settings': 'settings',
 }
 

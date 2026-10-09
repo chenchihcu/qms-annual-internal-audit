@@ -27,7 +27,7 @@ export function PlanPreviewPanel({
     <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 no-print">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-blue-950">{title}</h3>
+          <h3 className="text-sm font-bold text-blue-950">{title}</h3>
           <p className="text-sm text-blue-800">{description}</p>
         </div>
         <div className="flex gap-2">

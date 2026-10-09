@@ -8,8 +8,6 @@ import { useInlineFormFocus } from '../hooks/useInlineFormFocus'
 
 import { useRecordDisclosure } from '../hooks/useRecordDisclosure'
 
-import { FOCUS_RING } from '../lib/focusRing'
-
 import { resolveFollowupRecordLink } from '../lib/followupRecordLink'
 import { isFollowupOverdue } from '../lib/followupQueue'
 
@@ -207,6 +205,8 @@ export function NCRList({
 
   const displayNumbers = ncrNumberLabels(company.ncrs)
 
+  const showCompanyColumn = company.ncrs.some((ncr) => ncrCompanyScopeLabel(ncr.companyScope))
+
   const pagination = useTablePagination(
 
     company.ncrs.length,
@@ -363,7 +363,7 @@ export function NCRList({
 
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
 
-          <h3 className="text-sm font-semibold">不符合事項一覽（{company.ncrs.length}）</h3>
+          <h3 className="text-sm font-bold">不符合事項一覽（{company.ncrs.length}）</h3>
 
           {!showForm && (
 
@@ -441,7 +441,7 @@ export function NCRList({
 
                 {descriptionError && (
 
-                  <p className="mt-1 text-xs text-red-600" role="alert">{descriptionError}</p>
+                  <p className="mt-1 text-xs text-danger" role="alert">{descriptionError}</p>
 
                 )}
 
@@ -477,27 +477,27 @@ export function NCRList({
 
             <ScrollRegion ariaLabel="不符合事項一覽">
 
-              <table className="worksheet-table min-w-[68rem]">
+              <table className={`worksheet-table ${showCompanyColumn ? 'min-w-[67.5rem]' : 'min-w-[61.5rem]'}`}>
 
                 <colgroup>
 
-                  <col className="col-code" />
+                  <col className="col-ncr-number" />
 
                   <col className="col-code" />
 
-                  <col className="col-name" />
+                  <col className="col-ncr-dept" />
 
-                  <col className="col-status" />
+                  <col className={`col-ncr-company${showCompanyColumn ? '' : ' print-table-column'}`} />
 
                   <col />
 
-                  <col className="col-status" />
+                  <col className="col-ncr-status" />
 
-                  <col style={{ width: '11rem' }} />
+                  <col className="col-ncr-progress no-print" />
 
-                  <col className="col-date" />
+                  <col className="col-ncr-date" />
 
-                  <col className="col-date" />
+                  <col className="col-ncr-date" />
 
                   <col className="col-action no-print" />
 
@@ -513,7 +513,7 @@ export function NCRList({
 
                     <th>部門</th>
 
-                    <th>公司</th>
+                    <th className={showCompanyColumn ? undefined : 'print-table-cell'}>公司</th>
 
                     <th>摘要</th>
 
@@ -555,23 +555,23 @@ export function NCRList({
 
                         data-ncr-id={ncr.id}
 
-                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-amber-50/50 dark:bg-amber-950/20 ' : ''}${isOverdue ? 'bg-red-50/50 dark:bg-red-950/20 ' : ''}${expanded ? 'bg-blue-50/40 dark:bg-blue-950/20' : ''}`}
+                        className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${stale ? 'bg-row-warning/50 ' : ''}${isOverdue ? 'bg-row-danger/50 ' : ''}${expanded ? 'bg-row-selected/40' : ''}`}
 
                       >
 
-                        <td className="font-mono">{displayNumber}</td>
+                        <td className="whitespace-nowrap tabular-nums">{displayNumber}</td>
 
                         <td>{ncr.qpCode}</td>
 
                         <td className="break-words">{ncr.department}</td>
 
-                        <td className="break-words">{ncrCompanyScopeLabel(ncr.companyScope) || '—'}</td>
+                        <td className={`break-words${showCompanyColumn ? '' : ' print-table-cell'}`}>{ncrCompanyScopeLabel(ncr.companyScope) || '—'}</td>
 
                         <td className="break-words">
 
                           {stale && (
 
-                            <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                            <p className="mb-1 text-xs font-bold text-tone-warning-fg">
 
                               查檢已非不符，建議結案
 
@@ -579,9 +579,7 @@ export function NCRList({
 
                           )}
 
-                          <span className="line-clamp-3">{ncr.description}</span>
-
-                          <span className="print-only">{ncr.description}</span>
+                          <span className="whitespace-pre-wrap">{ncr.description}</span>
 
                         </td>
 
@@ -599,15 +597,29 @@ export function NCRList({
 
                         <td>{ncr.date || '—'}</td>
 
-                        <td>{ncr.dueDate || '—'}</td>
+                        <td>
+
+                          {ncr.dueDate || '—'}
+
+                          {isOverdue && (
+
+                            <span className="mt-1 block">
+
+                              <Badge label="逾期" tone="danger" />
+
+                            </span>
+
+                          )}
+
+                        </td>
 
                         <td className="no-print">
 
-                          <button
+                          <Button
 
-                            type="button"
+                            variant="secondary"
 
-                            className={`min-h-11 text-sm text-link hover:underline ${FOCUS_RING}`}
+                            className="whitespace-nowrap px-3"
 
                             aria-label={`${displayNumber} QR-28-03 報告`}
 
@@ -619,7 +631,7 @@ export function NCRList({
 
                             {expanded ? '收合' : '報告'}
 
-                          </button>
+                          </Button>
 
                         </td>
 

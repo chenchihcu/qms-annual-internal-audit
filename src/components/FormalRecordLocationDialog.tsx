@@ -127,7 +127,7 @@ export function FormalRecordLocationDialog({
         tabIndex={-1}
         className="relative z-10 w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
       >
-        <h2 id={titleId} className="text-sm font-semibold text-slate-900">
+        <h2 id={titleId} className="text-sm font-bold text-slate-900">
           {title}
         </h2>
         <p id={descId} className="mt-2 text-sm text-slate-600">
@@ -136,7 +136,7 @@ export function FormalRecordLocationDialog({
 
         <div className="mt-4 space-y-3">
           <div>
-            <span className="block text-xs font-medium text-slate-500 mb-1.5">快速代入常用位置：</span>
+            <span className="block text-xs font-bold text-slate-500 mb-1.5">快速代入常用位置：</span>
             <div className="flex flex-wrap gap-1.5">
               {QUICK_LOCATION_PRESETS.map((preset) => (
                 <button
@@ -148,7 +148,7 @@ export function FormalRecordLocationDialog({
                   }}
                   className={`rounded-md border px-2.5 py-1 text-xs transition ${
                     draft === preset
-                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-medium'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
                       : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >

@@ -19,9 +19,9 @@ function scoreClassFor(scoreLabel: string): string {
   if (scoreLabel === '不適用') return 'text-muted'
   const num = parseFloat(scoreLabel)
   if (Number.isNaN(num)) return 'text-muted'
-  if (num >= 80) return 'text-green-600 dark:text-green-400'
-  if (num >= 60) return 'text-amber-600 dark:text-amber-400'
-  return 'text-red-600 dark:text-red-400'
+  if (num >= 80) return 'text-green-600'
+  if (num >= 60) return 'text-amber-600'
+  return 'text-red-600'
 }
 
 function resolveDepartmentId(row: { qpCode: string; department: string }, planRows: PlanRow[]): string {

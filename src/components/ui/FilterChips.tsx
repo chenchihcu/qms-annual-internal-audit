@@ -40,7 +40,7 @@ export function FilterChips<T extends string>({
             key={option.id}
             type="button"
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-normal transition ${
               active ? activeClass : inactiveClass
             }`}
             onClick={() => onChange(option.id)}

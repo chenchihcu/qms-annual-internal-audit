@@ -52,10 +52,9 @@ describe('Personnel list columns', () => {
     expect(trash.textContent).toBe('')
     expect(trash.getAttribute('title')).toBe('移至回收區')
 
-    const statusFilter = screen.getByLabelText('資格狀態')
-    expect(within(statusFilter).queryByRole('option', { name: '暫停' })).toBeNull()
-    expect(within(statusFilter).getByRole('option', { name: '有效' })).toBeTruthy()
-    expect(within(statusFilter).getByRole('option', { name: '失效' })).toBeTruthy()
+    expect(screen.queryByLabelText('搜尋姓名')).toBeNull()
+    expect(screen.queryByLabelText('資格狀態')).toBeNull()
+    expect(screen.queryByRole('heading', { name: '內部稽核人員清單' })).toBeNull()
 
     fireEvent.click(within(table).getAllByRole('button', { name: '編輯' })[0])
     expect(screen.getByRole('heading', { name: '編輯人員' })).toBeTruthy()

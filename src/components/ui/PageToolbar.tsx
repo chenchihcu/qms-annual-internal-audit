@@ -12,7 +12,7 @@ export function PageToolbar({ title, meta, actions, className = '' }: PageToolba
     <div className={`mb-4 flex flex-wrap items-start gap-3 ${title || meta ? 'justify-between' : 'justify-end'} ${className}`}>
       {(title || meta) && (
         <div className="min-w-0">
-          {title && <h2 className="text-sm font-semibold">{title}</h2>}
+          {title && <h2 className="text-sm font-bold">{title}</h2>}
           {meta && <div className="mt-1 text-sm text-slate-500">{meta}</div>}
         </div>
       )}

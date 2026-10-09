@@ -119,14 +119,14 @@ export function StakeholderEditDialog({
           className="relative z-10 flex max-h-[min(90vh,40rem)] w-full max-w-lg flex-col rounded-xl border border-line bg-surface shadow-lg"
         >
           <div className="shrink-0 border-b border-line p-5 pb-3">
-            <h2 id={titleId} className="text-sm font-semibold text-ink">
+            <h2 id={titleId} className="text-sm font-bold text-ink">
               {dept.name}
             </h2>
             <p className="mt-1 text-sm text-muted">負責人：{dept.owner}</p>
           </div>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-5">
             <div>
-              <p className="text-sm font-medium text-slate-600">利害關係人</p>
+              <p className="text-sm font-bold text-muted">利害關係人</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {STAKEHOLDER_TAGS.map((tag) => {
                   const active = dept.stakeholders.includes(tag)
@@ -135,10 +135,10 @@ export function StakeholderEditDialog({
                       key={tag}
                       type="button"
                       aria-pressed={active}
-                      className={`rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
+                      className={`rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                         active
-                          ? 'border-blue-600 bg-blue-50 text-blue-800'
-                          : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                          ? 'border-primary bg-row-selected text-tone-info-fg'
+                          : 'border-line text-muted hover:border-line'
                       }`}
                       onClick={() => toggleTag(tag)}
                     >
@@ -162,9 +162,9 @@ export function StakeholderEditDialog({
               guide={SEVERITY_BAND_GUIDE}
               onChange={(n) => onUpdate({ riskSeverity: n })}
             />
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
-              <p className="font-medium">RPN {index} · {level} · 優先 {priority}</p>
-              <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+            <div className="rounded-lg border border-line bg-page p-3 text-sm text-ink">
+              <p className="font-bold">RPN {index} · {level} · 優先 {priority}</p>
+              <ul className="mt-2 space-y-0.5 text-xs text-muted">
                 <li>{impact.sortLine}</li>
                 <li>{impact.frequencyLine}</li>
                 <li>{impact.timingLine}</li>

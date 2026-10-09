@@ -46,7 +46,7 @@ export function AuditYearSwitcher({ store, compact = false, hideLabel = false, i
   const yearInput = (
     <input
       type="number"
-      className={`rounded border border-slate-300 bg-surface px-2 py-1 text-sm font-medium text-ink ${compact ? 'w-20' : 'w-24'}`}
+      className={`rounded border border-slate-300 bg-surface px-2 py-1 text-sm font-normal text-ink ${compact ? 'w-20' : 'w-24'}`}
       value={yearDraft}
       aria-label={inputAriaLabel}
       onChange={(event) => handleYearDraftChange(event.target.value)}

@@ -105,7 +105,7 @@ export function ConfirmDialog({
         tabIndex={-1}
         className="relative z-10 w-full max-w-md rounded-xl border border-line bg-surface p-5 shadow-lg"
       >
-        <h2 id={titleId} className="text-sm font-semibold text-ink">
+        <h2 id={titleId} className="text-sm font-bold text-ink">
           {title}
         </h2>
         <p id={descId} className="mt-2 text-sm text-muted">

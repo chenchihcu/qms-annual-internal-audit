@@ -30,7 +30,7 @@ export function TagInput({ label, value, onChange, placeholder = '輸入後按 E
 
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1 block text-sm font-bold text-slate-700">{label}</span>
       <div className="flex flex-wrap gap-2">
         <input
           type="text"
