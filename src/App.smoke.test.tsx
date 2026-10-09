@@ -4,7 +4,6 @@ import App from './App'
 
 const TAB_LABELS = [
   '稽核總覽',
-  '利害關係人',
   '風險來源登錄',
   '方案風險',
   '人員合格名單',
@@ -52,7 +51,7 @@ describe('App tab smoke', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('renders all twelve sidebar pages and the prep view without crashing', async () => {
+  it('renders all eleven sidebar pages and the prep and stakeholders views without crashing', async () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
@@ -68,9 +67,15 @@ describe('App tab smoke', () => {
       expect(screen.getByRole('region', { name: '外部稽核前準備清單' })).toBeTruthy()
     })
     expect(screen.queryByText('外稽準備 無法顯示')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '方案風險' }))
+    fireEvent.click(await screen.findByRole('button', { name: '部門利害關係人' }))
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
+    })
+    expect(screen.queryByText('利害關係人 無法顯示')).toBeNull()
   }, 30000)
 
-  it('lists twelve tabs without PDCA group headings; prep is a checklist view', () => {
+  it('lists eleven tabs without PDCA group headings; prep and stakeholders are views', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
     for (const heading of SIDEBAR_GROUP_LABELS) {
@@ -79,8 +84,9 @@ describe('App tab smoke', () => {
     for (const label of TAB_LABELS) {
       expect(within(nav).getByRole('button', { name: label })).toBeTruthy()
     }
-    expect(within(nav).getAllByRole('button')).toHaveLength(12)
+    expect(within(nav).getAllByRole('button')).toHaveLength(11)
     expect(within(nav).queryByRole('button', { name: '外稽準備' })).toBeNull()
+    expect(within(nav).queryByRole('button', { name: '利害關係人' })).toBeNull()
   })
 
   it('keeps the checklist sidebar item current on the prep view and returns to the checklist', async () => {
@@ -208,10 +214,16 @@ describe('App tab smoke', () => {
     expect(screen.queryByText(/不取代程序固有風險/)).toBeNull()
     expect(screen.queryByText(/至利害關係人編輯部門 O／S/)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
+    fireEvent.click(screen.getByRole('button', { name: '部門利害關係人' }))
     await waitFor(() => {
       expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
       expect(screen.queryByText('評分規則與編排影響')).toBeNull()
+    }, { timeout: 10000 })
+    const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
+    expect(within(nav).getByRole('button', { name: '方案風險' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(screen.getByRole('button', { name: '程序風險' }))
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '程序風險評估一覽' })).toBeTruthy()
     }, { timeout: 10000 })
     expect(screen.queryByText(/兩者不可互代/)).toBeNull()
   }, 20000)

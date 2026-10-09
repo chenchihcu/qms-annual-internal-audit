@@ -24,7 +24,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 殼層：頂欄標題為「年度稽核」（外稽準備頁仍為「外稽準備 · 準備表年度」），年份只留頁首輸入框；可見標籤「內稽年度」不顯示，輸入保留 `aria-label`「內稽年度」。頁名只在側欄，頁內不重複 H2 頁名。進度 `a/b` 只在仍顯示 Guide 的頁面。橫向捲動不顯示「此表可左右滑動查看完整欄位」。窄螢幕頂欄只留「選單」，不另加「首頁」；回家由側欄「稽核總覽」負責，藍卡不可點。側欄保留「資料儲存於本機 · v8」；**無**內容欄頁尾標語（如 ISO 9001／AS9100D）；系統設定**無**「關於」段落。資料待覆核橫幅不在系統設定頁顯示（該頁已有待覆核面板）。`Card` 不加 `shadow-sm`；sticky 頂欄不用 `backdrop-blur`，以 `bg-surface` + 底線分區。同一 `Card` 內並列清單不加內層 `rounded-lg border`，用間距或 `border-t` 分隔。
 
-利害關係人（`stakeholders`）：`PageToolbar` **無** `meta`（不重複與方案風險互代說明）；WorkflowGuide 缺口用 `利害關係人已標註 a/b`；畫面**不**顯示 `StakeholderRulesPanel`（評分規則與編排影響收合區已移除，種子與 `STAKEHOLDER_WEIGHTS` 邏輯仍保留於程式）。工作表主表一覽（對齊觀察事項台帳：`.worksheet-table` 主題色、**無**頁內 `h3`「部門利害關係人一覽（n）」、`ScrollRegion` aria 仍為「部門利害關係人一覽」、操作列 `Button` secondary＋編輯圖示）；已選標籤用 `Badge`、風險用 `Badge` + `data-stakeholder-dept` 掛列；列「編輯」開 `StakeholderEditDialog`（`no-print`）。標籤切換與發生度／嚴重度只在編輯面板；標籤按鈕只留名稱。發生度／嚴重度按鈕下不顯示說明句（`aria-label` 與 `title` 仍帶低／中／高事實）。主表編排影響只一行摘要；RPN 與編排三行細節在編輯面板。不改 `STAKEHOLDER_WEIGHTS`。檢查：主表無未選標籤按鈕；標籤無「· 權重」；無「評分規則與編排影響」summary。來源：2026-09-27 五頁低效益簡化；2026-09-27 利害關係人主表判讀＋編輯面板；2026-09-27 瀏覽器點選調整。
+利害關係人（`stakeholders`，2026-10-09 起為方案風險的檢視模式，`viewOf='risk'`）：`PageToolbar` **無** `meta`（不重複與方案風險互代說明）；WorkflowGuide 缺口用 `利害關係人已標註 a/b`；畫面**不**顯示 `StakeholderRulesPanel`（評分規則與編排影響收合區已移除，種子與 `STAKEHOLDER_WEIGHTS` 邏輯仍保留於程式）。工作表主表一覽（對齊觀察事項台帳：`.worksheet-table` 主題色、**無**頁內 `h3`「部門利害關係人一覽（n）」、`ScrollRegion` aria 仍為「部門利害關係人一覽」、操作列 `Button` secondary＋編輯圖示）；已選標籤用 `Badge`、風險用 `Badge` + `data-stakeholder-dept` 掛列；列「編輯」開 `StakeholderEditDialog`（`no-print`）。標籤切換與發生度／嚴重度只在編輯面板；標籤按鈕只留名稱。發生度／嚴重度按鈕下不顯示說明句（`aria-label` 與 `title` 仍帶低／中／高事實）。主表編排影響只一行摘要；RPN 與編排三行細節在編輯面板。不改 `STAKEHOLDER_WEIGHTS`。檢查：主表無未選標籤按鈕；標籤無「· 權重」；無「評分規則與編排影響」summary。來源：2026-09-27 五頁低效益簡化；2026-09-27 利害關係人主表判讀＋編輯面板；2026-09-27 瀏覽器點選調整。
 
 儀表板總覽（`dashboard`）：**無**頁內「稽核總覽」`h2` 與「追蹤清單」分區卡片；改單一 `worksheet-table`（項目／結果／說明）。列含年度指標、內部稽核缺口、管審日期、管審前置，以及四項追蹤計數；觀察三數仍分開、不合併。「說明」只在有補充時顯示（已回報件數、計畫列數、NCR 總筆數與未結數不同、管審尚未填寫或前置尚缺）；無補充留空，不寫「—」。總覽不提供列上「操作／開啟」，也不放「至稽核總覽」「至年度稽核計畫」捷徑；進入各作業頁由側欄負責。程序得分、雙證覆蓋與逐筆缺口不在總覽重複。檢查：`region` 名稱「稽核總覽」；無 `text-2xl` 指標卡；無「操作」欄；追蹤四列說明格為空。來源：2026-09-27 瀏覽器點選調整；2026-09-28 說明欄空白「—」；2026-09-30 總覽移除列上操作，並承接外稽序位的缺口與管審狀態。
 
@@ -60,7 +60,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。工作表表頭 12px 由 [`src/index.css`](src/index.css) `.worksheet-table thead th` 統一設定，不在各頁 `th` 逐格加 class；`tbody td` 繼承表格 `text-sm`，禁止在資料格上再套 `text-xs`（長文欄與短欄同級）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
 
-圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 12 頁，不渲染 PDCA 分組標題。
+圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 11 頁（外稽準備、利害關係人為檢視模式不列），不渲染 PDCA 分組標題。
 
 ## 2026-09-27 瀏覽器點選調整（harvest）
 

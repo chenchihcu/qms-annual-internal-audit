@@ -15,11 +15,17 @@ describe('workflow navigation/form mapping', () => {
   })
 
   it('folds the external prep view into the checklist sidebar entry', () => {
-    expect(SIDEBAR_TABS).toHaveLength(12)
+    expect(SIDEBAR_TABS).toHaveLength(11)
     expect(SIDEBAR_TABS.some((entry) => entry.id === 'prep')).toBe(false)
     expect(sidebarTabFor('prep')).toBe('audit')
     expect(sidebarTabFor('ncr')).toBe('ncr')
     expect(parseAppHash('#tab=prep').tab).toBe('prep')
+  })
+
+  it('folds the stakeholders view into the programme risk sidebar entry', () => {
+    expect(SIDEBAR_TABS.some((entry) => entry.id === 'stakeholders')).toBe(false)
+    expect(sidebarTabFor('stakeholders')).toBe('risk')
+    expect(parseAppHash('#tab=stakeholders').tab).toBe('stakeholders')
   })
 
   it('keeps the dashboard as the overview entry without a workflow form', () => {
