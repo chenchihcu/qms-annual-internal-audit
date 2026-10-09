@@ -94,7 +94,8 @@ const alertTexts = async (page) => {
 async function confirmIfAsked(page, meter) {
   const dialog = page.getByRole('alertdialog')
   if (await dialog.count() === 0) return false
-  await meter.click(dialog.getByRole('button').first())
+  // ConfirmDialog renders cancel first, an optional secondary action, then confirm last.
+  await meter.click(dialog.getByRole('button').last())
   return true
 }
 

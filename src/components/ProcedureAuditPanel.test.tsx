@@ -249,6 +249,58 @@ describe('ProcedureAuditPanel', () => {
     expect(screen.getByText('規劃中')).toBeTruthy()
   })
 
+  it('marks notification from the audit toolbar even when setup is collapsed', async () => {
+    const state = createCurrentDemoState()
+    const company = activeCompanyData(state)
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    audit.id = 'audit-QP-28-dept-qa'
+    company.audits = [audit]
+    audit.status = '規劃中'
+    audit.notifyDate = ''
+    audit.notifySent = false
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
+    const toggle = await screen.findByRole('button', { name: / 稽核設定$/ })
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(screen.getByRole('button', { name: '標記已通知' }))
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as AppState
+      const savedAudit = saved.workspace.audits.find((item) => item.id === audit.id)
+      expect(savedAudit?.notifySent).toBe(true)
+      expect(savedAudit?.notifyDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    })
+    expect(screen.queryByRole('button', { name: '標記已通知' })).toBeNull()
+    expect(screen.getByText(/^已通知 \d{4}-\d{2}-\d{2}$/)).toBeTruthy()
+  })
+
+  it('summarises multiple start errors in one alert line with expandable details', async () => {
+    const state = createCurrentDemoState()
+    const company = activeCompanyData(state)
+    const audit = company.audits.find((item) => item.qpCode === 'QP-28' && item.departmentId === 'dept-qa')!
+    audit.id = 'audit-QP-28-dept-qa'
+    company.audits = [audit]
+    audit.status = '規劃中'
+    audit.auditDate = '2026-08-14'
+    audit.team = undefined
+    state.auditProfile.formalRecordLocation = '品保部文件櫃'
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+
+    render(<AuditPage selectedKey={`${audit.qpCode}|${audit.departmentId}`} />)
+    fireEvent.click(await screen.findByRole('button', { name: '開始稽核' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toContain('無法開始稽核：')
+    expect(alert.textContent).toContain('尚未指派主任稽核員')
+    const summary = within(alert).getByText(/^查看全部 \d+ 項$/)
+    const details = summary.closest('details')!
+    expect(details.open).toBe(false)
+    expect(within(details).getByText('尚未指派合格內部稽核員')).toBeTruthy()
+    expect(screen.getByText('規劃中')).toBeTruthy()
+  })
+
   it('resets unsaved report references when changing audit records', async () => {
     const state = createCurrentDemoState()
     const company = activeCompanyData(state)

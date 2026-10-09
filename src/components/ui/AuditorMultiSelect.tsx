@@ -20,6 +20,8 @@ export interface AuditorMultiSelectProps {
   ariaLabel?: string
   className?: string
   excludePersonId?: string
+  /** 候選人橫向換行排列（設定列內緊湊顯示） */
+  inline?: boolean
 }
 
 export function AuditorMultiSelect({
@@ -33,6 +35,7 @@ export function AuditorMultiSelect({
   ariaLabel,
   className = '',
   excludePersonId,
+  inline = false,
 }: AuditorMultiSelectProps) {
   const options = useMemo(
     () => candidates.map((person) => ({ value: person.id, label: person.name })),
@@ -63,18 +66,21 @@ export function AuditorMultiSelect({
     <div
       role="group"
       aria-label={ariaLabel ?? label ?? '稽核人員'}
-      className="space-y-2 rounded-md border border-line bg-page p-3 text-sm"
+      className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-line bg-page px-3 py-1.5 text-sm"
     >
-      <p className="text-muted" role="status">
+      <p className="min-w-0 text-muted" role="status">
         目前沒有符合此次稽核範圍與日期的可指派人員。
       </p>
-      <p className="text-xs text-muted">請確認人員資格、適用範圍與有效期間。</p>
       <a
         href="#tab=personnel"
-        className={`inline-block text-primary underline underline-offset-2 ${FOCUS_RING}`}
+        className={`shrink-0 whitespace-nowrap text-primary underline underline-offset-2 ${FOCUS_RING}`}
       >
         前往人員合格名單
       </a>
+      <details className="open:basis-full">
+        <summary className={`cursor-pointer whitespace-nowrap text-xs text-muted ${FOCUS_RING}`}>原因</summary>
+        <p className="mt-1 text-xs text-muted">請確認人員資格、適用範圍與有效期間。</p>
+      </details>
     </div>
   ) : (
     <CheckboxList
@@ -83,6 +89,7 @@ export function AuditorMultiSelect({
       selected={checkboxSelected}
       onChange={handleChange}
       ariaLabel={ariaLabel ?? label ?? '稽核人員'}
+      inline={inline}
     />
   )
 

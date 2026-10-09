@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+# Local UI screenshot evidence (kept out of Git)
+artifacts/screenshots/2026-10-09_compact-audit/
 
 # Editor directories and files
 .vscode/*

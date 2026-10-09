@@ -51,6 +51,42 @@ describe('AuditorMultiSelect', () => {
     expect(screen.queryByText('目前記錄：王稽核')).toBeNull()
   })
 
+  it('keeps the no-candidate hint on one line and folds the reason into details', () => {
+    render(
+      <AuditorMultiSelect
+        label="稽核人員"
+        value=""
+        onChange={() => undefined}
+        candidates={[]}
+        people={[]}
+        inline
+      />,
+    )
+
+    const group = screen.getByRole('group', { name: '稽核人員' })
+    const reason = screen.getByText('請確認人員資格、適用範圍與有效期間。')
+    const details = reason.closest('details')
+    expect(details && group.contains(details)).toBe(true)
+    expect(details?.open).toBe(false)
+    expect(screen.getByRole('link', { name: '前往人員合格名單' })).toBeTruthy()
+  })
+
+  it('renders candidates in a wrapping row when inline', () => {
+    render(
+      <AuditorMultiSelect
+        value=""
+        onChange={() => undefined}
+        candidates={[auditor]}
+        people={[auditor]}
+        ariaLabel="稽核人員"
+        inline
+      />,
+    )
+
+    const checkbox = screen.getByRole('checkbox', { name: '王稽核' })
+    expect(checkbox.closest('[aria-label="稽核人員"]')?.className).toContain('flex-wrap')
+  })
+
   it('shows the empty state when a compact auditor list is expanded', () => {
     const { container } = render(
       <AuditorMultiSelect
