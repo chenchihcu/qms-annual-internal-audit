@@ -224,6 +224,8 @@ export function ensureNcrFromChecklistObservation(
     date: audit.auditDate || new Date().toISOString().slice(0, 10),
     status: '開立',
     checklistItemId: itemId,
+    sourceYear: year,
+    sourceAuditId: audit.id,
   })
 
   return { ncrs: [...existingNcrs, ncr], ncrId: ncr.id }

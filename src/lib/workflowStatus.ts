@@ -2,6 +2,7 @@ import { countPrepProgress, evaluatePrepSequence, formatPrepYearMismatch } from 
 import { buildCarryForwardSummary, countOpenFollowups } from './followupQueue'
 import { resolveLeadAuditorPersonId } from './personnel'
 import { scoreProcedureAudit } from './scoring'
+import { isRiskConfirmedForYear } from './risk'
 import type { AppState, CompanyData, CompanyId, ProcedureAudit, TabId } from '../types'
 import { companySettingsFor, DEFAULT_SCORING_RULES } from '../types'
 import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
@@ -65,13 +66,20 @@ export function stakeholdersReady(state: AppState, companyId: CompanyId = WORKSP
   return co.departments.every((dept) => dept.stakeholders.length >= 1)
 }
 
-export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
+function riskConfirmedRowCount(state: AppState, companyId: CompanyId): { confirmed: number; total: number } {
   const co = companyFor(state, companyId)
-  return co.planRows.every((row) =>
-    co.procedureRisks?.some(
-      (r) => r.qpCode === row.qpCode && r.departmentId === row.departmentId && r.inherentRisk >= 1,
-    ),
-  )
+  const year = companySettingsFor(state, companyId).auditYear
+  const confirmed = co.planRows.filter((row) => isRiskConfirmedForYear(
+    co.procedureRisks?.find((r) => r.qpCode === row.qpCode && r.departmentId === row.departmentId),
+    year,
+  )).length
+  return { confirmed, total: co.planRows.length }
+}
+
+/** 方案風險就緒：每一計畫列都有本年度已確認或已核准的評估（只存檔草稿不算）。 */
+export function riskPersistedForAllRows(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
+  const { confirmed, total } = riskConfirmedRowCount(state, companyId)
+  return confirmed === total
 }
 
 export function planScheduled(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
@@ -196,6 +204,7 @@ function pdcaPhaseForTab(tab: TabId): PdcaPhase {
   switch (tab) {
     case 'dashboard': return 'overview'
     case 'stakeholders':
+    case 'risk-sources':
     case 'risk':
     case 'plan':
     case 'personnel':
@@ -245,17 +254,24 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       break
     }
 
+    case 'risk-sources': {
+      const coverage = co.riskSourceCoverage ?? {}
+      if (!coverage.customer_complaint) gaps.push({ message: '客戶抱怨尚未勾選「已全部登錄」' })
+      if (!coverage.major_change) gaps.push({ message: '重大變更尚未勾選「已全部登錄」' })
+      const pending = (co.riskSourceEvents ?? [])
+        .filter((event) => !event.voidedAt)
+        .reduce((sum, event) => sum + event.targets.filter((target) => target.linkStatus === 'pending').length, 0)
+      if (pending > 0) gaps.push({ message: `關聯待確認 ${pending} 筆` })
+      ready = gaps.length === 0
+      break
+    }
+
     case 'risk': {
-      const total = co.planRows.length
-      const savedCount = co.planRows.filter((row) =>
-        co.procedureRisks?.some(
-          (r) => r.qpCode === row.qpCode && r.departmentId === row.departmentId && r.inherentRisk >= 1,
-        ),
-      ).length
-      if (savedCount < total) {
-        gaps.push({ message: `固有風險已存檔 ${savedCount}/${total}` })
+      const { confirmed, total } = riskConfirmedRowCount(state, companyId)
+      if (confirmed < total) {
+        gaps.push({ message: `方案風險已確認 ${confirmed}/${total}` })
       }
-      ready = savedCount === total
+      ready = confirmed === total
       break
     }
 

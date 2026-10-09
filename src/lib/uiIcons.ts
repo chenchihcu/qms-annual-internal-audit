@@ -58,6 +58,7 @@ export type IconName =
 export const TAB_ICONS: Record<TabId, IconName> = {
   dashboard: 'layoutDashboard',
   stakeholders: 'users',
+  'risk-sources': 'listChecks',
   risk: 'alertTriangle',
   plan: 'calendar',
   personnel: 'idCard',

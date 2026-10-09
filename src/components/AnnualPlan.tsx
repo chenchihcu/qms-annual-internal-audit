@@ -11,6 +11,8 @@ import { effectiveExternalAuditDate } from '../lib/externalAuditPrep'
 import { FOCUS_RING } from '../lib/focusRing'
 import { buildAppHash } from '../lib/navigation'
 import { getDisplayMonthStatus, type MonthCellChoice } from '../lib/planStatus'
+import { buildRegeneratedPlanRows, describePlanChanges, type PlanChangeRow } from '../lib/planRegeneration'
+import { isRiskConfirmedForYear } from '../lib/risk'
 import { auditorCandidates, departmentMemberCandidates, resolveLeadAuditorPersonId } from '../lib/personnel'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { MONTH_STATUS_LEGEND } from '../types'
@@ -18,6 +20,7 @@ import type { MonthStatus, TabId } from '../types'
 import { WorkflowGuide } from './ui/WorkflowGuide'
 import { Badge, Button, Input } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
+import { PlanPreviewPanel } from './ui/PlanPreviewPanel'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
@@ -120,12 +123,13 @@ function MonthChoiceMenu({
 }
 
 export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigate?: (tab: TabId) => void }) {
-  const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthChoice } = store
+  const { state, updateSettings, regeneratePlan, approvePlan, updatePlanRow, setPlanMonthChoice } = store
   const { settings, company } = state
   const externalAuditDate = effectiveExternalAuditDate(state.externalAuditPrep, settings)
   const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: externalAuditDate || undefined })
 
-  const [regenConfirm, setRegenConfirm] = useState(false)
+  const [regenPreview, setRegenPreview] = useState<PlanChangeRow[] | null>(null)
+  const [revokeConfirm, setRevokeConfirm] = useState(false)
   const [openMonth, setOpenMonth] = useState<{ key: string; rect: DOMRect } | null>(null)
   const closeMonthMenu = useCallback(() => setOpenMonth(null), [])
   const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`)
@@ -134,7 +138,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
   const deptOwner = (departmentId: string) =>
     company.departments.find((d) => d.id === departmentId)?.owner ?? ''
 
-  const leadAuditorName = useMemo(() => {
+  const appointedLeadAuditor = useMemo(() => {
     const personId = resolveLeadAuditorPersonId(
       state.people,
       WORKSPACE_COMPANY_ID,
@@ -142,8 +146,9 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
       state.annualPersonnelAssignments,
       settings.planWindowEnd || `${settings.auditYear}-12-31`,
     )
-    return state.people.find((person) => person.id === personId)?.name ?? '主任稽核員任命未完成'
+    return state.people.find((person) => person.id === personId)?.name ?? null
   }, [state.people, state.annualPersonnelAssignments, settings.auditYear, settings.planWindowEnd])
+  const leadAuditorName = appointedLeadAuditor ?? '主任稽核員任命未完成'
 
 
   const requiredStandards = useMemo(
@@ -153,21 +158,35 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
     [state.auditProfile],
   )
 
+  const riskConfirmedCount = company.planRows.filter((row) => isRiskConfirmedForYear(
+    company.procedureRisks?.find((record) => record.qpCode === row.qpCode && record.departmentId === row.departmentId),
+    settings.auditYear,
+  )).length
+  const planApprovedAt = settings.planApprovedAt?.slice(0, 10)
+  const hasScheduledMonth = company.planRows.some((row) => row.months.some(Boolean))
+
+  const openRegenPreview = () => {
+    setRegenPreview(describePlanChanges(company.planRows, buildRegeneratedPlanRows(state)))
+  }
+  const applyRegeneration = () => {
+    regeneratePlan()
+    setRegenPreview(null)
+    setRevokeConfirm(false)
+  }
+
   const referenceDate = settings.planWindowEnd || `${settings.auditYear}-12-31`
   const pagination = useTablePagination(company.planRows.length, 10, undefined, String(settings.auditYear))
 
   return (
     <div className="space-y-6 print-area qr-form">
       <ConfirmDialog
-        open={regenConfirm}
-        title="自動編排年度計畫"
-        description="未手動調整的計畫列，將依日期、利害關係人與風險重排月格（寫入擬定）。已手動調整的列會保留。"
-        confirmLabel="重新編排"
-        onConfirm={() => {
-          regeneratePlan()
-          setRegenConfirm(false)
-        }}
-        onCancel={() => setRegenConfirm(false)}
+        open={revokeConfirm}
+        title="套用將撤銷計畫核准"
+        description={`年度計畫已於 ${planApprovedAt ?? '—'} 核准。套用自動編排會改寫未手動調整的月格，並撤銷核准，需重新核准。`}
+        confirmLabel="撤銷核准並套用"
+        variant="danger"
+        onConfirm={applyRegeneration}
+        onCancel={() => setRevokeConfirm(false)}
       />
       <DepartmentOwnerConfirm ownerConfirm={ownerConfirm} />
 
@@ -179,8 +198,36 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
             ))}
             <span className="text-muted">（點月格可選排程或滿意／不滿意／矯正中／矯正圓滿；未手選時仍由查檢與 NCR 推導）</span>
           </div>
-          <Button className="shrink-0" onClick={() => setRegenConfirm(true)}>依日期與利害關係人自動編排</Button>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+            <span className="text-sm text-muted" role="status">
+              {planApprovedAt
+                ? `計畫已核准 ${planApprovedAt}${settings.planApprovedBy ? `・${settings.planApprovedBy}` : ''}`
+                : '計畫尚未核准'}
+            </span>
+            {!planApprovedAt && (
+              <Button
+                variant="secondary"
+                disabled={!hasScheduledMonth || !appointedLeadAuditor}
+                title={!appointedLeadAuditor ? '主任稽核員任命完成後才可核准' : !hasScheduledMonth ? '尚無已排月格' : undefined}
+                onClick={() => appointedLeadAuditor && approvePlan(appointedLeadAuditor)}
+              >
+                核准年度計畫
+              </Button>
+            )}
+            <Button onClick={openRegenPreview}>依日期與利害關係人自動編排</Button>
+          </div>
         </div>
+
+        {regenPreview && (
+          <PlanPreviewPanel
+            title="自動編排預覽"
+            description={`未手動調整的計畫列，將依日期、利害關係人與風險重排月格（寫入擬定）。已手動調整的列會保留。方案風險已確認 ${riskConfirmedCount}/${company.planRows.length} 列，其餘以程序種子與部門 O×S 估算。`}
+            rows={regenPreview}
+            applyLabel="套用編排"
+            onApply={() => (planApprovedAt ? setRevokeConfirm(true) : applyRegeneration())}
+            onCancel={() => setRegenPreview(null)}
+          />
+        )}
 
         <details className="mb-6 no-print">
           <summary className="cursor-pointer text-sm font-bold text-ink">計畫窗口與日期設定</summary>

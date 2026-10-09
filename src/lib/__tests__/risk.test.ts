@@ -21,6 +21,12 @@ import {
   factorWeightedPoints,
   suggestOverdueScaleFromOpenCount,
   suggestMonthsScaleFromAudits,
+  assessProcedurePriority,
+  inherentFloorLevel,
+  seedInherentScale,
+  effectiveRiskStatus,
+  plannerReadyRisks,
+  riskConfirmBlockers,
 } from '../risk'
 import type { CompanyData } from '../../types'
 
@@ -45,7 +51,7 @@ describe('calculateProcedurePriority', () => {
   it('marks missing evidence factors as provisional', () => {
     const result = calculateProcedurePriority({ inherentRisk: 5 })
     expect(result.provisional).toBe(true)
-    expect(result.missingFactors).toContain('客戶抱怨')
+    expect(result.missingFactors).toContain('客戶抱怨件數')
   })
 
   it('calculates a complete high-priority result', () => {
@@ -105,7 +111,8 @@ describe('risk factor label mappings', () => {
 
   it('formatFactorLabel routes by field kind', () => {
     expect(formatFactorLabel('previousInternalNcrCount', 3)).toBe('2件')
-    expect(formatFactorLabel('customerComplaintLevel', 1)).toBe('無')
+    expect(formatFactorLabel('customerComplaintLevel', 1)).toBe('0件')
+    expect(formatFactorLabel('changeImpact', 3)).toBe('2件')
     expect(formatFactorLabel('inherentRisk', 5)).toBe('高')
   })
 
@@ -189,5 +196,122 @@ describe('buildEffectiveProcedureRisks', () => {
     const risks = buildEffectiveProcedureRisks(baseCompany)
     expect(risks[1].inherentRisk).toBe(1)
     expect(risks[1].overdueOpenNcrCount).toBeUndefined()
+  })
+})
+
+describe('assessProcedurePriority (P0 scoring guards)', () => {
+  it('gives no formal level while any factor is undecided, instead of imputing 中', () => {
+    for (const inherentRisk of [1, 3, 5]) {
+      const result = assessProcedurePriority({ inherentRisk })
+      expect(result.level).toBeNull()
+      expect(result.missingKeys).toHaveLength(6)
+      expect(result.provisional).toBe(true)
+    }
+    expect(assessProcedurePriority({ inherentRisk: 5 }).score).toBe(66)
+  })
+
+  it('scores unavailable-with-reason factors at 3 and then grants a level', () => {
+    const result = assessProcedurePriority(
+      { inherentRisk: 3, previousInternalNcrCount: 1, previousThirdPartyNcrCount: 1, overdueOpenNcrCount: 1, monthsSinceLastAudit: 1 },
+      { customerComplaintLevel: '客訴系統未開放查詢', changeImpact: '變更紀錄未取得' },
+    )
+    expect(result.missingKeys).toEqual([])
+    expect(result.unavailableKeys).toEqual(['customerComplaintLevel', 'changeImpact'])
+    expect(result.score).toBe(9 + 4 + 3 + 3 + 9 + 6 + 2)
+    expect(result.level).toBe('低')
+  })
+
+  it('ignores blank unavailable reasons (still missing)', () => {
+    const result = assessProcedurePriority({ inherentRisk: 3 }, { changeImpact: '  ' })
+    expect(result.missingKeys).toContain('changeImpact')
+  })
+
+  it('applies the inherent floor: 固有高 with no events is at least 中', () => {
+    const result = assessProcedurePriority({
+      inherentRisk: 5,
+      previousInternalNcrCount: 1,
+      previousThirdPartyNcrCount: 1,
+      overdueOpenNcrCount: 1,
+      customerComplaintLevel: 1,
+      changeImpact: 1,
+      monthsSinceLastAudit: 1,
+    })
+    expect(result.score).toBe(32)
+    expect(result.formulaLevel).toBe('低')
+    expect(result.level).toBe('中')
+    expect(result.floorApplied).toBe(true)
+  })
+
+  it('does not floor 固有中 or 固有低', () => {
+    const all1 = { previousInternalNcrCount: 1, previousThirdPartyNcrCount: 1, overdueOpenNcrCount: 1, customerComplaintLevel: 1, changeImpact: 1, monthsSinceLastAudit: 1 }
+    expect(assessProcedurePriority({ inherentRisk: 3, ...all1 }).level).toBe('低')
+    expect(assessProcedurePriority({ inherentRisk: 3, ...all1 }).floorApplied).toBe(false)
+    expect(inherentFloorLevel(1)).toBeNull()
+  })
+})
+
+describe('seed inherent risk (G1 regression)', () => {
+  it('reads the procedure seed, not the plan row level written by auto-arrange', () => {
+    expect(seedInherentScale('QP-01', 'dept-qa', '中')).toBe(1)
+    expect(seedInherentScale('QP-03', 'dept-qa', '低')).toBe(3)
+  })
+
+  it('falls back to the plan row only for rows outside the seed', () => {
+    expect(seedInherentScale('QP-99', 'dept-x', '高')).toBe(5)
+  })
+
+  it('buildEffectiveProcedureRisks uses the seed for unsaved template rows', () => {
+    const company = {
+      planRows: [{ id: 'p', qpCode: 'QP-01', departmentId: 'dept-qa', department: '品保部', riskLevel: '中' as const, months: Array(12).fill(null), manualOverride: false }],
+      procedureRisks: [],
+    } as unknown as CompanyData
+    expect(buildEffectiveProcedureRisks(company)[0].inherentRisk).toBe(1)
+  })
+})
+
+describe('procedure risk status helpers', () => {
+  const complete = {
+    id: 'r1',
+    qpCode: 'QP-01',
+    departmentId: 'dept-qa',
+    inherentRisk: 1,
+    previousInternalNcrCount: 1,
+    previousThirdPartyNcrCount: 1,
+    overdueOpenNcrCount: 1,
+    customerComplaintLevel: 1,
+    changeImpact: 1,
+    monthsSinceLastAudit: 1,
+    evidenceReference: '',
+    updatedAt: '2026-01-01',
+  }
+
+  it('derives legacy / stale / year status without rewriting data', () => {
+    expect(effectiveRiskStatus(undefined, 2026)).toBe('none')
+    expect(effectiveRiskStatus(complete, 2026)).toBe('legacy')
+    expect(effectiveRiskStatus({ ...complete, assessmentYear: 2025, status: 'approved' }, 2026)).toBe('stale')
+    expect(effectiveRiskStatus({ ...complete, assessmentYear: 2026 }, 2026)).toBe('draft')
+    expect(effectiveRiskStatus({ ...complete, assessmentYear: 2026, status: 'approved' }, 2026)).toBe('approved')
+  })
+
+  it('plannerReadyRisks keeps only this year confirmed/approved records with a level', () => {
+    const company = {
+      planRows: [],
+      procedureRisks: [
+        { ...complete, id: 'a', assessmentYear: 2026, status: 'confirmed' as const },
+        { ...complete, id: 'b', assessmentYear: 2026, status: 'draft' as const },
+        { ...complete, id: 'c', assessmentYear: 2025, status: 'approved' as const },
+        { ...complete, id: 'd' },
+        { ...complete, id: 'e', assessmentYear: 2026, status: 'confirmed' as const, changeImpact: undefined },
+      ],
+    } as unknown as CompanyData
+    expect(plannerReadyRisks(company, 2026).map((r) => r.id)).toEqual(['a'])
+  })
+
+  it('blocks confirmation for missing factors and 中／高 complaint without basis', () => {
+    expect(riskConfirmBlockers(complete)).toEqual([])
+    expect(riskConfirmBlockers({ ...complete, customerComplaintLevel: 2 })).toEqual(['客戶抱怨件數缺依據'])
+    expect(riskConfirmBlockers({ ...complete, customerComplaintLevel: 2, factorSources: { customerComplaintLevel: ['e1'] } })).toEqual([])
+    expect(riskConfirmBlockers({ ...complete, customerComplaintLevel: 5, factorBasis: { customerComplaintLevel: 'CC-2026-01' } })).toEqual([])
+    expect(riskConfirmBlockers({ ...complete, changeImpact: undefined })).toEqual(['重大變更件數未填'])
   })
 })
