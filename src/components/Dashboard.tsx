@@ -161,7 +161,7 @@ export function Dashboard({ state }: DashboardProps) {
             {overviewRows.map((row) => (
               <tr key={row.key}>
                 <td>{row.label}</td>
-                <td className="font-medium tabular-nums">{row.value}</td>
+                <td className="font-bold tabular-nums">{row.value}</td>
                 <td>{row.hint}</td>
               </tr>
             ))}

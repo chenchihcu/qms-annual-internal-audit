@@ -100,7 +100,7 @@ export function Suggestions({
     const canCarry = sug.status === 'open' && !sug.carriedToYear && rows.length > 0
     return (
       <>
-        {sug.carriedToYear && <span className="w-full text-xs text-blue-600">已帶入 {sug.carriedToYear}</span>}
+        {sug.carriedToYear && <span className="w-full text-xs text-tone-info-fg">已帶入 {sug.carriedToYear}</span>}
         {canCarry && rows.length > 1 && (
           <div className="w-full">
             <Select
@@ -146,8 +146,8 @@ export function Suggestions({
         />
       {showForm && (
         <div ref={formRef} className="mb-4">
-        <Card className="border-blue-200 no-print">
-          <h3 className="mb-4 text-sm font-semibold">登錄第三方建議</h3>
+        <Card className="border-tone-info-line no-print">
+          <h3 className="mb-4 text-sm font-bold">登錄第三方建議</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             <Select
               label="程序 QP"
@@ -194,7 +194,7 @@ export function Suggestions({
         </div>
       )}
         {saveMessage && !showForm && (
-          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+          <p className="mb-3 text-sm text-tone-success-fg" role="status">已儲存</p>
         )}
 
         {listedSuggestions.length === 0 ? (
@@ -210,7 +210,7 @@ export function Suggestions({
                 <col className="col-name col-print-name" />
                 <col className="col-print-progress" />
                 <col className="col-status col-print-status" />
-                <col className="col-action no-print" />
+                <col className="col-suggestion-action no-print" />
               </colgroup>
               <thead>
                 <tr>
@@ -232,51 +232,53 @@ export function Suggestions({
                   >
                     <td>{sug.year}</td>
                     <td className="break-words">{sug.issue}</td>
-                    <td className="font-medium break-words">{sug.procedure}</td>
+                    <td className="font-normal break-words">{sug.procedure}</td>
                     <td className="break-words">{sug.responsibleUnit}</td>
-                    <td >
-                      <textarea
-                        className={`w-full min-w-0 rounded border border-line bg-surface px-2 py-1 no-print ${FOCUS_RING}`}
-                        rows={2}
-                        aria-label={`${sug.year} ${sug.procedure} 建議進度`}
-                        value={sug.progress}
-                        onChange={(e) => updateSuggestion(sug.id, { progress: e.target.value })}
-                      />
-                      <span className="print-only">{sug.progress}</span>
-                    </td>
-                    <td >
-                      <div className="no-print">
-                        <Select
-                          ariaLabel={`${sug.year} ${sug.procedure} 建議狀態`}
-                          value={sug.status}
-                          onChange={(v) => updateSuggestion(sug.id, { status: v as SuggestionStatus })}
-                          options={[
-                            { value: 'open', label: '待追蹤' },
-                            { value: 'closed', label: '已結案' },
-                          ]}
-                        />
-                      </div>
-                      <span className="print-only"><Badge label={statusLabel[sug.status]} /></span>
-                    </td>
+                    <td className="whitespace-pre-wrap break-words">{sug.progress || '—'}</td>
+                    <td><Badge label={statusLabel[sug.status]} /></td>
                     <td className="no-print">
                       <div className="flex flex-wrap items-center gap-2">
                         {renderCarryActions(sug)}
-                        <button
-                          type="button"
-                          className={`inline-flex min-h-11 w-fit shrink-0 items-center whitespace-nowrap text-sm text-link hover:underline ${FOCUS_RING}`}
+                        <Button
+                          variant="secondary"
+                          className="w-fit shrink-0 whitespace-nowrap px-3"
                           aria-label={`${sug.year} ${sug.procedure} 建議明細：${sug.issue}`}
                           aria-expanded={expandedId === sug.id}
                           aria-controls={`suggestion-detail-${sug.id}`}
                           onClick={() => setExpandedId(expandedId === sug.id ? null : sug.id)}
-                        >{expandedId === sug.id ? '收合' : '明細'}</button>
+                        >{expandedId === sug.id ? '收合' : '明細'}</Button>
                       </div>
                     </td>
                   </tr>
                   <tr id={`suggestion-detail-${sug.id}`} hidden={expandedId !== sug.id || !pagination.isVisible(index)} className="no-print bg-page">
                     <td colSpan={7} className="border p-3">
                       {expandedId === sug.id && (
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Button variant="ghost" icon={ACTION_ICONS.delete} className="text-red-700"
+                        <div className="flex flex-wrap items-end gap-3">
+                          <div className="min-w-[min(100%,20rem)] flex-1">
+                            <label className="mb-1 block text-sm font-bold text-ink" htmlFor={`suggestion-progress-${sug.id}`}>進度</label>
+                            <textarea
+                              id={`suggestion-progress-${sug.id}`}
+                              className={`w-full min-w-0 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink ${FOCUS_RING}`}
+                              rows={2}
+                              aria-label={`${sug.year} ${sug.procedure} 建議進度`}
+                              value={sug.progress}
+                              onChange={(e) => updateSuggestion(sug.id, { progress: e.target.value })}
+                            />
+                          </div>
+                          <div className="w-40">
+                            <Select
+                              label="狀態"
+                              ariaLabel={`${sug.year} ${sug.procedure} 建議狀態`}
+                              value={sug.status}
+                              onChange={(v) => updateSuggestion(sug.id, { status: v as SuggestionStatus })}
+                              options={[
+                                { value: 'open', label: '待追蹤' },
+                                { value: 'closed', label: '已結案' },
+                              ]}
+                            />
+                          </div>
+                          <p className="w-full text-xs text-muted" role="status">修改後即時儲存</p>
+                          <Button variant="dangerGhost" icon={ACTION_ICONS.delete}
                             aria-label={`移至回收區：${sug.year} ${sug.procedure}`}
                             onClick={() => setDeleteTarget({ id: sug.id, label: `${sug.year} · ${sug.procedure} · ${sug.issue}` })}
                           >移至回收區</Button>

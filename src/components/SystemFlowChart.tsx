@@ -15,7 +15,7 @@ export function SystemFlowChart({ onNavigate }: { onNavigate?: (tab: TabId) => v
       <ol className="space-y-2">
         {FLOW_GROUPS.map((group, groupIndex) => (
           <li key={group.label} className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-start sm:gap-x-4">
-            <p className="whitespace-nowrap text-xs font-semibold text-slate-600 sm:pt-3.5">{group.label}</p>
+            <p className="whitespace-nowrap text-xs font-bold text-slate-600 sm:pt-3.5">{group.label}</p>
             <ol className="flex min-w-0 flex-wrap items-center gap-2">
               {group.tabs.map((tab, tabIndex) => {
                 const workflow = TAB_WORKFLOW.find((item) => item.id === tab.id)
@@ -25,7 +25,7 @@ export function SystemFlowChart({ onNavigate }: { onNavigate?: (tab: TabId) => v
                     <button
                       type="button"
                       title={workflow?.exit}
-                      className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                      className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-normal text-slate-800 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                       onClick={() => onNavigate?.(tab.id)}
                     >
                       {tab.label}

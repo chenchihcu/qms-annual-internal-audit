@@ -89,7 +89,7 @@ export function AuditorMultiSelect({
   if (disabled) {
     return (
       <div className={className}>
-        {label && <span className="mb-1 block text-sm font-medium text-muted">{label}</span>}
+        {label && <span className="mb-1 block text-sm font-bold text-muted">{label}</span>}
         <span className="text-sm text-ink">{summary}</span>
       </div>
     )

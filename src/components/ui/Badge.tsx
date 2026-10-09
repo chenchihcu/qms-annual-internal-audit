@@ -2,33 +2,48 @@ import { useId, type ButtonHTMLAttributes, type ReactNode, type Ref } from 'reac
 import type { IconName } from '../../lib/uiIcons'
 import { Icon } from './Icon'
 
-const colors: Record<string, string> = {
-  高: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800',
-  中: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
-  低: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800',
-  開立: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-  矯正中: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  符合: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  不符: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-  觀察: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  不適用: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-  待追蹤: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-  已結案: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-  '已轉 NCR': 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-  有效: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800',
-  暫停: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800',
-  失效: 'bg-slate-200 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-600',
+export type BadgeTone = 'danger' | 'warning' | 'success' | 'info' | 'neutral' | 'pending'
+
+const TONE_CLASSES: Record<BadgeTone, string> = {
+  danger: 'bg-tone-danger-bg text-tone-danger-fg border-tone-danger-line',
+  warning: 'bg-tone-warning-bg text-tone-warning-fg border-tone-warning-line',
+  success: 'bg-tone-success-bg text-tone-success-fg border-tone-success-line',
+  info: 'bg-tone-info-bg text-tone-info-fg border-tone-info-line',
+  neutral: 'bg-tone-neutral-bg text-tone-neutral-fg border-tone-neutral-line',
+  pending: 'bg-tone-pending-bg text-tone-pending-fg border-tone-pending-line',
+}
+
+/** 既有標籤文字 → 色調；新呼叫端優先傳 `tone`，不依文案決定顏色。 */
+const LABEL_TONES: Record<string, BadgeTone> = {
+  高: 'danger',
+  中: 'warning',
+  低: 'success',
+  開立: 'danger',
+  矯正中: 'warning',
+  結案: 'success',
+  符合: 'success',
+  不符: 'danger',
+  觀察: 'warning',
+  不適用: 'neutral',
+  未判定: 'pending',
+  待追蹤: 'warning',
+  已結案: 'success',
+  '已轉 NCR': 'danger',
+  有效: 'success',
+  暫停: 'warning',
+  失效: 'neutral',
+}
+
+function badgeTone(label: string): BadgeTone {
+  return LABEL_TONES[label] ?? (/^\d{4}年$/.test(label) ? 'info' : 'neutral')
 }
 
 const FOCUS_RING =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-page'
 
-export function Badge({ label, className = '' }: { label: string; className?: string }) {
-  const yearMatch = /^(\d{4})年$/.exec(label)
-  const color = colors[label] ?? (yearMatch ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200')
+export function Badge({ label, tone, className = '' }: { label: string; tone?: BadgeTone; className?: string }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${color} ${className}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-normal ${TONE_CLASSES[tone ?? badgeTone(label)]} ${className}`}>
       {label}
     </span>
   )
@@ -44,7 +59,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children?: ReactNode
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
+  variant?: 'primary' | 'secondary' | 'danger' | 'dangerOutline' | 'ghost' | 'dangerGhost'
   icon?: IconName
   ref?: Ref<HTMLButtonElement>
 }
@@ -61,10 +76,12 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const variants = {
-    primary: 'bg-primary text-white hover:opacity-90',
-    secondary: 'bg-surface text-ink border border-line hover:bg-page',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
-    ghost: 'text-muted hover:bg-page hover:text-ink',
+    primary: 'bg-primary text-white hover:bg-primary-hover active:bg-primary-pressed',
+    secondary: 'bg-surface text-ink border border-line hover:bg-page active:bg-line',
+    danger: 'bg-danger-solid text-white hover:bg-danger-solid-hover',
+    ghost: 'text-muted hover:bg-page hover:text-ink active:bg-line',
+    dangerOutline: 'bg-surface text-danger border border-tone-danger-line hover:bg-tone-danger-bg active:bg-tone-danger-line',
+    dangerGhost: 'text-danger hover:bg-tone-danger-bg active:bg-tone-danger-line',
   }
   return (
     <button
@@ -72,7 +89,7 @@ export function Button({
       type={type}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING} ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS_RING} ${variants[variant]} ${className}`}
       {...rest}
     >
       {icon ? <Icon name={icon} /> : null}
@@ -121,7 +138,7 @@ export function Input({
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
   return (
     <div className={className}>
-      {label && <label className="mb-1 block text-sm font-medium text-ink" htmlFor={inputId}>{label}{required && <><span aria-hidden="true">*</span><span className="sr-only">必填</span></>}</label>}
+      {label && <label className="mb-1 block text-sm font-bold text-ink" htmlFor={inputId}>{label}{required && <><span aria-hidden="true" className="ml-0.5 text-danger">*</span><span className="sr-only">必填</span></>}</label>}
       <input
         id={inputId}
         type={type}
@@ -136,10 +153,10 @@ export function Input({
         aria-invalid={error ? true : undefined}
         required={required}
         disabled={disabled}
-        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING}`}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-danger' : ''} ${FOCUS_RING}`}
       />
       {hint && <p id={hintId} className="mt-1 text-xs text-muted">{hint}</p>}
-      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}
     </div>
   )
 }
@@ -176,7 +193,7 @@ export function Select({
   const describedBy = [hint ? hintId : null, error ? errorId : null].filter(Boolean).join(' ') || undefined
   return (
     <div>
-      {label && <label className="mb-1 block text-sm font-medium text-ink" htmlFor={selectId}>{label}{required && <><span aria-hidden="true">*</span><span className="sr-only">必填</span></>}</label>}
+      {label && <label className="mb-1 block text-sm font-bold text-ink" htmlFor={selectId}>{label}{required && <><span aria-hidden="true" className="ml-0.5 text-danger">*</span><span className="sr-only">必填</span></>}</label>}
       <select
         id={selectId}
         value={value}
@@ -186,7 +203,7 @@ export function Select({
         aria-invalid={error ? true : undefined}
         required={required}
         disabled={disabled}
-        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-red-600 dark:border-red-400' : ''} ${FOCUS_RING} ${className}`}
+        className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-60 ${error ? 'border-danger' : ''} ${FOCUS_RING} ${className}`}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -195,7 +212,7 @@ export function Select({
         ))}
       </select>
       {hint && <p id={hintId} className="mt-1 text-xs text-muted">{hint}</p>}
-      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-medium text-red-700 dark:text-red-300">{error}</p>}
+      {error && <p id={errorId} role="alert" className="mt-1 text-xs font-bold text-danger">{error}</p>}
     </div>
   )
 }

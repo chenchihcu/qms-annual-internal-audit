@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 # Windows cache paths accidentally created in workspace
 %SystemDrive%/
+# Playwright MCP local console/page snapshots
+.playwright-mcp/

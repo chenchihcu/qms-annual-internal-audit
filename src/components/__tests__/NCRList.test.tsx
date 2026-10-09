@@ -98,3 +98,43 @@ describe('NCRList QR-28-03 report', () => {
     expect(store.moveNCRToTrash).toHaveBeenCalledWith('ncr-test-1')
   })
 })
+
+describe('NCRList 一覽版面（試點）', () => {
+  const longDescription = '不合格品隔離區標示不完整，現場未依 QP-26 區分待判、報廢與重工品，且隔離紀錄缺少責任人簽核。'
+  const ncr = normalizeNCR({
+    id: 'ncr-layout-1',
+    ncrNumber: 'NCR-2026-001',
+    qpCode: 'QP-26',
+    departmentId: 'dept-1',
+    department: '生產製造部',
+    process: '內部稽核',
+    description: longDescription,
+    date: '2026-03-15',
+    dueDate: '2000-01-01',
+    status: '矯正中',
+  })
+
+  it('摘要完整顯示、不截斷，且只渲染一次', () => {
+    renderList(makeStore([ncr]))
+    const cells = screen.getAllByText(longDescription)
+    expect(cells).toHaveLength(1)
+    expect(cells[0].className).not.toContain('line-clamp')
+  })
+
+  it('公司欄無值時只在列印顯示', () => {
+    renderList(makeStore([ncr]))
+    const header = screen.getByRole('columnheader', { name: '公司' })
+    expect(header.className).toContain('print-table-cell')
+  })
+
+  it('逾期以文字標示，不只靠列底色', () => {
+    renderList(makeStore([ncr]))
+    expect(screen.getByText('逾期')).toBeTruthy()
+  })
+
+  it('精簡進度以文字摘要呈現各階段狀態', () => {
+    renderList(makeStore([ncr]))
+    const group = screen.getByRole('group', { name: /QR-28-03 填寫進度：NCR立案已填/ })
+    expect(group.textContent).toMatch(/^\d\/4 · 待/)
+  })
+})

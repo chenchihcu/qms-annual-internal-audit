@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme {
   --color-page: #f8fafc;
   --color-surface: #ffffff;
@@ -9,19 +7,39 @@
   --color-muted: #475569;
   --color-line: #e2e8f0;
   --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-primary-pressed: #1e3a8a;
   --color-link: #1d4ed8;
-  --font-sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", ui-sans-serif, system-ui, sans-serif;
-}
+  --color-danger: #b91c1c;
+  --color-danger-solid: #dc2626;
+  --color-danger-solid-hover: #b91c1c;
 
-html.dark {
-  color-scheme: dark;
-  --color-page: #0f172a;
-  --color-surface: #1e293b;
-  --color-ink: #f1f5f9;
-  --color-muted: #94a3b8;
-  --color-line: #334155;
-  --color-primary: #1d4ed8;
-  --color-link: #93c5fd;
+  /* 狀態色調（Badge tone SSOT）：bg 底色／fg 文字／line 外框 */
+  --color-tone-danger-bg: #fee2e2;
+  --color-tone-danger-fg: #991b1b;
+  --color-tone-danger-line: #fecaca;
+  --color-tone-warning-bg: #fef3c7;
+  --color-tone-warning-fg: #92400e;
+  --color-tone-warning-line: #fde68a;
+  --color-tone-success-bg: #dcfce7;
+  --color-tone-success-fg: #166534;
+  --color-tone-success-line: #bbf7d0;
+  --color-tone-info-bg: #dbeafe;
+  --color-tone-info-fg: #1e40af;
+  --color-tone-info-line: #bfdbfe;
+  --color-tone-neutral-bg: #f1f5f9;
+  --color-tone-neutral-fg: #334155;
+  --color-tone-neutral-line: #e2e8f0;
+  --color-tone-pending-bg: #f8fafc;
+  --color-tone-pending-fg: #475569;
+  --color-tone-pending-line: #cbd5e1;
+
+  /* 列底色：未存檔／待處理、逾期、選取中 */
+  --color-row-warning: #fffbeb;
+  --color-row-danger: #fef2f2;
+  --color-row-selected: #eff6ff;
+
+  --font-sans: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -157,6 +175,49 @@ html.dark {
       width: 4rem;
     }
 
+    /* 第三方建議：「帶入」「明細」同列不折行 */
+    col.col-suggestion-action {
+      width: 9.5rem;
+    }
+
+    /* 年度計畫：1280px 工作面可見 1–12 月 */
+    col.col-plan-risk {
+      width: 3.5rem;
+    }
+
+    col.col-plan-dept {
+      width: 6.5rem;
+    }
+
+    col.col-plan-auditors {
+      width: 7rem;
+    }
+
+    /* 不符合一覽：短欄依內容配寬，剩餘寬度留給摘要 */
+    col.col-ncr-number {
+      width: 7rem;
+    }
+
+    col.col-ncr-dept {
+      width: 6.5rem;
+    }
+
+    col.col-ncr-company {
+      width: 6rem;
+    }
+
+    col.col-ncr-status {
+      width: 5.5rem;
+    }
+
+    col.col-ncr-progress {
+      width: 8.5rem;
+    }
+
+    col.col-ncr-date {
+      width: 6.5rem;
+    }
+
     col.print-table-column {
       width: 0;
       max-width: 0;
@@ -180,7 +241,7 @@ html.dark {
       background: var(--color-page);
       color: var(--color-muted);
       font-size: 0.75rem;
-      font-weight: 600;
+      font-weight: 700;
       text-align: left;
     }
 
@@ -217,7 +278,7 @@ html.dark {
     margin-bottom: 0.25rem;
     color: var(--color-muted);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .stacked-table thead {
@@ -261,7 +322,7 @@ html.dark {
     content: attr(data-label);
     color: var(--color-muted);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .stacked-table td[data-label]:last-child {

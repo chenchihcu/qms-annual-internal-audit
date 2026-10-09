@@ -31,7 +31,7 @@ function GapLine({
           {' '}
           <button
             type="button"
-            className={`font-medium text-primary hover:underline ${FOCUS_RING}`}
+            className={`font-normal text-primary hover:underline ${FOCUS_RING}`}
             onClick={() => onNavigate!(targetTab!)}
           >
             至{tabLabel(targetTab!)}

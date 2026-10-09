@@ -39,13 +39,13 @@ export function CheckboxList({
 
   return (
     <div className={className}>
-      {label && <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>}
+      {label && <p className="mb-2 text-sm font-bold text-slate-700">{label}</p>}
       <div
         className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2"
         aria-label={ariaLabel ?? label}
       >
         {allLabel && onToggleAll && (
-          <label className="flex min-h-8 items-center gap-2 border-b border-slate-100 pb-2 text-sm font-medium">
+          <label className="flex min-h-8 items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold">
             <input
               type="checkbox"
               checked={allSelected}

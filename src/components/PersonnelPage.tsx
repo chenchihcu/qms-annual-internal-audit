@@ -126,9 +126,6 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const [pendingDeactivate, setPendingDeactivate] = useState<Person | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
   const [saveMessage, setSaveMessage] = useState(false)
-  const [nameFilter, setNameFilter] = useState('')
-  const [departmentFilter, setDepartmentFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
   const editCardRef = useRef<HTMLDivElement>(null)
   const today = new Date().toISOString().slice(0, 10)
 
@@ -155,20 +152,6 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
   const auditorRows = useMemo(() => {
     return state.people.filter((person) => currentAuditorQualification(person, today))
   }, [state.people, today])
-
-  const filteredAuditorRows = useMemo(() => {
-    const keyword = nameFilter.trim().toLowerCase()
-    return auditorRows.filter((person) => {
-      const qualification = currentAuditorQualification(person, today)
-      if (!qualification) return false
-      if (keyword && !person.name.toLowerCase().includes(keyword)) return false
-      const deptId = person.affiliations[0]?.departmentId ?? ''
-      if (departmentFilter && deptId !== departmentFilter) return false
-      const statusLabel = managedQualificationStatusLabel(qualification, today)
-      if (statusFilter && statusLabel !== statusFilter) return false
-      return true
-    })
-  }, [auditorRows, nameFilter, departmentFilter, statusFilter, today])
 
   const otherRows = useMemo(
     () => state.people.filter((person) => personHasOtherRoleEntry(
@@ -398,7 +381,7 @@ function legacyManagedStatus(
     exportPersonnelExcel(state, WORKSPACE_COMPANY_ID)
   }
 
-  const auditorPagination = useTablePagination(filteredAuditorRows.length, 10, undefined, String(state.settings.auditYear))
+  const auditorPagination = useTablePagination(auditorRows.length, 10, undefined, String(state.settings.auditYear))
 
   const otherRoleSummary = (person: Person): string => {
     const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
@@ -434,14 +417,14 @@ function legacyManagedStatus(
           <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
         </div>
         {saveMessage && !auditorEditing && !otherEditing && (
-          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+          <p className="mb-3 text-sm text-tone-success-fg" role="status">已儲存</p>
         )}
       </div>
 
       {auditorEditing && (
         <div ref={editCardRef}>
-          <Card className="border-blue-200">
-            <h3 className="mb-4 text-sm font-semibold">{auditorEditing.id ? '編輯內部稽核人員資格' : '新增內部稽核人員資格'}</h3>
+          <Card className="border-tone-info-line">
+            <h3 className="mb-4 text-sm font-bold">{auditorEditing.id ? '編輯內部稽核人員資格' : '新增內部稽核人員資格'}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input label="姓名 *" value={auditorEditing.name} onChange={(v) => patchAuditorForm({ name: v })} />
               <Select
@@ -503,28 +486,8 @@ function legacyManagedStatus(
       )}
 
       <div>
-        <h3 className="mb-3 text-sm font-semibold">內部稽核人員清單</h3>
-        <div className="no-print mb-3 grid gap-3 sm:grid-cols-3">
-          <Input label="搜尋姓名" value={nameFilter} onChange={setNameFilter} />
-          <Select
-            label="所屬單位"
-            value={departmentFilter}
-            onChange={setDepartmentFilter}
-            options={[{ value: '', label: '全部' }, ...departmentOptions]}
-          />
-          <Select
-            label="資格狀態"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={[
-              { value: '', label: '全部' },
-              { value: '有效', label: '有效' },
-              { value: '失效', label: '失效' },
-            ]}
-          />
-        </div>
-        {filteredAuditorRows.length === 0 ? (
-          <EmptyState message="目前沒有符合條件的內部稽核人員。" />
+        {auditorRows.length === 0 ? (
+          <EmptyState message="目前沒有內部稽核人員" />
         ) : (
           <>
             <ScrollRegion ariaLabel="內部稽核人員清單">
@@ -546,7 +509,7 @@ function legacyManagedStatus(
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAuditorRows.map((person, index) => {
+                  {auditorRows.map((person, index) => {
                     const qualification = currentAuditorQualification(person, today)!
                     const statusLabel = managedQualificationStatusLabel(qualification, today)
                     const deptName = state.company.departments.find((d) => d.id === person.affiliations[0]?.departmentId)?.name ?? '—'
@@ -555,7 +518,7 @@ function legacyManagedStatus(
                         key={person.id}
                         className={!auditorPagination.isVisible(index) ? 'pagination-hidden-row' : ''}
                       >
-                        <td className="font-medium">{person.name}</td>
+                        <td className="font-normal">{person.name}</td>
                         <td>{deptName}</td>
                         <td>
                           {isAuditorQualificationRole(qualification.role)
@@ -565,14 +528,14 @@ function legacyManagedStatus(
                         <td><Badge label={statusLabel} /></td>
                         <td className="no-print">
                           <div className="flex flex-wrap gap-1">
-                            <Button variant="ghost" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openAuditorEdit(person)}>編輯</Button>
+                            <Button variant="secondary" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openAuditorEdit(person)}>編輯</Button>
                             {person.active && (
-                              <Button variant="ghost" icon="minusCircle" className="shrink-0 whitespace-nowrap" onClick={() => setPendingDeactivate(person)}>停用</Button>
+                              <Button variant="secondary" icon="minusCircle" className="shrink-0 whitespace-nowrap" onClick={() => setPendingDeactivate(person)}>停用</Button>
                             )}
                             <Button
-                              variant="ghost"
+                              variant="dangerOutline"
                               icon={ACTION_ICONS.delete}
-                              className="shrink-0 text-red-700"
+                              className="shrink-0"
                               aria-label={`移至回收區：${person.name}`}
                               title="移至回收區"
                               onClick={() => setDeleteTarget({ id: person.id, label: person.name })}
@@ -592,8 +555,8 @@ function legacyManagedStatus(
 
       {otherEditing && (
         <div ref={editCardRef}>
-          <Card className="border-slate-200">
-            <h3 className="mb-4 text-sm font-semibold">{otherEditing.id ? '編輯其他角色與任命' : '新增其他角色與任命'}</h3>
+          <Card className="border-line">
+            <h3 className="mb-4 text-sm font-bold">{otherEditing.id ? '編輯其他角色與任命' : '新增其他角色與任命'}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input label="姓名 *" value={otherEditing.name} onChange={(v) => patchOtherForm({ name: v })} />
               <Select
@@ -636,7 +599,7 @@ function legacyManagedStatus(
 
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">其他角色與任命</h3>
+          <h3 className="text-sm font-bold">其他角色與任命</h3>
           <Button
             variant="secondary"
             icon={ACTION_ICONS.add}
@@ -666,10 +629,10 @@ function legacyManagedStatus(
               <tbody>
                 {otherRows.map((person) => (
                   <tr key={person.id}>
-                    <td className="font-medium">{person.name}</td>
+                    <td className="font-normal">{person.name}</td>
                     <td>{otherRoleSummary(person)}</td>
                     <td className="no-print">
-                      <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => openOtherEdit(person)}>編輯</Button>
+                      <Button variant="secondary" icon={ACTION_ICONS.edit} onClick={() => openOtherEdit(person)}>編輯</Button>
                     </td>
                   </tr>
                 ))}

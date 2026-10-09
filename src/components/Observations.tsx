@@ -254,12 +254,12 @@ export function Observations({
     <div className="min-w-0 max-w-full space-y-6 overflow-x-clip print-area qr-form">
       <div className="mb-3 flex flex-wrap items-center gap-2 no-print">
         {(importableObs.length > 0 || importableNCR.length > 0) && (
-          <div className="flex w-fit max-w-full shrink-0 flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2">
-            <p className="whitespace-nowrap text-sm text-amber-900" title={`跨年待帶入：觀察 ${importableObs.length} 件、NCR ${importableNCR.length} 件`}>
+          <div className="flex w-fit max-w-full shrink-0 flex-wrap items-center gap-2 rounded-lg border border-tone-warning-line bg-row-warning/40 px-3 py-2">
+            <p className="whitespace-nowrap text-sm text-tone-warning-fg" title={`跨年待帶入：觀察 ${importableObs.length} 件、NCR ${importableNCR.length} 件`}>
               待帶入 觀察 {importableObs.length}、NCR {importableNCR.length}
             </p>
             <details open={priorDetailsOpen} onToggle={(e) => setPriorDetailsOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="cursor-pointer whitespace-nowrap text-sm font-medium text-slate-800" aria-label="逐筆帶入">逐筆</summary>
+              <summary className="cursor-pointer whitespace-nowrap text-sm font-bold text-ink" aria-label="逐筆帶入">逐筆</summary>
             </details>
             <Button
               className="shrink-0 whitespace-nowrap"
@@ -298,22 +298,22 @@ export function Observations({
         </div>
       </div>
       {(importableObs.length > 0 || importableNCR.length > 0) && priorDetailsOpen && (
-        <div className="no-print rounded-xl border border-amber-200 bg-amber-50/40 p-5">
+        <div className="no-print rounded-xl border border-tone-warning-line bg-row-warning/40 p-5">
             <div className="space-y-4" ref={priorSectionRef}>
               <div>
-                <h3 className="mb-2 text-sm font-medium">前年度觀察事項（{priorObs.length}）</h3>
+                <h3 className="mb-2 text-sm font-bold">前年度觀察事項（{priorObs.length}）</h3>
                 {priorObs.length === 0 ? (
-                  <p className="text-sm text-slate-500">無前年度觀察事項</p>
+                  <p className="text-sm text-muted">無前年度觀察事項</p>
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {priorObs.map((obs) => (
-                      <li key={obs.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2">
+                      <li key={obs.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line px-3 py-2">
                         <span className="min-w-0">
                           <Badge label={`${obs.year}年`} />
-                          <span className="ml-2 font-medium">{obs.qpCode} · {obs.department}</span>
-                          <span className="ml-2 break-words text-slate-600">{obs.content}</span>
+                          <span className="ml-2 font-normal">{obs.qpCode} · {obs.department}</span>
+                          <span className="ml-2 break-words text-muted">{obs.content}</span>
                           {obs.carriedToYear && (
-                            <span className="ml-2 text-xs text-blue-600">已帶入 {obs.carriedToYear} 年</span>
+                            <span className="ml-2 text-xs text-tone-info-fg">已帶入 {obs.carriedToYear} 年</span>
                           )}
                         </span>
                         {obs.carriedToYear !== currentYear && !obs.carryForwards?.some((entry) => entry.year === currentYear) && (
@@ -327,9 +327,9 @@ export function Observations({
                 )}
               </div>
               <div>
-                <h3 className="mb-2 text-sm font-medium">未結案 NCR 跨年追蹤（{openPriorNCR.length}）</h3>
+                <h3 className="mb-2 text-sm font-bold">未結案 NCR 跨年追蹤（{openPriorNCR.length}）</h3>
                 {openPriorNCR.length === 0 ? (
-                  <p className="text-sm text-slate-500">無未結案 NCR</p>
+                  <p className="text-sm text-muted">無未結案 NCR</p>
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {openPriorNCR.map((ncr) => (
@@ -360,8 +360,8 @@ export function Observations({
         {showRecordLinkNotice && recordLinkResult && <FollowupRecordLinkNotice result={recordLinkResult} />}
       {showForm && (
         <div ref={formRef} className="mb-4">
-        <Card className="border-blue-200 no-print">
-          <h3 className="mb-4 text-sm font-semibold">登錄稽核活動觀察事項</h3>
+        <Card className="border-tone-info-line no-print">
+          <h3 className="mb-4 text-sm font-bold">登錄稽核活動觀察事項</h3>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Select label="來源活動" value={form.sourceType} onChange={(value) => setForm({ ...form, sourceType: value as typeof form.sourceType, sourceAuditId: '' })} options={[{ value: 'internal_audit', label: '內部稽核' }, { value: 'third_party_audit', label: '第三方稽核' }]} />
             {form.sourceType === 'internal_audit' && <Select label="內部稽核事件" value={form.sourceAuditId} onChange={(value) => { const audit = auditEvents.find((item) => item.id === value); setForm({ ...form, sourceAuditId: value, sourceReference: audit?.reportReference || value, occurrenceDate: audit?.auditDate || audit?.plannedDate || '', qpCode: audit?.qpCode || '', departmentId: audit?.departmentId || form.departmentId }) }} options={[{ value: '', label: '請選擇事件' }, ...auditEvents.map((audit) => ({ value: audit.id, label: `${audit.year ?? currentYear} · ${audit.qpCode} · ${audit.department} · ${audit.auditDate || audit.plannedDate || '日期待確認'}` }))]} />}
@@ -379,7 +379,7 @@ export function Observations({
             <Input label="處理要求／說明" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
             <Input label="預定完成日" type="date" value={form.dueDate} onChange={(value) => setForm({ ...form, dueDate: value })} />
           </div>
-          {form.occurrenceDate && Number(form.occurrenceDate.slice(0, 4)) !== currentYear && <p className="mt-2 text-sm text-amber-700">請先切換至 {form.occurrenceDate.slice(0, 4)} 年度，再登錄該年度紀錄。</p>}
+          {form.occurrenceDate && Number(form.occurrenceDate.slice(0, 4)) !== currentYear && <p className="mt-2 text-sm text-tone-warning-fg">請先切換至 {form.occurrenceDate.slice(0, 4)} 年度，再登錄該年度紀錄。</p>}
           <div className="mt-4 flex gap-2">
             <Button disabled={!form.content.trim() || !form.sourceReference.trim() || !form.occurrenceDate || Number(form.occurrenceDate.slice(0, 4)) !== currentYear || (form.sourceType === 'internal_audit' && !form.sourceAuditId)} onClick={() => { const department = company.departments.find((item) => item.id === form.departmentId); addObservation({ year: currentYear, qpCode: form.qpCode || '待確認', departmentId: form.departmentId, department: department?.name ?? '待確認', process: '', content: form.content, description: form.description, status: 'open', sourceType: form.sourceType, sourceAuditId: form.sourceAuditId || undefined, sourceReference: form.sourceReference, occurrenceDate: form.occurrenceDate, owner: form.owner, dueDate: form.dueDate, followUps: [] }); setShowForm(false); setSaveMessage(true); setForm({ ...form, sourceAuditId: '', sourceReference: '', occurrenceDate: '', qpCode: '', content: '', description: '', owner: '', dueDate: '' }) }}>儲存紀錄</Button>
             <Button variant="secondary" onClick={() => setShowForm(false)}>取消</Button>
@@ -388,12 +388,12 @@ export function Observations({
         </div>
       )}
         {saveMessage && !showForm && (
-          <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
+          <p className="mb-3 text-sm text-tone-success-fg" role="status">已儲存</p>
         )}
 
         {!showUnsyncedView && (
           <details className="mb-3 no-print">
-            <summary className="cursor-pointer text-sm font-medium text-slate-700">更多篩選</summary>
+            <summary className="cursor-pointer text-sm font-bold text-muted">更多篩選</summary>
             <div className="mt-2 space-y-2">
               <FilterChips
                 options={yearFilterOptions}
@@ -496,7 +496,7 @@ export function Observations({
                       <td >
                         <button
                           type="button"
-                          className={`text-left font-medium text-blue-800 underline-offset-2 hover:underline ${FOCUS_RING}`}
+                          className={`text-left font-normal text-link underline-offset-2 hover:underline ${FOCUS_RING}`}
                           aria-expanded={expanded}
                           aria-controls={`observation-detail-${item.id}`}
                           onClick={() => setExpandedId(expanded && editId !== item.id ? null : item.id)}
@@ -543,23 +543,23 @@ export function Observations({
                       {expanded && (
                         <tr id={`observation-detail-${item.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}no-print`}>
                         <td colSpan={9} className="border p-3">
-                          <p className="text-sm text-slate-600">{item.description}</p>
+                          <p className="text-sm text-muted">{item.description}</p>
                           {(item.followUps ?? []).length > 0 && (
-                            <div className="mt-3 space-y-1 border-l-2 border-slate-200 pl-3">
+                            <div className="mt-3 space-y-1 border-l-2 border-line pl-3">
                               {[...(item.followUps ?? [])].sort((a, b) => a.date.localeCompare(b.date)).map((entry) => (
                                 <p key={entry.id} className="text-xs">
-                                  <span className="font-medium">{entry.date || '未填日期'}</span> · {entry.note}
+                                  <span className="font-bold">{entry.date || '未填日期'}</span> · {entry.note}
                                 </p>
                               ))}
                             </div>
                           )}
                           {!!item.revisions?.length && (
-                            <details className="mt-3 text-xs text-slate-600">
-                              <summary className="cursor-pointer font-medium">修訂歷程（{item.revisions.length}）</summary>
-                              <div className="mt-2 space-y-2 border-l-2 border-slate-200 pl-3">
+                            <details className="mt-3 text-xs text-muted">
+                              <summary className="cursor-pointer font-bold">修訂歷程（{item.revisions.length}）</summary>
+                              <div className="mt-2 space-y-2 border-l-2 border-line pl-3">
                                 {item.revisions.map((revision) => (
                                   <div key={revision.id}>
-                                    <p className="font-medium">{new Date(revision.changedAt).toLocaleString('zh-TW')}</p>
+                                    <p className="font-bold">{new Date(revision.changedAt).toLocaleString('zh-TW')}</p>
                                     {([
                                       ['content', '觀察事項'], ['description', '處理說明'], ['owner', '責任人'], ['dueDate', '預定完成日'], ['closedAt', '結案日期'], ['closeEvidence', '結案證據'], ['status', '狀態'],
                                     ] as const).filter(([field]) => revision.before[field] !== revision.after[field]).map(([field, label]) => (
@@ -571,7 +571,7 @@ export function Observations({
                             </details>
                           )}
                           {editId === item.id ? (
-                            <div className="mt-4 space-y-3 rounded-lg bg-slate-50 p-3">
+                            <div className="mt-4 space-y-3 rounded-lg bg-page p-3">
                               <div className="grid gap-3 sm:grid-cols-2">
                                 <Input label="觀察事項" value={editDraft.content} onChange={(value) => setEditDraft({ ...editDraft, content: value })} />
                                 <Input label="處理要求／說明" value={editDraft.description} onChange={(value) => setEditDraft({ ...editDraft, description: value })} />
@@ -595,7 +595,7 @@ export function Observations({
                                 <Button disabled={!editDraft.content.trim() || !editDraft.closedAt || !editDraft.closeEvidence?.trim()} onClick={() => { updateObservation(item.id, { ...editDraft, status: 'closed' }); setEditId(null) }}>儲存並結案</Button>
                                 <Button variant="secondary" onClick={() => setEditId(null)}>取消</Button>
                               </div>
-                              {item.status === 'open' && <p className="text-xs text-slate-500">結案須填寫結案日期與結案證據，可一次按「儲存並結案」。</p>}
+                              {item.status === 'open' && <p className="text-xs text-muted">結案須填寫結案日期與結案證據，可一次按「儲存並結案」。</p>}
                             </div>
                           ) : item.status === 'open' ? (
                             <div className="mt-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]">
@@ -604,13 +604,13 @@ export function Observations({
                               <Button variant="secondary" disabled={!followDraft[item.id]?.trim() || followDate[item.id] === ''} onClick={() => { addObservationFollowUp(item.id, followDate[item.id] ?? todayLocal, followDraft[item.id] ?? ''); setFollowDraft({ ...followDraft, [item.id]: '' }) }}>加入時間軸</Button>
                             </div>
                           ) : null}
-                          {item.status === 'closed' && <p className="mt-2 text-xs text-green-700">結案：{item.closedAt} · {item.closeEvidence}</p>}
-                          {item.convertedNcrId && <p className="mt-2 text-xs text-blue-700">關聯 NCR：{currentNcrDisplayNumbers.get(item.convertedNcrId) ?? item.convertedNcrId}</p>}
-                          {item.carriedToYear && <p className="mt-2 text-xs text-blue-700">已帶入 {item.carriedToYear} 年查檢表</p>}
+                          {item.status === 'closed' && <p className="mt-2 text-xs text-tone-success-fg">結案：{item.closedAt} · {item.closeEvidence}</p>}
+                          {item.convertedNcrId && <p className="mt-2 text-xs text-tone-info-fg">關聯 NCR：{currentNcrDisplayNumbers.get(item.convertedNcrId) ?? item.convertedNcrId}</p>}
+                          {item.carriedToYear && <p className="mt-2 text-xs text-tone-info-fg">已帶入 {item.carriedToYear} 年查檢表</p>}
                           <Button
-                            variant="ghost"
+                            variant="dangerGhost"
                             icon={ACTION_ICONS.delete}
-                            className="mt-3 text-red-700 no-print"
+                            className="mt-3 no-print"
                             aria-label={`移至回收區：${item.year} ${item.qpCode} ${item.department}`}
                             onClick={() => setDeleteTarget({ id: item.id, label: `${item.year} · ${item.qpCode} · ${item.department} · ${item.content}` })}
                           >移至回收區</Button>

@@ -173,7 +173,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
                 onChange={() => setActiveSection(id)}
               />
               <span
-                className={`inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-medium transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-blue-600 peer-focus-visible:ring-offset-2 ${selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+                className={`inline-flex min-h-10 items-center rounded-md border px-3 text-sm font-normal transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-blue-600 peer-focus-visible:ring-offset-2 ${selected ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
               >
                 {text}
               </span>
@@ -209,7 +209,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
                   aria-selected={selected}
                   aria-controls={`audit-pane-${id}`}
                   tabIndex={selected ? 0 : -1}
-                  className={`min-h-10 border-b-2 px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${selected ? 'border-blue-700 text-blue-800' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
+                  className={`min-h-10 border-b-2 px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${selected ? 'border-blue-700 text-blue-800' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
                   onClick={() => setAuditPane(id)}
                 >
                   {label}
@@ -222,18 +222,18 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
             <div role="tabpanel" id="audit-pane-procedure" aria-labelledby="audit-tab-procedure" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-semibold text-slate-900">正式紀錄保存位置</h3>
+                  <h3 className="text-sm font-bold text-slate-900">正式紀錄保存位置</h3>
                   <p className="text-sm text-slate-600">
                     組織受控之內部稽核查檢表與年度結案報告存檔路徑（各程序文件依現行受控版本執行稽核）。
                   </p>
                   <div className="pt-1 text-sm">
-                    <span className="font-medium text-slate-700">目前設定：</span>
+                    <span className="font-bold text-slate-700">目前設定：</span>
                     {profile.formalRecordLocation ? (
-                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-medium text-blue-700">
+                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-normal text-blue-700">
                         {profile.formalRecordLocation}
                       </span>
                     ) : (
-                      <span className="font-medium text-amber-700">尚未指定保存位置</span>
+                      <span className="font-bold text-amber-700">尚未指定保存位置</span>
                     )}
                   </div>
                 </div>
@@ -290,7 +290,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       {activeSection === 'data' && (
         <div className="space-y-4">
           <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="backup-heading">
-            <h2 id="backup-heading" className="mb-2 text-sm font-semibold text-slate-900">備份與還原</h2>
+            <h2 id="backup-heading" className="mb-2 text-sm font-bold text-slate-900">備份與還原</h2>
             <p className="mb-4 text-sm text-slate-600">完整 JSON 備份包含工作區、年度封存、外稽準備與回收區。資料變更後須重新下載備份，才能還原並覆寫目前資料。</p>
             <div className="flex flex-wrap gap-3">
               <Button icon={ACTION_ICONS.backup} onClick={handleBackup}>下載完整備份</Button>
@@ -312,7 +312,7 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
           </section>
 
           <section className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5" aria-labelledby="export-heading">
-            <h2 id="export-heading" className="mb-2 text-sm font-semibold text-slate-900">匯出工作表</h2>
+            <h2 id="export-heading" className="mb-2 text-sm font-bold text-slate-900">匯出工作表</h2>
             <p className="mb-4 text-sm text-slate-600">匯出目前年度資料供整理、列印或另存正式紀錄；本系統的本機資料不取代受控紀錄。</p>
             <div className="flex flex-wrap gap-3">
               <Button icon={ACTION_ICONS.exportExcel} onClick={handleExportAllExcel}>匯出全部稽核表單</Button>
