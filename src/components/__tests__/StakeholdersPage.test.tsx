@@ -4,13 +4,12 @@ import App from '../../App'
 
 describe('StakeholdersPage', () => {
   beforeEach(() => {
-    window.history.replaceState(null, '', '/')
+    window.history.replaceState(null, '', '/#tab=stakeholders')
     localStorage.clear()
   })
 
   it('shows formula, ranking, and department rows', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
 
     await waitFor(() => {
       expect(screen.getByRole('region', { name: '部門利害關係人一覽' })).toBeTruthy()
@@ -34,7 +33,6 @@ describe('StakeholdersPage', () => {
 
   it('updates chip and occurrence only in edit dialog', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '利害關係人' }))
 
     await waitFor(() => {
       expect(screen.getAllByText('管理部').length).toBeGreaterThan(0)

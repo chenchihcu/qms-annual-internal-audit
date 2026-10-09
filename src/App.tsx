@@ -8,6 +8,7 @@ import { WorkflowGuide } from './components/ui/WorkflowGuide'
 import { ALL_TABS, SIDEBAR_TABS, parseAppHash, sidebarTabFor, syncHash, type NavigateOptions } from './lib/navigation'
 import { countPrepProgress } from './lib/externalAuditPrep'
 import { AuditViewSwitch } from './components/ui/AuditViewSwitch'
+import { ViewSwitch } from './components/ui/ViewSwitch'
 import { Icon } from './components/ui/Icon'
 import { useNcrUnsavedGuardActions } from './context/NcrUnsavedGuardContext'
 import { NcrUnsavedGuardProvider } from './context/NcrUnsavedGuardProvider'
@@ -220,6 +221,17 @@ function AppShell() {
             current={tab}
             prepProgress={`${prepProgress.done}/${prepProgress.total}`}
             onChange={(view) => setTab(view, view === 'audit' ? lastAuditKey : undefined)}
+          />
+        )}
+        {(tab === 'risk' || tab === 'stakeholders') && (
+          <ViewSwitch
+            current={tab}
+            ariaLabel="方案風險檢視"
+            views={[
+              { value: 'risk', label: '程序風險' },
+              { value: 'stakeholders', label: '部門利害關係人' },
+            ]}
+            onChange={(view) => setTab(view)}
           />
         )}
         {activeEntry?.formId ? (

@@ -31,7 +31,7 @@ export const TAB_GROUPS: TabGroup[] = [
     label: 'P · 方案規劃',
     icon: TAB_GROUP_ICONS.P,
     tabs: [
-      tab('stakeholders', '利害關係人', 'stakeholders-form'),
+      tab('stakeholders', '利害關係人', 'stakeholders-form', 'risk'),
       tab('risk-sources', '風險來源登錄', 'risk-sources-form'),
       tab('risk', '方案風險', 'risk-assessment-form'),
       tab('personnel', '人員合格名單', 'personnel-form'),
