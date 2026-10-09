@@ -24,7 +24,8 @@
 - **程序風險**：依 QP 存 `procedureRisks`，按「存檔」才寫入；部門 O/S（利害關係人）不取代固有風險。
 - **NCR**：`syncNCRDescriptions` 不覆寫 `description`；結案須矯正措施引用、效果確認引用、確認人、確認日四欄，`updateNCR` 回傳缺項給畫面。畫面與 NCR 匯出顯示 `companyScope` 時用 `ncrCompanyScopeLabel`（`src/lib/certificateScope.ts`）；`both`／空不顯示成雙證書公司名，舊 `jiurun`／`zhenglongxing` 仍顯示。檢查：`src/lib/__tests__/certificateScope.test.ts`。
 - **觀察計數**：儀表板三數不可合併——查檢判定次數、本年度台帳 open、前年度 open（含封存）；實作見 `src/lib/dashboardMetrics.ts`。
-- **任命與年度**：主任稽核員用 `resolveLeadAuditorPersonId`；內稽年度僅頁首切換；外稽日期僅外稽準備編輯並同步 `settings.externalAuditDate`；內部稽核完成為覆蓋推導唯讀。
+- **任命與年度**：主任稽核員用 `resolveLeadAuditorPersonId`；內稽年度僅頁首切換；外稽日期僅在查檢表的「外稽準備」檢視編輯並同步 `settings.externalAuditDate`，讀取一律用 `effectiveExternalAuditDate`；內部稽核完成為覆蓋推導唯讀。
+- **外稽準備併入查檢表（2026-10-09）**：外稽準備是查檢表的檢視模式（`#tab=prep`，`TabEntry.viewOf='audit'`），側欄只留「查檢表」。準備任務唯一來源仍是 `externalAuditPrep`，查檢判定仍在 `ProcedureAudit`；兩者只用種子 `linkedQp` 讀取關聯（`src/lib/prepLinks.ts`），不互寫、不把準備項變成查檢題、不依判定自動勾選。第 4 項與序位「2 管審」是單一控制（`setManagementReviewComplete` 同步寫兩欄）；完成狀態一律讀 `prepItemCompleted`，兩值不一致只標「待覆核」。系統檢核提示（2-a 覆蓋、2-b／2-c 未結 NCR、第 4 項管審前置、第 7 項管代任命）只讀。檢查：`src/lib/__tests__/prepLinks.test.ts` 23 項對照。
 - **深連結**：`src/lib/navigation.ts` 的 hash 支援 `record`（`recordId`）；待改善追蹤點列須開到 NCR／觀察／建議該筆並展開。
 - **查檢種子與部門名**：題目基準在 `src/data/checklists.seed.json`，查詢鍵為 `QP|部門`（`resolveProcedureSeed`／`getSeedChecklistQuestions`）。年度計畫 `proceduresRaw.department`（例：開發工程部）與部門主檔 `DepartmentProfile.name`（例：開發工程）可能不一致；`procedurePlan.ts` 的 `DEPT_ID` 與 `checklistLoader` 的部門別名須同步維護。畫面「查檢項目待匯入」先查別名與 `localStorage` 是否只剩占位，不可直接判定種子未上傳。
 - **待匯入占位刷新**：僅當稽核項目全是未填寫的「待匯入」、且狀態非「已回報」時，才可用種子題目取代（`refreshedSeedItemsIfPendingOnly`／`getOrCreateAudit`）。已有判定、說明或證據的快照不覆寫；不得以清 `localStorage` 修復。

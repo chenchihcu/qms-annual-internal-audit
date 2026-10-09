@@ -15,7 +15,6 @@ const tabLabels = [
   '不符合',
   '第三方建議',
   '待改善追蹤',
-  '外稽準備',
   '系統設定',
 ]
 const oldCopy = [
@@ -90,12 +89,37 @@ for (const width of widths) {
     }
   }
 
+  // 外稽準備是查檢表的檢視模式：側欄只留「查檢表」，由檢視切換進入
+  async function openPrepView() {
+    await navigateTab('查檢表')
+    const viewButton = page.getByRole('button', { name: /^外稽準備 \d+\/\d+$/ })
+    if (await viewButton.count() !== 1) throw new Error('查檢表缺少唯一的「外稽準備」檢視切換')
+    await viewButton.click({ timeout: 2000 })
+    await page.getByRole('region', { name: '外部稽核前準備清單' }).waitFor({ state: 'visible', timeout: 5000 })
+    const sidebarCurrent = await page.locator('button[aria-current="page"]').allTextContents()
+    if (!sidebarCurrent.some((label) => label.trim() === '查檢表')) throw new Error('外稽準備檢視時側欄未標示查檢表')
+    const text = await page.locator('body').innerText()
+    return {
+      label: '外稽準備（查檢表檢視）',
+      errBox: await page.getByText('無法顯示', { exact: false }).count(),
+      rootEmpty: false,
+      horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+      stale: oldCopy.filter((phrase) => text.includes(phrase)),
+      sample: text.slice(0, 180).replace(/\s+/g, ' '),
+    }
+  }
+
   for (const label of tabLabels) {
     try {
       widthResults.push(await navigateTab(label))
     } catch (e) {
       widthResults.push({ label, error: String(e).split('\n').slice(0, 2).join(' '), errBox: -1 })
     }
+  }
+  try {
+    widthResults.push(await openPrepView())
+  } catch (e) {
+    widthResults.push({ label: '外稽準備（查檢表檢視）', error: String(e).split('\n').slice(0, 2).join(' '), errBox: -1 })
   }
 
   const widthResult = { width, title, tabs: widthResults }
@@ -110,7 +134,8 @@ for (const width of widths) {
     widthResult.print = []
     for (const target of printTargets) {
       await page.emulateMedia({ media: 'screen' })
-      await navigateTab(target.label)
+      if (target.label === '外稽準備') await openPrepView()
+      else await navigateTab(target.label)
       await page.waitForFunction(
         (phrases) => phrases.some((phrase) => document.body.innerText.includes(phrase)),
         target.required,
@@ -515,7 +540,7 @@ for (const width of widths) {
       workflowChecks.push('NCR／觀察／建議重載讀回')
 
       workflowStage = '外稽準備完成項保存'
-      await navigateTab('外稽準備')
+      await openPrepView()
       const prepCheckboxes = page.locator('input[type="checkbox"][aria-label^="第 "]')
       if (await prepCheckboxes.count() === 0) throw new Error('外稽準備清單沒有可操作的完成項')
       const prepCheckbox = prepCheckboxes.first()
@@ -524,7 +549,7 @@ for (const width of widths) {
       const wasPrepCompleted = await prepCheckbox.evaluate((element) => element.checked)
       await prepCheckbox.setChecked(!wasPrepCompleted)
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await navigateTab('外稽準備')
+      await openPrepView()
       const prepCheckboxAfterReload = page.getByLabel(prepCheckboxLabel, { exact: true })
       if (await prepCheckboxAfterReload.count() !== 1) throw new Error('重載後無法唯一找到外稽準備完成項')
       if (await prepCheckboxAfterReload.evaluate((element) => element.checked) !== !wasPrepCompleted) {

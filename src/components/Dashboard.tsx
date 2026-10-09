@@ -5,6 +5,7 @@ import {
 import { buildMergedCertificateCoverage } from '../lib/coverage'
 import {
   countPrepProgress,
+  effectiveExternalAuditDate,
   evaluatePrepSequence,
   getManagementReviewCompletionBlockers,
 } from '../lib/externalAuditPrep'
@@ -32,11 +33,11 @@ export function Dashboard({ state }: DashboardProps) {
     settings,
     yearArchives: state.yearArchives,
   })
-  const effectiveExternalAuditDate = externalAuditPrep.externalAuditDate?.trim() || settings.externalAuditDate?.trim()
+  const externalAuditDate = effectiveExternalAuditDate(externalAuditPrep, settings)
   const managementReviewBlockers = getManagementReviewCompletionBlockers({
     internalAuditComplete: sequence.internalAuditComplete,
     managementReviewDate,
-    externalAuditDate: effectiveExternalAuditDate,
+    externalAuditDate,
   })
   const openNCR = company.ncrs.filter((n) => n.status !== '結案').length
   const currentYearOpenObs = countCurrentYearOpenObservations(state)

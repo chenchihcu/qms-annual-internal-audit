@@ -5,7 +5,9 @@ import { AuditYearSwitcher } from './components/AuditYearSwitcher'
 import { Dashboard } from './components/Dashboard'
 import { ProcessForm } from './components/ui/ProcessForm'
 import { WorkflowGuide } from './components/ui/WorkflowGuide'
-import { ALL_TABS, parseAppHash, syncHash, type NavigateOptions } from './lib/navigation'
+import { ALL_TABS, SIDEBAR_TABS, parseAppHash, sidebarTabFor, syncHash, type NavigateOptions } from './lib/navigation'
+import { countPrepProgress } from './lib/externalAuditPrep'
+import { AuditViewSwitch } from './components/ui/AuditViewSwitch'
 import { Icon } from './components/ui/Icon'
 import { useNcrUnsavedGuardActions } from './context/NcrUnsavedGuardContext'
 import { NcrUnsavedGuardProvider } from './context/NcrUnsavedGuardProvider'
@@ -80,6 +82,10 @@ function AppShell() {
     if (tab === 'ncr' && next !== 'ncr' && !confirmIfUnsaved()) return
     applyTab(next, options)
   }
+  // 查檢 ↔ 外稽準備切換時保留原本選取的查檢表
+  const [lastAuditKey, setLastAuditKey] = useState(auditKey)
+  if (tab === 'audit' && auditKey && auditKey !== lastAuditKey) setLastAuditKey(auditKey)
+  const prepProgress = countPrepProgress(externalAuditPrep)
   useEffect(() => {
     const update = () => {
       const parsed = parseAppHash(window.location.hash)
@@ -120,13 +126,13 @@ function AppShell() {
         <span className="block text-sm font-bold leading-snug">QMS 年度內部稽核</span>
       </div>
       <nav ref={sidebarNavRef} className="flex-1 overflow-y-auto px-3 pb-4" aria-label="依稽核流程的表單導覽">
-        {ALL_TABS.map((item) => (
+        {SIDEBAR_TABS.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 font-bold text-blue-800 shadow-sm ring-1 ring-inset ring-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-            aria-current={tab === item.id ? 'page' : undefined}
+            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${sidebarTabFor(tab) === item.id ? 'bg-blue-50 font-bold text-blue-800 shadow-sm ring-1 ring-inset ring-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            aria-current={sidebarTabFor(tab) === item.id ? 'page' : undefined}
             aria-controls={item.formId}
           >
             <Icon name={item.icon} className="mt-0.5 shrink-0" />
@@ -208,6 +214,13 @@ function AppShell() {
         )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>
         {tab !== 'plan' && tab !== 'personnel' && <WorkflowGuide tab={tab} state={store.state} onNavigate={setTab} />}
+        {(tab === 'audit' || tab === 'prep') && (
+          <AuditViewSwitch
+            current={tab}
+            prepProgress={`${prepProgress.done}/${prepProgress.total}`}
+            onChange={(view) => setTab(view, view === 'audit' ? lastAuditKey : undefined)}
+          />
+        )}
         {activeEntry?.formId ? (
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
@@ -247,7 +260,7 @@ function AppShell() {
             )}
             {tab === 'prep' && (
               <TabErrorBoundary tabLabel="外稽準備">
-                <PreAuditPrep store={store} />
+                <PreAuditPrep store={store} onNavigate={setTab} />
               </TabErrorBoundary>
             )}
             {tab === 'stakeholders' && (

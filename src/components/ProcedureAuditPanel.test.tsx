@@ -22,6 +22,25 @@ function createCurrentDemoState() {
 }
 
 describe('ProcedureAuditPanel', () => {
+  it('lists linked external prep items on the checklist and keeps judgments separate', async () => {
+    const state = createDemoState()
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    render(<AuditPage selectedKey="QP-03|dept-qa" />)
+
+    const summary = await screen.findByText(/關聯外稽準備 \d+\/3 項/)
+    expect(screen.getByText('準備完成不影響本表判定')).toBeTruthy()
+    fireEvent.click(summary)
+    const linked = screen.getByRole('region', { name: 'QP-03 關聯外稽準備事項' })
+    expect(within(linked).getAllByRole('row')).toHaveLength(4)
+    const stats = screen.getByLabelText('查檢判定統計')
+    const before = stats.textContent
+    const remark = within(linked).getAllByRole('textbox')[0]
+    fireEvent.change(remark, { target: { value: '目標統計已備' } })
+    expect((within(linked).getAllByRole('textbox')[0] as HTMLInputElement).value).toBe('目標統計已備')
+    expect(screen.getByLabelText('查檢判定統計').textContent).toBe(before)
+  })
+
+
   it('renders checklist selector and header fields for demo audit', async () => {
     const state = createDemoState()
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))

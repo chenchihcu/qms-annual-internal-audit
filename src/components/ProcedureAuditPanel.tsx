@@ -35,6 +35,9 @@ import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ScrollRegion } from './ui/ScrollRegion'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { TablePagination } from './ui/TablePagination'
+import { PrepTaskTable } from './PrepTaskTable'
+import { prepTemplatesForAudit } from '../lib/prepLinks'
+import { prepItemCompleted } from '../lib/externalAuditPrep'
 
 const JUDGMENTS: Judgment[] = ['符合', '不符', '觀察', '不適用']
 
@@ -231,6 +234,11 @@ export function ProcedureAuditPanel({
 
   const audit = auditForPage!
   const dept = company.departments.find((d) => d.id === departmentId)
+  const linkedPrepIds = new Set(
+    prepTemplatesForAudit(audit.qpCode, audit.departmentId, company.planRows).map((template) => template.id),
+  )
+  const linkedPrepItems = state.externalAuditPrep.items.filter((item) => linkedPrepIds.has(item.id))
+  const linkedPrepDone = linkedPrepItems.filter((item) => prepItemCompleted(state.externalAuditPrep, item)).length
 
   const score = scoreProcedureAudit(audit, settings.scoringRules)
   const categories = [...new Set(audit.items.map(getChecklistDisplayCategory))]
@@ -676,6 +684,27 @@ export function ProcedureAuditPanel({
             <Button variant="secondary" className="no-print shrink-0" onClick={() => addChecklistItem(audit.id)}>新增稽核項目</Button>
           )}
         </div>
+
+        {linkedPrepItems.length > 0 && (
+          <details className="mb-3 no-print">
+            <summary className={`cursor-pointer text-sm ${FOCUS_RING}`}>
+              <span className="font-bold">關聯外稽準備 {linkedPrepDone}/{linkedPrepItems.length} 項</span>
+              {linkedPrepDone < linkedPrepItems.length && (
+                <span className="ml-2 text-tone-warning-fg">未完成 {linkedPrepItems.length - linkedPrepDone} 項</span>
+              )}
+              <span className="ml-2 text-xs text-muted">準備完成不影響本表判定</span>
+            </summary>
+            <div className="mt-2">
+              <PrepTaskTable
+                store={store}
+                itemIds={linkedPrepItems.map((item) => item.id)}
+                showLinks={false}
+                ariaLabel={`${audit.qpCode} 關聯外稽準備事項`}
+                onNavigate={onNavigate}
+              />
+            </div>
+          </details>
+        )}
 
         <ScrollRegion ariaLabel="查檢表項目清單">
           <table className="qr-checklist worksheet-table print-checklist min-w-[42rem]">

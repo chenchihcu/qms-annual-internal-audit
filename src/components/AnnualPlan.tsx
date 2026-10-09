@@ -7,6 +7,7 @@ import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
 import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
 import { evaluateDateSequence } from '../lib/coverage'
+import { effectiveExternalAuditDate } from '../lib/externalAuditPrep'
 import { FOCUS_RING } from '../lib/focusRing'
 import { buildAppHash } from '../lib/navigation'
 import { getDisplayMonthStatus, type MonthCellChoice } from '../lib/planStatus'
@@ -121,8 +122,8 @@ function MonthChoiceMenu({
 export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigate?: (tab: TabId) => void }) {
   const { state, updateSettings, regeneratePlan, updatePlanRow, setPlanMonthChoice } = store
   const { settings, company } = state
-  const effectiveExternalAuditDate = state.externalAuditPrep.externalAuditDate?.trim() || settings.externalAuditDate
-  const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: effectiveExternalAuditDate })
+  const externalAuditDate = effectiveExternalAuditDate(state.externalAuditPrep, settings)
+  const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: externalAuditDate || undefined })
 
   const [regenConfirm, setRegenConfirm] = useState(false)
   const [openMonth, setOpenMonth] = useState<{ key: string; rect: DOMRect } | null>(null)
@@ -144,7 +145,6 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
     return state.people.find((person) => person.id === personId)?.name ?? '主任稽核員任命未完成'
   }, [state.people, state.annualPersonnelAssignments, settings.auditYear, settings.planWindowEnd])
 
-  const externalAuditDate = state.externalAuditPrep.externalAuditDate ?? settings.externalAuditDate ?? ''
 
   const requiredStandards = useMemo(
     () => state.auditProfile.applicableStandards

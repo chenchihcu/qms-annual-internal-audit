@@ -87,8 +87,8 @@ describe('form export smoke', () => {
 
     const correctiveRow = rows.find((row) => String(row[1]).includes('QR-28-03'))
     const auditRow = rows.find((row) => String(row[1]).includes('QR-28-07'))
-    expect(correctiveRow).toEqual([3, 'QR-28-03 稽核矯正報告', '稽核員', '是', '矯正報告備註'])
-    expect(auditRow).toEqual([4, 'QR-28-07 內外部稽核報告書', '稽核員', '', '稽核報告備註'])
+    expect(correctiveRow).toEqual([3, 'QR-28-03 稽核矯正報告', '稽核員', 'QP-28 品保部', '是', '矯正報告備註'])
+    expect(auditRow).toEqual([4, 'QR-28-07 內外部稽核報告書', '稽核員', 'QP-28 品保部', '', '稽核報告備註'])
   })
 
   it('keeps worksheet names unique for repeated audit events', () => {

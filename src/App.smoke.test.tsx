@@ -13,7 +13,6 @@ const TAB_LABELS = [
   '不符合',
   '第三方建議',
   '待改善追蹤',
-  '外稽準備',
   '系統設定',
 ]
 
@@ -51,7 +50,7 @@ describe('App tab smoke', () => {
 
   afterEach(() => vi.restoreAllMocks())
 
-  it('renders all twelve remaining pages without crashing', async () => {
+  it('renders all eleven sidebar pages and the prep view without crashing', async () => {
     render(<App />)
 
     for (const label of TAB_LABELS) {
@@ -61,9 +60,15 @@ describe('App tab smoke', () => {
         expect(screen.queryByText(`${label} 無法顯示`)).toBeNull()
       })
     }
+    fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^外稽準備 \d+\/\d+$/ }))
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '外部稽核前準備清單' })).toBeTruthy()
+    })
+    expect(screen.queryByText('外稽準備 無法顯示')).toBeNull()
   }, 30000)
 
-  it('lists twelve tabs without PDCA group headings', () => {
+  it('lists eleven tabs without PDCA group headings; prep is a checklist view', () => {
     render(<App />)
     const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
     for (const heading of SIDEBAR_GROUP_LABELS) {
@@ -72,6 +77,22 @@ describe('App tab smoke', () => {
     for (const label of TAB_LABELS) {
       expect(within(nav).getByRole('button', { name: label })).toBeTruthy()
     }
+    expect(within(nav).getAllByRole('button')).toHaveLength(11)
+    expect(within(nav).queryByRole('button', { name: '外稽準備' })).toBeNull()
+  })
+
+  it('keeps the checklist sidebar item current on the prep view and returns to the checklist', async () => {
+    window.history.replaceState(null, '', '/#tab=prep')
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '外部稽核前準備清單' })).toBeTruthy()
+    })
+    const nav = screen.getByRole('navigation', { name: '依稽核流程的表單導覽' })
+    expect(within(nav).getByRole('button', { name: '查檢表' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(screen.getByRole('button', { name: '查檢' }))
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '查檢表項目清單' })).toBeTruthy()
+    })
   })
 
   it('exposes mobile navigation state and lets the menu button close the drawer', () => {
@@ -335,7 +356,8 @@ describe('App tab smoke', () => {
 
   it('asks before switching external prep year', async () => {
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: '外稽準備' }))
+    fireEvent.click(screen.getByRole('button', { name: '查檢表' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^外稽準備 \d+\/\d+$/ }))
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '改準備表年度' })).toBeTruthy()
     })

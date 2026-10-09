@@ -175,6 +175,15 @@
       width: 4rem;
     }
 
+    /* 外稽準備：關聯查檢 QP／部門與系統檢核提示 */
+    col.col-prep-link {
+      width: 11rem;
+    }
+
+    col.col-prep-done {
+      width: 5.5rem;
+    }
+
     /* 第三方建議：「帶入」「明細」同列不折行 */
     col.col-suggestion-action {
       width: 9.5rem;
@@ -390,23 +399,27 @@
   }
 
   .print-prep-checklist col.col-print-seq {
-    width: 8%;
+    width: 6%;
   }
 
   .print-prep-checklist col.col-print-prep-title {
-    width: 36%;
+    width: 32%;
   }
 
   .print-prep-checklist col.col-print-name {
-    width: 12%;
+    width: 11%;
+  }
+
+  .print-prep-checklist col.col-print-prep-link {
+    width: 16%;
   }
 
   .print-prep-checklist col.col-print-done {
-    width: 8%;
+    width: 7%;
   }
 
   .print-prep-checklist col.col-print-prep-remark {
-    width: 32%;
+    width: 28%;
   }
 
   .print-suggestions-table col.col-print-year {

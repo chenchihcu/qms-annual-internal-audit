@@ -20,7 +20,7 @@ import type {
   ProcedureRiskRecord,
   TrashCompanyRecordKind,
 } from '../types'
-import { createDefaultPrepState } from '../lib/externalAuditPrep'
+import { MANAGEMENT_REVIEW_PREP_ITEM_ID, createDefaultPrepState } from '../lib/externalAuditPrep'
 import {
   createDemoState,
   createBlankState,
@@ -1122,6 +1122,20 @@ export function useAuditStore() {
     [],
   )
 
+  /** 第 4 項與序位「2 管審」單一控制：同一次更新寫入兩個既有欄位。 */
+  const setManagementReviewComplete = useCallback((checked: boolean) => {
+    setState((s) => ({
+      ...s,
+      externalAuditPrep: {
+        ...s.externalAuditPrep,
+        managementReviewComplete: checked,
+        items: s.externalAuditPrep.items.map((p) =>
+          p.id === MANAGEMENT_REVIEW_PREP_ITEM_ID ? { ...p, completed: checked } : p,
+        ),
+      },
+    }))
+  }, [])
+
   const updateExternalPrepRelationship = useCallback((key: string, checked: boolean) => {
     setState((s) => ({
       ...s,
@@ -1503,6 +1517,7 @@ export function useAuditStore() {
     startAudit,
     updateExternalPrepItem,
     updateExternalPrepSequence,
+    setManagementReviewComplete,
     updateExternalPrepRelationship,
     switchPrepYear,
     addOnsiteSlot,
