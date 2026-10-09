@@ -13,6 +13,7 @@ import type { NavigateOptions } from '../lib/navigation'
 import type { TabId } from '../types'
 import { companySettingsFor } from '../types'
 import { FOLLOWUP_FILTER_ICONS } from '../lib/uiIcons'
+import { FOCUS_RING } from '../lib/focusRing'
 import { Badge } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { FilterChips } from './ui/FilterChips'
@@ -79,12 +80,12 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                 {visibleRows.map((row, index) => {
                   const overdue = isFollowupOverdue(row.dueDate, today)
                   return (
-                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${overdue ? 'bg-red-50/50 dark:bg-red-950/20 ' : ''}`}>
+                  <tr key={`${row.kind}-${row.id}`} className={`${!pagination.isVisible(index) ? 'pagination-hidden-row ' : ''}${overdue ? 'bg-row-danger/50 ' : ''}`}>
                     <td ><Badge label={FOLLOWUP_KIND_LABELS[row.kind]} /></td>
                     <td >
                       <button
                         type="button"
-                        className="text-left font-medium text-blue-800 underline-offset-2 hover:underline"
+                        className={`min-h-6 text-left text-link underline-offset-2 hover:underline ${FOCUS_RING}`}
                         onClick={() =>
                           onNavigate(row.tab, {
                             recordId: row.id,
@@ -103,12 +104,10 @@ export function FollowupsPage({ store, onNavigate }: FollowupsPageProps) {
                     <td>{row.qpCode || '—'}</td>
                     <td>{row.department || '—'}</td>
                     <td>
-                      {row.status}
-                      {isFollowupOverdue(row.dueDate, today) && (
-                        <span className="ml-2 inline-flex rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
-                          逾期
-                        </span>
-                      )}
+                      <span className="flex flex-wrap gap-1">
+                        <Badge label={row.status} />
+                        {overdue && <Badge label="逾期" tone="danger" />}
+                      </span>
                     </td>
                     <td>{row.dueDate || '—'}</td>
                   </tr>

@@ -38,7 +38,7 @@ function CalloutBadge({ type }: { type: 'quality-objectives' | 'risk-climate' | 
   }[type]
 
   return (
-    <p className={`mt-2 rounded-md border px-2 py-1.5 text-xs font-medium ${config.className}`}>
+    <p className={`mt-2 rounded-md border px-2 py-1.5 text-xs font-normal ${config.className}`}>
       {config.text}
     </p>
   )
@@ -146,7 +146,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         <div className="mb-4 flex flex-col gap-3 no-print min-[720px]:flex-row min-[720px]:items-start">
         <div className="min-w-0 w-full rounded-lg border border-slate-200 bg-slate-50 p-3 min-[720px]:w-auto min-[720px]:flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-slate-800">
-            <span className="font-semibold text-slate-700">稽核序位</span>
+            <span className="font-bold text-slate-700">稽核序位</span>
             <span>
               1 內稽
               {derivedInternalComplete ? '已覆蓋' : `缺口 ${internalGapCount}`}
@@ -205,7 +205,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
         {derivedInternalComplete && !externalAuditPrep.managementReviewComplete && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 no-print">
-            <p className="font-medium">提示：內部稽核已完成</p>
+            <p className="font-bold">提示：內部稽核已完成</p>
             <p className="mt-1">請匯出內部稽核總結報告（包含所有稽核紀錄與表單），提交管理階層進行審查；落實後請於上方勾選「2 管審」。</p>
             <div className="mt-3">
               <Button onClick={() => exportAllFormsExcel(state, WORKSPACE_COMPANY_ID)}>
@@ -256,9 +256,9 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
 
                 return (
                   <tr key={itemState.id} className={done ? 'bg-green-50/30' : ''}>
-                    <td className="text-center align-top font-medium">{displayNo}</td>
+                    <td className="text-center align-top font-normal">{displayNo}</td>
                     <td className="align-top">
-                      <div className="font-medium">{title}</div>
+                      <div className="font-bold">{title}</div>
                       {formsText && (
                         <p className="mt-1 text-xs text-slate-600">{formsText}</p>
                       )}
@@ -294,7 +294,7 @@ export function PreAuditPrep({ store }: { store: AuditStore }) {
         </ScrollRegion>
 
         <div className="mt-4">
-          <h3 className="mb-2 text-sm font-semibold">稽核要點</h3>
+          <h3 className="mb-2 text-sm font-bold">稽核要點</h3>
           <table className="worksheet-table min-w-[11rem]" aria-label="稽核要點">
             <colgroup>
               <col className="col-seq" />

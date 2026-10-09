@@ -66,7 +66,7 @@ export function TablePagination({
             aria-label={`${label}第 ${page} 頁`}
             aria-current={page === pagination.page ? 'page' : undefined}
             onClick={() => pagination.setPage(page)}
-            className={`min-h-9 min-w-9 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${page === pagination.page ? 'border-blue-700 bg-blue-700 font-semibold text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
+            className={`min-h-9 min-w-9 rounded-md border px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${page === pagination.page ? 'border-blue-700 bg-blue-700 font-bold text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-50'}`}
           >
             {page}
           </button>

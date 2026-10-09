@@ -40,7 +40,7 @@ export function OsBandRadios({
 
   return (
     <div id={fieldId} className="space-y-1">
-      <span className="text-sm font-medium text-slate-600">{label}</span>
+      <span className="text-sm font-bold text-muted">{label}</span>
       <div role="radiogroup" aria-label={`${label}（低／中／高）`} className="flex gap-1">
         {OS_BAND_ORDER.map((band) => {
           const selected = selectedBand === band
@@ -55,10 +55,10 @@ export function OsBandRadios({
               aria-label={`${label} ${bandLabel}：${fact}`}
               title={fact}
               tabIndex={selected ? 0 : -1}
-              className={`min-h-9 flex-1 rounded border px-1 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${
+              className={`min-h-9 flex-1 rounded border px-1 text-sm font-normal transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 selected
-                  ? 'border-blue-600 bg-blue-50 text-blue-800'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  ? 'border-primary bg-row-selected text-tone-info-fg'
+                  : 'border-line bg-white text-muted hover:bg-page'
               }`}
               onClick={() => onChange(osBandToScale(band))}
               onKeyDown={(event) => handleBandKeyDown(event, band)}

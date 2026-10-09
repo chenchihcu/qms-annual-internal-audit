@@ -109,10 +109,29 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 | --- | --- | --- |
 | 盤點 | 依序：`src/index.css`（`body`／`@media print`）→ `rg 'text-(xs\|sm\|base\|lg\|xl)' src` → 共用 `Button`／`Input`／`.worksheet-table` | 列印／`print-only`／`formExport` 標為例外，不列入畫面違規 |
 | 兩級契約 | 畫面僅 14px（`text-sm`）與 12px（`text-xs`）；`h1`–`h4` 須有 `text-sm`，禁止畫面 `text-base`／`text-lg` 以上（列印表頭除外） | `rg 'text-(base\|lg\|xl\|2xl\|3xl)' src --glob '*.tsx'` 為零（`PrintDocHeader` 的 `print-only` 除外） |
-| 不升級密度 | 不把 `body` 或工作表整體升到 16px；層級靠 `font-semibold`／`font-bold`，不靠更大字級 | 使用者未核准前不改 `index.css` `body` 14px 與 `html` rem 基準 |
+| 不升級密度 | 不把 `body` 或工作表整體升到 16px；層級靠 `font-bold`，不靠更大字級 | 使用者未核准前不改 `index.css` `body` 14px 與 `html` rem 基準 |
 | 表頭 SSOT | 螢幕用 `.worksheet-table thead th { font-size: 0.75rem }`；台帳 `td` 不另加 `text-xs` | 不符合等同表：`th` 12px、`td`（QP／摘要）皆 14px |
 | 控制項同級 | 與 `Input`／`Button` 同層的標籤、`details summary`、列內文字按鈕、未用共用元件的 `textarea`／inline 輸入用 `text-sm` | 外稽「稽核要點」標題、年度切換「內稽年度」、附件標籤為 14px |
 | 緊湊例外 | 月格 44px 狀態按鈕、方案風險因素循環小按鈕、收合區內條列說明、流程圖群組名可維持 `text-xs` | 月格「矯正圓滿」仍 12px；`Badge`／錯誤／員工編號附註仍 12px |
 | 驗收 | 受影響頁元件測試 + `43124` `getComputedStyle`：表頭 12px、資料格與表單控制 14px | 設定備份區 `h2`、確認對話、利害關係人編輯對話已量測 |
 
 出處：2026-09-28「字體尺寸優化」對話；2026-09-28 字級一致性實作與 `43124` 量測。產品決策：對齊現行 14／12，不選整體放大一階。
+
+## 2026-10-09 Design System 統一
+
+只改畫面樣式；不改判定、計分、`localStorage`、種子、列印正式標題與匯出欄位。
+
+| 項目 | 規則 | 檢查 |
+| --- | --- | --- |
+| 只用淺色 | 不提供深色模式；不寫 `dark:` 樣式、`html.dark` token 或主題切換。舊 `qms-audit-theme` 本機鍵不讀也不清 | `rg 'dark:' src` 為零 |
+| 狀態色 SSOT | `src/index.css` 的 `tone-{danger,warning,success,info,neutral,pending}-{bg,fg,line}`；`Badge` 用 `tone`，舊呼叫端依標籤文字對應。「未判定」用 `pending`，不用紅色 | 新增狀態不在頁面寫 `bg-red-100` 類色號 |
+| 列底色 | 未存檔／待處理 `bg-row-warning/50`、逾期 `bg-row-danger/50`、選取 `bg-row-selected/40`；逾期另加「逾期」`Badge`，不只靠底色 | NCR／待改善追蹤逾期列有可見「逾期」 |
+| 文字色 | `text-ink`／`text-muted`／`text-link`／`text-danger`／`text-tone-*-fg`；台帳頁不寫 `text-slate-*`、`text-blue-*` | 台帳 7 頁 `rg '(bg\|text\|border)-(slate\|blue\|red\|green\|amber)-[0-9]'` 為零 |
+| 字重 | 畫面只用 400／700：標籤、標題、`summary`、按鈕與狀態強調用 `font-bold`，其餘 `font-normal`；表頭 700。列印表頭與 `formExport` 例外 | `rg 'font-(medium\|semibold)' src` 只剩列印專用 |
+| 按鈕 | 共用 `Button`：primary 有 hover／pressed；破壞性動作用 `dangerOutline`（表格操作欄）或 `dangerGhost`（明細區），不在 `className` 覆寫紅色 | 人員垃圾桶、建議／觀察「移至回收區」、NCR「作廢」為紅色 |
+| 台帳操作欄 | 列上動作用 secondary `Button`、`whitespace-nowrap`；同列多鈕時該表加專屬 `col-*` 讓按鈕單列 | 建議「帶入」「明細」同列（`col-suggestion-action` 9.5rem） |
+| 第三方建議 | 一覽唯讀顯示進度與狀態 `Badge`；進度、狀態編輯與移至回收區在「明細」展開區，修改即時儲存並顯示「修改後即時儲存」 | 列上無 textbox／combobox；`aria-label`「建議進度／建議狀態」仍在 |
+| 不符合一覽 | 短欄用 `col-ncr-*`；摘要完整換行（不 `line-clamp`）；「公司」欄全空時只在列印顯示；精簡進度顯示「a/4 · 待{階段}」，完整狀態在 `aria-label` | 1280px 無表內橫捲，摘要欄 ≥ 12rem |
+| 年度計畫 | `col-plan-risk`／`col-plan-dept`／`col-plan-auditors`，表 `min-w-[64rem]`；1280px 不捲動可見 1–12 月 | 1280px `scrollWidth ≤ clientWidth` |
+| 資料待覆核 | 候選值兩欄並列（來源 + 完整內容 +「採用此內容」）；欄位鍵只在畫面換成既有中文標籤（客觀證據、發現說明…），未對應的鍵保留原字 | 標題無 `objectiveEvidence`；已存衝突資料不改寫 |
+| 側欄圖示 | 外稽準備用 `shieldCheck`，不與待改善追蹤 `listTodo` 相近；目前頁加 `font-bold`，不只靠顏色 | 12 項圖示互不相同 |

@@ -51,7 +51,7 @@ export function AttachmentField({
   return (
     <div className="mt-2">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium text-muted">{label}</span>
+        <span className="text-sm font-bold text-muted">{label}</span>
         {!disabled && (
           <button
             type="button"
@@ -76,7 +76,7 @@ export function AttachmentField({
               key={att.id}
               className="flex flex-wrap items-center gap-2 rounded border border-line bg-page/50 px-2 py-1"
             >
-              <span className="font-medium text-ink">{att.fileName}</span>
+              <span className="font-normal text-ink">{att.fileName}</span>
               <span className="text-muted">({Math.round(att.sizeBytes / 1024)} KB)</span>
               {!disabled && (
                 <button
@@ -103,7 +103,7 @@ export function AttachmentField({
         <p className="text-xs text-muted">尚無附件</p>
       )}
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">
+        <p role="alert" className="mt-1 text-xs text-red-700">
           {error}
         </p>
       )}

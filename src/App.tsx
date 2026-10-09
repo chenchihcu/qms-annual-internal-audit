@@ -35,7 +35,7 @@ class TabErrorBoundary extends Component<
     if (this.state.error) {
       return (
         <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-          <h2 className="text-sm font-semibold text-red-800">{this.props.tabLabel} 無法顯示</h2>
+          <h2 className="text-sm font-bold text-red-800">{this.props.tabLabel} 無法顯示</h2>
           <p className="mt-2 text-sm text-red-700">{this.state.error.message}</p>
           <button
             type="button"
@@ -125,7 +125,7 @@ function AppShell() {
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-medium leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 text-blue-800 shadow-sm ring-1 ring-inset ring-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+            className={`mb-1 flex min-h-11 w-full items-start gap-2 whitespace-normal rounded-lg px-3 py-2 text-left text-sm font-normal leading-snug transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 ${tab === item.id ? 'bg-blue-50 font-bold text-blue-800 shadow-sm ring-1 ring-inset ring-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
             aria-current={tab === item.id ? 'page' : undefined}
             aria-controls={item.formId}
           >
@@ -146,7 +146,7 @@ function AppShell() {
           event.preventDefault()
           mainRef.current?.focus()
         }}
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-ink focus:shadow-lg"
       >
         跳至主要內容
       </a>
@@ -163,7 +163,7 @@ function AppShell() {
                 <Icon name="menu" />
                 選單
               </button>
-              <div className="flex min-h-11 min-w-0 items-center gap-2 px-2 text-left text-sm font-medium text-ink" title={headerScope}>
+              <div className="flex min-h-11 min-w-0 items-center gap-2 px-2 text-left text-sm font-normal text-ink" title={headerScope}>
                 {tab === 'prep' ? (
                   <span className="truncate">{headerScope}</span>
                 ) : (
@@ -203,7 +203,7 @@ function AppShell() {
         {(store.state.workspaceMigrationConflicts?.length ?? 0) > 0 && (
           <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
             <span>有 {store.state.workspaceMigrationConflicts?.length} 項資料待覆核；判定衝突不會計分。</span>
-            <button type="button" className="font-semibold underline underline-offset-2" onClick={() => setTab('system-settings')}>查看待覆核資料</button>
+            <button type="button" className="font-bold underline underline-offset-2" onClick={() => setTab('system-settings')}>查看待覆核資料</button>
           </div>
         )}
         <Suspense fallback={<div className="rounded-xl border border-line bg-surface p-6 text-sm text-muted">正在載入頁面…</div>}>

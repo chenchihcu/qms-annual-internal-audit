@@ -183,7 +183,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
         </div>
 
         <details className="mb-6 no-print">
-          <summary className="cursor-pointer text-sm font-medium text-ink">計畫窗口與日期設定</summary>
+          <summary className="cursor-pointer text-sm font-bold text-ink">計畫窗口與日期設定</summary>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Input
               label="年度起始"
@@ -204,10 +204,10 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
               onChange={(v) => updateSettings({ planWindowEnd: v })}
             />
             <div>
-              <span className="mb-1 block text-sm font-medium text-ink">外部稽核日期</span>
+              <span className="mb-1 block text-sm font-bold text-ink">外部稽核日期</span>
               <p className="text-sm text-muted">
                 {externalAuditDate || '尚未填寫'}
-                <a href={buildAppHash('prep')} className="ml-2 font-medium text-link hover:underline">
+                <a href={buildAppHash('prep')} className="ml-2 font-normal text-link hover:underline">
                   至外稽準備編輯
                 </a>
               </p>
@@ -224,7 +224,8 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
-          formTitle="年度內部稽核計畫 QR-28-01"
+          formTitle="年度內部稽核計畫"
+          formId="QR-28-01"
           subtitle={`主任稽核員：${leadAuditorName}`}
         />
 
@@ -242,16 +243,16 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
         </div>
 
         <ScrollRegion ariaLabel="年度稽核計畫月格表">
-          <table className="qr-plan-table worksheet-table min-w-[69.5rem]">
+          <table className="qr-plan-table worksheet-table min-w-[64rem]">
             <colgroup>
               <col className="col-seq" />
-              <col className="col-status" />
+              <col className="col-plan-risk" />
               <col />
-              <col className="col-name" />
+              <col className="col-plan-dept" />
               <col className="print-table-column" />
               <col className="print-table-column" />
               <col className="print-table-column" />
-              <col className="col-name" />
+              <col className="col-plan-auditors" />
               {MONTHS.map((month) => <col key={month} className="col-month" />)}
             </colgroup>
             <thead>
@@ -279,15 +280,15 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                   data-plan-row-id={row.id}
                   className={`${!pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''}${
                     unscheduled
-                      ? 'bg-rose-50/60 dark:bg-rose-950/20'
+                      ? 'bg-rose-50/60'
                       : row.manualOverride
-                        ? 'bg-amber-50/50 dark:bg-amber-950/20'
+                        ? 'bg-amber-50/50'
                         : ''
                   }`}
                 >
                   <td className="tabular-nums">{row.sequence}</td>
                   <td><Badge label={row.riskLevel} /></td>
-                  <td className="font-medium break-words">
+                  <td className="font-normal break-words">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <a
                         href={buildAppHash('audit', { auditKey: `${row.qpCode}|${row.departmentId}` })}
@@ -303,12 +304,12 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                         onClick={() => setExpandedId(expanded ? null : row.id)}
                       >{expanded ? '收合' : '明細'}</button>
                       {unscheduled && (
-                        <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
+                        <span className="rounded bg-rose-100 px-1.5 py-0.5 text-xs font-normal text-rose-900 no-print">
                           未排月格
                         </span>
                       )}
                       {!unscheduled && row.manualOverride && (
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900 no-print">
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 no-print">
                           已手動調整
                         </span>
                       )}
@@ -355,7 +356,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                         aria-haspopup="menu"
                         aria-expanded={openMonth?.key === monthKey}
                         aria-controls={openMonth?.key === monthKey ? `month-menu-${row.id}-${i}` : undefined}
-                        className={`no-print h-11 w-11 rounded text-xs font-medium ${FOCUS_RING} ${statusClass(displayStatus)}`}
+                        className={`no-print h-11 w-11 rounded text-xs font-normal ${FOCUS_RING} ${statusClass(displayStatus)}`}
                         onClick={(event) => {
                           const rect = event.currentTarget.getBoundingClientRect()
                           setOpenMonth((current) => current?.key === monthKey ? null : { key: monthKey, rect })
@@ -414,7 +415,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
         {dateWarnings.length > 0 && (
           <div
             role="alert"
-            className="min-w-[min(100%,16rem)] flex-1 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"
+            className="min-w-[min(100%,16rem)] flex-1 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           >
             {dateWarnings.map((msg) => (
               <p key={msg}>⚠ {msg}</p>

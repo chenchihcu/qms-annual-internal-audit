@@ -57,7 +57,7 @@ export function DepartmentOwnerField({
     <div className={`no-print ${className}`}>
       <div className="flex flex-wrap items-center gap-1">
         {usePicker ? (
-          <div className={`min-w-[5rem] flex-1 ${dirty ? 'rounded border border-amber-400 dark:border-amber-600' : ''}`}>
+          <div className={`min-w-[5rem] flex-1 ${dirty ? 'rounded border border-amber-400' : ''}`}>
             <PersonNameSelect
               value={value}
               onChange={setDraft}
@@ -70,7 +70,7 @@ export function DepartmentOwnerField({
         ) : (
           <input
             type="text"
-            className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400 dark:border-amber-600' : ''} ${inputClassName} ${selectClassName}`}
+            className={`min-w-[5rem] flex-1 rounded border border-line bg-surface px-2 py-1 text-sm ${FOCUS_RING} ${dirty ? 'border-amber-400' : ''} ${inputClassName} ${selectClassName}`}
             value={value}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -87,7 +87,7 @@ export function DepartmentOwnerField({
           <>
             <button
               type="button"
-              className={`shrink-0 rounded bg-primary px-2 py-1 text-sm font-medium text-white hover:opacity-90 ${FOCUS_RING}`}
+              className={`shrink-0 rounded bg-primary px-2 py-1 text-sm font-bold text-white hover:opacity-90 ${FOCUS_RING}`}
               onClick={handleSave}
             >
               儲存

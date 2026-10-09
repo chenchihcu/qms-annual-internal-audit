@@ -361,7 +361,7 @@ export function ProcedureAuditPanel({
                 <button
                   key={field}
                   type="button"
-                  className={`inline-flex items-center rounded border border-transparent px-2 py-1 text-xs font-medium text-link hover:bg-slate-100 ${FOCUS_RING}`}
+                  className={`inline-flex items-center rounded border border-transparent px-2 py-1 text-xs font-normal text-link hover:bg-slate-100 ${FOCUS_RING}`}
                   aria-label={`${audit.qpCode} NO ${item.no} 加${EVIDENCE_FIELD_LABELS[field]}`}
                   onClick={() => revealEvidenceField(item.id, field)}
                 >
@@ -393,7 +393,7 @@ export function ProcedureAuditPanel({
       <div className="mt-1 text-xs no-print">
         <button
           type="button"
-          className={`hover:underline ${FOCUS_RING} ${stale ? 'text-amber-700 dark:text-amber-300' : 'text-primary'}`}
+          className={`hover:underline ${FOCUS_RING} ${stale ? 'text-amber-700' : 'text-primary'}`}
           onClick={() => onNavigate('ncr')}
         >
           {stale
@@ -452,14 +452,15 @@ export function ProcedureAuditPanel({
         <PrintDocHeader
           companyName={company.name}
           auditYear={settings.auditYear}
-          formTitle="內部稽核查檢表 QR-28-02"
+          formTitle="內部稽核查檢表"
+          formId="QR-28-02"
           subtitle={`${audit.qpCode} ${getProcedureTitle(audit.qpCode, audit.department)} · ${audit.auditCategory}`}
         />
 
         <div className="mb-4 no-print space-y-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <div className="flex min-w-[16rem] flex-1 items-center gap-2">
-              <label htmlFor="procedure-audit-select" className="shrink-0 text-sm font-medium text-ink">查檢表</label>
+              <label htmlFor="procedure-audit-select" className="shrink-0 text-sm font-bold text-ink">查檢表</label>
               <div className="min-w-0 flex-1">
                 <Select
                   id="procedure-audit-select"
@@ -544,7 +545,7 @@ export function ProcedureAuditPanel({
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {audit.documents.trim() !== '' && audit.documents.trim() !== audit.qpCode.trim() && (
                 <div className="min-w-0 break-words">
-                  <span className="block text-sm font-medium">對應文件</span>
+                  <span className="block text-sm font-bold">對應文件</span>
                   {audit.documents}
                 </div>
               )}
@@ -553,12 +554,12 @@ export function ProcedureAuditPanel({
                 onChange={(value) => handleHeaderChange('auditDate', value)} disabled={!auditSetupEditable}
               />
               <div>
-                <span className="mb-1 block text-sm font-medium">被稽核部門主管</span>
+                <span className="mb-1 block text-sm font-bold">被稽核部門主管</span>
                 {auditLocked ? (
                   <>
                     <span>{audit.departmentManager}</span>
                     {managerMismatch && (
-                      <p className="mt-1 text-xs text-amber-800 dark:text-amber-200">
+                      <p className="mt-1 text-xs text-amber-800">
                         已評分，本表凍結為「{audit.departmentManager}」；部門負責人已改為「{dept?.owner}」
                       </p>
                     )}
@@ -573,7 +574,7 @@ export function ProcedureAuditPanel({
                 )}
               </div>
               <div>
-                <span className="mb-1 block text-sm font-medium">稽核人員</span>
+                <span className="mb-1 block text-sm font-bold">稽核人員</span>
                 <AuditorMultiSelect
                   value={audit.auditors}
                   onChange={(auditors, personIds) => updateAudit({
@@ -634,7 +635,7 @@ export function ProcedureAuditPanel({
               ['不適用', score.breakdown.notApplicable],
               ['未判定', score.breakdown.pending],
             ].map(([label, value]) => (
-              <div key={label} className="flex gap-1"><dt className="text-muted">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>
+              <div key={label} className="flex gap-1"><dt className="text-muted">{label}</dt><dd className="font-bold tabular-nums">{value}</dd></div>
             ))}
           </dl>
           {canJudge && (
@@ -674,26 +675,26 @@ export function ProcedureAuditPanel({
                     key={item.id}
                     className={`${!visible ? 'pagination-hidden-row ' : ''}${
                       isChecklistItemPending(item)
-                        ? 'bg-rose-50/40 dark:bg-rose-950/20'
+                        ? 'bg-rose-50/40'
                         : item.sourceYear
-                          ? 'bg-amber-50/40 dark:bg-amber-950/20'
+                          ? 'bg-amber-50/40'
                           : ''
                     }`}
                   >
                     {item.id === firstVisibleId && visibleCatItems.length > 0 && (
-                      <td className="no-print align-top font-medium break-words" rowSpan={visibleCatItems.length}>
+                      <td className="no-print align-top font-bold break-words" rowSpan={visibleCatItems.length}>
                         {cat}
                       </td>
                     )}
                     {idx === 0 && (
-                      <td className="pagination-print-cell align-top font-medium" rowSpan={catItems.length}>
+                      <td className="pagination-print-cell align-top font-bold" rowSpan={catItems.length}>
                         {cat}
                       </td>
                     )}
                     <td className="align-top text-center">{item.no}</td>
                     <td className="align-top break-words">
                       {isChecklistItemPending(item) && (
-                        <span className="mb-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-medium text-rose-900 no-print">
+                        <span className="mb-1 inline-block rounded bg-rose-100 px-1.5 py-0.5 text-xs font-normal text-rose-900 no-print">
                           未判定
                         </span>
                       )}
@@ -717,7 +718,7 @@ export function ProcedureAuditPanel({
                         </span>
                       )}
                       {item.sourceYear && (
-                        <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">來源：{item.sourceYear} 年追蹤</span>
+                        <span className="mt-1 block text-xs text-amber-700">來源：{item.sourceYear} 年追蹤</span>
                       )}
                     </td>
                     <td className="align-top">

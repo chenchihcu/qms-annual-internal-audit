@@ -9,7 +9,7 @@ export function FollowupRecordLinkNotice({ result }: { result: FollowupRecordLin
       {result.settingsTab === 'system-settings' && (
         <>
           {' '}
-          <a className="font-medium text-link underline" href={buildAppHash('system-settings')}>
+          <a className="font-normal text-link underline" href={buildAppHash('system-settings')}>
             至系統設定
           </a>
           （回收區在「回收區」分頁）。

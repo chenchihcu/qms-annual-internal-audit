@@ -89,7 +89,7 @@ export function NcrCorrectiveReport({
           <Button variant="secondary" onClick={onClose}>
             收合
           </Button>
-          <Button variant="ghost" icon={ACTION_ICONS.delete} className="text-red-700" onClick={onVoid}>
+          <Button variant="dangerGhost" icon={ACTION_ICONS.delete} onClick={onVoid}>
             作廢
           </Button>
         </div>
@@ -102,7 +102,7 @@ export function NcrCorrectiveReport({
 
       <div className="qr-ncr-report-sheet overflow-x-auto">
         {companyLine ? (
-          <p className="print-only mb-2 text-center text-sm font-semibold">{companyLine}</p>
+          <p className="print-only mb-2 text-center text-sm font-bold">{companyLine}</p>
         ) : null}
         <table className="qr-ncr-report-table w-full min-w-[42rem] border-collapse text-sm">
           <tbody>
@@ -115,7 +115,7 @@ export function NcrCorrectiveReport({
               </td>
             </tr>
             <tr>
-              <td colSpan={2} className="qr-ncr-label text-center font-semibold">
+              <td colSpan={2} className="qr-ncr-label text-center font-bold">
                 起始
                 <br />
                 日期
@@ -131,7 +131,7 @@ export function NcrCorrectiveReport({
                   onChange={(v) => onDraftChange({ date: v })}
                 />
               </td>
-              <td colSpan={2} className="qr-ncr-label text-center font-semibold">
+              <td colSpan={2} className="qr-ncr-label text-center font-bold">
                 稽核
                 <br />
                 項目
@@ -140,7 +140,7 @@ export function NcrCorrectiveReport({
                 <span className="print-only">{auditItemLabel}</span>
                 <span className="no-print text-muted">{auditItemLabel}</span>
               </td>
-              <td colSpan={2} className="qr-ncr-label text-center font-semibold">
+              <td colSpan={2} className="qr-ncr-label text-center font-bold">
                 受稽
                 <br />
                 部門
@@ -150,7 +150,7 @@ export function NcrCorrectiveReport({
               </td>
             </tr>
             <tr>
-              <td colSpan={4} className="qr-ncr-label font-semibold">
+              <td colSpan={4} className="qr-ncr-label font-bold">
                 預計回覆日期{' '}
                 <span className="print-only font-normal">{draft.dueDate || ' '}</span>
                 <span className="no-print inline-block align-middle">
@@ -169,7 +169,7 @@ export function NcrCorrectiveReport({
               </td>
             </tr>
             <tr>
-              <td colSpan={4} className="qr-ncr-label font-semibold">
+              <td colSpan={4} className="qr-ncr-label font-bold">
                 發生流程/地點/單位
               </td>
               <td colSpan={5} className="qr-ncr-value">
@@ -182,7 +182,7 @@ export function NcrCorrectiveReport({
                   onChange={(v) => onDraftChange({ process: v })}
                 />
               </td>
-              <td colSpan={2} className="qr-ncr-label text-center font-semibold">
+              <td colSpan={2} className="qr-ncr-label text-center font-bold">
                 責任
                 <br />
                 單位
@@ -190,7 +190,7 @@ export function NcrCorrectiveReport({
               <td colSpan={1} className="qr-ncr-value" />
             </tr>
             <tr>
-              <td colSpan={11} className="qr-ncr-section font-semibold align-top">
+              <td colSpan={11} className="qr-ncr-section font-bold align-top">
                 不符合事項：
                 <div className="mt-1 min-h-[4rem] whitespace-pre-wrap font-normal">
                   <span className="print-only">{findingBlock(draft) || ' '}</span>
@@ -206,12 +206,12 @@ export function NcrCorrectiveReport({
             </tr>
             <tr>
               <td colSpan={11} className="qr-ncr-signatures text-xs">
-                <span className="font-semibold">稽核人員:</span> {auditors || ' '}
-                <span className="ml-6 font-semibold">受稽人員:</span>
+                <span className="font-bold">稽核人員:</span> {auditors || ' '}
+                <span className="ml-6 font-bold">受稽人員:</span>
               </td>
             </tr>
             <tr>
-              <td colSpan={11} className="qr-ncr-section font-semibold align-top">
+              <td colSpan={11} className="qr-ncr-section font-bold align-top">
                 原因分析:
                 <div className="mt-1 min-h-[5rem] whitespace-pre-wrap font-normal">
                   <span className="print-only">{draft.rootCause || ' '}</span>
@@ -227,8 +227,8 @@ export function NcrCorrectiveReport({
             </tr>
             <tr>
               <td colSpan={11} className="qr-ncr-signatures text-xs">
-                <span className="font-semibold">單位主管:</span>
-                <span className="ml-6 font-semibold">負責人員:</span>{' '}
+                <span className="font-bold">單位主管:</span>
+                <span className="ml-6 font-bold">負責人員:</span>{' '}
                 <span className="print-only">{draft.responsiblePerson || ' '}</span>
                 <span className="no-print inline-block min-w-[8rem] align-middle">
                   <PersonNameSelect
@@ -246,7 +246,7 @@ export function NcrCorrectiveReport({
               </td>
             </tr>
             <tr>
-              <td colSpan={11} className="qr-ncr-section font-semibold align-top">
+              <td colSpan={11} className="qr-ncr-section font-bold align-top">
                 矯正措施：
                 <div className="mt-1 min-h-[5rem] whitespace-pre-wrap font-normal">
                   <span className="print-only">
@@ -273,13 +273,13 @@ export function NcrCorrectiveReport({
             </tr>
             <tr>
               <td colSpan={11} className="qr-ncr-signatures text-xs">
-                <span className="font-semibold">單位主管:</span>
-                <span className="ml-6 font-semibold">負責人員:</span>{' '}
+                <span className="font-bold">單位主管:</span>
+                <span className="ml-6 font-bold">負責人員:</span>{' '}
                 {draft.responsiblePerson || ' '}
               </td>
             </tr>
             <tr>
-              <td colSpan={11} className="qr-ncr-section font-semibold align-top">
+              <td colSpan={11} className="qr-ncr-section font-bold align-top">
                 追蹤結果：
                 <div className="mt-1 min-h-[5rem] whitespace-pre-wrap font-normal">
                   <span className="print-only">{followUpBlock(draft) || ' '}</span>
@@ -320,8 +320,8 @@ export function NcrCorrectiveReport({
             </tr>
             <tr>
               <td colSpan={11} className="qr-ncr-signatures text-xs">
-                <span className="font-semibold">管理代表:</span>
-                <span className="ml-6 font-semibold">稽核人員:</span> {auditors || ' '}
+                <span className="font-bold">管理代表:</span>
+                <span className="ml-6 font-bold">稽核人員:</span> {auditors || ' '}
               </td>
             </tr>
             <tr>

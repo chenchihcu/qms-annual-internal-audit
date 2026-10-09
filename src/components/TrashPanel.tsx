@@ -44,7 +44,7 @@ export function TrashPanel({ store }: { store: AuditStore }) {
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">回收區</h2>
+        <h2 className="text-sm font-bold">回收區</h2>
         <Badge label={`${entries.length} 筆`} />
       </div>
       <p className="mb-4 text-sm text-muted">刪除的自建資料會先移至此處。還原會回到原年度或查檢表位置；永久清除後無法復原。</p>
