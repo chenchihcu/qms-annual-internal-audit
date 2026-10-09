@@ -180,7 +180,7 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
           )
         })}
       </ul>
-      <p className="text-xs text-muted">勾選「已全部登錄」且日期涵蓋到今天，沒有關聯的程序才會算 0 件；未勾選或日期過舊則顯示待確認。第三方稽核缺失來自觀察台帳（來源＝第三方稽核）。</p>
+      <p className="text-xs text-muted">客訴與重大變更：沒有已確認關聯的程序算 0 件；「已全部登錄」記錄盤點到哪一天。第三方稽核缺失來自觀察台帳（來源＝第三方稽核），須勾選「已全部登錄」且涵蓋到今天，無紀錄的程序才算 0 件。</p>
 
       {showForm && (
         <div className="space-y-3 rounded-lg border border-line p-3">

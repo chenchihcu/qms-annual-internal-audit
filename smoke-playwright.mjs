@@ -6,7 +6,6 @@ console.log('browser_smoke progress=browser-launched url=127.0.0.1:43124')
 const widths = [320, 375, 768, 1280, 1536]
 const tabLabels = [
   '稽核總覽',
-  '利害關係人',
   '風險來源登錄',
   '方案風險',
   '人員合格名單',
@@ -305,7 +304,9 @@ for (const width of widths) {
       if (personnelPermanentDeleteVerified) workflowChecks.push('回收區永久清除取消保留與確認清除')
 
       workflowStage = '利害關係人標籤保存'
-      await navigateTab('利害關係人')
+      await navigateTab('方案風險')
+      await page.getByRole('group', { name: '方案風險檢視' }).getByRole('button', { name: '部門利害關係人', exact: true }).click()
+      await page.getByRole('region', { name: '部門利害關係人一覽' }).waitFor({ state: 'visible', timeout: 8000 })
       const stakeholderRows = page.locator('[data-stakeholder-dept]')
       if (await stakeholderRows.count() === 0) throw new Error('利害關係人頁沒有可編輯的部門資料列')
       const stakeholderRow = stakeholderRows.first()
@@ -350,7 +351,9 @@ for (const width of widths) {
           })
       }, { departmentId: stakeholderDepartmentId, tag: stakeholderTagValue }, { timeout: 5000 })
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await navigateTab('利害關係人')
+      await navigateTab('方案風險')
+      await page.getByRole('group', { name: '方案風險檢視' }).getByRole('button', { name: '部門利害關係人', exact: true }).click()
+      await page.getByRole('region', { name: '部門利害關係人一覽' }).waitFor({ state: 'visible', timeout: 8000 })
       const persistedStakeholderRow = page.locator(`[data-stakeholder-dept="${stakeholderDepartmentId}"]`)
       if (!await persistedStakeholderRow.getByText(stakeholderTagValue, { exact: true }).count()) {
         throw new Error('重載後表格未顯示已儲存利害關係人標籤')
@@ -360,6 +363,9 @@ for (const width of widths) {
       workflowStage = '方案風險證據引用保存'
       await navigateTab('方案風險')
       const riskRegion = page.getByRole('region', { name: '程序風險評估一覽' })
+      // 「待處理優先」會把已存列排到後頁；用計畫順序固定列位置再定位。
+      const selectRiskPlanOrder = () => page.getByRole('group', { name: '列排序' }).getByRole('button', { name: '計畫順序', exact: true }).click()
+      await selectRiskPlanOrder()
       const riskRow = riskRegion.getByRole('row').nth(1)
       const riskCells = riskRow.getByRole('cell')
       const riskQpCode = (await riskCells.nth(0).innerText()).trim()
@@ -375,6 +381,7 @@ for (const width of widths) {
       await riskRow.getByRole('button', { name: '已存檔', exact: true }).waitFor({ state: 'visible', timeout: 5000 })
       await page.reload({ waitUntil: 'domcontentloaded' })
       await navigateTab('方案風險')
+      await selectRiskPlanOrder()
       const persistedRiskRow = riskRegion.getByRole('row').filter({ hasText: riskQpCode }).filter({ hasText: riskDepartment })
       if (await persistedRiskRow.count() !== 1) throw new Error('重載後無法唯一定位已儲存方案風險資料列')
       const persistedRiskEvidence = persistedRiskRow.locator('input[aria-label$="證據引用"]')

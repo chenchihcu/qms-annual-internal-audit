@@ -28,7 +28,7 @@ import {
 } from '../lib/riskWorkingValues'
 import { WORKSPACE_COMPANY_ID } from '../lib/singleWorkspaceMigration'
 import type { PlanRow, ProcedureRiskFactorKey, ProcedureRiskOverride, ProcedureRiskRecord } from '../types'
-import { Badge, Button, Input } from './ui/Badge'
+import { Badge, Button } from './ui/Badge'
 import { EmptyState } from './ui/EmptyState'
 import { PrintDocHeader } from './ui/PrintDocHeader'
 import { ReasonSelect } from './ui/ReasonSelect'
@@ -45,6 +45,25 @@ const FACTOR_SHORT: Record<ProcedureRiskFactorKey, string> = {
   changeImpact: '重大變更',
   monthsSinceLastAudit: '距上次稽核',
 }
+
+/** 欄位預設來源（表頭第二行）；格內只標例外（人工、與系統不同、待確認）。 */
+const FACTOR_ORIGIN: Record<ProcedureRiskFactorKey, string> = {
+  inherentRisk: '系統',
+  previousInternalNcrCount: '系統',
+  previousThirdPartyNcrCount: '系統',
+  overdueOpenNcrCount: '系統',
+  customerComplaintLevel: '登錄',
+  changeImpact: '登錄',
+  monthsSinceLastAudit: '系統',
+}
+
+/** 這些因素的「已全部登錄」盤點在風險來源登錄頁設定。 */
+const COVERAGE_FACTORS: ProcedureRiskFactorKey[] = ['previousThirdPartyNcrCount', 'customerComplaintLevel', 'changeImpact']
+
+type SortMode = 'attention' | 'plan'
+
+/** 待處理優先：未評估／舊紀錄 → 草稿 → 已確認 → 已核准；同級維持計畫順序。 */
+const STATUS_RANK: Record<string, number> = { none: 0, legacy: 0, stale: 0, draft: 1, confirmed: 2, approved: 3 }
 
 /**
  * 每列的工作值：有系統來源的因子自動帶入（不在 manual 內）；
@@ -198,6 +217,31 @@ function cellMarker(draft: RowDraft, info: DerivedFactor, key: ProcedureRiskFact
   return { text: `人工（系統 ${formatFactorLabel(key, info.suggested)}）`, tone: 'text-tone-warning-fg' }
 }
 
+/** 格內可見的例外標記；與欄位預設來源相同時不顯示。 */
+function cellException(draft: RowDraft, info: DerivedFactor, key: ProcedureRiskFactorKey): string | null {
+  const value = draft.values[key]
+  if (value == null || !draft.manual.includes(key) || value === info.suggested) return null
+  return info.suggested == null ? '✎ 人工' : `✎ 系統 ${formatFactorLabel(key, info.suggested)}`
+}
+
+/** 分級 4–5 加淡底色（同格仍有文字值，不只靠顏色）。 */
+function gradeTint(value: number | undefined): string {
+  if (value == null) return ''
+  if (value >= 5) return 'bg-tone-danger-bg/60'
+  if (value >= 4) return 'bg-tone-warning-bg/60'
+  return ''
+}
+
+function orderKeys(mode: SortMode, rows: PlanRow[], records: ProcedureRiskRecord[] | undefined, auditYear: number): string[] {
+  const keyed = rows.map((row, index) => ({
+    key: rowKey(row),
+    index,
+    rank: STATUS_RANK[effectiveRiskStatus(savedRecord(records, row), auditYear)] ?? 0,
+  }))
+  if (mode === 'attention') keyed.sort((a, b) => a.rank - b.rank || a.index - b.index)
+  return keyed.map((item) => item.key)
+}
+
 interface EditorTarget {
   row: PlanRow
   factor: ProcedureRiskFactorKey
@@ -348,6 +392,18 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
   const [bulkMessage, setBulkMessage] = useState<string | null>(null)
 
   const rows = company.planRows
+  /** 排序在切換或計畫列增減時才重算，編輯或存檔中列不跳動。 */
+  const rowsSignature = `${auditYear}|${rows.map(rowKey).join(',')}`
+  const [order, setOrder] = useState(() => ({
+    signature: rowsSignature,
+    mode: 'attention' as SortMode,
+    keys: orderKeys('attention', rows, company.procedureRisks, auditYear),
+  }))
+  if (order.signature !== rowsSignature) {
+    setOrder({ signature: rowsSignature, mode: order.mode, keys: orderKeys(order.mode, rows, company.procedureRisks, auditYear) })
+  }
+  const applySort = (mode: SortMode) =>
+    setOrder({ signature: rowsSignature, mode, keys: orderKeys(mode, rows, company.procedureRisks, auditYear) })
   const pool = useMemo(
     () => buildRiskDerivationPool({ workspace: state.workspace, yearArchives: state.yearArchives, settings }),
     [state.workspace, state.yearArchives, settings],
@@ -449,6 +505,27 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     const assessment = assessProcedurePriority(workingInput(draft.values), workingUnavailable(draft))
     return { row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }
   })
+  const statesByKey = new Map(rowStates.map((item) => [rowKey(item.row), item]))
+  const displayStates = order.keys.flatMap((key) => statesByKey.get(key) ?? [])
+  /** 缺資料摘要：每個因素的待確認列數與人工（無系統值）列數，附系統判定原因。 */
+  const factorGaps = RISK_FACTOR_KEYS.flatMap((factor) => {
+    let pending = 0
+    let manualOnly = 0
+    const notes = new Map<string, number>()
+    for (const { row, draft } of rowStates) {
+      const info = derivedFor(row)[factor]
+      const value = draft.values[factor]
+      const isPending = value == null && !(factor in draft.unavailable)
+      const isManualOnly = value != null && info.suggested == null && draft.manual.includes(factor)
+      if (!isPending && !isManualOnly) continue
+      if (isPending) pending += 1
+      else manualOnly += 1
+      notes.set(info.note, (notes.get(info.note) ?? 0) + 1)
+    }
+    if (pending === 0 && manualOnly === 0) return []
+    const note = [...notes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+    return [{ factor, pending, manualOnly, note }]
+  })
   const pendingRows = rowStates.filter((item) => !item.savedThisYear || item.dirty)
   const confirmable = rowStates.filter((item) => item.status === 'draft' && !item.dirty && item.blockers.length === 0)
   const confirmedCount = rowStates.filter((item) => item.status === 'confirmed').length
@@ -548,6 +625,47 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
         </p>
       )}
 
+      <div className="flex flex-wrap items-start gap-3 no-print">
+        {factorGaps.length > 0 ? (
+          <div className="min-w-[min(100%,20rem)] flex-1 rounded-lg border border-line px-3 py-2 text-sm" role="status" aria-label="缺資料摘要">
+            <p className="font-bold text-ink">缺資料摘要</p>
+            <ul className="mt-1 space-y-1">
+              {factorGaps.map(({ factor, pending, manualOnly, note }) => (
+                <li key={factor} className="break-words text-ink">
+                  <span className="font-bold">{FACTOR_SHORT[factor]}</span>
+                  {pending > 0 && <span className="ml-2 text-tone-warning-fg">待確認 {pending} 列</span>}
+                  {manualOnly > 0 && <span className="ml-2 text-tone-warning-fg">人工 {manualOnly} 列</span>}
+                  <span className="ml-2 text-xs text-muted">{note}</span>
+                  {COVERAGE_FACTORS.includes(factor) && (
+                    <a href={buildAppHash('risk-sources')} className={`ml-2 text-xs text-link hover:underline ${FOCUS_RING}`}>
+                      前往風險來源登錄
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1" />
+        )}
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="列排序">
+          <span className="text-sm text-muted">排序</span>
+          {([['attention', '待處理優先'], ['plan', '計畫順序']] as const).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={order.mode === mode}
+              className={`min-h-11 rounded-lg border px-3 text-sm ${FOCUS_RING} ${order.mode === mode
+                ? 'border-primary bg-tone-info-bg font-bold text-tone-info-fg'
+                : 'border-line bg-surface text-ink hover:bg-page'}`}
+              onClick={() => applySort(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div>
         {rows.length === 0 ? (
           <EmptyState message="尚無年度計畫列。" />
@@ -558,8 +676,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                 <col className="col-code col-print-code" />
                 <col className="col-risk-dept col-print-name" />
                 {RISK_FACTOR_KEYS.map((key) => <col key={key} className="col-risk-factor col-print-factor" />)}
-                <col className="col-status col-print-status" />
-                <col className="col-status col-print-status" />
+                <col className="col-risk-result col-print-result" />
                 <col className="col-print-evidence-ref" />
                 <col className="col-action no-print" />
               </colgroup>
@@ -570,20 +687,28 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                   {RISK_FACTOR_KEYS.map((key) => (
                     <th key={key} title={`${factorNames[key]}：${FACTOR_DEFINITIONS[key].definition}（${FACTOR_DEFINITIONS[key].scale}）`}>
                       {FACTOR_SHORT[key]}
+                      <span className="block font-normal no-print">{FACTOR_ORIGIN[key]}</span>
                     </th>
                   ))}
-                  <th>優先分／等級</th>
-                  <th>狀態</th>
+                  <th>結果</th>
                   <th>證據引用</th>
                   <th className="no-print">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {rowStates.map(({ row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }, rowIndex) => {
+                {displayStates.map(({ row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }, rowIndex) => {
                   const key = rowKey(row)
                   const derived = derivedFor(row)
                   const hiddenClass = !pagination.isVisible(rowIndex) ? 'pagination-hidden-row ' : ''
                   const revisions = saved?.revisions ?? []
+                  const needsSave = !savedThisYear || dirty
+                  const statusNote = dirty
+                    ? { text: '有更新未存', title: undefined }
+                    : status === 'draft' && blockers.length > 0
+                      ? { text: `待補 ${blockers.length} 項`, title: blockers.join('、') }
+                      : !assessment.level
+                        ? { text: `缺 ${assessment.missingKeys.length} 項`, title: `待確認：${assessment.missingFactors.join('、')}` }
+                        : null
                   return (
                     <tr key={key} className={`${hiddenClass}${!savedThisYear ? 'bg-row-warning/50' : ''}`}>
                       <td className="font-normal text-ink">{row.qpCode}</td>
@@ -591,24 +716,33 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                       {RISK_FACTOR_KEYS.map((factor) => {
                         const value = draft.values[factor]
                         const unavailable = value == null && factor in draft.unavailable
-                        const marker = cellMarker(draft, derived[factor], factor)
-                        const label = value == null ? (unavailable ? '未取得' : '—') : formatFactorLabel(factor, value)
+                        const pending = value == null && !unavailable
+                        const info = derived[factor]
+                        const marker = cellMarker(draft, info, factor)
+                        const exception = cellException(draft, info, factor)
+                        const label = value == null ? (unavailable ? '未取得' : '待確認') : formatFactorLabel(factor, value)
                         const open = editor != null && rowKey(editor.row) === key && editor.factor === factor
+                        const frame = open
+                          ? 'border-primary'
+                          : pending
+                            ? 'border-dashed border-tone-warning-fg/50'
+                            : 'border-transparent hover:border-line'
                         return (
                           <td key={factor} className="align-top">
                             <button
                               type="button"
                               aria-haspopup="dialog"
                               aria-expanded={open}
-                              aria-label={`${row.qpCode} ${row.department} ${factorNames[factor]}：${label}（${marker.text}）`}
-                              className={`no-print flex min-h-11 w-full flex-col items-start justify-center rounded border px-1.5 py-1 text-left ${open ? 'border-primary' : 'border-line'} ${value == null && !unavailable ? 'bg-row-warning/40' : 'bg-surface'} ${FOCUS_RING}`}
+                              aria-label={`${row.qpCode} ${row.department} ${factorNames[factor]}：${value == null ? (unavailable ? '未取得' : '—') : label}（${marker.text}）`}
+                              title={info.note}
+                              className={`no-print flex min-h-11 w-full flex-col items-start justify-center rounded border px-1.5 py-1 text-left ${frame} ${gradeTint(value)} ${FOCUS_RING}`}
                               onClick={(event) => {
                                 const anchor = event.currentTarget
                                 setEditor(open ? null : { row, factor, anchor })
                               }}
                             >
-                              <span className="text-xs font-bold text-ink">{label}</span>
-                              <span className={`text-xs ${marker.tone}`}>{marker.text}</span>
+                              <span className={`text-xs ${pending ? 'text-tone-warning-fg' : unavailable ? 'text-muted' : 'font-bold text-ink'}`}>{label}</span>
+                              {exception && <span className="text-xs text-tone-warning-fg">{exception}</span>}
                             </button>
                             <span className="print-only text-xs">
                               {!savedThisYear || !saved
@@ -620,51 +754,54 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
                           </td>
                         )
                       })}
-                      <td className="align-top">
-                        <span className="print-only text-xs">
-                          {printed ? `${printed.score} ${printed.level ?? '資料不足'}` : '未存檔'}
-                        </span>
-                        <span className="no-print font-bold">{assessment.score}</span>
-                        {assessment.provisional && <span className="no-print ml-1 text-xs text-muted">暫估</span>}
-                        <span className="no-print mt-1 block">
-                          {assessment.level ? (
-                            <span className="inline-flex flex-wrap items-center gap-1">
-                              <Badge label={assessment.level} />
-                              {assessment.floorApplied && <span className="text-xs text-muted" title={`公式等級 ${assessment.formulaLevel}`}>地板</span>}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-tone-warning-fg" title={`待確認：${assessment.missingFactors.join('、')}`}>
-                              資料不足（缺 {assessment.missingKeys.length}）
-                            </span>
-                          )}
-                        </span>
-                      </td>
                       <td
                         className="align-top text-xs"
                         title={revisions.length > 0
                           ? `核准紀錄：${revisions.map((revision) => `${revision.changedAt.slice(0, 10)} ${revision.approvedBy ?? ''}（${revision.snapshot.score} ${revision.snapshot.level ?? '資料不足'}）`).join('；')}`
                           : undefined}
                       >
-                        <span>{RISK_STATUS_LABELS[status]}</span>
-                        {dirty && <span className="block text-tone-warning-fg no-print">有更新未存</span>}
-                        {status === 'draft' && !dirty && blockers.length > 0 && (
-                          <span className="block text-muted no-print" title={blockers.join('、')}>待補 {blockers.length} 項</span>
-                        )}
+                        <span className="print-only">
+                          {printed ? `${printed.score} ${printed.level ?? '資料不足'}` : '未存檔'}
+                        </span>
+                        <span className="no-print block">
+                          {assessment.level ? (
+                            <span className="inline-flex flex-wrap items-center gap-1">
+                              <span className="text-sm font-bold text-ink">{assessment.score}</span>
+                              <Badge label={assessment.level} />
+                              {assessment.provisional && <span className="text-muted">暫估</span>}
+                              {assessment.floorApplied && <span className="text-muted" title={`公式等級 ${assessment.formulaLevel}`}>地板</span>}
+                            </span>
+                          ) : (
+                            <span className="text-muted" title="資料不足，不給等級也不參與編排">暫估 {assessment.score}</span>
+                          )}
+                        </span>
+                        <span className="mt-1 block">
+                          <span>{RISK_STATUS_LABELS[status]}</span>
+                          {statusNote && (
+                            <span className="text-tone-warning-fg no-print" title={statusNote.title}>・{statusNote.text}</span>
+                          )}
+                        </span>
                       </td>
                       <td className="align-top">
-                        <Input
+                        <input
                           value={draft.evidenceReference}
-                          onChange={(value) => updateDraft(row, (current) => ({ ...current, evidenceReference: value }))}
-                          className="no-print min-w-[6rem]"
-                          ariaLabel={`${row.qpCode} 證據引用`}
+                          onChange={(event) => updateDraft(row, (current) => ({ ...current, evidenceReference: event.target.value }))}
+                          aria-label={`${row.qpCode} 證據引用`}
+                          placeholder="—"
+                          title={draft.evidenceReference || '點選輸入證據引用'}
+                          className={`no-print min-h-11 w-full min-w-0 rounded border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink placeholder:text-muted hover:border-line focus:border-primary focus:bg-surface ${FOCUS_RING}`}
                         />
                         <span className="print-only text-xs">{(savedThisYear && saved?.evidenceReference) || '—'}</span>
                       </td>
                       <td className="align-top no-print">
                         {errors[key] && <p className="mb-1 text-xs font-bold text-danger" role="alert">{errors[key]}</p>}
-                        <Button variant="secondary" onClick={() => persistRow(row)} disabled={savedThisYear && !dirty}>
-                          {savedFlash[key] ? '已存檔' : '存檔'}
-                        </Button>
+                        {savedFlash[key] ? (
+                          <Button variant="secondary" disabled>已存檔</Button>
+                        ) : needsSave ? (
+                          <Button variant="secondary" onClick={() => persistRow(row)}>存檔</Button>
+                        ) : (
+                          <span className="text-xs text-muted">已存</span>
+                        )}
                       </td>
                     </tr>
                   )

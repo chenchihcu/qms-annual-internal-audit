@@ -144,6 +144,10 @@
       width: 6rem;
     }
 
+    col.col-risk-result {
+      width: 8.5rem;
+    }
+
     col.col-person-name {
       width: 6.25rem;
     }
@@ -509,6 +513,10 @@
 
   .print-risk-table col.col-print-status {
     width: 7.5%;
+  }
+
+  .print-risk-table col.col-print-result {
+    width: 15%;
   }
 
   .print-risk-table col.col-print-evidence-ref {

@@ -293,20 +293,12 @@ function sourceEventFactor(
   if (pendingCount > 0) {
     return { status: 'no_data', sources: [], note: `${pendingCount} 件關聯待確認，確認前不判定為無事件` }
   }
+  // 未登錄視為 0 件（2026-10-10 使用者核准）；「已全部登錄」只影響說明，不再擋計數。
   const coverage = pool.sourceCoverage[kind]
-  if (isCoverageCurrent(coverage, pool.today)) {
-    return {
-      status: 'no_events',
-      count: 0,
-      suggested: countToScale(0),
-      sources: [],
-      note: `已全部登錄至 ${coverage!.checkedThrough}，期間內無關聯此程序的紀錄`,
-    }
-  }
-  if (coverage) {
-    return { status: 'no_data', sources: [], note: `「已全部登錄」只到 ${coverage.checkedThrough}，之後尚未盤點，無法判定為 0 件` }
-  }
-  return { status: 'no_data', sources: [], note: '尚無登錄，也未勾選「已全部登錄」，無法判定為 0 件' }
+  const note = isCoverageCurrent(coverage, pool.today)
+    ? `已全部登錄至 ${coverage!.checkedThrough}，期間內無關聯此程序的紀錄`
+    : `${periodNote} 無已確認登錄，視為 0 件`
+  return { status: 'no_events', count: 0, suggested: countToScale(0), sources: [], note }
 }
 
 export function deriveRiskFactors(
