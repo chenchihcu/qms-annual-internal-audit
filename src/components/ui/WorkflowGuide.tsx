@@ -1,12 +1,12 @@
 import type { AppState, TabId } from '../../types'
 import { FOCUS_RING } from '../../lib/focusRing'
-import { getTabWorkflow, tabLabel } from '../../lib/navigation'
+import { getTabWorkflow, tabLabel, type NavigateOptions } from '../../lib/navigation'
 import { getTabWorkflowStatus, type WorkflowGap } from '../../lib/workflowStatus'
 
 interface WorkflowGuideProps {
   tab: TabId
   state: AppState
-  onNavigate?: (tab: TabId) => void
+  onNavigate?: (tab: TabId, options?: NavigateOptions) => void
 }
 
 function GapLine({
@@ -16,7 +16,7 @@ function GapLine({
 }: {
   gap: WorkflowGap
   tone: 'gap' | 'advisory'
-  onNavigate?: (tab: TabId) => void
+  onNavigate?: (tab: TabId, options?: NavigateOptions) => void
 }) {
   const prefix = tone === 'gap' ? '待完成：' : '提示：'
   const targetTab = gap.tab
@@ -32,7 +32,7 @@ function GapLine({
           <button
             type="button"
             className={`font-normal text-primary hover:underline ${FOCUS_RING}`}
-            onClick={() => onNavigate!(targetTab!)}
+            onClick={() => onNavigate!(targetTab!, gap.options)}
           >
             至{tabLabel(targetTab!)}
           </button>

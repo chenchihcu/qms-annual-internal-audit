@@ -6,7 +6,6 @@ console.log('browser_smoke progress=browser-launched url=127.0.0.1:43124')
 const widths = [320, 375, 768, 1280, 1536]
 const tabLabels = [
   '稽核總覽',
-  '利害關係人',
   '風險來源登錄',
   '方案風險',
   '人員合格名單',
@@ -304,32 +303,29 @@ for (const width of widths) {
       if (planScheduleVerified) workflowChecks.push('年度計畫月格排程保存與重載讀回')
       if (personnelPermanentDeleteVerified) workflowChecks.push('回收區永久清除取消保留與確認清除')
 
-      workflowStage = '利害關係人標籤保存'
-      await navigateTab('利害關係人')
-      const stakeholderRows = page.locator('[data-stakeholder-dept]')
-      if (await stakeholderRows.count() === 0) throw new Error('利害關係人頁沒有可編輯的部門資料列')
-      const stakeholderRow = stakeholderRows.first()
-      const stakeholderDepartmentId = await stakeholderRow.getAttribute('data-stakeholder-dept')
-      if (!stakeholderDepartmentId) throw new Error('利害關係人資料列缺少部門識別')
-      const stakeholderEditButton = stakeholderRow.getByRole('button', { name: /編輯 .+ 利害關係人與風險/ })
-      if (await stakeholderEditButton.count() !== 1) throw new Error('第一筆利害關係人資料列沒有編輯按鈕')
-      await stakeholderEditButton.click()
-      const stakeholderDialog = page.getByRole('dialog')
-      await stakeholderDialog.waitFor({ state: 'visible', timeout: 5000 })
-      const unselectedTags = stakeholderDialog.locator('button[aria-pressed="false"]')
-      if (await unselectedTags.count() === 0) throw new Error('第一筆利害關係人資料列沒有可編輯標籤')
+      workflowStage = '利害關係人標籤保存（年度計畫明細列）'
+      await navigateTab('年度稽核計畫')
+      const stakeholderPlanGrid = page.getByRole('region', { name: '年度稽核計畫月格表' })
+      const firstPlanRow = stakeholderPlanGrid.locator('[data-plan-row-id]').first()
+      const firstPlanRowId = await firstPlanRow.getAttribute('data-plan-row-id')
+      if (!firstPlanRowId) throw new Error('年度計畫列缺少計畫列識別')
+      await firstPlanRow.getByRole('button', { name: / 明細$/ }).click()
+      const openStakeholderField = () => page.locator(`#plan-detail-${firstPlanRowId}`)
+        .getByRole('group', { name: '利害關係人（部門）', exact: true })
+      const stakeholderField = openStakeholderField()
+      await stakeholderField.waitFor({ state: 'visible', timeout: 5000 })
+      const stakeholderDepartmentId = await stakeholderField.getAttribute('data-stakeholder-dept')
+      if (!stakeholderDepartmentId) throw new Error('利害關係人欄位缺少部門識別')
+      if (await stakeholderField.locator('input, select, textarea').count() !== 0) throw new Error('部門 O／S 應為唯讀，不應有輸入控制')
+      if (!await stakeholderField.getByText(/部門 O／S（參考）/).count()) throw new Error('明細列未顯示部門 O／S 參考')
+      const unselectedTags = stakeholderField.locator('button[aria-pressed="false"]')
+      if (await unselectedTags.count() === 0) throw new Error('第一筆計畫列部門沒有可新增的利害關係人標籤')
       const stakeholderTag = unselectedTags.first()
-      const stakeholderTagLabel = (await stakeholderTag.innerText()).trim()
-      const stakeholderTagValue = stakeholderTagLabel.replace(/\s+·\s+\d+$/, '')
-      await stakeholderTag.click()
-      await page.waitForFunction(({ tag }) => {
-        const dialog = document.querySelector('[role="dialog"]')
-        const button = [...(dialog?.querySelectorAll('button') ?? [])]
-          .find((item) => item.textContent?.trim() === tag)
-        return button?.getAttribute('aria-pressed') === 'true'
-      }, { tag: stakeholderTagLabel }, { timeout: 5000 })
-      await stakeholderDialog.getByRole('button', { name: '關閉', exact: true }).click()
-      await stakeholderDialog.waitFor({ state: 'hidden', timeout: 5000 })
+      const stakeholderTagValue = (await stakeholderTag.innerText()).trim()
+      await stakeholderTag.focus()
+      await page.keyboard.press('Space')
+      await stakeholderField.getByRole('button', { name: stakeholderTagValue, exact: true })
+        .and(page.locator('[aria-pressed="true"]')).waitFor({ timeout: 5000 })
       await page.waitForFunction(({ departmentId, tag }) => {
         const containsSelection = (value) => {
           if (Array.isArray(value)) return value.some(containsSelection)
@@ -349,13 +345,23 @@ for (const width of widths) {
             }
           })
       }, { departmentId: stakeholderDepartmentId, tag: stakeholderTagValue }, { timeout: 5000 })
+      await page.goto(`${url}#tab=plan&record=${encodeURIComponent(firstPlanRowId)}`, { waitUntil: 'domcontentloaded' })
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await navigateTab('利害關係人')
-      const persistedStakeholderRow = page.locator(`[data-stakeholder-dept="${stakeholderDepartmentId}"]`)
-      if (!await persistedStakeholderRow.getByText(stakeholderTagValue, { exact: true }).count()) {
-        throw new Error('重載後表格未顯示已儲存利害關係人標籤')
+      const persistedStakeholderField = openStakeholderField()
+      await persistedStakeholderField.waitFor({ state: 'visible', timeout: 8000 })
+      if (await persistedStakeholderField.getByRole('button', { name: stakeholderTagValue, exact: true }).getAttribute('aria-pressed') !== 'true') {
+        throw new Error('重載後年度計畫明細列未顯示已儲存利害關係人標籤')
       }
-      workflowChecks.push('利害關係人標籤編輯與重載讀回')
+      workflowChecks.push('利害關係人標籤於年度計畫明細列編輯（鍵盤）與重載讀回')
+
+      workflowStage = '舊利害關係人連結轉至年度計畫'
+      await page.goto(`${url}#tab=stakeholders`, { waitUntil: 'domcontentloaded' })
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await page.getByRole('region', { name: '年度稽核計畫月格表' }).waitFor({ state: 'visible', timeout: 8000 })
+      if (await page.getByRole('button', { name: '利害關係人', exact: true }).count() !== 0) {
+        throw new Error('側欄仍有已移除的利害關係人入口')
+      }
+      workflowChecks.push('#tab=stakeholders 轉至年度計畫')
 
       workflowStage = '方案風險證據引用保存'
       await navigateTab('方案風險')

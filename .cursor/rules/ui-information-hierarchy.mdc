@@ -24,11 +24,11 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 殼層：頂欄標題為「年度稽核」（外稽準備頁仍為「外稽準備 · 準備表年度」），年份只留頁首輸入框；可見標籤「內稽年度」不顯示，輸入保留 `aria-label`「內稽年度」。頁名只在側欄，頁內不重複 H2 頁名。進度 `a/b` 只在仍顯示 Guide 的頁面。橫向捲動不顯示「此表可左右滑動查看完整欄位」。窄螢幕頂欄只留「選單」，不另加「首頁」；回家由側欄「稽核總覽」負責，藍卡不可點。側欄保留「資料儲存於本機 · v8」；**無**內容欄頁尾標語（如 ISO 9001／AS9100D）；系統設定**無**「關於」段落。資料待覆核橫幅不在系統設定頁顯示（該頁已有待覆核面板）。`Card` 不加 `shadow-sm`；sticky 頂欄不用 `backdrop-blur`，以 `bg-surface` + 底線分區。同一 `Card` 內並列清單不加內層 `rounded-lg border`，用間距或 `border-t` 分隔。
 
-利害關係人（`stakeholders`）：`PageToolbar` **無** `meta`（不重複與方案風險互代說明）；WorkflowGuide 缺口用 `利害關係人已標註 a/b`；畫面**不**顯示 `StakeholderRulesPanel`（評分規則與編排影響收合區已移除，種子與 `STAKEHOLDER_WEIGHTS` 邏輯仍保留於程式）。工作表主表一覽（對齊觀察事項台帳：`.worksheet-table` 主題色、**無**頁內 `h3`「部門利害關係人一覽（n）」、`ScrollRegion` aria 仍為「部門利害關係人一覽」、操作列 `Button` secondary＋編輯圖示）；已選標籤用 `Badge`、風險用 `Badge` + `data-stakeholder-dept` 掛列；列「編輯」開 `StakeholderEditDialog`（`no-print`）。標籤切換與發生度／嚴重度只在編輯面板；標籤按鈕只留名稱。發生度／嚴重度按鈕下不顯示說明句（`aria-label` 與 `title` 仍帶低／中／高事實）。主表編排影響只一行摘要；RPN 與編排三行細節在編輯面板。不改 `STAKEHOLDER_WEIGHTS`。檢查：主表無未選標籤按鈕；標籤無「· 權重」；無「評分規則與編排影響」summary。來源：2026-09-27 五頁低效益簡化；2026-09-27 利害關係人主表判讀＋編輯面板；2026-09-27 瀏覽器點選調整。
+利害關係人（2026-10-09 併入年度計畫，`#tab=stakeholders` 轉 `plan`）：不另設頁、無主表與編輯對話。部門標籤在年度計畫列「明細」的 `DepartmentStakeholderField`（負責人旁；`fieldset` + 可見 legend「利害關係人（部門）」、5 顆 `aria-pressed` 按鈕、選取以 `✓` 文字標示、`role=status`「已選 n 項 · 套用於本部門 m 列」／「待標註：至少選 1 項」），點選即寫 `updateDepartment`（只寫 `stakeholders`）。部門 O／S 只唯讀一行「部門 O／S（參考）：O x · S y」，無輸入控制。未標註部門的計畫列在 QP 欄加 `no-print` 小標「待標註利害關係人」；計畫頁 WorkflowGuide 缺口 `部門利害關係人已標註 a/b` 深連結 `#tab=plan&record=<planRowId>` 翻頁並展開。不改 `STAKEHOLDER_WEIGHTS`／`calculateDepartmentPriority`（`stakeholderFoldIn.regression.test.ts` 以 b79dc6f 基準比對）。
 
 儀表板總覽（`dashboard`）：**無**頁內「稽核總覽」`h2` 與「追蹤清單」分區卡片；改單一 `worksheet-table`（項目／結果／說明）。列含年度指標、內部稽核缺口、管審日期、管審前置，以及四項追蹤計數；觀察三數仍分開、不合併。「說明」只在有補充時顯示（已回報件數、計畫列數、NCR 總筆數與未結數不同、管審尚未填寫或前置尚缺）；無補充留空，不寫「—」。總覽不提供列上「操作／開啟」，也不放「至稽核總覽」「至年度稽核計畫」捷徑；進入各作業頁由側欄負責。程序得分、雙證覆蓋與逐筆缺口不在總覽重複。檢查：`region` 名稱「稽核總覽」；無 `text-2xl` 指標卡；無「操作」欄；追蹤四列說明格為空。來源：2026-09-27 瀏覽器點選調整；2026-09-28 說明欄空白「—」；2026-09-30 總覽移除列上操作，並承接外稽序位的缺口與管審狀態。
 
-年度計畫（`plan`）：月格圖例與「點月格可選排程或結果」說明與「依日期與利害關係人自動編排」**同一列**並排，圖例與按鈕字級皆 `text-sm`。點月格開選單；滿意／不滿意／矯正中／矯正圓滿寫 `manualMonthOverrides`，`months` 只留空白或擬定，未手選時仍由查檢與 NCR 推導。QP 代碼與「明細」同一列，程序名稱在下一行。`PageToolbar` **無** `meta`、**無**頁內 H2；表上方**不**常駐日期序位警告（警告與任命 Guide 在表**下方**並排）。不在頁尾重複「利害關係人已標註」。
+年度計畫（`plan`）：月格圖例與「點月格可選排程或結果」說明與「依日期與利害關係人自動編排」**同一列**並排，圖例與按鈕字級皆 `text-sm`。點月格開選單；滿意／不滿意／矯正中／矯正圓滿寫 `manualMonthOverrides`，`months` 只留空白或擬定，未手選時仍由查檢與 NCR 推導。QP 代碼與「明細」同一列，程序名稱在下一行。`PageToolbar` **無** `meta`、**無**頁內 H2；表上方**不**常駐日期序位警告（警告與任命 Guide 在表**下方**並排）。頁尾 Guide 的「部門利害關係人已標註 a/b」是利害關係人頁移除後唯一的彙總入口（帶深連結），不再另列其他頁。
 
 稽核事件由年度計畫與查檢表直接建立／開啟，不另設稽核日程頁。
 
@@ -38,7 +38,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 觀察事項（`observations`）：**無** `PageToolbar` 頁名。頂部工具列 `flex-wrap`：待帶入摘要（可見「待帶入 觀察 n、NCR m」，`title` 仍寫跨年件數）與狀態 chips **同一列**；「逐筆」`aria-label` 為逐筆帶入，「全部帶入」`aria-label` 為匯入全部待追蹤項目，「未同步 n」`aria-label` 仍為查檢未同步。登錄／匯出靠右（`ml-auto`）；「未同步 n」在 n=0 且未啟用時不顯示。控制項用 `w-fit`／`shrink-0`／`whitespace-nowrap`，禁止窄欄 `flex-1 min-w-0` 把按鈕壓成一字一行。年度與來源收在「更多篩選」。深連結 `record` 仍展開該筆。`ScrollRegion` aria 仍為「觀察事項紀錄一覽」／「查檢未同步一覽」；**無**可見 `h3` 一覽標題，aria 與列印表頭不刪。檢查：匯入按鈕高度約 `min-h-11`、非數百 px 直排。列上只留「編輯／結案」（`col-observation-action` 9rem，單行）；「轉為 NCR」「重新開啟」「移至回收區」在展開明細列。來源：2026-09-27 五頁低效益簡化；2026-09-27 瀏覽器點選調整。
 
-台帳一覽 SSOT（`observations`／`ncr`／`suggestions`／`followups`／`personnel`／`stakeholders`／`risk`）：篩選或工具列後 → `ScrollRegion`（`aria-label`「{名稱}一覽」）→ `worksheet-table` + `colgroup`；**預設不**顯示可見 `h3`「{名稱}一覽（n）」（使用者點選移除標籤時只拿掉 `h2`／`h3` 與 `PageToolbar` 頁名，保留 aria、列印表頭、按鈕與篩選）。不符合一覽標題與「手動新增 NCR」**同一列**並排。表頭／格線／列 hover 由 [`src/index.css`](src/index.css) 的 `.worksheet-table` 統一。空清單用 `EmptyState`。`ScrollRegion` **不**顯示「此表可左右滑動查看完整欄位」。稽核總覽「項目」欄寬用 `col-overview-item`（10.4rem），勿改全域 `col-name`。年度計畫、查檢、外稽準備、回收區工作表同一套畫面樣式；列印黑框在 `@media print`。
+台帳一覽 SSOT（`observations`／`ncr`／`suggestions`／`followups`／`personnel`／`risk`）：篩選或工具列後 → `ScrollRegion`（`aria-label`「{名稱}一覽」）→ `worksheet-table` + `colgroup`；**預設不**顯示可見 `h3`「{名稱}一覽（n）」（使用者點選移除標籤時只拿掉 `h2`／`h3` 與 `PageToolbar` 頁名，保留 aria、列印表頭、按鈕與篩選）。不符合一覽標題與「手動新增 NCR」**同一列**並排。表頭／格線／列 hover 由 [`src/index.css`](src/index.css) 的 `.worksheet-table` 統一。空清單用 `EmptyState`。`ScrollRegion` **不**顯示「此表可左右滑動查看完整欄位」。稽核總覽「項目」欄寬用 `col-overview-item`（10.4rem），勿改全域 `col-name`。年度計畫、查檢、外稽準備、回收區工作表同一套畫面樣式；列印黑框在 `@media print`。
 
 殼層藍卡只留產品名；`headerScope` 只在頂欄。內稽頁首把「年度稽核 ·」與年度輸入合成一列，可見「內稽年度」不重複；`aria-label` 仍為「內稽年度」。外稽準備頁首仍顯示準備表年度，內稽年度切換留在該頁右側。儀表板另一家台帳純摘要，不切公司。
 
@@ -60,7 +60,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 畫面字級：內文／標題／表單／導覽 14px（`text-sm`）；輔助／表頭／chip 12px（`text-xs`）。工作表表頭 12px 由 [`src/index.css`](src/index.css) `.worksheet-table thead th` 統一設定，不在各頁 `th` 逐格加 class；`tbody td` 繼承表格 `text-sm`，禁止在資料格上再套 `text-xs`（長文欄與短欄同級）。禁止 `text-[10px]`、`text-[11px]`、未設字級的 h1–h4，以及畫面用 `text-lg` / `text-2xl` / `text-3xl`（列印表頭除外）。`html` 維持 16px rem 基準。
 
-圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 12 頁，不渲染 PDCA 分組標題。
+圖示：`uiIcons.ts` + `Icon.tsx` SSOT；導覽／Badge／工具列可加 16px 圖，必須保留文字 accessible name；`aria-hidden`；列印 `no-print`；禁止 icon-only 與新增圖示套件。月格、外稽逐項長標、利害關係人標籤、人員角色不加圖。側欄直列 11 頁，不渲染 PDCA 分組標題。
 
 ## 2026-09-27 瀏覽器點選調整（harvest）
 
@@ -113,7 +113,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 | 表頭 SSOT | 螢幕用 `.worksheet-table thead th { font-size: 0.75rem }`；台帳 `td` 不另加 `text-xs` | 不符合等同表：`th` 12px、`td`（QP／摘要）皆 14px |
 | 控制項同級 | 與 `Input`／`Button` 同層的標籤、`details summary`、列內文字按鈕、未用共用元件的 `textarea`／inline 輸入用 `text-sm` | 外稽「稽核要點」標題、年度切換「內稽年度」、附件標籤為 14px |
 | 緊湊例外 | 月格 44px 狀態按鈕、方案風險因素循環小按鈕、收合區內條列說明、流程圖群組名可維持 `text-xs` | 月格「矯正圓滿」仍 12px；`Badge`／錯誤／員工編號附註仍 12px |
-| 驗收 | 受影響頁元件測試 + `43124` `getComputedStyle`：表頭 12px、資料格與表單控制 14px | 設定備份區 `h2`、確認對話、利害關係人編輯對話已量測 |
+| 驗收 | 受影響頁元件測試 + `43124` `getComputedStyle`：表頭 12px、資料格與表單控制 14px | 設定備份區 `h2`、確認對話已量測（利害關係人編輯對話已隨頁移除） |
 
 出處：2026-09-28「字體尺寸優化」對話；2026-09-28 字級一致性實作與 `43124` 量測。產品決策：對齊現行 14／12，不選整體放大一階。
 
@@ -142,7 +142,7 @@ N≥10 禁止 `details` 大卡牆；矩陣用表＋點格 1–5。集合頁改 *
 
 | 項目 | 規則 | 檢查 |
 | --- | --- | --- |
-| 列上單一主按鈕 | 台帳列只留最常用動作；停用、移至回收區、轉為 NCR、重新開啟、帶入放在該筆的編輯卡或展開明細 | 人員列只有「編輯」；觀察列只有「編輯／結案」；建議列只有「明細」；NCR「報告」、利害關係人「編輯」本來即單鈕 |
+| 列上單一主按鈕 | 台帳列只留最常用動作；停用、移至回收區、轉為 NCR、重新開啟、帶入放在該筆的編輯卡或展開明細 | 人員列只有「編輯」；觀察列只有「編輯／結案」；建議列只有「明細」；NCR「報告」本來即單鈕 |
 | 狀態不重複 | 下拉、Badge、統計已表達的狀態，不再加標籤或列底；缺件才用文字 Badge 說明原因 | 查檢表無「未判定」標籤與粉紅列底；外稽準備工具列無「準備清單 a/b」；總覽內部稽核列說明為空；回收區卡內無標題與「N 筆」 |
 | 全欄空白 | 整欄每列都不會有內容時移除該欄；部分列空白仍保留欄寬 | 查檢表無「操作」欄頭，表 `min-w-[34.5rem]` |
 | 重複提示 | 同頁已有同一入口或面板時不再顯示橫幅／Guide | 系統設定頁無「有 N 項資料待覆核」橫幅；查檢表頁無頁首 Guide |

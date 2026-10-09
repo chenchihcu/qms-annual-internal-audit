@@ -8,6 +8,7 @@ import {
   riskSourceGaps,
   standardReady,
   stakeholdersReady,
+  untaggedDepartmentPlanLink,
 } from '../workflowStatus'
 
 describe('workflowStatus', () => {
@@ -85,18 +86,25 @@ describe('workflowStatus', () => {
     expect(plan.gaps.filter((gap) => gap.tab === 'risk-sources').length).toBeGreaterThan(0)
   })
 
-  it('requires stakeholder tags for stakeholders tab exit', () => {
+  it('deep-links missing stakeholder tags to the department row in the annual plan', () => {
     const state = createDemoState()
     expect(stakeholdersReady(state, 'jiurun')).toBe(true)
-    expect(canProceedToNextTab(state, 'stakeholders')).toBe(true)
-    state.workspace.departments[0].stakeholders = []
+    expect(getTabWorkflowStatus(state, 'plan').gaps.some((gap) => /利害關係人/.test(gap.message))).toBe(false)
+    const target = state.workspace.departments.find((dept) => state.workspace.planRows.some((row) => row.departmentId === dept.id))!
+    target.stakeholders = []
+    const firstRow = state.workspace.planRows.find((row) => row.departmentId === target.id)!
     expect(stakeholdersReady(state, 'jiurun')).toBe(false)
-    expect(canProceedToNextTab(state, 'stakeholders')).toBe(false)
-    const status = getTabWorkflowStatus(state, 'stakeholders')
-    expect(status.gaps).toHaveLength(1)
-    expect(status.gaps[0].message).toMatch(/利害關係人已標註 \d+\/\d+/)
-    const overview = getPdcaOverview(state, 'jiurun')
-    expect(overview.plan.gaps.some((gap) => gap.tab === 'stakeholders')).toBe(true)
+    expect(untaggedDepartmentPlanLink(state.workspace)).toEqual({ recordId: firstRow.id })
+
+    const tagGap = getTabWorkflowStatus(state, 'plan').gaps.find((gap) => /利害關係人/.test(gap.message))!
+    expect(tagGap.message).toMatch(/部門利害關係人已標註 \d+\/\d+/)
+    expect(tagGap.tab).toBe('plan')
+    expect(tagGap.options).toEqual({ recordId: firstRow.id })
+    expect(canProceedToNextTab(state, 'plan')).toBe(false)
+
+    const overviewGap = getPdcaOverview(state, 'jiurun').plan.gaps.find((gap) => gap.message === '部門利害關係人尚未全部標註')!
+    expect(overviewGap.tab).toBe('plan')
+    expect(overviewGap.options).toEqual({ recordId: firstRow.id })
   })
 
   it('blocks complete report when pending checklist items remain', () => {

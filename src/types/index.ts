@@ -761,7 +761,6 @@ export type TabId =
   | 'suggestions'
   | 'prep'
   | 'risk'
-  | 'stakeholders'
   | 'risk-sources'
   | 'personnel'
   | 'system-settings'

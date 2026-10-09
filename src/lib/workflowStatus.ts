@@ -8,6 +8,7 @@ import { localIsoDate } from './localDate'
 import type { AppState, CompanyData, CompanyId, ProcedureAudit, TabId } from '../types'
 import { companySettingsFor, DEFAULT_SCORING_RULES, RISK_COVERAGE_KIND_LABELS, type RiskCoverageKind } from '../types'
 import { WORKSPACE_COMPANY_ID } from './singleWorkspaceMigration'
+import type { NavigateOptions } from './navigation'
 
 export function isPlanRowScheduled(row: { months: Array<unknown> }): boolean {
   return row.months.some(Boolean)
@@ -25,6 +26,8 @@ export type PdcaPhase = 'P' | 'D' | 'C' | 'A' | 'overview' | 'system'
 export interface WorkflowGap {
   message: string
   tab?: TabId
+  /** 深連結參數（例：年度計畫 `recordId` 開到指定計畫列並展開）。 */
+  options?: NavigateOptions
 }
 
 export interface TabWorkflowStatus {
@@ -66,6 +69,27 @@ export function stakeholdersReady(state: AppState, companyId: CompanyId = WORKSP
   const co = companyFor(state, companyId)
   if (co.departments.length === 0) return false
   return co.departments.every((dept) => dept.stakeholders.length >= 1)
+}
+
+/** 第一個未標註部門的第一筆計畫列；標籤在年度計畫明細列編輯。 */
+export function untaggedDepartmentPlanLink(co: CompanyData): NavigateOptions | undefined {
+  for (const dept of co.departments) {
+    if (dept.stakeholders.length >= 1) continue
+    const row = co.planRows.find((item) => item.departmentId === dept.id)
+    if (row) return { recordId: row.id }
+  }
+  return undefined
+}
+
+function stakeholderTagGap(co: CompanyData): WorkflowGap | null {
+  const total = co.departments.length
+  const tagged = co.departments.filter((d) => d.stakeholders.length >= 1).length
+  if (total > 0 && tagged === total) return null
+  return {
+    message: `部門利害關係人已標註 ${tagged}/${total}（於計畫列明細編輯）`,
+    tab: 'plan',
+    options: untaggedDepartmentPlanLink(co),
+  }
 }
 
 function riskConfirmedRowCount(state: AppState, companyId: CompanyId): { confirmed: number; total: number } {
@@ -160,7 +184,9 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = WORKSPAC
   const planGaps: WorkflowGap[] = []
   if (!standardReady(state, companyId)) planGaps.push({ message: '適用標準與證書依據未完整', tab: 'system-settings' })
   if (!procedureSourceReady(state, companyId)) planGaps.push({ message: '正式紀錄保存位置未指定', tab: 'system-settings' })
-  if (!stakeholdersReady(state, companyId)) planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'stakeholders' })
+  if (!stakeholdersReady(state, companyId)) {
+    planGaps.push({ message: '部門利害關係人尚未全部標註', tab: 'plan', options: untaggedDepartmentPlanLink(co) })
+  }
   for (const message of riskSourceGaps(co)) planGaps.push({ message, tab: 'risk-sources' })
   if (!riskPersistedForAllRows(state, companyId)) planGaps.push({ message: '方案風險尚未全部確認', tab: 'risk' })
   if (!leadAuditorAppointed(state, companyId)) planGaps.push({ message: '主任稽核員任命未完成', tab: 'personnel' })
@@ -224,7 +250,6 @@ export function getPdcaOverview(state: AppState, companyId: CompanyId = WORKSPAC
 function pdcaPhaseForTab(tab: TabId): PdcaPhase {
   switch (tab) {
     case 'dashboard': return 'overview'
-    case 'stakeholders':
     case 'risk-sources':
     case 'risk':
     case 'plan':
@@ -265,16 +290,6 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       break
     }
 
-    case 'stakeholders': {
-      const total = co.departments.length
-      const tagged = co.departments.filter((d) => d.stakeholders.length >= 1).length
-      if (tagged < total) {
-        gaps.push({ message: `利害關係人已標註 ${tagged}/${total}` })
-      }
-      ready = tagged === total
-      break
-    }
-
     case 'risk-sources': {
       for (const message of riskSourceGaps(co)) gaps.push({ message })
       ready = gaps.length === 0
@@ -300,6 +315,8 @@ export function getTabWorkflowStatus(state: AppState, tab: TabId): TabWorkflowSt
       if (!co.planRows.some((row) => row.months.some(Boolean))) {
         gaps.push({ message: '至少須排定一個程序月格' })
       }
+      const tagGap = stakeholderTagGap(co)
+      if (tagGap) gaps.push(tagGap)
       
       const openSug = co.suggestions.filter((s) => s.status === 'open').length
       if (openSug > 0) {

@@ -455,30 +455,6 @@
     width: 10%;
   }
 
-  .print-stakeholders-table col.col-print-dept {
-    width: 12%;
-  }
-
-  .print-stakeholders-table col.col-print-owner {
-    width: 12%;
-  }
-
-  .print-stakeholders-table col.col-print-stakeholders {
-    width: 26%;
-  }
-
-  .print-stakeholders-table col.col-print-risk {
-    width: 10%;
-  }
-
-  .print-stakeholders-table col.col-print-priority {
-    width: 10%;
-  }
-
-  .print-stakeholders-table col.col-print-arrangement {
-    width: 26%;
-  }
-
   .print-trash-table col.col-print-status {
     width: 12%;
   }

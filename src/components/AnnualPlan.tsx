@@ -6,10 +6,11 @@ import type { AuditStore } from '../hooks/useAuditStore'
 import { useDepartmentOwnerConfirm } from '../hooks/useDepartmentOwnerConfirm'
 import { DepartmentOwnerField } from './DepartmentOwnerField'
 import { DepartmentOwnerConfirm } from './DepartmentOwnerConfirm'
+import { DepartmentStakeholderField } from './DepartmentStakeholderField'
 import { evaluateDateSequence } from '../lib/coverage'
 import { effectiveExternalAuditDate } from '../lib/externalAuditPrep'
 import { FOCUS_RING } from '../lib/focusRing'
-import { buildAppHash } from '../lib/navigation'
+import { buildAppHash, type NavigateOptions } from '../lib/navigation'
 import { getDisplayMonthStatus, type MonthCellChoice } from '../lib/planStatus'
 import { buildRegeneratedPlanRows, describePlanChanges, isPlanApprovalCurrent, type PlanChangeRow } from '../lib/planRegeneration'
 import { isRiskConfirmedForYear } from '../lib/risk'
@@ -122,8 +123,17 @@ function MonthChoiceMenu({
   )
 }
 
-export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigate?: (tab: TabId) => void }) {
-  const { state, updateSettings, regeneratePlan, approvePlan, updatePlanRow, setPlanMonthChoice } = store
+export function AnnualPlan({
+  store,
+  onNavigate,
+  highlightRecordId,
+}: {
+  store: AuditStore
+  onNavigate?: (tab: TabId, options?: NavigateOptions) => void
+  /** 深連結（`#tab=plan&record=<planRowId>`）：翻到並展開該計畫列 */
+  highlightRecordId?: string
+}) {
+  const { state, updateSettings, regeneratePlan, approvePlan, updatePlanRow, setPlanMonthChoice, updateDepartment } = store
   const { settings, company } = state
   const externalAuditDate = effectiveExternalAuditDate(state.externalAuditPrep, settings)
   const dateWarnings = evaluateDateSequence({ ...settings, externalAuditDate: externalAuditDate || undefined })
@@ -132,11 +142,30 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
   const [revokeConfirm, setRevokeConfirm] = useState(false)
   const [openMonth, setOpenMonth] = useState<{ key: string; rect: DOMRect } | null>(null)
   const closeMonthMenu = useCallback(() => setOpenMonth(null), [])
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`)
+  const highlightIndex = highlightRecordId
+    ? company.planRows.findIndex((row) => row.id === highlightRecordId)
+    : -1
+  const requestedRowId = highlightIndex >= 0 ? highlightRecordId : undefined
+  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`, requestedRowId)
+  useEffect(() => {
+    if (!requestedRowId) return
+    requestAnimationFrame(() => {
+      document.getElementById(`plan-detail-${requestedRowId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    })
+  }, [requestedRowId])
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptOwner = (departmentId: string) =>
     company.departments.find((d) => d.id === departmentId)?.owner ?? ''
+  const deptById = useMemo(
+    () => new Map(company.departments.map((dept) => [dept.id, dept])),
+    [company.departments],
+  )
+  const planRowCountByDept = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of company.planRows) counts.set(row.departmentId, (counts.get(row.departmentId) ?? 0) + 1)
+    return counts
+  }, [company.planRows])
 
   const appointedLeadAuditor = useMemo(() => {
     const personId = resolveLeadAuditorPersonId(
@@ -177,7 +206,12 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
   }
 
   const referenceDate = settings.planWindowEnd || `${settings.auditYear}-12-31`
-  const pagination = useTablePagination(company.planRows.length, 10, undefined, String(settings.auditYear))
+  const pagination = useTablePagination(
+    company.planRows.length,
+    10,
+    requestedRowId ? { key: requestedRowId, index: highlightIndex } : undefined,
+    String(settings.auditYear),
+  )
 
   return (
     <div className="space-y-6 print-area qr-form">
@@ -325,6 +359,8 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
               {company.planRows.map((row, rowIndex) => {
                 const unscheduled = !row.months.some(Boolean)
                 const expanded = expandedId === row.id
+                const rowDept = deptById.get(row.departmentId)
+                const untagged = rowDept ? rowDept.stakeholders.length === 0 : false
                 return (
                 <Fragment key={row.id}>
                 <tr
@@ -362,6 +398,11 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                       {!unscheduled && row.manualOverride && (
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 no-print">
                           已手動調整
+                        </span>
+                      )}
+                      {untagged && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-normal text-amber-900 no-print">
+                          待標註利害關係人
                         </span>
                       )}
                     </div>
@@ -436,7 +477,7 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                 <tr id={`plan-detail-${row.id}`} hidden={!expanded || !pagination.isVisible(rowIndex)} className="no-print bg-page">
                   <td colSpan={17} className="p-3">
                     {expanded && (
-                      <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="min-w-0 break-words"><span className="block text-xs text-muted">對應文件</span>{row.documents || '—'}</div>
                         <div>
                           <span className="mb-1 block text-sm">負責人</span>
@@ -449,6 +490,13 @@ export function AnnualPlan({ store, onNavigate }: { store: AuditStore; onNavigat
                             candidates={departmentMemberCandidates(state.people, WORKSPACE_COMPANY_ID, row.departmentId, referenceDate)}
                           />
                         </div>
+                        {rowDept && (
+                          <DepartmentStakeholderField
+                            dept={rowDept}
+                            rowCount={planRowCountByDept.get(rowDept.id) ?? 0}
+                            onChange={(stakeholders) => updateDepartment(rowDept.id, { stakeholders })}
+                          />
+                        )}
                         <div><span className="block text-xs text-muted">稽核類型</span>{row.auditCategory}</div>
                       </div>
                     )}

@@ -31,7 +31,6 @@ export const TAB_GROUPS: TabGroup[] = [
     label: 'P · 方案規劃',
     icon: TAB_GROUP_ICONS.P,
     tabs: [
-      tab('stakeholders', '利害關係人', 'stakeholders-form'),
       tab('risk-sources', '風險來源登錄', 'risk-sources-form'),
       tab('risk', '方案風險', 'risk-assessment-form'),
       tab('personnel', '人員合格名單', 'personnel-form'),
@@ -105,26 +104,16 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     entry: '開啟系統或點選首頁',
     exit: '辨識各階段缺口並進入方案規劃',
     outputs: 'PDCA 缺口摘要、待辦導向',
-    nextTab: 'stakeholders',
-  },
-  {
-    id: 'stakeholders',
-    label: tabLabel('stakeholders'),
-    purpose: '標定各部門利害關係人與 O／S（低／中／高）。',
-    entry: '稽核程序與紀錄已於系統設定確認',
-    exit: '每個部門至少一個利害關係人標籤',
-    outputs: '部門標籤與 O／S（不改月格）',
-    prevTab: 'system-settings',
     nextTab: 'risk-sources',
   },
   {
     id: 'risk-sources',
     label: tabLabel('risk-sources'),
     purpose: '登錄客訴與重大變更，點選關聯程序，供方案風險自動計數。',
-    entry: '部門利害關係人已標註',
+    entry: '稽核程序與紀錄已於系統設定確認',
     exit: '各類別已勾選「已全部登錄」，且無待確認關聯',
     outputs: 'riskSourceEvents（事件→程序關聯）、程序類型對照',
-    prevTab: 'stakeholders',
+    prevTab: 'dashboard',
     nextTab: 'risk',
   },
   {
@@ -242,6 +231,8 @@ const LEGACY_TAB_ALIASES: Record<string, TabId> = {
   procedure: 'system-settings',
   schedule: 'audit',
   onsite: 'prep',
+  // 利害關係人頁已併入年度計畫明細列（2026-10-09）
+  stakeholders: 'plan',
 }
 
 export function isValidTabId(id: string): id is TabId {
@@ -293,7 +284,7 @@ export function buildAppHash(tab: TabId, options?: NavigateOptions | string): st
   if (tab === 'observations' && resolved?.section) {
     params.set('section', resolved.section)
   }
-  const recordTabs: TabId[] = ['ncr', 'observations', 'suggestions', 'followups']
+  const recordTabs: TabId[] = ['ncr', 'observations', 'suggestions', 'followups', 'plan']
   if (resolved?.recordId && recordTabs.includes(tab)) {
     params.set('record', resolved.recordId)
   }

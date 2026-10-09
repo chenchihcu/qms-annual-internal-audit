@@ -21,7 +21,7 @@
 
 - **月格 `months`**：只存排程（`null`／`擬定`）；滿意等結果一律 `getDisplayMonthStatus`／`deriveMonthStatus` 推導，不可寫回 `months`。
 - **查檢狀態**：非「執行中」不可判定；「已回報」鎖定。年度結案「尚未開始」只計**已排月格**（`isAuditScheduledInPlan`）；未排月格仍可開查檢，不擋結案。
-- **程序風險**：依 QP 存 `procedureRisks`，按「存檔」才寫入；部門 O/S（利害關係人）不取代固有風險。
+- **程序風險**：依 QP 存 `procedureRisks`，按「存檔」才寫入；部門 O/S（年度計畫明細唯讀參考）不取代固有風險。
 - **NCR**：`syncNCRDescriptions` 不覆寫 `description`；結案須矯正措施引用、效果確認引用、確認人、確認日四欄，`updateNCR` 回傳缺項給畫面。畫面與 NCR 匯出顯示 `companyScope` 時用 `ncrCompanyScopeLabel`（`src/lib/certificateScope.ts`）；`both`／空不顯示成雙證書公司名，舊 `jiurun`／`zhenglongxing` 仍顯示。檢查：`src/lib/__tests__/certificateScope.test.ts`。
 - **觀察計數**：儀表板三數不可合併——查檢判定次數、本年度台帳 open、前年度 open（含封存）；實作見 `src/lib/dashboardMetrics.ts`。
 - **任命與年度**：主任稽核員用 `resolveLeadAuditorPersonId`；內稽年度僅頁首切換；外稽日期僅在查檢表的「外稽準備」檢視編輯並同步 `settings.externalAuditDate`，讀取一律用 `effectiveExternalAuditDate`；內部稽核完成為覆蓋推導唯讀。
@@ -39,7 +39,7 @@
 - 畫面字級兩級（14px／12px）、盤點順序與列印／匯出例外見 `.cursor/rules/ui-information-hierarchy.mdc`「畫面字級」與「2026-09-28 畫面字級對齊（harvest）」；螢幕用工作表表頭 12px 以 `src/index.css` 的 `.worksheet-table thead th` 為 SSOT，勿在各頁 `th` 逐格加字級 class。字級優化先全庫盤點再改，未核准不把 body 或工作表升到 16px。
 - 短碼、日期、狀態與人員用固定欄寬；自由文字在欄內換行並可查看全文。工作表先設 `table-fixed` 與 `colgroup`，空欄不塌縮、長文不撐欄；看到撐開再調比例不算完成。長清單沿用共用分頁，保留篩選、編輯、讀回與完整列印。
 - 維持稽核員可完成的完整流程，包含輸入、追蹤、查閱及列印；重要狀態須有文字說明，不可只靠顏色表達。
-- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充、查檢列「未判定」標籤與列底、台帳列上多顆按鈕〔每列只留一個主按鈕，次要動作在編輯卡／明細〕）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk`／`stakeholders` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示。側欄保留「資料儲存於本機 · v15」；外稽準備進度用檢視切換的可見 `外稽準備 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
+- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充、查檢列「未判定」標籤與列底、台帳列上多顆按鈕〔每列只留一個主按鈕，次要動作在編輯卡／明細〕）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示。側欄保留「資料儲存於本機 · v15」；外稽準備進度用檢視切換的可見 `外稽準備 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
 - 主要導覽採左側選單，依稽核作業流程排列；專案基準與驗收條件見 `docs/web-ui-ux-sidebar-spec.md`。功能項目使用語意一致的圖示，側欄寬度依圖示與最長項目名稱的實際內容需求設定，不保留非必要空白。
 - 表單欄位須有明確標籤、可見鍵盤焦點及可理解的錯誤提示；空白、載入、錯誤與成功狀態須有清楚回饋。
 - 將欄位改為固定選單前，先由現行型別、資料來源或受控規範確認完整值域；敘述及外部自訂值保留自由輸入，數值無核准範圍時不造選項，混合內外部值可提供保留自訂值的提示清單。檢查：逐欄核對型別、既有值及實際選項。來源：2026-09-27 手動輸入與選單盤點。
