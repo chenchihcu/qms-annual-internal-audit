@@ -23,6 +23,7 @@ import {
 import { exportPersonnelExcel } from '../lib/formExport'
 import { ACTION_ICONS } from '../lib/uiIcons'
 import { Badge, Button, Card, Input, Select } from './ui/Badge'
+import { CheckboxList } from './ui/CheckboxList'
 import { ConfirmDialog } from './ui/ConfirmDialog'
 import { MoveToTrashDialog, type TrashDeleteTarget } from './ui/MoveToTrashDialog'
 import { EmptyState } from './ui/EmptyState'
@@ -35,23 +36,14 @@ import { AttachmentField } from './ui/AttachmentField'
 
 type AuditorQualificationRole = (typeof AUDITOR_QUALIFICATION_ROLES)[number]
 
-interface AuditorFormState {
-  id?: string
-  qualificationId?: string
-  name: string
-  departmentId: string
-  qualificationRole: AuditorQualificationRole
-  qualificationStatus: ManagedQualificationStatus
-  effectiveFrom: string
-  evidenceAttachments: EvidenceAttachment[]
-  createdAt?: string
-  updatedAt?: string
-}
+/** 統一新增表單的角色；auditor 寫資格，其餘寫任命／年度指派 */
+type PersonFormRole = 'auditor' | 'lead_appointment' | 'management_representative' | 'annual_escort'
 
-const OTHER_ROLE_OPTIONS: { value: PersonnelRole; label: string }[] = [
-  { value: 'internal_lead_auditor', label: '主任稽核員任命' },
-  { value: 'management_representative', label: PERSONNEL_ROLE_LABELS.management_representative },
-  { value: 'annual_escort', label: PERSONNEL_ROLE_LABELS.annual_escort },
+const PERSON_ROLE_OPTIONS: { value: PersonFormRole; label: string }[] = [
+  { value: 'auditor', label: '內部稽核員' },
+  { value: 'lead_appointment', label: '主任稽核員' },
+  { value: 'management_representative', label: '管理代表' },
+  { value: 'annual_escort', label: '陪稽人員' },
 ]
 
 const QUALIFICATION_STATUS_OPTIONS: { value: ManagedQualificationStatus; label: string }[] = [
@@ -59,37 +51,51 @@ const QUALIFICATION_STATUS_OPTIONS: { value: ManagedQualificationStatus; label: 
   { value: 'invalid', label: '失效' },
 ]
 
-const OTHER_PERSONNEL_ROLES = new Set<PersonnelRole>(OTHER_ROLE_OPTIONS.map((item) => item.value))
+const OTHER_PERSONNEL_ROLES = new Set<PersonnelRole>([
+  'internal_lead_auditor',
+  'management_representative',
+  'annual_escort',
+])
 
-interface OtherFormState {
+interface PersonFormState {
   id?: string
   name: string
   type: 'internal' | 'external'
   departmentId: string
   externalOrganization: string
-  role: PersonnelRole
-  effectiveFrom: string
-  effectiveTo: string
+  roles: PersonFormRole[]
+  qualificationId?: string
+  qualificationRole: AuditorQualificationRole
+  qualificationStatus: ManagedQualificationStatus
+  qualificationFrom: string
+  evidenceAttachments: EvidenceAttachment[]
+  createdAt?: string
+  updatedAt?: string
+  leadFrom: string
+  leadTo: string
+  mrFrom: string
+  mrTo: string
 }
 
-const blankAuditorForm = (): AuditorFormState => ({
-  name: '',
-  departmentId: '',
-  qualificationRole: 'internal_auditor',
-  qualificationStatus: 'effective',
-  effectiveFrom: '',
-  evidenceAttachments: [],
-})
-
-const blankOtherForm = (): OtherFormState => ({
+const blankPersonForm = (): PersonFormState => ({
   name: '',
   type: 'internal',
   departmentId: '',
   externalOrganization: '',
-  role: 'internal_lead_auditor',
-  effectiveFrom: '',
-  effectiveTo: '',
+  roles: [],
+  qualificationRole: 'internal_auditor',
+  qualificationStatus: 'effective',
+  qualificationFrom: '',
+  evidenceAttachments: [],
+  leadFrom: '',
+  leadTo: '',
+  mrFrom: '',
+  mrTo: '',
 })
+
+const orderRoles = (roles: PersonFormRole[]): PersonFormRole[] => (
+  PERSON_ROLE_OPTIONS.map((option) => option.value).filter((role) => roles.includes(role))
+)
 
 function personHasOtherRoleEntry(
   person: Person,
@@ -105,24 +111,49 @@ function personHasOtherRoleEntry(
   ))
 }
 
-function activeLeadAppointment(
+function activeAppointment(
   person: Person,
+  role: 'internal_lead_auditor' | 'management_representative',
   onDate: string,
 ): RoleAppointment | undefined {
-  return person.appointments.find((appointment) => (
-    appointment.role === 'internal_lead_auditor'
+  return person.appointments.toReversed().find((appointment) => (
+    appointment.role === role
     && appointment.companyId === WORKSPACE_COMPANY_ID
     && (!appointment.supersededAt || appointment.supersededAt > onDate)
   ))
 }
 
+function activeLeadAppointment(person: Person, onDate: string): RoleAppointment | undefined {
+  return activeAppointment(person, 'internal_lead_auditor', onDate)
+}
+
+function legacyManagedStatus(
+  qualification: QualificationRecord,
+  onDate: string,
+): ManagedQualificationStatus {
+  if (qualification.suspendedAt && qualification.suspendedAt <= onDate) return 'suspended'
+  if (qualification.endedAt && qualification.endedAt <= onDate) return 'invalid'
+  if (qualification.supersededAt && qualification.supersededAt <= onDate) return 'invalid'
+  const state = qualificationState(qualification, onDate)
+  if (state === 'effective') return 'effective'
+  if (state === 'suspended') return 'suspended'
+  return 'invalid'
+}
+
+function auditorFieldsChanged(form: PersonFormState, initial: PersonFormState): boolean {
+  return form.qualificationRole !== initial.qualificationRole
+    || form.qualificationStatus !== initial.qualificationStatus
+    || form.qualificationFrom !== initial.qualificationFrom
+    || JSON.stringify(form.evidenceAttachments) !== JSON.stringify(initial.evidenceAttachments)
+}
+
 export function PersonnelPage({ store }: { store: AuditStore }) {
   const { state, addPerson, updatePerson, deactivatePerson, movePersonToTrash, upsertAnnualPersonnelAssignment } = store
-  const [auditorEditing, setAuditorEditing] = useState<AuditorFormState | null>(null)
-  const [otherEditing, setOtherEditing] = useState<OtherFormState | null>(null)
-  const [auditorDirty, setAuditorDirty] = useState(false)
-  const [otherDirty, setOtherDirty] = useState(false)
-  const [pendingCancel, setPendingCancel] = useState<'auditor' | 'other' | null>(null)
+  const [editing, setEditing] = useState<PersonFormState | null>(null)
+  /** 編輯開啟時的快照：鎖定既有角色、判斷資格／任命是否需要重寫 */
+  const [initialForm, setInitialForm] = useState<PersonFormState | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const [pendingCancel, setPendingCancel] = useState(false)
   const [pendingDeactivate, setPendingDeactivate] = useState<Person | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<TrashDeleteTarget | null>(null)
   const [saveMessage, setSaveMessage] = useState(false)
@@ -139,18 +170,18 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => {
-      if (!auditorDirty && !otherDirty) return
+      if (!dirty) return
       event.preventDefault()
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
-  }, [auditorDirty, otherDirty])
+  }, [dirty])
 
   useEffect(() => {
-    if ((auditorEditing?.id || otherEditing?.id) && editCardRef.current) {
+    if (editing?.id && editCardRef.current) {
       editCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [auditorEditing?.id, otherEditing?.id])
+  }, [editing?.id])
 
   const auditorRows = useMemo(() => {
     return state.people.filter((person) => currentAuditorQualification(person, today))
@@ -179,218 +210,240 @@ export function PersonnelPage({ store }: { store: AuditStore }) {
     [state.people, state.settings.auditYear, state.annualPersonnelAssignments],
   )
 
-  const patchAuditorForm = (patch: Partial<AuditorFormState>) => {
-    setAuditorEditing((current) => current ? { ...current, ...patch } : current)
-    setAuditorDirty(true)
+  const lockedRoles = initialForm?.id ? initialForm.roles : []
+  const isAuditor = editing?.roles.includes('auditor') ?? false
+  const formType = isAuditor ? 'internal' : editing?.type ?? 'internal'
+  const trimmedName = editing?.name.trim() ?? ''
+  const duplicatePerson = trimmedName
+    ? state.people.find((person) => person.id !== editing?.id && person.name.trim() === trimmedName)
+    : undefined
+  const missingFields = editing
+    ? [
+        !trimmedName ? '姓名' : '',
+        editing.roles.length === 0 ? '角色' : '',
+        isAuditor && !editing.departmentId ? '所屬單位' : '',
+      ].filter(Boolean)
+    : []
+  const canSave = missingFields.length === 0 && !duplicatePerson
+
+  const patchForm = (patch: Partial<PersonFormState>) => {
+    setEditing((current) => current ? { ...current, ...patch } : current)
+    setDirty(true)
   }
 
-  const patchOtherForm = (patch: Partial<OtherFormState>) => {
-    setOtherEditing((current) => current ? { ...current, ...patch } : current)
-    setOtherDirty(true)
+  const setRoles = (selected: string[]) => {
+    const roles = orderRoles(selected as PersonFormRole[])
+    patchForm(roles.includes('auditor') ? { roles, type: 'internal' } : { roles })
   }
 
-  const openAuditorEdit = (person: Person) => {
+  const formFromPerson = (person: Person): PersonFormState => {
     const qualification = currentAuditorQualification(person, today)
-    if (!qualification || !isAuditorQualificationRole(qualification.role)) return
-    setOtherEditing(null)
-    setOtherDirty(false)
-    setAuditorEditing({
-      id: person.id,
-      qualificationId: qualification.id,
-      name: person.name,
-      departmentId: person.affiliations[0]?.departmentId ?? '',
-      qualificationRole: qualification.role,
-      qualificationStatus: qualification.qualificationStatus ?? legacyManagedStatus(qualification, today),
-      effectiveFrom: qualification.effectiveFrom ?? '',
-      evidenceAttachments: qualification.evidenceAttachments ?? [],
-      createdAt: qualification.createdAt,
-      updatedAt: qualification.updatedAt,
-    })
-    setAuditorDirty(false)
-  }
-
-  const openOtherEdit = (person: Person) => {
-    const roles = personRoles(person, state.settings.auditYear, state.annualPersonnelAssignments)
-    const role = roles.find((item) => OTHER_PERSONNEL_ROLES.has(item)) ?? 'internal_lead_auditor'
-    const appointment = activeLeadAppointment(person, today)
-      ?? person.appointments.find((item) => (
-        (item.role === role || (role === 'management_representative' && item.role === 'management_representative'))
-        && item.companyId === WORKSPACE_COMPANY_ID
-      ))
-    setOtherEditing({
+    const auditorQual = qualification && isAuditorQualificationRole(qualification.role) ? qualification : undefined
+    const annualRoles = state.annualPersonnelAssignments
+      .filter((item) => item.personId === person.id && item.year === state.settings.auditYear)
+      .map((item) => item.role)
+    const lead = activeLeadAppointment(person, today)
+    const mr = activeAppointment(person, 'management_representative', today)
+    const roles: PersonFormRole[] = []
+    if (auditorQual) roles.push('auditor')
+    if (lead || annualRoles.includes('internal_lead_auditor')) roles.push('lead_appointment')
+    if (mr || annualRoles.includes('management_representative')) roles.push('management_representative')
+    if (annualRoles.includes('annual_escort')) roles.push('annual_escort')
+    return {
+      ...blankPersonForm(),
       id: person.id,
       name: person.name,
       type: person.type,
       departmentId: person.affiliations[0]?.departmentId ?? '',
       externalOrganization: person.affiliations[0]?.externalOrganization ?? '',
-      role,
-      effectiveFrom: appointment?.effectiveFrom ?? '',
-      effectiveTo: appointment?.effectiveTo ?? '',
-    })
-    setOtherDirty(false)
+      roles,
+      ...(auditorQual && isAuditorQualificationRole(auditorQual.role)
+        ? {
+            qualificationId: auditorQual.id,
+            qualificationRole: auditorQual.role,
+            qualificationStatus: auditorQual.qualificationStatus ?? legacyManagedStatus(auditorQual, today),
+            qualificationFrom: auditorQual.effectiveFrom ?? '',
+            evidenceAttachments: auditorQual.evidenceAttachments ?? [],
+            createdAt: auditorQual.createdAt,
+            updatedAt: auditorQual.updatedAt,
+          }
+        : {}),
+      leadFrom: lead?.effectiveFrom ?? '',
+      leadTo: lead?.effectiveTo ?? '',
+      mrFrom: mr?.effectiveFrom ?? '',
+      mrTo: mr?.effectiveTo ?? '',
+    }
   }
 
-function legacyManagedStatus(
-  qualification: QualificationRecord,
-  onDate: string,
-): ManagedQualificationStatus {
-  if (qualification.suspendedAt && qualification.suspendedAt <= onDate) return 'suspended'
-  if (qualification.endedAt && qualification.endedAt <= onDate) return 'invalid'
-  if (qualification.supersededAt && qualification.supersededAt <= onDate) return 'invalid'
-  const state = qualificationState(qualification, onDate)
-  if (state === 'effective') return 'effective'
-  if (state === 'suspended') return 'suspended'
-  return 'invalid'
-}
+  const openCreate = () => {
+    setEditing(blankPersonForm())
+    setInitialForm(null)
+    setDirty(false)
+    setSaveMessage(false)
+  }
 
-  const cancelAuditor = () => {
-    if (auditorDirty) {
-      setPendingCancel('auditor')
+  const openEdit = (person: Person) => {
+    const form = formFromPerson(person)
+    setEditing(form)
+    setInitialForm(form)
+    setDirty(false)
+  }
+
+  /** 新增時遇同名人員：改為編輯該人，並保留已勾選的新角色與其欄位 */
+  const loadExistingPerson = (person: Person) => {
+    if (!editing) return
+    const base = formFromPerson(person)
+    const roles = orderRoles([...new Set([...base.roles, ...editing.roles])])
+    const merged: PersonFormState = {
+      ...base,
+      roles,
+      type: roles.includes('auditor') ? 'internal' : base.type,
+      departmentId: base.departmentId || editing.departmentId,
+      ...(!base.roles.includes('auditor') && editing.roles.includes('auditor')
+        ? {
+            qualificationRole: editing.qualificationRole,
+            qualificationStatus: editing.qualificationStatus,
+            qualificationFrom: editing.qualificationFrom,
+            evidenceAttachments: editing.evidenceAttachments,
+          }
+        : {}),
+      ...(!base.roles.includes('lead_appointment') ? { leadFrom: editing.leadFrom, leadTo: editing.leadTo } : {}),
+      ...(!base.roles.includes('management_representative') ? { mrFrom: editing.mrFrom, mrTo: editing.mrTo } : {}),
+    }
+    setEditing(merged)
+    setInitialForm(base)
+    setDirty(true)
+  }
+
+  const closeForm = () => {
+    setEditing(null)
+    setInitialForm(null)
+    setDirty(false)
+  }
+
+  const cancelEdit = () => {
+    if (dirty) {
+      setPendingCancel(true)
       return
     }
-    setAuditorEditing(null)
-    setAuditorDirty(false)
+    closeForm()
   }
 
-  const cancelOther = () => {
-    if (otherDirty) {
-      setPendingCancel('other')
-      return
-    }
-    setOtherEditing(null)
-    setOtherDirty(false)
-  }
-
-  const saveAuditor = () => {
-    if (!auditorEditing?.name.trim() || !auditorEditing.departmentId) return
+  const savePerson = () => {
+    if (!editing || !canSave) return
+    const form = editing
     const now = new Date().toISOString()
-    const existing = state.people.find((person) => person.id === auditorEditing.id)
-    const affiliation = {
-      id: existing?.affiliations[0]?.id ?? `aff-${crypto.randomUUID()}`,
-      companyId: WORKSPACE_COMPANY_ID,
-      departmentId: auditorEditing.departmentId,
-      effectiveFrom: existing?.affiliations[0]?.effectiveFrom,
-      effectiveTo: existing?.affiliations[0]?.effectiveTo,
-    }
-    const existingQual = existing?.qualifications.find((item) => item.id === auditorEditing.qualificationId)
-      ?? existing?.qualifications.toReversed().find((item) => (
-        isAuditorQualificationRole(item.role) && (!item.supersededAt || item.supersededAt > today)
-      ))
-    const qualification: QualificationRecord = {
-      id: existingQual?.id ?? `qual-${crypto.randomUUID()}`,
-      role: auditorEditing.qualificationRole,
-      companyIds: [WORKSPACE_COMPANY_ID],
-      standardVersions: existingQual?.standardVersions ?? [],
-      procedureScopes: existingQual?.procedureScopes ?? [],
-      departmentScopes: existingQual?.departmentScopes ?? [],
-      documentTitle: existingQual?.documentTitle ?? '',
-      documentNumber: existingQual?.documentNumber ?? '',
-      documentLocation: existingQual?.documentLocation ?? '',
-      assessedBy: existingQual?.assessedBy ?? '',
-      assessmentDate: existingQual?.assessmentDate ?? '',
-      effectiveFrom: auditorEditing.effectiveFrom,
-      validityMode: existingQual?.validityMode ?? 'no_expiry',
-      effectiveTo: existingQual?.effectiveTo,
-      suspendedAt: auditorEditing.qualificationStatus === 'suspended' ? (existingQual?.suspendedAt ?? today) : undefined,
-      endedAt: auditorEditing.qualificationStatus === 'invalid' ? (existingQual?.endedAt ?? today) : undefined,
-      supersededAt: existingQual?.supersededAt,
-      revisionOfId: existingQual?.revisionOfId,
-      revisedAt: existingQual?.revisedAt,
-      statusReason: existingQual?.statusReason,
-      qualificationStatus: auditorEditing.qualificationStatus,
-      applicableStandard: 'AS9100',
-      evidenceAttachments: [...auditorEditing.evidenceAttachments],
-      createdAt: existingQual?.createdAt ?? now,
-      updatedAt: now,
-    }
-    const otherQualifications = (existing?.qualifications ?? []).filter((item) => item.id !== qualification.id)
-    const person: Omit<Person, 'id'> = {
-      name: auditorEditing.name.trim(),
-      employeeNumber: existing?.employeeNumber ?? '',
-      type: 'internal',
-      affiliations: [affiliation],
-      qualifications: [...otherQualifications, qualification],
-      appointments: existing?.appointments ?? [],
-      active: existing?.active ?? true,
-      notes: existing?.notes ?? '',
-    }
-    if (existing) updatePerson(existing.id, person)
-    else addPerson(person)
-    setAuditorEditing(null)
-    setAuditorDirty(false)
-    setSaveMessage(true)
-  }
-
-  const saveOther = () => {
-    if (!otherEditing?.name.trim()) return
-    const existing = state.people.find((person) => person.id === otherEditing.id)
     const companyId = WORKSPACE_COMPANY_ID
+    const existing = state.people.find((person) => person.id === form.id)
+    const hasRole = (role: PersonFormRole) => form.roles.includes(role)
+    const hadRole = (role: PersonFormRole) => initialForm?.roles.includes(role) ?? false
+    const previousAffiliation = existing?.affiliations[0]
     const affiliation = {
-      id: existing?.affiliations[0]?.id ?? `aff-${crypto.randomUUID()}`,
+      id: previousAffiliation?.id ?? `aff-${crypto.randomUUID()}`,
       companyId,
-      departmentId: otherEditing.type === 'internal' || otherEditing.role === 'annual_escort'
-        ? otherEditing.departmentId || undefined
-        : undefined,
-      externalOrganization: otherEditing.type === 'external' ? otherEditing.externalOrganization || undefined : undefined,
+      departmentId: formType === 'internal' || hasRole('annual_escort') ? form.departmentId || undefined : undefined,
+      externalOrganization: formType === 'external' ? form.externalOrganization || undefined : undefined,
+      effectiveFrom: previousAffiliation?.effectiveFrom,
+      effectiveTo: previousAffiliation?.effectiveTo,
     }
-    const revisionDate = otherEditing.effectiveFrom || today
-    const existingAppointment = existing?.appointments.toReversed().find((item) => {
-      if (otherEditing.role === 'internal_lead_auditor') {
-        return item.role === 'internal_lead_auditor' && item.companyId === companyId && (!item.supersededAt || item.supersededAt > today)
+
+    let qualifications = existing?.qualifications ?? []
+    if (hasRole('auditor') && (!hadRole('auditor') || !initialForm || auditorFieldsChanged(form, initialForm))) {
+      const existingQual = existing?.qualifications.find((item) => item.id === form.qualificationId)
+        ?? existing?.qualifications.toReversed().find((item) => (
+          isAuditorQualificationRole(item.role) && (!item.supersededAt || item.supersededAt > today)
+        ))
+      const qualification: QualificationRecord = {
+        id: existingQual?.id ?? `qual-${crypto.randomUUID()}`,
+        role: form.qualificationRole,
+        companyIds: [companyId],
+        standardVersions: existingQual?.standardVersions ?? [],
+        procedureScopes: existingQual?.procedureScopes ?? [],
+        departmentScopes: existingQual?.departmentScopes ?? [],
+        documentTitle: existingQual?.documentTitle ?? '',
+        documentNumber: existingQual?.documentNumber ?? '',
+        documentLocation: existingQual?.documentLocation ?? '',
+        assessedBy: existingQual?.assessedBy ?? '',
+        assessmentDate: existingQual?.assessmentDate ?? '',
+        effectiveFrom: form.qualificationFrom,
+        validityMode: existingQual?.validityMode ?? 'no_expiry',
+        effectiveTo: existingQual?.effectiveTo,
+        suspendedAt: form.qualificationStatus === 'suspended' ? (existingQual?.suspendedAt ?? today) : undefined,
+        endedAt: form.qualificationStatus === 'invalid' ? (existingQual?.endedAt ?? today) : undefined,
+        supersededAt: existingQual?.supersededAt,
+        revisionOfId: existingQual?.revisionOfId,
+        revisedAt: existingQual?.revisedAt,
+        statusReason: existingQual?.statusReason,
+        qualificationStatus: form.qualificationStatus,
+        applicableStandard: 'AS9100',
+        evidenceAttachments: [...form.evidenceAttachments],
+        createdAt: existingQual?.createdAt ?? now,
+        updatedAt: now,
       }
-      if (otherEditing.role === 'management_representative') {
-        return item.role === 'management_representative' && item.companyId === companyId && (!item.supersededAt || item.supersededAt > today)
-      }
-      return false
-    })
+      qualifications = [...qualifications.filter((item) => item.id !== qualification.id), qualification]
+    }
+
     let appointments = [...(existing?.appointments ?? [])]
-    const needsAppointment = otherEditing.role === 'internal_lead_auditor'
-      || otherEditing.role === 'management_representative'
-    if (needsAppointment) {
-      const effectiveFrom = otherEditing.effectiveFrom || today
-      if (existingAppointment) {
-        appointments = appointments.map((item) => item.id === existingAppointment.id
-          ? { ...item, supersededAt: revisionDate }
-          : item)
+    const reviseAppointment = (
+      role: 'internal_lead_auditor' | 'management_representative',
+      from: string,
+      to: string,
+      initialFrom: string | undefined,
+      initialTo: string | undefined,
+    ) => {
+      const current = appointments.toReversed().find((item) => (
+        item.role === role && item.companyId === companyId && (!item.supersededAt || item.supersededAt > today)
+      ))
+      // 既有任命且日期未改：不產生空修訂
+      if (current && from === initialFrom && to === initialTo) return
+      const effectiveFrom = from || today
+      if (current) {
+        appointments = appointments.map((item) => item.id === current.id ? { ...item, supersededAt: effectiveFrom } : item)
       }
-      if (otherEditing.role === 'internal_lead_auditor' || otherEditing.role === 'management_representative') {
-        appointments.push({
-          id: `appointment-${crypto.randomUUID()}`,
-          role: otherEditing.role,
-          companyId,
-          documentReference: existingAppointment?.documentReference ?? '',
-          scope: existingAppointment?.scope ?? '',
-          effectiveFrom,
-          effectiveTo: otherEditing.effectiveTo || undefined,
-          revisionOfId: existingAppointment?.id,
-          revisedAt: new Date().toISOString(),
-        })
-      }
+      appointments.push({
+        id: `appointment-${crypto.randomUUID()}`,
+        role,
+        companyId,
+        documentReference: current?.documentReference ?? '',
+        scope: current?.scope ?? '',
+        effectiveFrom,
+        effectiveTo: to || undefined,
+        revisionOfId: current?.id,
+        revisedAt: now,
+      })
     }
+    if (hasRole('lead_appointment')) {
+      reviseAppointment('internal_lead_auditor', form.leadFrom, form.leadTo, initialForm?.leadFrom, initialForm?.leadTo)
+    }
+    if (hasRole('management_representative')) {
+      reviseAppointment('management_representative', form.mrFrom, form.mrTo, initialForm?.mrFrom, initialForm?.mrTo)
+    }
+
     const person: Omit<Person, 'id'> = {
-      name: otherEditing.name.trim(),
+      name: trimmedName,
       employeeNumber: existing?.employeeNumber ?? '',
-      type: otherEditing.type,
+      type: formType,
       affiliations: [affiliation],
-      qualifications: existing?.qualifications ?? [],
+      qualifications,
       appointments,
       active: existing?.active ?? true,
       notes: existing?.notes ?? '',
     }
     const savedId = existing ? (updatePerson(existing.id, person), existing.id) : addPerson(person)
-    if (otherEditing.role === 'internal_lead_auditor' || otherEditing.role === 'annual_escort' || otherEditing.role === 'management_representative') {
-      upsertAnnualPersonnelAssignment({
-        year: state.settings.auditYear,
-        companyId,
-        personId: savedId,
-        role: otherEditing.role === 'annual_escort'
-          ? 'annual_escort'
-          : otherEditing.role as AnnualPersonnelAssignment['role'],
-        departmentId: otherEditing.departmentId || undefined,
-      })
-    }
-    setOtherEditing(null)
-    setOtherDirty(false)
+
+    const annualRoles: AnnualPersonnelAssignment['role'][] = [
+      ...(hasRole('lead_appointment') ? ['internal_lead_auditor' as const] : []),
+      ...(hasRole('management_representative') ? ['management_representative' as const] : []),
+      ...(hasRole('annual_escort') ? ['annual_escort' as const] : []),
+    ]
+    annualRoles.forEach((role) => upsertAnnualPersonnelAssignment({
+      year: state.settings.auditYear,
+      companyId,
+      personId: savedId,
+      role,
+      departmentId: affiliation.departmentId,
+    }))
+    closeForm()
     setSaveMessage(true)
   }
 
@@ -421,82 +474,136 @@ function legacyManagedStatus(
       <div>
         <div className="mb-4 flex flex-wrap items-center justify-end gap-3 no-print">
           <WorkflowGuide tab="personnel" state={state} className="mr-auto min-w-[min(100%,12rem)] flex-1" />
-          <Button icon={ACTION_ICONS.add} onClick={() => {
-            setAuditorEditing(blankAuditorForm())
-            setOtherEditing(null)
-            setAuditorDirty(false)
-            setOtherDirty(false)
-            setSaveMessage(false)
-          }}
-          >
-            新增稽核員
-          </Button>
+          <Button icon={ACTION_ICONS.add} onClick={openCreate}>新增人員</Button>
           <Button variant="secondary" icon={ACTION_ICONS.exportExcel} onClick={exportExcel}>匯出名單</Button>
         </div>
-        {saveMessage && !auditorEditing && !otherEditing && (
+        {saveMessage && !editing && (
           <p className="mb-3 text-sm text-green-700" role="status">已儲存</p>
         )}
       </div>
 
-      {auditorEditing && (
+      {editing && (
         <div ref={editCardRef}>
           <Card className="border-blue-200">
-            <h3 className="mb-4 text-sm font-semibold">{auditorEditing.id ? '編輯內部稽核人員資格' : '新增內部稽核人員資格'}</h3>
+            <h3 className="mb-4 text-sm font-semibold">{editing.id ? '編輯人員' : '新增人員'}</h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="姓名 *" value={auditorEditing.name} onChange={(v) => patchAuditorForm({ name: v })} />
-              <Select
-                label="所屬單位 *"
-                value={auditorEditing.departmentId}
-                onChange={(v) => patchAuditorForm({ departmentId: v })}
-                options={[{ value: '', label: '請選擇' }, ...departmentOptions]}
-              />
-              <Select
-                label="稽核資格 *"
-                value={auditorEditing.qualificationRole}
-                onChange={(v) => patchAuditorForm({ qualificationRole: v as AuditorQualificationRole })}
-                options={AUDITOR_QUALIFICATION_ROLES.map((role) => ({
-                  value: role,
-                  label: AUDITOR_QUALIFICATION_FORM_LABELS[role],
-                }))}
-              />
-              <Select
-                label="資格狀態 *"
-                value={auditorEditing.qualificationStatus}
-                onChange={(v) => patchAuditorForm({ qualificationStatus: v as ManagedQualificationStatus })}
-                options={
-                  auditorEditing.qualificationStatus === 'suspended'
-                    ? [...QUALIFICATION_STATUS_OPTIONS, { value: 'suspended', label: '暫停' }]
-                    : QUALIFICATION_STATUS_OPTIONS
-                }
-              />
-              <Input
-                label="資格取得日"
-                type="date"
-                value={auditorEditing.effectiveFrom}
-                onChange={(v) => patchAuditorForm({ effectiveFrom: v })}
-              />
-              <div className="sm:col-span-2">
-                <AttachmentField
-                  label="資格證據"
-                  attachments={auditorEditing.evidenceAttachments}
-                  onChange={(evidenceAttachments) => patchAuditorForm({ evidenceAttachments })}
+              <div>
+                <Input
+                  label="姓名 *"
+                  value={editing.name}
+                  onChange={(v) => patchForm({ name: v })}
+                  error={duplicatePerson ? '已有同名人員，請改為編輯該人員以加入角色。' : undefined}
                 />
+                {duplicatePerson && !editing.id && (
+                  <Button variant="secondary" className="mt-2" onClick={() => loadExistingPerson(duplicatePerson)}>
+                    載入既有人員
+                  </Button>
+                )}
               </div>
+              <CheckboxList
+                label="角色 *"
+                options={PERSON_ROLE_OPTIONS}
+                selected={editing.roles}
+                onChange={setRoles}
+                disabledValues={lockedRoles}
+                inline
+                footer={lockedRoles.length > 0 && (
+                  <p className="mt-1 text-xs text-muted">既有角色不在此移除；資格請改資格狀態，人員請用停用。</p>
+                )}
+              />
+              <Select
+                label="人員類型"
+                value={formType}
+                onChange={(v) => patchForm({ type: v as PersonFormState['type'] })}
+                options={[{ value: 'internal', label: '內部人員' }, { value: 'external', label: '外部人員' }]}
+                disabled={isAuditor}
+                hint={isAuditor ? '內部稽核員須為內部人員。' : undefined}
+              />
+              {formType === 'external' && (
+                <Input label="外部機構" value={editing.externalOrganization} onChange={(v) => patchForm({ externalOrganization: v })} />
+              )}
+              {(formType === 'internal' || editing.roles.includes('annual_escort')) && (
+                <Select
+                  label={isAuditor ? '所屬單位 *' : '所屬單位'}
+                  value={editing.departmentId}
+                  onChange={(v) => patchForm({ departmentId: v })}
+                  options={[{ value: '', label: isAuditor ? '請選擇' : '待確認' }, ...departmentOptions]}
+                />
+              )}
             </div>
-            {(auditorEditing.createdAt || auditorEditing.updatedAt) && (
-              <p className="mt-3 text-xs text-muted">
-                {auditorEditing.createdAt ? `建立：${auditorEditing.createdAt.slice(0, 19).replace('T', ' ')}` : ''}
-                {auditorEditing.updatedAt ? ` · 最後修改：${auditorEditing.updatedAt.slice(0, 19).replace('T', ' ')}` : ''}
-              </p>
+
+            {isAuditor && (
+              <section className="mt-5 border-t border-line pt-4" aria-label="內部稽核員資格">
+                <h4 className="mb-3 text-sm font-semibold">內部稽核員資格</h4>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Select
+                    label="稽核資格 *"
+                    value={editing.qualificationRole}
+                    onChange={(v) => patchForm({ qualificationRole: v as AuditorQualificationRole })}
+                    options={AUDITOR_QUALIFICATION_ROLES.map((role) => ({
+                      value: role,
+                      label: AUDITOR_QUALIFICATION_FORM_LABELS[role],
+                    }))}
+                  />
+                  <Select
+                    label="資格狀態 *"
+                    value={editing.qualificationStatus}
+                    onChange={(v) => patchForm({ qualificationStatus: v as ManagedQualificationStatus })}
+                    options={
+                      editing.qualificationStatus === 'suspended'
+                        ? [...QUALIFICATION_STATUS_OPTIONS, { value: 'suspended', label: '暫停' }]
+                        : QUALIFICATION_STATUS_OPTIONS
+                    }
+                  />
+                  <Input
+                    label="資格取得日"
+                    type="date"
+                    value={editing.qualificationFrom}
+                    onChange={(v) => patchForm({ qualificationFrom: v })}
+                  />
+                  <div className="sm:col-span-2">
+                    <AttachmentField
+                      label="資格證據"
+                      attachments={editing.evidenceAttachments}
+                      onChange={(evidenceAttachments) => patchForm({ evidenceAttachments })}
+                    />
+                  </div>
+                </div>
+                {(editing.createdAt || editing.updatedAt) && (
+                  <p className="mt-3 text-xs text-muted">
+                    {editing.createdAt ? `建立：${editing.createdAt.slice(0, 19).replace('T', ' ')}` : ''}
+                    {editing.updatedAt ? ` · 最後修改：${editing.updatedAt.slice(0, 19).replace('T', ' ')}` : ''}
+                  </p>
+                )}
+              </section>
             )}
-            <div className="mt-5 flex gap-2">
-              <Button variant="secondary" onClick={cancelAuditor}>取消</Button>
-              <Button
-                onClick={saveAuditor}
-                disabled={!auditorEditing.name.trim() || !auditorEditing.departmentId}
-              >
-                儲存
-              </Button>
+
+            {editing.roles.includes('lead_appointment') && (
+              <section className="mt-5 border-t border-line pt-4" aria-label="主任稽核員任命">
+                <h4 className="mb-3 text-sm font-semibold">主任稽核員任命</h4>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="主任稽核員生效日" type="date" value={editing.leadFrom} onChange={(v) => patchForm({ leadFrom: v })} />
+                  <Input label="主任稽核員到期日" type="date" value={editing.leadTo} onChange={(v) => patchForm({ leadTo: v })} />
+                </div>
+              </section>
+            )}
+
+            {editing.roles.includes('management_representative') && (
+              <section className="mt-5 border-t border-line pt-4" aria-label="管理代表任命">
+                <h4 className="mb-3 text-sm font-semibold">管理代表任命</h4>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="管理代表生效日" type="date" value={editing.mrFrom} onChange={(v) => patchForm({ mrFrom: v })} />
+                  <Input label="管理代表到期日" type="date" value={editing.mrTo} onChange={(v) => patchForm({ mrTo: v })} />
+                </div>
+              </section>
+            )}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <Button variant="secondary" onClick={cancelEdit}>取消</Button>
+              <Button onClick={savePerson} disabled={!canSave}>儲存</Button>
+              {missingFields.length > 0 && (
+                <p className="text-xs text-muted" role="status">尚需填寫：{missingFields.join('、')}</p>
+              )}
             </div>
           </Card>
         </div>
@@ -565,7 +672,7 @@ function legacyManagedStatus(
                         <td><Badge label={statusLabel} /></td>
                         <td className="no-print">
                           <div className="flex flex-wrap gap-1">
-                            <Button variant="ghost" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openAuditorEdit(person)}>編輯</Button>
+                            <Button variant="ghost" icon={ACTION_ICONS.edit} className="shrink-0 whitespace-nowrap" onClick={() => openEdit(person)}>編輯</Button>
                             {person.active && (
                               <Button variant="ghost" icon="minusCircle" className="shrink-0 whitespace-nowrap" onClick={() => setPendingDeactivate(person)}>停用</Button>
                             )}
@@ -590,69 +697,10 @@ function legacyManagedStatus(
         )}
       </div>
 
-      {otherEditing && (
-        <div ref={editCardRef}>
-          <Card className="border-slate-200">
-            <h3 className="mb-4 text-sm font-semibold">{otherEditing.id ? '編輯其他角色與任命' : '新增其他角色與任命'}</h3>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input label="姓名 *" value={otherEditing.name} onChange={(v) => patchOtherForm({ name: v })} />
-              <Select
-                label="人員類型"
-                value={otherEditing.type}
-                onChange={(v) => patchOtherForm({ type: v as OtherFormState['type'] })}
-                options={[{ value: 'internal', label: '內部人員' }, { value: 'external', label: '外部人員' }]}
-              />
-              {otherEditing.type === 'external' && (
-                <Input label="外部機構" value={otherEditing.externalOrganization} onChange={(v) => patchOtherForm({ externalOrganization: v })} />
-              )}
-              {(otherEditing.type === 'internal' || otherEditing.role === 'annual_escort') && (
-                <Select
-                  label="所屬單位"
-                  value={otherEditing.departmentId}
-                  onChange={(v) => patchOtherForm({ departmentId: v })}
-                  options={[{ value: '', label: '待確認' }, ...departmentOptions]}
-                />
-              )}
-              <Select
-                label="角色／任命"
-                value={otherEditing.role}
-                onChange={(v) => patchOtherForm({ role: v as PersonnelRole })}
-                options={OTHER_ROLE_OPTIONS}
-              />
-              {(otherEditing.role === 'internal_lead_auditor' || otherEditing.role === 'management_representative') && (
-                <>
-                  <Input label="生效日期" type="date" value={otherEditing.effectiveFrom} onChange={(v) => patchOtherForm({ effectiveFrom: v })} />
-                  <Input label="到期日" type="date" value={otherEditing.effectiveTo} onChange={(v) => patchOtherForm({ effectiveTo: v })} />
-                </>
-              )}
-            </div>
-            <div className="mt-5 flex gap-2">
-              <Button variant="secondary" onClick={cancelOther}>取消</Button>
-              <Button onClick={saveOther} disabled={!otherEditing.name.trim()}>儲存</Button>
-            </div>
-          </Card>
-        </div>
-      )}
-
       <div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">其他角色與任命</h3>
-          <Button
-            variant="secondary"
-            icon={ACTION_ICONS.add}
-            className="no-print"
-            onClick={() => {
-              setOtherEditing(blankOtherForm())
-              setAuditorEditing(null)
-              setAuditorDirty(false)
-              setOtherDirty(false)
-            }}
-          >
-            新增
-          </Button>
-        </div>
+        <h3 className="mb-3 text-sm font-semibold">其他角色與任命</h3>
         {otherRows.length === 0 ? (
-          <EmptyState message="尚無管理代表、陪稽或主任稽核員任命。" />
+          <EmptyState message="尚無管理代表、陪稽或主任稽核員任命；請由「新增人員」建立。" />
         ) : (
           <ScrollRegion ariaLabel="其他角色與任命清單">
             <table className="worksheet-table min-w-[32rem]">
@@ -669,7 +717,7 @@ function legacyManagedStatus(
                     <td className="font-medium">{person.name}</td>
                     <td>{otherRoleSummary(person)}</td>
                     <td className="no-print">
-                      <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => openOtherEdit(person)}>編輯</Button>
+                      <Button variant="ghost" icon={ACTION_ICONS.edit} onClick={() => openEdit(person)}>編輯</Button>
                     </td>
                   </tr>
                 ))}
@@ -687,16 +735,10 @@ function legacyManagedStatus(
           confirmLabel="放棄變更"
           variant="danger"
           onConfirm={() => {
-            if (pendingCancel === 'auditor') {
-              setAuditorEditing(null)
-              setAuditorDirty(false)
-            } else {
-              setOtherEditing(null)
-              setOtherDirty(false)
-            }
-            setPendingCancel(null)
+            closeForm()
+            setPendingCancel(false)
           }}
-          onCancel={() => setPendingCancel(null)}
+          onCancel={() => setPendingCancel(false)}
         />
       )}
       {pendingDeactivate && (

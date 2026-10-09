@@ -17,6 +17,10 @@ interface CheckboxListProps {
   footer?: ReactNode
   className?: string
   disabled?: boolean
+  /** 個別鎖定的選項（仍顯示勾選狀態） */
+  disabledValues?: string[]
+  /** 橫向換行排列（設定列內緊湊顯示） */
+  inline?: boolean
 }
 
 export function CheckboxList({
@@ -31,6 +35,8 @@ export function CheckboxList({
   footer,
   className = '',
   disabled = false,
+  disabledValues,
+  inline = false,
 }: CheckboxListProps) {
   const toggle = (value: string, checked: boolean) => {
     if (checked) onChange([...selected, value])
@@ -41,7 +47,11 @@ export function CheckboxList({
     <div className={className}>
       {label && <p className="mb-2 text-sm font-medium text-slate-700">{label}</p>}
       <div
-        className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2"
+        className={
+          inline
+            ? 'flex max-h-24 min-h-11 flex-wrap items-center gap-x-4 gap-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-white px-3 py-1'
+            : 'max-h-36 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2'
+        }
         aria-label={ariaLabel ?? label}
       >
         {allLabel && onToggleAll && (
@@ -58,7 +68,7 @@ export function CheckboxList({
           <label key={option.value} className="flex min-h-8 items-center gap-2 text-sm">
             <input
               type="checkbox"
-              disabled={disabled}
+              disabled={disabled || disabledValues?.includes(option.value)}
               checked={selected.includes(option.value)}
               onChange={(event) => toggle(option.value, event.target.checked)}
             />

@@ -175,8 +175,10 @@ for (const width of widths) {
       workflowStage = '人員新增與儲存'
       await navigateTab('人員合格名單')
       const personName = `Smoke驗收${Date.now()}`
-      await page.getByRole('button', { name: '新增稽核員', exact: true }).click()
+      if (await page.getByRole('button', { name: '新增稽核員', exact: true }).count()) throw new Error('人員頁仍有舊的「新增稽核員」入口')
+      await page.getByRole('button', { name: '新增人員', exact: true }).click()
       await page.getByLabel('姓名 *', { exact: true }).fill(personName)
+      await page.getByRole('checkbox', { name: '內部稽核員', exact: true }).check()
       const departmentSelect = page.getByLabel('所屬單位 *', { exact: true })
       const departmentValue = await departmentSelect.locator('option').nth(1).getAttribute('value')
       if (!departmentValue) throw new Error('人員表單缺少可選部門')
