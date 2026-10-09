@@ -51,6 +51,25 @@ describe('Annual plan QP row', () => {
     expect(within(group).getByRole('status').textContent).toMatch(/^已選 \d+ 項 · 套用於本部門 \d+ 列$/)
   }, 15000)
 
+  it('reopens the same row when the stakeholder gap link is clicked again', async () => {
+    window.location.hash = '#tab=plan&record=plan-QP-03-dept-qa'
+    render(<App />)
+    await screen.findByRole('region', { name: '年度稽核計畫月格表' }, { timeout: 10000 })
+    const detail = () => document.getElementById('plan-detail-plan-QP-03-dept-qa')!
+    const group = within(detail()).getByRole('group', { name: '利害關係人（部門）' })
+    for (const button of within(group).getAllByRole('button')) {
+      if (button.getAttribute('aria-pressed') === 'true') fireEvent.click(button)
+    }
+    const gapLine = (await screen.findByText(/部門利害關係人已標註/)).closest('li')!
+    const gapLink = within(gapLine).getByRole('button', { name: '至年度稽核計畫' })
+
+    fireEvent.click(gapLink)
+    fireEvent.click(screen.getByRole('button', { name: 'QP-03 品保部 明細' }))
+    expect(detail().hidden).toBe(true)
+    fireEvent.click(gapLink)
+    expect(detail().hidden).toBe(false)
+  }, 15000)
+
   it('opens the row requested by a #tab=plan&record deep link, even on a later page', async () => {
     const rows = createDemoState().workspace.planRows
     const target = rows[rows.length - 1]

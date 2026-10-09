@@ -107,6 +107,17 @@ describe('workflowStatus', () => {
     expect(overviewGap.options).toEqual({ recordId: firstRow.id })
   })
 
+  it('does not block on departments without plan rows (no editor exists for them)', () => {
+    const state = createDemoState()
+    const unplanned = state.workspace.departments.find((dept) => !state.workspace.planRows.some((row) => row.departmentId === dept.id))
+    const target = unplanned ?? state.workspace.departments[0]
+    if (!unplanned) state.workspace.planRows = state.workspace.planRows.filter((row) => row.departmentId !== target.id)
+    target.stakeholders = []
+    expect(stakeholdersReady(state, 'jiurun')).toBe(true)
+    expect(getTabWorkflowStatus(state, 'plan').gaps.some((gap) => /利害關係人/.test(gap.message))).toBe(false)
+    expect(getPdcaOverview(state, 'jiurun').plan.gaps.some((gap) => /利害關係人/.test(gap.message))).toBe(false)
+  })
+
   it('blocks complete report when pending checklist items remain', () => {
     const state = createDemoState()
     const audit = state.workspace.audits[0]

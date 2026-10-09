@@ -65,10 +65,19 @@ export function standardReady(_state?: AppState, _companyId?: CompanyId): boolea
   return true
 }
 
+/**
+ * 需標註的部門＝在年度計畫中有列的部門：標籤只在計畫列明細編輯，
+ * 沒有計畫列的部門（例：匯入或遷移資料）不阻擋，以免形成無法完成的缺口。
+ */
+function departmentsNeedingTags(co: CompanyData) {
+  const planned = new Set(co.planRows.map((row) => row.departmentId))
+  return co.departments.filter((dept) => planned.has(dept.id))
+}
+
 export function stakeholdersReady(state: AppState, companyId: CompanyId = WORKSPACE_COMPANY_ID): boolean {
   const co = companyFor(state, companyId)
   if (co.departments.length === 0) return false
-  return co.departments.every((dept) => dept.stakeholders.length >= 1)
+  return departmentsNeedingTags(co).every((dept) => dept.stakeholders.length >= 1)
 }
 
 /** 第一個未標註部門的第一筆計畫列；標籤在年度計畫明細列編輯。 */
@@ -82,9 +91,13 @@ export function untaggedDepartmentPlanLink(co: CompanyData): NavigateOptions | u
 }
 
 function stakeholderTagGap(co: CompanyData): WorkflowGap | null {
-  const total = co.departments.length
-  const tagged = co.departments.filter((d) => d.stakeholders.length >= 1).length
-  if (total > 0 && tagged === total) return null
+  if (co.departments.length === 0) {
+    return { message: '部門利害關係人已標註 0/0（於計畫列明細編輯）', tab: 'plan' }
+  }
+  const needed = departmentsNeedingTags(co)
+  const total = needed.length
+  const tagged = needed.filter((d) => d.stakeholders.length >= 1).length
+  if (tagged === total) return null
   return {
     message: `部門利害關係人已標註 ${tagged}/${total}（於計畫列明細編輯）`,
     tab: 'plan',

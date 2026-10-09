@@ -79,6 +79,7 @@ describe('App tab smoke', () => {
     }
     expect(within(nav).getAllByRole('button')).toHaveLength(11)
     expect(within(nav).queryByRole('button', { name: '外稽準備' })).toBeNull()
+    expect(within(nav).queryByRole('button', { name: '利害關係人' })).toBeNull()
   })
 
   it('keeps the checklist sidebar item current on the prep view and returns to the checklist', async () => {

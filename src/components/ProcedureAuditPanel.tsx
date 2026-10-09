@@ -26,6 +26,7 @@ import { diagnoseChecklistSeed } from '../data/checklistLoader'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
 import type { ChecklistItem, Judgment, TabId } from '../types'
 import { auditorCandidates, departmentMemberCandidates } from '../lib/personnel'
+import { procedureRelatedDepartments } from '../lib/procedureDepartments'
 import { AuditorMultiSelect } from './ui/AuditorMultiSelect'
 import { FormalRecordLocationDialog } from './FormalRecordLocationDialog'
 import { Badge, Button, Input, Select } from './ui/Badge'
@@ -234,6 +235,7 @@ export function ProcedureAuditPanel({
 
   const audit = auditForPage!
   const dept = company.departments.find((d) => d.id === departmentId)
+  const relatedDepartments = procedureRelatedDepartments(audit.qpCode, company.planRows)
   const linkedPrepIds = new Set(
     prepTemplatesForAudit(audit.qpCode, audit.departmentId, company.planRows).map((template) => template.id),
   )
@@ -538,6 +540,16 @@ export function ProcedureAuditPanel({
                 onClick={() => setSetupState({ scope: setupScope, open: !setupOpen })}
               >稽核設定</Button>
             </div>
+            <dl aria-label="受稽部門" className="flex basis-full flex-wrap gap-x-4 gap-y-1 text-sm">
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0 font-bold text-ink">被稽核部門</dt>
+                <dd className="min-w-0 break-words">{audit.department}（依年度計畫，不可改）</dd>
+              </div>
+              <div className="flex min-w-0 gap-1">
+                <dt className="shrink-0 font-bold text-ink">程序相關部門</dt>
+                <dd className="min-w-0 break-words">{relatedDepartments.length > 0 ? relatedDepartments.join('、') : audit.department}</dd>
+              </div>
+            </dl>
             {!setupOpen && (
               <p className="min-w-0 break-words text-sm text-muted">
                 {audit.auditDate || '未填稽核日期'} · {audit.auditors || '未選稽核人員'}

@@ -57,6 +57,8 @@ function AppShell() {
   const store = useAuditStore()
   const [hashState, setHashState] = useState(() => parseAppHash(window.location.hash))
   const { tab, auditKey, section, recordId } = hashState
+  /** 每次程式內導覽遞增；同一深連結重複點選時讓目標頁重新展開該筆。 */
+  const [navRequest, setNavRequest] = useState(0)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarNavRef = useRef<HTMLElement>(null)
@@ -75,6 +77,7 @@ function AppShell() {
       section: next === 'observations' ? resolved?.section : undefined,
       recordId: resolved?.recordId,
     })
+    setNavRequest((count) => count + 1)
     syncHash(next, options)
     setMobileMenuOpen(false)
   }
@@ -225,7 +228,7 @@ function AppShell() {
           <ProcessForm formId={activeEntry.formId} label={`${activeEntry.label}表單`}>
             {tab === 'plan' && (
               <TabErrorBoundary tabLabel="年度稽核計畫">
-                <AnnualPlan store={store} onNavigate={setTab} highlightRecordId={recordId} />
+                <AnnualPlan store={store} onNavigate={setTab} highlightRecordId={recordId} highlightRequest={navRequest} />
               </TabErrorBoundary>
             )}
             {tab === 'audit' && (

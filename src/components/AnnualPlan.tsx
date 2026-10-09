@@ -127,11 +127,14 @@ export function AnnualPlan({
   store,
   onNavigate,
   highlightRecordId,
+  highlightRequest = 0,
 }: {
   store: AuditStore
   onNavigate?: (tab: TabId, options?: NavigateOptions) => void
   /** 深連結（`#tab=plan&record=<planRowId>`）：翻到並展開該計畫列 */
   highlightRecordId?: string
+  /** 導覽序號：同一 `highlightRecordId` 再次導覽時重新翻頁並展開 */
+  highlightRequest?: number
 }) {
   const { state, updateSettings, regeneratePlan, approvePlan, updatePlanRow, setPlanMonthChoice, updateDepartment } = store
   const { settings, company } = state
@@ -146,13 +149,14 @@ export function AnnualPlan({
     ? company.planRows.findIndex((row) => row.id === highlightRecordId)
     : -1
   const requestedRowId = highlightIndex >= 0 ? highlightRecordId : undefined
-  const [expandedId, setExpandedId] = useRecordDisclosure(`${WORKSPACE_COMPANY_ID}:${settings.auditYear}`, requestedRowId)
+  const disclosureScope = `${WORKSPACE_COMPANY_ID}:${settings.auditYear}${requestedRowId ? `#${highlightRequest}` : ''}`
+  const [expandedId, setExpandedId] = useRecordDisclosure(disclosureScope, requestedRowId)
   useEffect(() => {
     if (!requestedRowId) return
     requestAnimationFrame(() => {
       document.getElementById(`plan-detail-${requestedRowId}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     })
-  }, [requestedRowId])
+  }, [requestedRowId, highlightRequest])
   const ownerConfirm = useDepartmentOwnerConfirm(store)
 
   const deptOwner = (departmentId: string) =>
@@ -209,7 +213,7 @@ export function AnnualPlan({
   const pagination = useTablePagination(
     company.planRows.length,
     10,
-    requestedRowId ? { key: requestedRowId, index: highlightIndex } : undefined,
+    requestedRowId ? { key: `${requestedRowId}#${highlightRequest}`, index: highlightIndex } : undefined,
     String(settings.auditYear),
   )
 
