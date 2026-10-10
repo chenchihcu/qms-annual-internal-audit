@@ -58,12 +58,20 @@ describe('RiskAssessment auto-counted matrix', () => {
     const table = await openRiskTable()
     const sortGroup = screen.getByRole('group', { name: '列排序' })
     expect(within(sortGroup).getByRole('button', { name: '待處理優先' }).getAttribute('aria-pressed')).toBe('true')
-    const firstCode = () => within(within(table).getAllByRole('row')[1]).getAllByRole('cell')[0].textContent
+    const firstCode = () => within(within(table).getAllByRole('row')[1]).getAllByRole('cell').slice(0, 2).map((cell) => cell.textContent).join('|')
     const before = firstCode()
     fireEvent.click(within(within(table).getAllByRole('row')[1]).getByRole('button', { name: '存檔' }))
     expect(firstCode()).toBe(before)
     fireEvent.click(within(sortGroup).getByRole('button', { name: '計畫順序' }))
     expect(within(sortGroup).getByRole('button', { name: '計畫順序' }).getAttribute('aria-pressed')).toBe('true')
+
+    // 已存列在「待處理優先」排到後面；列印時仍回到計畫順序。
+    fireEvent.click(within(sortGroup).getByRole('button', { name: '待處理優先' }))
+    expect(firstCode()).not.toBe(before)
+    fireEvent(window, new Event('beforeprint'))
+    expect(firstCode()).toBe(before)
+    fireEvent(window, new Event('afterprint'))
+    await waitFor(() => expect(firstCode()).not.toBe(before))
   }, 15000)
 
   it('requires a selected reason when a value departs from the system value', async () => {

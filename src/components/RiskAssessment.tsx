@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal, flushSync } from 'react-dom'
 import type { AuditStore } from '../hooks/useAuditStore'
 import { useTablePagination } from '../hooks/useTablePagination'
 import { FOCUS_RING } from '../lib/focusRing'
@@ -404,6 +404,18 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
   }
   const applySort = (mode: SortMode) =>
     setOrder({ signature: rowsSignature, mode, keys: orderKeys(mode, rows, company.procedureRisks, auditYear) })
+  /** 列印 QR-02-01 一律用年度計畫順序，不受畫面排序影響。 */
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => {
+    const before = () => flushSync(() => setPrinting(true))
+    const after = () => setPrinting(false)
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
+    return () => {
+      window.removeEventListener('beforeprint', before)
+      window.removeEventListener('afterprint', after)
+    }
+  }, [])
   const pool = useMemo(
     () => buildRiskDerivationPool({ workspace: state.workspace, yearArchives: state.yearArchives, settings }),
     [state.workspace, state.yearArchives, settings],
@@ -506,7 +518,7 @@ export function RiskAssessment({ store }: { store: AuditStore }) {
     return { row, saved, status, draft, dirty, savedThisYear, blockers, assessment, printed }
   })
   const statesByKey = new Map(rowStates.map((item) => [rowKey(item.row), item]))
-  const displayStates = order.keys.flatMap((key) => statesByKey.get(key) ?? [])
+  const displayStates = (printing ? rows.map(rowKey) : order.keys).flatMap((key) => statesByKey.get(key) ?? [])
   /** 缺資料摘要：每個因素的待確認列數與人工（無系統值）列數，附系統判定原因。 */
   const factorGaps = RISK_FACTOR_KEYS.flatMap((factor) => {
     let pending = 0
