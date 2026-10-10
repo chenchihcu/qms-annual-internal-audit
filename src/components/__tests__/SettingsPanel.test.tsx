@@ -4,6 +4,7 @@ import { createDemoState, STORAGE_KEY } from '../../data/demoData'
 import { movePersonToTrash } from '../../lib/trash'
 import { useAuditStore } from '../../hooks/useAuditStore'
 import { SettingsPanel } from '../SettingsPanel'
+import { FLOW_LINKS, TAB_GROUPS, isValidTabId } from '../../lib/navigation'
 
 beforeEach(() => localStorage.clear())
 
@@ -104,7 +105,23 @@ describe('SettingsPanel sections', () => {
       expect(screen.getByRole('button', { name: '查檢表' })).toBeTruthy()
       expect(screen.getByRole('button', { name: '外稽準備' })).toBeTruthy()
       expect(screen.queryByRole('button', { name: '系統設定' })).toBeNull()
+      expect(screen.getByText('QR-28-01 Excel／HTML')).toBeTruthy()
+      expect(screen.getByText('主任稽核員任命有效')).toBeTruthy()
+      expect(screen.getByText('程序風險、QR-02-01 Excel')).toBeTruthy()
+      expect(screen.queryByText(/riskSourceEvents|procedureRisks/)).toBeNull()
+      expect(screen.getByText('風險來源事件（事件→程序關聯）')).toBeTruthy()
+      expect(screen.getByText(/查檢表：判定「不符」 → 不符合/)).toBeTruthy()
+      expect(screen.getByText(/觀察事項／不符合／第三方建議：未結項目合併 → 待改善追蹤/)).toBeTruthy()
     })
+  })
+
+  it('flow links reference only valid tabs', () => {
+    for (const link of FLOW_LINKS) {
+      for (const id of [...link.from, ...(link.to ? [link.to] : [])]) {
+        expect(isValidTabId(id)).toBe(true)
+      }
+      expect(TAB_GROUPS.some((group) => group.label === link.group)).toBe(true)
+    }
   })
 
   it('does not turn a blank scoring value into zero', async () => {

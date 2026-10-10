@@ -130,48 +130,11 @@ export const ACTION_ICONS = {
   resetDemo: 'rotateCcw' as IconName,
 } satisfies Record<string, IconName>
 
-export const DASHBOARD_KPI_ICONS = {
-  score: 'barChart' as IconName,
-  ncr: 'xCircle' as IconName,
-  observations: 'eye' as IconName,
-  suggestions: 'lightbulb' as IconName,
-  plan: 'calendarDays' as IconName,
-  audits: 'activity' as IconName,
-  planning: 'clipboardList' as IconName,
-  prep: 'shieldCheck' as IconName,
-}
-
-export const ATTENTION_FILTER_ICONS: Record<string, IconName> = {
-  需關注: 'filter',
-  高中風險: 'alertTriangle',
-  已計分: 'barChart',
-  全部: 'layers',
-}
-
-export const SCHEDULE_FILTER_ICONS: Record<string, IconName> = {
-  執行中: 'playCircle',
-  本月: 'calendar',
-  全部: 'layers',
-}
-
 export const FOLLOWUP_FILTER_ICONS: Record<string, IconName> = {
   全部: 'layers',
   NCR: 'xCircle',
   觀察: 'eye',
   建議: 'lightbulb',
-}
-
-export const CATEGORY_FILTER_ICONS: Record<string, IconName> = {
-  全部類型: 'layers',
-  系統稽核: 'layers',
-  製程稽核: 'cog',
-  型態稽核: 'shapes',
-}
-
-export const RISK_FILTER_ICONS: Record<string, IconName> = {
-  全部: 'layers',
-  未存檔: 'save',
-  暫定: 'star',
 }
 
 export function badgeIconFor(label: string): IconName | undefined {
