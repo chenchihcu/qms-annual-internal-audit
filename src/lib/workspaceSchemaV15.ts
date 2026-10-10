@@ -155,6 +155,30 @@ export function validateV15State(value: unknown): value is AppState {
   return true
 }
 
+/** 已停用欄位：程序類型改為固定對照（`QP_PROCESS_TYPES`），使用者舊指定值不再讀寫，載入／還原時移除。 */
+const RETIRED_WORKSPACE_FIELDS = ['procedureProcessTypes'] as const
+
+function withoutRetiredFields(workspace: CompanyData): CompanyData {
+  if (!RETIRED_WORKSPACE_FIELDS.some((field) => field in workspace)) return workspace
+  const next: Record<string, unknown> = { ...workspace }
+  for (const field of RETIRED_WORKSPACE_FIELDS) delete next[field]
+  return next as unknown as CompanyData
+}
+
+/** 移除目前工作區與各年度封存中的已停用欄位；無變動時回傳原物件。 */
+export function dropRetiredWorkspaceFields(state: AppState): AppState {
+  const workspace = withoutRetiredFields(state.workspace)
+  let archivesChanged = false
+  const yearArchives: AppState['yearArchives'] = {}
+  for (const [year, entry] of Object.entries(state.yearArchives)) {
+    const archived = withoutRetiredFields(entry.workspace)
+    if (archived !== entry.workspace) archivesChanged = true
+    yearArchives[year] = archived === entry.workspace ? entry : { ...entry, workspace: archived }
+  }
+  if (workspace === state.workspace && !archivesChanged) return state
+  return { ...state, workspace, yearArchives: archivesChanged ? yearArchives : state.yearArchives }
+}
+
 function replaceYearInDate(value?: string, year?: number): string | undefined {
   if (!value || year == null) return value
   return value.replace(/^\d{4}/, String(year))

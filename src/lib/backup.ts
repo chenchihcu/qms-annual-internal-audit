@@ -15,6 +15,7 @@ import {
   validateSingleWorkspaceState,
 } from './singleWorkspaceMigration'
 import {
+  dropRetiredWorkspaceFields,
   isAppStateV14Legacy,
   migrateV14ToV15,
   SINGLE_WORKSPACE_STORAGE_VERSION,
@@ -86,7 +87,7 @@ export function migrateImportedState(raw: AppState | AppStateV14Legacy): AppStat
   }
   const migrated = toV15(raw)
   if (!validateV15State(migrated)) throw new Error('單一工作區備份結構不完整')
-  return migrated
+  return dropRetiredWorkspaceFields(migrated)
 }
 
 export function parseBackupJson(json: string): AppState {

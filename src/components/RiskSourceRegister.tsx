@@ -76,7 +76,7 @@ export function RiskSourceRegister({ store, liveScores }: { store: AuditStore; l
 
   const rowFor = (target: Pick<RiskSourceTarget, 'qpCode' | 'departmentId'>) =>
     company.planRows.find((row) => row.qpCode === target.qpCode && row.departmentId === target.departmentId)
-  const suggested = (row: PlanRow) => isSuggestedTarget(company.procedureProcessTypes, row.qpCode, row.departmentId, draft.kind)
+  const suggested = (row: PlanRow) => isSuggestedTarget(row.qpCode, draft.kind)
   const suggestedCount = company.planRows.filter(suggested).length
 
   const departments = [...new Map(company.planRows.map((row) => [row.department, row.department])).keys()]

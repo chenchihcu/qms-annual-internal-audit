@@ -22,7 +22,6 @@ import type {
   RiskSourceCoverage,
   RiskCoverageKind,
   RiskSourceLinkStatus,
-  ProcessType,
   TrashCompanyRecordKind,
 } from '../types'
 import { MANAGEMENT_REVIEW_PREP_ITEM_ID, createDefaultPrepState } from '../lib/externalAuditPrep'
@@ -53,6 +52,7 @@ import {
   WORKSPACE_COMPANY_ID,
 } from '../lib/singleWorkspaceMigration'
 import {
+  dropRetiredWorkspaceFields,
   isAppStateV14Legacy,
   LEGACY_STORAGE_KEY_V14,
   migrateV14ToV15,
@@ -155,7 +155,7 @@ function parseStoredState(raw: string, label: string, _storageKey: string): Load
   if (parsed.version > SINGLE_WORKSPACE_STORAGE_VERSION) return loadFailure(`${label} 為較新的 v${parsed.version}，本系統拒絕降版載入`)
   if (parsed.version === SINGLE_WORKSPACE_STORAGE_VERSION) {
     if (!validateV15State(parsed)) return loadFailure(`${label} 新版工作區結構不完整`)
-    return { state: parsed, persistenceAllowed: true, storageWarning: null }
+    return { state: dropRetiredWorkspaceFields(parsed), persistenceAllowed: true, storageWarning: null }
   }
   if (isAppStateV14Legacy(parsed)) {
     try {
@@ -577,16 +577,6 @@ export function useAuditStore() {
     setState((s) => patchWorkspace(s, {
       riskSourceEvents: applyRiskSourceLinkStatus(s.workspace.riskSourceEvents ?? [], eventId, key, status, reason, new Date().toISOString()),
     }))
-  }, [])
-
-  const setProcedureProcessType = useCallback((qpCode: string, departmentId: string, type: ProcessType | null) => {
-    setState((s) => {
-      const next = { ...(s.workspace.procedureProcessTypes ?? {}) }
-      const key = `${qpCode}|${departmentId}`
-      if (type) next[key] = type
-      else delete next[key]
-      return patchWorkspace(s, { procedureProcessTypes: next })
-    })
   }, [])
 
   const setRiskSourceCoverage = useCallback((kind: RiskCoverageKind, coverage: Omit<RiskSourceCoverage, 'recordedAt'> | null) => {
@@ -1569,7 +1559,6 @@ export function useAuditStore() {
     voidRiskSourceEvent,
     setRiskSourceLinkStatus,
     setRiskSourceCoverage,
-    setProcedureProcessType,
     regeneratePlan,
     approvePlan,
     replacePlanRows,
