@@ -145,13 +145,6 @@ export function scoreProcedureAudit(
   return scoreChecklistItems(audit.items, rules)
 }
 
-export function formatScoreDisplay(result: ScoreResult): string {
-  if (result.status === 'scored' && result.score !== null) return `${result.score}%`
-  if (result.status === 'not_applicable') return '不適用'
-  if (result.status === 'incomplete') return '未完成'
-  return '未評'
-}
-
 export function isAuditComplete(audit: ProcedureAudit, rules?: ScoringRules): boolean {
   const result = scoreProcedureAudit(audit, rules)
   return result.status === 'scored' || result.status === 'not_applicable'
@@ -167,70 +160,4 @@ export function countNonConformJudgments(item: ChecklistItem): number {
 
 export function countObservationJudgments(item: ChecklistItem): number {
   return item.judgment === '觀察' ? 1 : 0
-}
-
-export interface AnnualScoreSummary {
-  overallScore: number | null
-  overallStatus: ScoreStatus
-  departmentScores: Array<{
-    auditId: string
-    label: string
-    score: number | null
-    status: ScoreStatus
-    applicableItems: number
-  }>
-  totalNCR: number
-  totalObservation: number
-}
-
-export function calculateAnnualScore(
-  audits: ProcedureAudit[],
-  rules?: ScoringRules,
-): AnnualScoreSummary {
-  const departmentScores = audits.map((audit) => {
-    const result = scoreProcedureAudit(audit, rules)
-    return {
-      auditId: audit.id,
-      label: `${audit.qpCode} · ${audit.department}`,
-      score: result.score,
-      status: result.status,
-      applicableItems: result.applicableItems,
-    }
-  })
-
-  let totalNumerator = 0
-  let totalApplicable = 0
-  let totalNCR = 0
-  let totalObservation = 0
-  let hasIncomplete = false
-
-  for (const audit of audits) {
-    const result = scoreChecklistItems(audit.items, rules)
-    for (const item of audit.items) {
-      totalNCR += countNonConformJudgments(item)
-      totalObservation += countObservationJudgments(item)
-    }
-    if (result.status === 'incomplete') hasIncomplete = true
-    if (result.status === 'scored' && result.score !== null) {
-      totalApplicable += result.applicableItems
-      totalNumerator += (result.score / 100) * result.applicableItems
-    }
-  }
-
-  let overallStatus: ScoreStatus = 'unevaluated'
-  if (hasIncomplete) overallStatus = 'incomplete'
-  else if (totalApplicable > 0) overallStatus = 'scored'
-
-  const overallScore =
-    overallStatus === 'scored'
-      ? Math.round((totalNumerator / totalApplicable) * 1000) / 10
-      : null
-
-  return {
-    overallScore,
-    overallStatus,
-    departmentScores,
-    totalNCR,
-    totalObservation,
-  }
 }

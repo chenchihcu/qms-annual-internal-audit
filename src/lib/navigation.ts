@@ -229,27 +229,6 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
   },
 ]
 
-export interface FlowLink {
-  /** 顯示在此 PDCA 群組列下方。 */
-  group: string
-  from: TabId[]
-  /** 省略代表留在來源頁（例：跨年帶入）。 */
-  to?: TabId
-  /** 觸發條件；語意依 `TAB_WORKFLOW` 的 entry／exit／purpose。 */
-  via: string
-}
-
-/** 跨步驟資料流與回饋（只讀說明，不改任何推導）。 */
-export const FLOW_LINKS: FlowLink[] = [
-  { group: 'D · 稽核執行', from: ['audit'], to: 'observations', via: '判定「觀察」' },
-  { group: 'D · 稽核執行', from: ['audit'], to: 'ncr', via: '判定「不符」' },
-  { group: 'C · 結果與改善', from: ['observations'], to: 'ncr', via: '觀察轉 NCR' },
-  { group: 'C · 結果與改善', from: ['observations', 'ncr', 'suggestions'], to: 'followups', via: '未結項目合併' },
-  { group: 'A · 結案與改進', from: ['prep'], to: 'dashboard', via: '準備完成後回到總覽' },
-  { group: 'A · 結案與改進', from: ['observations'], via: '未結觀察跨年帶入新年度' },
-  { group: 'A · 結案與改進', from: ['suggestions'], to: 'audit', via: '第三方建議帶入今年查檢' },
-]
-
 const WORKFLOW_BY_TAB = new Map<TabId, TabWorkflow>(TAB_WORKFLOW.map((w) => [w.id, w]))
 
 export function getTabWorkflow(tab: TabId): TabWorkflow | undefined {

@@ -20,7 +20,7 @@ import {
   visibleEvidenceFields,
   type EvidenceField,
 } from '../lib/checklistEvidence'
-import { checklistPendingReason, formatScoreDisplay, scoreProcedureAudit } from '../lib/scoring'
+import { checklistPendingReason, scoreProcedureAudit } from '../lib/scoring'
 import { canCompleteAuditReport } from '../lib/workflowStatus'
 import { diagnoseChecklistSeed } from '../data/checklistLoader'
 import { ImpartialityBanner } from './ui/ImpartialityBanner'
@@ -685,7 +685,6 @@ export function ProcedureAuditPanel({
         <div className="mb-2 mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <dl aria-label="查檢判定統計" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {[
-              ['程序得分', formatScoreDisplay(score)],
               ['總項數', score.totalItems],
               ['符合', score.breakdown.conform],
               ['不符', score.breakdown.nonConform],

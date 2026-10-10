@@ -272,13 +272,6 @@ export function evaluatePrepSequence(context: PrepSequenceContext): PrepSequence
   }
 }
 
-export function itemHasCallout(no: number): 'quality-objectives' | 'risk-climate' | 'satisfaction' | null {
-  if (no === 3) return 'quality-objectives'
-  if (no === 5) return 'risk-climate'
-  if (no === 15) return 'satisfaction'
-  return null
-}
-
 export function formatPrepYearMismatch(prepYear: number, auditYear: number): string | null {
   if (prepYear === auditYear) return null
   return `外稽準備年度為 ${prepYear}，目前稽核台帳年度為 ${auditYear}，請確認年度。`

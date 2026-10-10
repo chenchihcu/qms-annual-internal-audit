@@ -12,17 +12,11 @@ export interface FormalRecordLocationDialogProps {
   onCancel: () => void
 }
 
-const QUICK_LOCATION_PRESETS = [
-  '文管中心受控檔案室／品保部',
-  '品保部受控檔案夾',
-  '\\\\公司NAS\\品質保證\\內部稽核紀錄',
-]
-
 export function FormalRecordLocationDialog({
   open,
   currentLocation = '',
   title = '指定正式紀錄保存位置',
-  description = '本系統為本機輔助工具；正式稽核紀錄（QR-28-02 查檢表與報告）須歸檔至組織受控位置。請指定或選取正式紀錄保存路徑：',
+  description = '本系統為本機輔助工具；正式稽核紀錄（QR-28-02 查檢表與報告）須歸檔至組織受控位置。請輸入正式紀錄保存路徑：',
   onConfirm,
   onCancel,
 }: FormalRecordLocationDialogProps) {
@@ -135,34 +129,11 @@ export function FormalRecordLocationDialog({
         </p>
 
         <div className="mt-4 space-y-3">
-          <div>
-            <span className="block text-xs font-bold text-slate-500 mb-1.5">快速代入常用位置：</span>
-            <div className="flex flex-wrap gap-1.5">
-              {QUICK_LOCATION_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => {
-                    setDraft(preset)
-                    setError('')
-                  }}
-                  className={`rounded-md border px-2.5 py-1 text-xs transition ${
-                    draft === preset
-                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <Input
             label="正式紀錄保存位置"
             value={draft}
             error={error}
-            hint="例如：文管中心受控檔案室／品保部 或 \\NAS路徑"
+            hint="依組織受控文件規定填寫實體位置或網路路徑"
             onChange={(val) => {
               setDraft(val)
               if (error) setError('')

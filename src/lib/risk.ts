@@ -24,15 +24,6 @@ export function clampRiskValue(value: number): number {
   return Math.min(5, Math.max(1, Math.round(value)))
 }
 
-/** 解析風險分數輸入；空白或非法值回傳 null，不寫入 store */
-export function parseRiskInputValue(raw: string): number | null {
-  const trimmed = raw.trim()
-  if (trimmed === '') return null
-  const n = Number(trimmed)
-  if (!Number.isFinite(n) || n < 1 || n > 5) return null
-  return Math.round(n)
-}
-
 export function calculateRiskIndex(occurrence: number, severity: number): number {
   const o = clampRiskValue(occurrence)
   const s = clampRiskValue(severity)
@@ -46,20 +37,6 @@ export function calculateRiskLevel(occurrence: number, severity: number): RiskRe
   else if (index >= RISK_BANDS.medium.min) level = '中'
   else level = '低'
   return { index, level }
-}
-
-/** 依稽核結果建議調整發生度（NCR 多或分數低時提高風險） */
-export function suggestRiskBump(
-  currentOccurrence: number,
-  ncrCount: number,
-  scorePercent: number,
-): number {
-  let bump = 0
-  if (ncrCount >= 3) bump += 1
-  else if (ncrCount >= 1) bump += 0.5
-  if (scorePercent < 60) bump += 1
-  else if (scorePercent < 80) bump += 0.5
-  return clampRiskValue(currentOccurrence + bump)
 }
 
 export const PROCEDURE_RISK_WEIGHTS = {
@@ -174,20 +151,6 @@ export function scaleToCountLabel(scale: number | undefined): string {
   return '≥4件'
 }
 
-/** 循環 NCR 件數欄：— → 0件 → … → ≥4件 → —（必填欄回到 0件） */
-export function cycleCountScale(current: number | undefined, required: boolean): number | undefined {
-  if (current == null || Number.isNaN(current)) return 1
-  if (current >= 5) return required ? 1 : undefined
-  return current + 1
-}
-
-/** 三檔（無／中／高）→ 1／3／5 */
-export function bandToScale(band: 'low' | 'mid' | 'high'): number {
-  if (band === 'low') return 1
-  if (band === 'mid') return 3
-  return 5
-}
-
 /** 1–5 → 三檔標籤（客訴／變更） */
 export function scaleToBandLabel(scale: number | undefined): string {
   if (scale == null || Number.isNaN(scale)) return '—'
@@ -195,14 +158,6 @@ export function scaleToBandLabel(scale: number | undefined): string {
   if (s <= 2) return '無'
   if (s <= 3) return '中'
   return '高'
-}
-
-/** 循環三檔欄：— → 無 → 中 → 高 → — */
-export function cycleBandScale(current: number | undefined, required: boolean): number | undefined {
-  if (current == null || Number.isNaN(current)) return 1
-  if (current <= 2) return 3
-  if (current <= 3) return 5
-  return required ? 1 : undefined
 }
 
 /** 距上次稽核月數 → 1–5 */
@@ -226,11 +181,6 @@ export function scaleToMonthsLabel(scale: number | undefined): string {
   return '≥24月'
 }
 
-/** 循環距上次欄 */
-export function cycleMonthsScale(current: number | undefined, required: boolean): number | undefined {
-  return cycleCountScale(current, required)
-}
-
 /** 程序種子風險等級 → 固有 1–5 */
 export function inherentScaleFromSeed(riskLevel: RiskLevel | undefined): number {
   if (riskLevel === '高') return 5
@@ -247,14 +197,6 @@ export function scaleToInherentLabel(scale: number | undefined): string {
   return '高'
 }
 
-/** 循環固有欄：低 → 中 → 高 → 低 */
-export function cycleInherentScale(current: number | undefined): number {
-  const s = current == null || Number.isNaN(current) ? 1 : clampRiskValue(current)
-  if (s <= 2) return 3
-  if (s <= 3) return 5
-  return 1
-}
-
 export type RiskFactorKind = 'inherent' | 'count' | 'band' | 'months'
 
 export function factorKind(field: keyof ProcedurePriorityInput): RiskFactorKind {
@@ -269,62 +211,6 @@ export function formatFactorLabel(field: keyof ProcedurePriorityInput, scale: nu
   if (kind === 'band') return scaleToBandLabel(scale)
   if (kind === 'months') return scaleToMonthsLabel(scale)
   return scaleToCountLabel(scale)
-}
-
-export function cycleFactorScale(
-  field: keyof ProcedurePriorityInput,
-  current: number | undefined,
-  required: boolean,
-): number | undefined {
-  const kind = factorKind(field)
-  if (kind === 'inherent') return cycleInherentScale(current)
-  if (kind === 'band') return cycleBandScale(current, required)
-  if (kind === 'months') return cycleMonthsScale(current, required)
-  return cycleCountScale(current, required)
-}
-
-/** 單因素加權貢獻（四捨五入至整數） */
-export function factorWeightedPoints(field: keyof ProcedurePriorityInput, scale: number | undefined): number {
-  const weight = PROCEDURE_RISK_WEIGHTS[field]
-  const value = scale == null || Number.isNaN(scale) ? 3 : clampRiskValue(scale)
-  return Math.round((value / 5) * weight)
-}
-
-/** 展開列拆帳文案 */
-export function formatFactorBreakdown(field: keyof ProcedurePriorityInput, scale: number | undefined): string {
-  const short = factorNames[field].replace('上次', '').replace('程序固有風險', '固有').replace('距上次稽核時間', '距上次')
-  const label = formatFactorLabel(field, scale)
-  const effective = scale == null || Number.isNaN(scale) ? 3 : clampRiskValue(scale)
-  const pts = factorWeightedPoints(field, scale)
-  const suffix = scale == null || Number.isNaN(scale) ? '（暫估）' : ''
-  return `${short} ${label}→${effective} ×${PROCEDURE_RISK_WEIGHTS[field]}% = ${pts}${suffix}`
-}
-
-/** 依未結 NCR 件數建議逾期欄 scale（不自動寫入） */
-export function suggestOverdueScaleFromOpenCount(openNcrCount: number): number | undefined {
-  if (openNcrCount <= 0) return undefined
-  return countToScale(openNcrCount)
-}
-
-/** 依最近稽核日期建議距上次 scale（不自動寫入） */
-export function suggestMonthsScaleFromAudits(
-  audits: Array<{ qpCode: string; departmentId: string; auditDate: string; plannedDate?: string }>,
-  qpCode: string,
-  departmentId: string,
-  referenceDate: string,
-): number | undefined {
-  const dates = audits
-    .filter((a) => a.qpCode === qpCode && a.departmentId === departmentId)
-    .map((a) => a.auditDate || a.plannedDate || '')
-    .filter(Boolean)
-    .sort()
-  const last = dates.at(-1)
-  if (!last) return undefined
-  const ref = new Date(referenceDate)
-  const lastDate = new Date(last)
-  if (Number.isNaN(ref.getTime()) || Number.isNaN(lastDate.getTime())) return undefined
-  const months = (ref.getFullYear() - lastDate.getFullYear()) * 12 + (ref.getMonth() - lastDate.getMonth())
-  return monthsToScale(Math.max(0, months))
 }
 
 /** 公司自訂的稽核優先順序模型；未知因素以中位數 3 暫估並明確標為暫定。 */
@@ -498,27 +384,4 @@ export function buildRiskSnapshot(record: ProcedureRiskRecord): ProcedureRiskSna
     level: assessment.level,
     evidenceReference: record.evidenceReference,
   }
-}
-
-/** Merge persisted procedureRisks with seed fallbacks (inherent from the procedure seed, never from plan output). */
-export function buildEffectiveProcedureRisks(company: CompanyData): ProcedureRiskRecord[] {
-  return company.planRows.map((plan) => {
-    const saved = company.procedureRisks?.find(
-      (item) => item.qpCode === plan.qpCode && item.departmentId === plan.departmentId,
-    )
-    return {
-      id: saved?.id ?? `risk-${plan.qpCode}-${plan.departmentId}`,
-      qpCode: plan.qpCode,
-      departmentId: plan.departmentId,
-      inherentRisk: saved?.inherentRisk ?? seedInherentScale(plan.qpCode, plan.departmentId, plan.riskLevel),
-      previousInternalNcrCount: saved?.previousInternalNcrCount,
-      previousThirdPartyNcrCount: saved?.previousThirdPartyNcrCount,
-      overdueOpenNcrCount: saved?.overdueOpenNcrCount,
-      customerComplaintLevel: saved?.customerComplaintLevel,
-      changeImpact: saved?.changeImpact,
-      monthsSinceLastAudit: saved?.monthsSinceLastAudit,
-      evidenceReference: saved?.evidenceReference ?? '',
-      updatedAt: saved?.updatedAt ?? new Date().toISOString(),
-    }
-  })
 }

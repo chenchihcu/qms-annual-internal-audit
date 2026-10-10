@@ -5,7 +5,6 @@ import {
   evaluatePrepSequence,
   getPrepTemplate,
   isItemDone,
-  itemHasCallout,
   migratePrepState,
   workspacePrepNotes,
   EXTERNAL_AUDIT_PREP_SEED,
@@ -180,14 +179,5 @@ describe('workspacePrepNotes', () => {
     expect(workspacePrepNotes(
       '氣候變遷要加入風險評估。廠區／氣候風險可合併；產品／客戶相關風險須標適用公司。',
     )).toBe('氣候變遷要加入風險評估。')
-  })
-})
-
-describe('itemHasCallout', () => {
-  it('returns callout types for items 3, 5, and 15', () => {
-    expect(itemHasCallout(3)).toBe('quality-objectives')
-    expect(itemHasCallout(5)).toBe('risk-climate')
-    expect(itemHasCallout(15)).toBe('satisfaction')
-    expect(itemHasCallout(1)).toBeNull()
   })
 })

@@ -2,18 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { createDemoState } from '../../data/demoData'
 import { carryPlanDatesToAudit, resolvePlannedMonthFromPlan } from '../auditDates'
 import { checkPlanRowImpartiality } from '../impartiality'
-import { calculateAnnualScore } from '../scoring'
 import { isProcedureComplete } from '../auditComplete'
 import { scoreProcedureAudit } from '../scoring'
 
 describe('demo defect fixes', () => {
-  it('jiurun dashboard annual score is not scored while plan procedures remain unjudged', () => {
-    const state = createDemoState()
-    const company = state.workspace
-    const summary = calculateAnnualScore(company.audits, state.settings.scoringRules)
-    expect(summary.overallScore).toBeNull()
-  })
-
   it('bulk-conform style audit without evidence is not complete or scored', () => {
     const state = createDemoState()
     const audit = state.workspace.audits.find((a) => a.qpCode === 'QP-05')

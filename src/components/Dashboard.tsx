@@ -1,10 +1,6 @@
-import {
-  calculateAnnualScore,
-  formatScoreDisplay,
-} from '../lib/scoring'
+import { countObservationJudgments } from '../lib/scoring'
 import { buildMergedCertificateCoverage } from '../lib/coverage'
 import {
-  countPrepProgress,
   effectiveExternalAuditDate,
   evaluatePrepSequence,
   getManagementReviewCompletionBlockers,
@@ -22,8 +18,10 @@ interface DashboardProps {
 
 export function Dashboard({ state }: DashboardProps) {
   const { company, settings, externalAuditPrep } = state
-  const summary = calculateAnnualScore(company.audits, settings.scoringRules)
-  const prepProgress = countPrepProgress(externalAuditPrep)
+  const checklistObservations = company.audits.reduce(
+    (sum, audit) => sum + audit.items.reduce((n, item) => n + countObservationJudgments(item), 0),
+    0,
+  )
   const coverage = buildMergedCertificateCoverage(company, settings.auditYear, settings.scoringRules)
   const internalGapCount = coverage.gaps.length + coverage.dualPendingItems.length
   const managementReviewDate = settings.managementReviewDate?.trim() ?? ''
@@ -43,44 +41,19 @@ export function Dashboard({ state }: DashboardProps) {
   const currentYearOpenObs = countCurrentYearOpenObservations(state)
   const priorOpenObs = countPriorOpenObservations(state)
   const openSug = company.suggestions.filter((s) => s.status === 'open').length
-  const plannedMonths = company.planRows.reduce(
-    (sum, row) => sum + row.months.filter(Boolean).length,
-    0,
-  )
-  const plannedRows = company.planRows.filter((row) => row.months.some(Boolean)).length
   const reportedAudits = company.audits.filter((audit) => audit.status === '已回報').length
 
-  const overallDisplay = formatScoreDisplay({
-    score: summary.overallScore,
-    status: summary.overallStatus,
-    totalItems: 0,
-    applicableItems: 0,
-    breakdown: { conform: 0, nonConform: 0, observation: 0, notApplicable: 0, pending: 0 },
-  })
-
-  const summaryMetrics = [
+  const summaryMetrics: Array<{ key: string; label: string; value: string; hint?: string }> = [
     {
-      key: 'score',
-      label: '年度總分',
-      value: overallDisplay,
-      hint: `已回報 ${reportedAudits}/${company.audits.length} 件`,
-    },
-    {
-      key: 'planned',
-      label: '已排月格',
-      value: String(plannedMonths),
-      hint: `計畫項目 ${plannedRows}/${company.planRows.length} 列`,
+      key: 'reported',
+      label: '查檢已回報',
+      value: `${reportedAudits}/${company.audits.length}`,
     },
     {
       key: 'ncr',
       label: '未結 NCR',
       value: String(openNCR),
       hint: openNCR !== company.ncrs.length ? `共 ${company.ncrs.length} 筆紀錄` : undefined,
-    },
-    {
-      key: 'prep',
-      label: '外稽準備',
-      value: `${prepProgress.done}/${prepProgress.total}`,
     },
     {
       key: 'internal-audit',
@@ -107,7 +80,7 @@ export function Dashboard({ state }: DashboardProps) {
     {
       key: 'check-observations',
       label: '查檢判定觀察',
-      value: summary.totalObservation,
+      value: checklistObservations,
     },
     {
       key: 'current-observations',

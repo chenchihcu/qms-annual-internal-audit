@@ -132,33 +132,6 @@ export function annualAuditFrequencyForLevel(level: RiskLevel): number {
   return 1
 }
 
-/** Shown beside auto-arrange preview / apply actions that rewrite plan months. */
-export const MANUAL_OVERRIDE_PLAN_NOTE = '手動覆寫的計畫列會保留。'
-
-export const ARRANGEMENT_IMPACT_RULES = {
-  scope: '此部門底下各 QP 在年度計畫的「順序」與「月格次數／早晚」。',
-  trigger: '僅在年度計畫頁按「依日期與利害關係人自動編排」，檢視預覽並確認套用時生效。',
-  excludes: 'QR-02-01 本年度已確認或已核准的 QP 改以方案風險為準；已手動覆寫的月格不會被改寫。',
-  columnNote: '本欄為各部門 QP 在「QR-02-01 尚未確認」時的估算；實際以自動編排結果為準。',
-} as const
-
-/** 利害關係人工作流與紙本／標準對照（本頁無獨立 QR 匯出） */
-export const STAKEHOLDER_WORKFLOW_REFERENCES = {
-  procedures: [
-    { code: 'QP-28', name: '內部稽核管理程序', note: '年度計畫擬定、稽核頻率與月格編排' },
-    { code: 'QP-02', name: '風險與機會管理程序', note: 'QR-02-01 方案風險（與本頁部門 O×S 分軌）' },
-  ],
-  clauses: [
-    { standard: 'ISO 9001', clause: '4.2', label: '了解相關方需求與期望（利害關係人標籤）' },
-    { standard: 'ISO 9001', clause: '9.2', label: '內部稽核方案規劃（計畫順序／頻率）' },
-  ],
-  forms: [
-    { code: '—', name: '本頁工作流輸入', role: '部門利害關係人與 O／S 三檔事實', storage: '備份 JSON' },
-    { code: 'QR-28-01', name: '年度稽核計畫表', role: '編排產出（月格）', tab: 'plan' as const },
-    { code: 'QR-02-01', name: '風險與機會監控評估表', role: 'QP 方案風險（優先於本頁估算）', tab: 'risk' as const },
-  ],
-} as const
-
 export interface ArrangementImpact {
   summary: string
   sortLine: string
