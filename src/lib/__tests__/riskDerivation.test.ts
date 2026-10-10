@@ -170,8 +170,9 @@ describe('deriveRiskFactors', () => {
     expect(unknown.previousInternalNcrCount.status).toBe('no_data')
     expect(unknown.overdueOpenNcrCount.status).toBe('no_data')
     expect(unknown.monthsSinceLastAudit.status).toBe('no_data')
-    expect(unknown.customerComplaintLevel.status).toBe('no_data')
-    expect(unknown.changeImpact.suggested).toBeUndefined()
+    // 客訴／重大變更：未登錄視為 0 件（2026-10-10 核准）
+    expect(unknown.customerComplaintLevel.status).toBe('no_events')
+    expect(unknown.changeImpact.suggested).toBe(1)
   })
 
   it('suggests inherent risk from the procedure seed', () => {
@@ -226,7 +227,7 @@ describe('external source register → complaint／change factors', () => {
     expect(deriveRiskFactors(pool, QP, DEPT).customerComplaintLevel.count).toBe(1)
   })
 
-  it('treats a declared coverage with no events as 無, and no declaration as no data', () => {
+  it('treats no confirmed events as 0 件 with or without a coverage declaration', () => {
     const declared = poolAt({
       workspace: workspace({ riskSourceCoverage: { major_change: { checkedThrough: '2026-03-31', reference: 'ECN 清冊', recordedAt: 'x' } } }),
       settings,
@@ -235,7 +236,10 @@ describe('external source register → complaint／change factors', () => {
     const result = deriveRiskFactors(declared, QP, DEPT)
     expect(result.changeImpact.status).toBe('no_events')
     expect(result.changeImpact.suggested).toBe(1)
-    expect(result.customerComplaintLevel.status).toBe('no_data')
+    expect(result.changeImpact.note).toContain('已全部登錄至 2026-03-31')
+    expect(result.customerComplaintLevel.status).toBe('no_events')
+    expect(result.customerComplaintLevel.suggested).toBe(1)
+    expect(result.customerComplaintLevel.note).toContain('無已確認登錄，視為 0 件')
   })
 
   it('counts only confirmed links; pending links block a 無事件 conclusion', () => {
@@ -273,7 +277,7 @@ describe('external source register → complaint／change factors', () => {
     expect(deriveRiskFactors(notApplicable, QP, DEPT).customerComplaintLevel.status).toBe('no_events')
   })
 
-  it('does not treat stale coverage as 0 件 once the assessment date passes the cutoff', () => {
+  it('still counts 0 件 after the coverage cutoff passes, with the plain note', () => {
     const state = {
       workspace: workspace({ riskSourceCoverage: { customer_complaint: { checkedThrough: '2026-03-31', reference: '清冊', recordedAt: 'x' } } }),
       settings,
@@ -281,12 +285,12 @@ describe('external source register → complaint／change factors', () => {
     }
     expect(deriveRiskFactors(buildRiskDerivationPool(state, '2026-03-31'), QP, DEPT).customerComplaintLevel.status).toBe('no_events')
     const stale = deriveRiskFactors(buildRiskDerivationPool(state, '2026-10-09'), QP, DEPT).customerComplaintLevel
-    expect(stale.status).toBe('no_data')
-    expect(stale.note).toContain('只到 2026-03-31')
+    expect(stale.status).toBe('no_events')
+    expect(stale.note).toContain('視為 0 件')
   })
 
   it('does not attribute an event to unrelated QP rows', () => {
     const pool = poolAt({ workspace: workspace({ riskSourceEvents: [event('a')] }), settings, yearArchives: {} })
-    expect(deriveRiskFactors(pool, 'QP-03', DEPT).customerComplaintLevel.status).toBe('no_data')
+    expect(deriveRiskFactors(pool, 'QP-03', DEPT).customerComplaintLevel.count).toBe(0)
   })
 })

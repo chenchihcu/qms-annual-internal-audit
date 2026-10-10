@@ -138,13 +138,13 @@ export const FACTOR_DEFINITIONS: Record<keyof ProcedurePriorityInput, RiskFactor
   },
   customerComplaintLevel: {
     definition: '與此程序相關的客戶抱怨件數，同一外部編號只計一次',
-    source: '外部來源登錄（客戶抱怨）點選關聯程序後自動計數；無登錄須勾選「已全部登錄」',
+    source: '外部來源登錄（客戶抱怨）點選關聯程序後自動計數；無已確認登錄視為 0 件',
     period: '前一年度＋本年度',
     scale: '0／1／2／3／≥4 件→1–5',
   },
   changeImpact: {
     definition: '影響此程序的組織、製程、產品或文件重大變更件數，同一外部編號只計一次',
-    source: '外部來源登錄（重大變更）點選關聯程序後自動計數；無登錄須勾選「已全部登錄」',
+    source: '外部來源登錄（重大變更）點選關聯程序後自動計數；無已確認登錄視為 0 件',
     period: '前一年度＋本年度',
     scale: '0／1／2／3／≥4 件→1–5',
   },

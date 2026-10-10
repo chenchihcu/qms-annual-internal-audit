@@ -27,22 +27,51 @@ describe('RiskAssessment auto-counted matrix', () => {
     expect(screen.queryByRole('button', { name: /未填因素帶入建議/ })).toBeNull()
 
     const headers = within(table).getAllByRole('columnheader').map((th) => th.textContent)
-    expect(headers).toEqual(['QP', '部門', '固有', '內稽NCR', '第三方NCR', '未結NCR', '客訴', '重大變更', '距上次稽核', '優先分／等級', '狀態', '證據引用', '操作'])
-    expect(within(table).getByRole('columnheader', { name: '客訴' }).getAttribute('title')).toContain('同一外部編號只計一次')
+    expect(headers).toEqual(['QP', '部門', '固有系統', '內稽NCR系統', '第三方NCR系統', '未結NCR系統', '客訴登錄', '重大變更登錄', '距上次稽核系統', '結果', '證據引用', '操作'])
+    expect(within(table).getByRole('columnheader', { name: '客訴登錄' }).getAttribute('title')).toContain('同一外部編號只計一次')
     const cols = table.querySelectorAll('colgroup col')
-    expect(cols).toHaveLength(13)
+    expect(cols).toHaveLength(12)
     expect(cols[2]?.className).toBe('col-risk-factor col-print-factor')
-    expect(cols[11]?.className).toBe('col-print-evidence-ref')
+    expect(cols[9]?.className).toBe('col-risk-result col-print-result')
+    expect(cols[10]?.className).toBe('col-print-evidence-ref')
 
     const firstRow = within(table).getAllByRole('row')[1]
     expect(within(firstRow).getByRole('button', { name: /程序固有風險：.+（自動）/ })).toBeTruthy()
     expect(within(firstRow).getAllByRole('button', { name: /（待確認）$/ }).length).toBeGreaterThan(0)
-    expect(within(firstRow).getByText(/資料不足（缺 \d）/)).toBeTruthy()
+    // 客訴未登錄視為 0 件，自動帶入
+    expect(within(firstRow).getByRole('button', { name: /客戶抱怨件數：0件（自動）/ })).toBeTruthy()
+    expect(within(firstRow).getByText(/^暫估 \d+$/)).toBeTruthy()
+    expect(within(firstRow).getByText(/^・缺 \d 項$/)).toBeTruthy()
+    expect(screen.getByRole('status', { name: '缺資料摘要' })).toBeTruthy()
 
     fireEvent.click(within(firstRow).getByRole('button', { name: '存檔' }))
     await waitFor(() => {
       expect(within(firstRow).getByRole('button', { name: '已存檔' })).toBeTruthy()
     })
+    await waitFor(() => {
+      expect(within(firstRow).getByText('已存')).toBeTruthy()
+    }, { timeout: 4000 })
+    expect(within(firstRow).queryByRole('button', { name: '存檔' })).toBeNull()
+  }, 15000)
+
+  it('keeps row order fixed while editing and re-sorts only on request', async () => {
+    const table = await openRiskTable()
+    const sortGroup = screen.getByRole('group', { name: '列排序' })
+    expect(within(sortGroup).getByRole('button', { name: '待處理優先' }).getAttribute('aria-pressed')).toBe('true')
+    const firstCode = () => within(within(table).getAllByRole('row')[1]).getAllByRole('cell').slice(0, 2).map((cell) => cell.textContent).join('|')
+    const before = firstCode()
+    fireEvent.click(within(within(table).getAllByRole('row')[1]).getByRole('button', { name: '存檔' }))
+    expect(firstCode()).toBe(before)
+    fireEvent.click(within(sortGroup).getByRole('button', { name: '計畫順序' }))
+    expect(within(sortGroup).getByRole('button', { name: '計畫順序' }).getAttribute('aria-pressed')).toBe('true')
+
+    // 已存列在「待處理優先」排到後面；列印時仍回到計畫順序。
+    fireEvent.click(within(sortGroup).getByRole('button', { name: '待處理優先' }))
+    expect(firstCode()).not.toBe(before)
+    fireEvent(window, new Event('beforeprint'))
+    expect(firstCode()).toBe(before)
+    fireEvent(window, new Event('afterprint'))
+    await waitFor(() => expect(firstCode()).not.toBe(before))
   }, 15000)
 
   it('requires a selected reason when a value departs from the system value', async () => {

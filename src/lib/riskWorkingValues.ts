@@ -12,7 +12,13 @@ export interface RiskWorkingValues {
   unavailable: FactorText
 }
 
-/** 舊紀錄無 manualFactors 時：有存值且與系統值不同（或系統無值）視為人工。 */
+/**
+ * 人工值只在系統值未變時沿用：
+ * - 存值等於目前系統值 → 自動。
+ * - 人工改值後系統值已變（覆寫紀錄的 suggested 與目前不同）→ 改回系統值，該列待存檔重審
+ *   （例：未登錄視為 0 件前手填的 0 件，不可持續蓋過之後的新登錄）。
+ * - 舊紀錄無 manualFactors 時：與系統值不同（或系統無值）視為人工。
+ */
 export function isManualSaved(
   key: ProcedureRiskFactorKey,
   saved: ProcedureRiskRecord | undefined,
@@ -20,8 +26,12 @@ export function isManualSaved(
 ): boolean {
   const value = saved?.[key]
   if (value == null) return false
+  const suggested = derived[key].suggested
+  if (suggested != null && value === suggested) return false
+  const override = [...(saved?.overrides ?? [])].reverse().find((item) => item.factor === key && item.value === value)
+  if (override && suggested != null && override.suggested !== suggested) return false
   if (saved?.manualFactors) return saved.manualFactors.includes(key)
-  return derived[key].suggested == null || value !== derived[key].suggested
+  return true
 }
 
 /** 工作值：人工值優先，其餘取系統值（自動統計）；未取得理由只在無值時保留。 */
