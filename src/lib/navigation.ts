@@ -123,7 +123,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     purpose: '登錄客訴與重大變更，點選關聯程序，供方案風險自動計數。',
     entry: '部門利害關係人已標註',
     exit: '各類別已勾選「已全部登錄」，且無待確認關聯',
-    outputs: 'riskSourceEvents（事件→程序關聯）、程序類型對照',
+    outputs: '風險來源事件（事件→程序關聯）',
     prevTab: 'stakeholders',
     nextTab: 'risk',
   },
@@ -133,7 +133,7 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     purpose: '彙整歷史紀錄評估全部 QP 優先順序，確認並核准。',
     entry: '風險來源已登錄或聲明已全部登錄',
     exit: '各 QP 本年度方案風險已確認（未取得須選理由）',
-    outputs: 'procedureRisks、QR-02-01 Excel',
+    outputs: '程序風險、QR-02-01 Excel',
     prevTab: 'risk-sources',
     nextTab: 'personnel',
   },
@@ -227,6 +227,27 @@ export const TAB_WORKFLOW: TabWorkflow[] = [
     prevTab: 'dashboard',
     nextTab: 'dashboard',
   },
+]
+
+export interface FlowLink {
+  /** 顯示在此 PDCA 群組列下方。 */
+  group: string
+  from: TabId[]
+  /** 省略代表留在來源頁（例：跨年帶入）。 */
+  to?: TabId
+  /** 觸發條件；語意依 `TAB_WORKFLOW` 的 entry／exit／purpose。 */
+  via: string
+}
+
+/** 跨步驟資料流與回饋（只讀說明，不改任何推導）。 */
+export const FLOW_LINKS: FlowLink[] = [
+  { group: 'D · 稽核執行', from: ['audit'], to: 'observations', via: '判定「觀察」' },
+  { group: 'D · 稽核執行', from: ['audit'], to: 'ncr', via: '判定「不符」' },
+  { group: 'C · 結果與改善', from: ['observations'], to: 'ncr', via: '觀察轉 NCR' },
+  { group: 'C · 結果與改善', from: ['observations', 'ncr', 'suggestions'], to: 'followups', via: '未結項目合併' },
+  { group: 'A · 結案與改進', from: ['prep'], to: 'dashboard', via: '準備完成後回到總覽' },
+  { group: 'A · 結案與改進', from: ['observations'], via: '未結觀察跨年帶入新年度' },
+  { group: 'A · 結案與改進', from: ['suggestions'], to: 'audit', via: '第三方建議帶入今年查檢' },
 ]
 
 const WORKFLOW_BY_TAB = new Map<TabId, TabWorkflow>(TAB_WORKFLOW.map((w) => [w.id, w]))
