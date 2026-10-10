@@ -578,8 +578,9 @@ for (const width of widths) {
       if (await page.getByRole('button', { name: /指定保存位置|變更保存位置/ }).count() !== 1) {
         throw new Error('程序與紀錄未保留正式紀錄保存位置指定功能')
       }
-      if (await page.getByRole('radio', { name: '系統流程', exact: true }).count() !== 1) {
-        throw new Error('系統設定沒有系統流程')
+      if (await page.getByRole('radio', { name: '系統流程', exact: true }).count() !== 0
+        || await page.getByRole('tab', { name: '進階評分設定', exact: true }).count() !== 0) {
+        throw new Error('系統設定仍顯示已移除的系統流程或進階評分設定')
       }
       workflowChecks.push('設定頁只保留正式紀錄保存位置指定，不顯示已移除的證書表單')
       await page.getByRole('radio', { name: '備份與匯出', exact: true }).locator('xpath=..').click()

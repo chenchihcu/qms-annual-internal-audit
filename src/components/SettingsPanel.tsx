@@ -9,81 +9,27 @@ import {
 } from '../lib/auditProfileValidation'
 import { procedureSourceReady, standardReady } from '../lib/workflowStatus'
 import { ACTION_ICONS } from '../lib/uiIcons'
-import { Button, Input } from './ui/Badge'
+import { Button } from './ui/Badge'
 import { ConfirmDialog } from './ui/ConfirmDialog'
-import type { ScoringRules, TabId } from '../types'
+import type { TabId } from '../types'
 import { TrashPanel } from './TrashPanel'
-import { SystemFlowChart } from './SystemFlowChart'
 import { WorkspaceMigrationReview } from './WorkspaceMigrationReview'
 import { FormalRecordLocationDialog } from './FormalRecordLocationDialog'
 
-type SettingsSection = 'audit' | 'data' | 'trash' | 'flow'
-type AuditPane = 'procedure' | 'scoring'
-type ScoringField = keyof ScoringRules
+type SettingsSection = 'audit' | 'data' | 'trash'
 
 const SETTINGS_SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'audit', label: '稽核資料' },
   { id: 'data', label: '備份與匯出' },
   { id: 'trash', label: '回收區' },
-  { id: 'flow', label: '系統流程' },
 ]
-
-const AUDIT_PANES: Array<{ id: AuditPane; label: string }> = [
-  { id: 'procedure', label: '程序與紀錄' },
-  { id: 'scoring', label: '進階評分設定' },
-]
-
-function ScoringRuleInput({
-  field,
-  label,
-  value,
-  onSave,
-  onEdit,
-}: {
-  field: ScoringField
-  label: string
-  value: number
-  onSave: (field: ScoringField, value: number) => void
-  onEdit: () => void
-}) {
-  const [draft, setDraft] = useState(String(value))
-  const [error, setError] = useState('')
-
-  return (
-    <Input
-      label={label}
-      type="number"
-      step="any"
-      min={0}
-      required
-      value={draft}
-      error={error}
-      onChange={(next) => {
-        setDraft(next)
-        setError('')
-        onEdit()
-      }}
-      onBlur={(raw) => {
-        const parsed = Number(raw)
-        if (!raw.trim() || !Number.isFinite(parsed) || parsed < 0) {
-          setError('請輸入 0 或更高的有效數值')
-          return
-        }
-        setError('')
-        onSave(field, parsed)
-      }}
-    />
-  )
-}
 
 export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavigate?: (tab: TabId) => void }) {
-  const { state, updateSettings, updateCompanyAuditProfile, exportJSON, importJSON } = store
+  const { state, updateCompanyAuditProfile, exportJSON, importJSON } = store
   const fileRef = useRef<HTMLInputElement>(null)
   const [activeSection, setActiveSection] = useState<SettingsSection>('audit')
-  const [auditPane, setAuditPane] = useState<AuditPane>('procedure')
   const [pendingRestore, setPendingRestore] = useState<{ json: string; summary: string } | null>(null)
   const [restoreStatus, setRestoreStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [scoringSavedMessage, setScoringSavedMessage] = useState(false)
   const [locationDialogOpen, setLocationDialogOpen] = useState(false)
   const [backedUpState, setBackedUpState] = useState<typeof state | null>(null)
   const profile = state.auditProfile
@@ -145,11 +91,6 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
     setBackedUpState(state)
   }
 
-  const saveScoringRule = (field: ScoringField, value: number) => {
-    updateSettings({ scoringRules: { ...state.settings.scoringRules, [field]: value } })
-    setScoringSavedMessage(true)
-  }
-
   const handleExportAllExcel = () => {
     exportAllFormsExcel(state, WORKSPACE_COMPANY_ID)
   }
@@ -183,106 +124,35 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       </div>
 
       {activeSection === 'audit' && (
-        <div className="space-y-4">
-          <div
-            className="flex flex-wrap gap-1 border-b border-slate-200"
-            role="tablist"
-            aria-label="稽核資料分頁"
-            onKeyDown={(event) => {
-              if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
-              event.preventDefault()
-              const index = AUDIT_PANES.findIndex((pane) => pane.id === auditPane)
-              const step = event.key === 'ArrowRight' ? 1 : -1
-              const next = AUDIT_PANES[(index + step + AUDIT_PANES.length) % AUDIT_PANES.length]
-              setAuditPane(next.id)
-              queueMicrotask(() => document.getElementById(`audit-tab-${next.id}`)?.focus())
-            }}
-          >
-            {AUDIT_PANES.map(({ id, label }) => {
-              const selected = auditPane === id
-              return (
-                <button
-                  key={id}
-                  id={`audit-tab-${id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls={`audit-pane-${id}`}
-                  tabIndex={selected ? 0 : -1}
-                  className={`min-h-10 border-b-2 px-3 text-sm font-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${selected ? 'border-blue-700 text-blue-800' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
-                  onClick={() => setAuditPane(id)}
-                >
-                  {label}
-                </button>
-              )
-            })}
+        <div className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-bold text-slate-900">正式紀錄保存位置</h3>
+              <p className="text-sm text-slate-600">
+                組織受控之內部稽核查檢表與年度結案報告存檔路徑（各程序文件依現行受控版本執行稽核）。
+              </p>
+              <div className="pt-1 text-sm">
+                <span className="font-bold text-slate-700">目前設定：</span>
+                {profile.formalRecordLocation ? (
+                  <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-normal text-blue-700">
+                    {profile.formalRecordLocation}
+                  </span>
+                ) : (
+                  <span className="font-bold text-amber-700">尚未指定保存位置</span>
+                )}
+              </div>
+            </div>
+            <div>
+              <Button
+                icon={ACTION_ICONS.edit}
+                onClick={() => setLocationDialogOpen(true)}
+              >
+                {profile.formalRecordLocation ? '變更保存位置' : '指定保存位置'}
+              </Button>
+            </div>
           </div>
-
-          {auditPane === 'procedure' && (
-            <div role="tabpanel" id="audit-pane-procedure" aria-labelledby="audit-tab-procedure" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="space-y-1">
-                  <h3 className="text-sm font-bold text-slate-900">正式紀錄保存位置</h3>
-                  <p className="text-sm text-slate-600">
-                    組織受控之內部稽核查檢表與年度結案報告存檔路徑（各程序文件依現行受控版本執行稽核）。
-                  </p>
-                  <div className="pt-1 text-sm">
-                    <span className="font-bold text-slate-700">目前設定：</span>
-                    {profile.formalRecordLocation ? (
-                      <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 font-normal text-blue-700">
-                        {profile.formalRecordLocation}
-                      </span>
-                    ) : (
-                      <span className="font-bold text-amber-700">尚未指定保存位置</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Button
-                    icon={ACTION_ICONS.edit}
-                    onClick={() => setLocationDialogOpen(true)}
-                  >
-                    {profile.formalRecordLocation ? '變更保存位置' : '指定保存位置'}
-                  </Button>
-                </div>
-              </div>
-              {profileReady && (
-                <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
-              )}
-            </div>
-          )}
-
-          {auditPane === 'scoring' && (
-            <div role="tabpanel" id="audit-pane-scoring" aria-labelledby="audit-tab-scoring" className="rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
-              <p className="text-sm text-slate-600">只調整後續稽核的計分；已回報紀錄不會回寫。未經核准的評分規則請維持預設值。</p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <ScoringRuleInput
-                  key={`conform-${state.settings.scoringRules.conform}`}
-                  field="conform"
-                  label="符合得分"
-                  value={state.settings.scoringRules.conform}
-                  onSave={saveScoringRule}
-                  onEdit={() => setScoringSavedMessage(false)}
-                />
-                <ScoringRuleInput
-                  key={`nonConform-${state.settings.scoringRules.nonConform}`}
-                  field="nonConform"
-                  label="不符得分"
-                  value={state.settings.scoringRules.nonConform}
-                  onSave={saveScoringRule}
-                  onEdit={() => setScoringSavedMessage(false)}
-                />
-                <ScoringRuleInput
-                  key={`observation-${state.settings.scoringRules.observation}`}
-                  field="observation"
-                  label="觀察得分（部分）"
-                  value={state.settings.scoringRules.observation}
-                  onSave={saveScoringRule}
-                  onEdit={() => setScoringSavedMessage(false)}
-                />
-              </div>
-              {scoringSavedMessage && <p className="mt-3 text-sm text-green-700" role="status">評分規則已寫入</p>}
-            </div>
+          {profileReady && (
+            <p className="mt-3 text-sm text-green-700" role="status">{PROFILE_SNAPSHOT_READY_MESSAGE}</p>
           )}
         </div>
       )}
@@ -322,8 +192,6 @@ export function SettingsPanel({ store, onNavigate }: { store: AuditStore; onNavi
       )}
 
       {activeSection === 'trash' && <TrashPanel store={store} />}
-
-      {activeSection === 'flow' && <SystemFlowChart onNavigate={onNavigate} />}
 
       <FormalRecordLocationDialog
         open={locationDialogOpen}

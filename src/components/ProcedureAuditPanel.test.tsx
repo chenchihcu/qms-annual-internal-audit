@@ -51,7 +51,7 @@ describe('ProcedureAuditPanel', () => {
       expect(screen.getByLabelText('稽核日期')).toBeTruthy()
       expect(screen.queryByRole('heading', { name: '查檢表' })).toBeNull()
       const stats = screen.getByLabelText('查檢判定統計')
-      expect(within(stats).getByText('程序得分')).toBeTruthy()
+      expect(within(stats).queryByText('程序得分')).toBeNull()
       expect(within(stats).getByText('未判定')).toBeTruthy()
     })
   })

@@ -4,7 +4,6 @@ import { createDemoState, STORAGE_KEY } from '../../data/demoData'
 import { movePersonToTrash } from '../../lib/trash'
 import { useAuditStore } from '../../hooks/useAuditStore'
 import { SettingsPanel } from '../SettingsPanel'
-import { FLOW_LINKS, TAB_GROUPS, isValidTabId } from '../../lib/navigation'
 
 beforeEach(() => localStorage.clear())
 
@@ -40,9 +39,9 @@ describe('SettingsPanel profile feedback', () => {
       expect(screen.queryByRole('heading', { name: '管理系統認證證書' })).toBeNull()
       expect(screen.queryByLabelText('版本 — AS9100')).toBeNull()
       expect(screen.queryByRole('heading', { name: '稽核程序與正式紀錄位置' })).toBeNull()
-      expect(screen.getByRole('tab', { name: '進階評分設定', selected: false })).toBeTruthy()
-      expect(screen.getByRole('tab', { name: '程序與紀錄', selected: true })).toBeTruthy()
-      expect(screen.queryByLabelText('符合得分')).toBeNull()
+      expect(screen.queryByRole('tab', { name: '進階評分設定' })).toBeNull()
+      expect(screen.queryByRole('tablist', { name: '稽核資料分頁' })).toBeNull()
+      expect(screen.queryByLabelText(/符合得分/)).toBeNull()
       expect(screen.getByRole('radiogroup', { name: '系統設定區塊' })).toBeTruthy()
       expect(screen.queryByRole('button', { name: '清除全部資料' })).toBeNull()
     })
@@ -97,47 +96,9 @@ describe('SettingsPanel sections', () => {
       expect(dataSection.checked).toBe(false)
       expect(screen.getByText('回收區目前是空的。')).toBeTruthy()
 
-      const flowSection = screen.getByRole('radio', { name: '系統流程' }) as HTMLInputElement
-      fireEvent.click(flowSection)
-      expect(flowSection.checked).toBe(true)
-      expect(screen.getByRole('figure', { name: '系統作業流程' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: '年度稽核計畫' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: '查檢表' })).toBeTruthy()
-      expect(screen.getByRole('button', { name: '外稽準備' })).toBeTruthy()
-      expect(screen.queryByRole('button', { name: '系統設定' })).toBeNull()
-      expect(screen.getByText('QR-28-01 Excel／HTML')).toBeTruthy()
-      expect(screen.getByText('主任稽核員任命有效')).toBeTruthy()
-      expect(screen.getByText('程序風險、QR-02-01 Excel')).toBeTruthy()
-      expect(screen.queryByText(/riskSourceEvents|procedureRisks/)).toBeNull()
-      expect(screen.getByText('風險來源事件（事件→程序關聯）')).toBeTruthy()
-      expect(screen.getByText(/查檢表：判定「不符」 → 不符合/)).toBeTruthy()
-      expect(screen.getByText(/觀察事項／不符合／第三方建議：未結項目合併 → 待改善追蹤/)).toBeTruthy()
+      expect(screen.queryByRole('radio', { name: '系統流程' })).toBeNull()
+      expect(screen.queryByRole('figure', { name: '系統作業流程' })).toBeNull()
     })
-  })
-
-  it('flow links reference only valid tabs', () => {
-    for (const link of FLOW_LINKS) {
-      for (const id of [...link.from, ...(link.to ? [link.to] : [])]) {
-        expect(isValidTabId(id)).toBe(true)
-      }
-      expect(TAB_GROUPS.some((group) => group.label === link.group)).toBe(true)
-    }
-  })
-
-  it('does not turn a blank scoring value into zero', async () => {
-    seedSettingsLocalStorage()
-    render(<SystemSettingsPage />)
-
-    fireEvent.click(screen.getByRole('tab', { name: '進階評分設定' }))
-    expect(screen.queryByRole('heading', { name: '稽核程序與正式紀錄位置' })).toBeNull()
-    expect(screen.queryByText('0 或更高')).toBeNull()
-    const conform = screen.getByLabelText(/符合得分/) as HTMLInputElement
-    fireEvent.change(conform, { target: { value: '' } })
-    fireEvent.blur(conform)
-
-    expect(await screen.findByText('請輸入 0 或更高的有效數值')).toBeTruthy()
-    expect(conform.value).toBe('')
-    expect(screen.queryByRole('status', { name: '評分規則已寫入' })).toBeNull()
   })
 
   it('keeps stored standard versions when the certificate fields are not shown', async () => {

@@ -41,13 +41,14 @@
 - 畫面字級兩級（14px／12px）、盤點順序與列印／匯出例外見 `.cursor/rules/ui-information-hierarchy.mdc`「畫面字級」與「2026-09-28 畫面字級對齊（harvest）」；螢幕用工作表表頭 12px 以 `src/index.css` 的 `.worksheet-table thead th` 為 SSOT，勿在各頁 `th` 逐格加字級 class。字級優化先全庫盤點再改，未核准不把 body 或工作表升到 16px。
 - 短碼、日期、狀態與人員用固定欄寬；自由文字在欄內換行並可查看全文。工作表先設 `table-fixed` 與 `colgroup`，空欄不塌縮、長文不撐欄；看到撐開再調比例不算完成。長清單沿用共用分頁，保留篩選、編輯、讀回與完整列印。
 - 維持稽核員可完成的完整流程，包含輸入、追蹤、查閱及列印；重要狀態須有文字說明，不可只靠顏色表達。
-- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充、查檢列「未判定」標籤與列底、台帳列上多顆按鈕〔每列只留一個主按鈕，次要動作在編輯卡／明細〕）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk`／`stakeholders` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示；例外：系統設定「系統流程」卡片只讀顯示 `outputs` 與 `exit`，跨步驟資料流取自同檔 `FLOW_LINKS`。側欄保留「資料儲存於本機 · v15」；外稽準備進度用檢視切換的可見 `外稽準備 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
+- UI-only 去重先比對操作、資料來源與狀態；NCR／觀察／建議、查檢表觀察判定數／待追蹤觀察數，以及桌面／窄螢幕導覽，不因名稱相似而合併。移除操作入口後，驗證保留入口仍可完成原流程。裝飾去重（`shadow-sm`、`backdrop-blur`、工作表整頁 `Card` 外框、卡內再包框、側欄藍卡第二回家、Guide 常駐 purpose、`PageToolbar` 與缺口條／頁首／列印重複說明、內容欄頁尾標語、設定「關於」、外稽準備色條進度、儀表板三類稽核重複補充、查檢列「未判定」標籤與列底、台帳列上多顆按鈕〔每列只留一個主按鈕，次要動作在編輯卡／明細〕）不改判定、計分或儲存；細節見 `.cursor/rules/ui-information-hierarchy.mdc`（側欄藍卡只顯示產品名不可點，回家僅「稽核總覽」；`plan`／`risk`／`stakeholders` 工具列不重複年度／任命／互代／已存檔 a/b）。`src/lib/navigation.ts` 的 `purpose`／entry／exit 仍供 workflow metadata，不在畫面顯示。側欄保留「資料儲存於本機 · v15」；外稽準備進度用檢視切換的可見 `外稽準備 a/b`；NCR 自動匯入說明只在展開手動登錄區顯示。
 - 主要導覽採左側選單，依稽核作業流程排列；專案基準與驗收條件見 `docs/web-ui-ux-sidebar-spec.md`。功能項目使用語意一致的圖示，側欄寬度依圖示與最長項目名稱的實際內容需求設定，不保留非必要空白。
 - 表單欄位須有明確標籤、可見鍵盤焦點及可理解的錯誤提示；空白、載入、錯誤與成功狀態須有清楚回饋。
 - 將欄位改為固定選單前，先由現行型別、資料來源或受控規範確認完整值域；敘述及外部自訂值保留自由輸入，數值無核准範圍時不造選項，混合內外部值可提供保留自訂值的提示清單。檢查：逐欄核對型別、既有值及實際選項。來源：2026-09-27 手動輸入與選單盤點。
 - 驗證桌面與窄螢幕版面；表單在窄螢幕逐項堆疊。捲動提示依表格在該寬度的實際 overflow 決定，不一律顯示，也不以全域窄螢幕 CSS 隱藏仍需水平捲動的表格提示。
 - 長中文內容不得靜默截斷；需要限制顯示時，應讓使用者能查看完整內容。
 - 純視覺調整不得改變稽核判定、評分公式、狀態或資料意義。
+- 內容去留以 AS9100／ISO 9001 條文與品質管理效益判斷（2026-10-10）：已移除程序得分／年度總分、進階評分設定、系統流程圖、總覽「已排月格」「外稽準備 a/b」、保存位置寫死預設；不補回。`scoringRules`、`linkType` 等持久欄位保留。風險來源「逃逸控制」關聯類型對應 AS9100 逃逸點，保留。
 - 精簡完成度逐項對照核准計畫：年度計畫套用 `stacked-table`／`data-label` 不等於完成低頻欄位詳細區，共用 class 不等於操作與回饋位置已一致；替代方案、未實作與未驗證項目分開回報。
 
 <!-- 精簡驗收依據：2026-09-24「002#可精簡 UI/UX 設計盤點與分階段精簡計畫」；2026-09-24「刪除多餘畫面框與常駐說明」（Guide 缺口-only、工作表去 Card、年度計畫去重複 meta／頁尾小卡）；2026-09-24「刪除重複畫面裝飾」（頁尾標語、設定關於、外稽 meta／色條、NCR 常駐說明、儀表板三類稽核補充）；2026-09-24「移除重複說明與第二回家」（藍卡不可點、plan／risk／stakeholders 去 PageToolbar meta 與風險頁尾計數卡）；2026-09-27 五頁低效益簡化（觀察主列只留狀態、查檢未同步獨立按鈕、利害關係人標籤不顯示權重、外稽序位一行且清單不分頁、證書一區兩欄網格只編輯 AS9100、方案風險無暫定欄）；2026-09-27 查檢列依判定顯示證據欄並移除「標不適用」。見 `.cursor/rules/ui-information-hierarchy.mdc`。 -->
@@ -58,7 +59,7 @@
 - 文件／技能修改使用內容、引用及治理檢查；只重跑本次修改會影響的 gate，不為取得 Harness marker 重跑無關產品全套測試。命令被啟動前拒絕、產品檢查失敗、Harness 事件未登錄須分開回報，無新證據不重複重試。
 - Harness 識別：從 `functions.exec` 執行固定驗證器時，直接輸出 `exec_command` 的 stdout 原文，不用 `JSON.stringify` 包裝；完成後確認 `C:\Users\user\.codex\data\harness\events.jsonl` 有 `event=verification`、`result=ok`、`verification_marker=true`。若只看到終端 marker 而事件未入帳，視為 Harness 尚未驗證。（2026-09-26）
 - 完整驗證使用固定入口 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\verify.ps1`，依序執行 lint、tests、build 及僅連到 43124 的隔離瀏覽器 smoke；全數成功才輸出 `event=verification result=ok verification_marker=true`。單一檢查使用同一入口加 `-Mode lint`、`-Mode tests`、`-Mode build` 或 `-Mode browser-smoke`；成功時輸出範圍明確的 Harness marker，測試可再限縮 `-TestFile`／`-TestName`。`-Mode local-backup` 只檢查設定頁完整 JSON 備份（`QMS備份_*.json`）為 v15 封套（`state.version === 15`、含 `workspace`／`settings`／`auditProfile`、不含 `companies`）；未指定 `-BackupPath` 時限最近 30 分鐘內檔案。可用 `-BackupPath` 指定路徑，不輸出紀錄內容，也不代表完整程式驗證成功。避免臨時 PowerShell `-Command` 驗證，因本機執行政策會在啟動前拒絕不透明命令；拒絕代表命令未啟動，應改用已檢視的固定 `-File` 入口，不可把拒絕算成測試失敗或成功。
-- 已移除的設定頁（「稽核基本資料」「管理系統認證證書」、證書範圍／編號／適用性輸入）不得從 `HEAD`（`424a86a` 的 `SettingsPanel.tsx` 仍含這些標題）或舊煙測補回。`smoke-playwright.mjs` 只斷言這些標題與欄位不存在；煙測因缺標題失敗時改斷言，不把舊頁加回。`SettingsPanel`、`SystemFlowChart`、設定頁測試、煙測與 [`docs/web-ui-ux-sidebar-spec.md`](docs/web-ui-ux-sidebar-spec.md) 同一批提交，避免捨棄未提交檔後整頁回到舊設計。證書文字仍留在資料與匯出。檢查：設定頁無上述標題與欄位；煙測在它們出現時失敗。出處：2026-09-28 舊設定頁被工作區蓋回。
+- 已移除的設定頁（「稽核基本資料」「管理系統認證證書」、證書範圍／編號／適用性輸入）不得從 `HEAD`（`424a86a` 的 `SettingsPanel.tsx` 仍含這些標題）或舊煙測補回。`smoke-playwright.mjs` 只斷言這些標題與欄位不存在；煙測因缺標題失敗時改斷言，不把舊頁加回。`SettingsPanel`、設定頁測試、煙測與 [`docs/web-ui-ux-sidebar-spec.md`](docs/web-ui-ux-sidebar-spec.md) 同一批提交，避免捨棄未提交檔後整頁回到舊設計。證書文字仍留在資料與匯出。檢查：設定頁無上述標題與欄位；煙測在它們出現時失敗。出處：2026-09-28 舊設定頁被工作區蓋回。
 - 依變更範圍使用 `npm run lint`、`npm test` 與 `npm run build`；UI 變更另檢查 375／768／1280／1536px 實際呈現與鍵盤操作，涉及收合區時檢查收合後列印內容。僅有 DOM 文字或無整頁 overflow 的檢查，不能取代可讀性、互動與列印驗收。側欄 smoke 斷言產品名須容忍桌面／窄螢幕雙 DOM（`getAllByText`）；`lazy` 分頁測試全套件易逾時，可 `beforeAll` 預載該 chunk。
 - 開始前先檢查 `git status` 並保留既有變更；不得重設、清理或覆蓋不屬於目前工作的檔案。
 - 未經使用者明確要求，不建立提交、不推送、不整合至受保護分支，也不清除或重建使用者資料。
